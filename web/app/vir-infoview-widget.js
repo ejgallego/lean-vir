@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import * as React from "react";
-import { DocumentPosition, EditorContext, TaggedText_stripTags, useClientNotificationEffect, useRpcSession } from "@leanprover/infoview";
+import { DocumentPosition, EditorContext, InteractiveCode, TaggedText_stripTags, useClientNotificationEffect, useRpcSession } from "@leanprover/infoview";
 import { createBrowserHostBindings } from "../src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.js";
 import { createVirRuntime as createBundledVirRuntime } from "../src/vir-runtime.js";
@@ -370,6 +370,7 @@ export async function loadRuntimeService({ rpcSession, config }) {
       reactHostBindings: createBrowserReactHostBindings,
       infoviewUseClientNotificationEffect: useClientNotificationEffect,
       infoviewUseRpcSession: useRpcSession,
+      infoviewInteractiveCode: InteractiveCode,
       infoviewStripTags: TaggedText_stripTags,
     }),
   });

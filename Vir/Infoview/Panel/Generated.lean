@@ -18,6 +18,20 @@ namespace Lean.Vir
 namespace Infoview
 
 /--
+Generated binding for reviewed VIR protocol `infoview.interactiveCode`.
+
+Returns the exact public upstream InteractiveCode function for React composition, not a Lean-callable render action. Supply native props with the required fmt field; the enclosing infoview owns its contexts.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.interactiveCode"]
+opaque interactiveCode : Lean.Vir.RuntimeM (React.FunctionComponent React.Props)
+
+/--
 Generated binding for reviewed VIR protocol `infoview.editorContext`.
 
 Returns the exact upstream EditorContext for React.Hooks.useContext.
@@ -48,6 +62,54 @@ opaque useRpcSession : Lean.Vir.React.ReactM (Lean.Vir.Js Infoview.RpcSession)
 end Infoview
 
 namespace Infoview.CodeWithInfos
+
+/--
+Generated binding for reviewed VIR protocol `infoview.code-with-infos.text`.
+
+Projects TaggedText.text when present, otherwise undefined. The native tagged-text union and all nested values remain unchanged.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; code js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.codeWithInfos.text"]
+opaque text
+    (code : @& Lean.Vir.Js Infoview.CodeWithInfos) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr (String))
+
+/--
+Generated binding for reviewed VIR protocol `infoview.code-with-infos.append`.
+
+Projects TaggedText.append when present, otherwise undefined. The native tagged-text union and all nested values remain unchanged.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; code js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.codeWithInfos.append"]
+opaque append
+    (code : @& Lean.Vir.Js Infoview.CodeWithInfos) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr (Lean.Vir.Js.Array.Value Infoview.CodeWithInfos))
+
+/--
+Generated binding for reviewed VIR protocol `infoview.code-with-infos.tag`.
+
+Projects TaggedText.tag when present, otherwise undefined. The native tagged-text union and all nested values remain unchanged.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; code js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.codeWithInfos.tag"]
+opaque tag
+    (code : @& Lean.Vir.Js Infoview.CodeWithInfos) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr (Lean.Vir.Js.Tuple2.Value Lean.Vir.Js.Any.Value Infoview.CodeWithInfos))
 
 /--
 Generated binding for reviewed VIR protocol `infoview.code-with-infos.strip-tags`.
@@ -143,6 +205,113 @@ opaque revealPosition
     Lean.Vir.RuntimeM (Lean.Vir.Js.Promise Unit)
 
 end Infoview.EditorConnection
+
+namespace Infoview.HoverDom
+
+/--
+Generated binding for reviewed VIR protocol `infoview.hover.modifier`.
+
+Forwards a PointerEvent or KeyboardEvent receiver and key to getModifierState.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; key js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.hover.modifier"]
+opaque modifier
+    (event : @& Lean.Vir.Js Browser.Event)
+    (key : @& Lean.Vir.Js String) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `infoview.hover.rect`.
+
+Returns the exact DOMRect from Element.getBoundingClientRect; placement policy remains in Lean.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; element js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.hover.rect"]
+opaque rect
+    (element : @& Lean.Vir.Js Browser.Element) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Infoview.HoverRect)
+
+/--
+Generated binding for reviewed VIR protocol `infoview.hover.portal`.
+
+Calls ReactDOM.createPortal with the exact node and the embedding document.body as the selected container; no hover behavior is implemented by the host.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; node js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.hover.portal"]
+opaque portal
+    (node : @& Lean.Vir.Js React.Node) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js React.Node)
+
+/--
+Generated binding for reviewed VIR protocol `infoview.hover.observe`.
+
+Observes reference/popup size and viewport scroll/resize. The exact callback performs Lean placement; returned native cleanup disconnects observers/listeners.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; reference js-resource/borrowed/call; popup js-resource/borrowed/call; callback js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.hover.observe"]
+opaque observe
+    (reference : @& Lean.Vir.Js Browser.Element)
+    (popup : @& Lean.Vir.Js Browser.Element)
+    (callback : @& Lean.Vir.Js.Function1 Lean.Vir.Js.Any Unit) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js.Function1 Lean.Vir.Js.Any Unit)
+
+end Infoview.HoverDom
+
+namespace Infoview.InfoPopup
+
+/--
+Generated binding for reviewed VIR protocol `infoview.info-popup.type`.
+
+Returns exact optional InfoPopup.type, preserving tagged code and undefined.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; popup js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.infoPopup.type"]
+opaque type
+    (popup : @& Lean.Vir.Js Infoview.InfoPopup) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr (Infoview.CodeWithInfos))
+
+/--
+Generated binding for reviewed VIR protocol `infoview.info-popup.expr-explicit`.
+
+Returns exact optional InfoPopup.exprExplicit, preserving tagged code and undefined.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; popup js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.infoPopup.exprExplicit"]
+opaque exprExplicit
+    (popup : @& Lean.Vir.Js Infoview.InfoPopup) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr (Infoview.CodeWithInfos))
+
+end Infoview.InfoPopup
 
 namespace Infoview.InteractiveGoal
 
@@ -242,6 +411,22 @@ opaque isRemoved
     (goal : @& Lean.Vir.Js Infoview.InteractiveGoal) :
     Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr Bool)
 
+/--
+Generated binding for reviewed VIR protocol `infoview.interactive-goal.goal-prefix`.
+
+Returns the exact optional InteractiveGoal.goalPrefix value, retaining undefined.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; goal js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.interactiveGoal.goalPrefix"]
+opaque goalPrefix
+    (goal : @& Lean.Vir.Js Infoview.InteractiveGoal) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr String)
+
 end Infoview.InteractiveGoal
 
 namespace Infoview.InteractiveHypothesisBundle
@@ -293,6 +478,70 @@ This declaration is generated; edit the binding configuration.
 opaque val
     (hypothesis : @& Lean.Vir.Js Infoview.InteractiveHypothesisBundle) :
     Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr Infoview.CodeWithInfos)
+
+/--
+Generated binding for reviewed VIR protocol `infoview.interactive-hypothesis-bundle.is-type`.
+
+Returns the exact optional InteractiveHypothesisBundle.isType value, retaining undefined.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; hypothesis js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.interactiveHypothesisBundle.isType"]
+opaque isType
+    (hypothesis : @& Lean.Vir.Js Infoview.InteractiveHypothesisBundle) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr Bool)
+
+/--
+Generated binding for reviewed VIR protocol `infoview.interactive-hypothesis-bundle.is-instance`.
+
+Returns the exact optional InteractiveHypothesisBundle.isInstance value, retaining undefined.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; hypothesis js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.interactiveHypothesisBundle.isInstance"]
+opaque isInstance
+    (hypothesis : @& Lean.Vir.Js Infoview.InteractiveHypothesisBundle) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr Bool)
+
+/--
+Generated binding for reviewed VIR protocol `infoview.interactive-hypothesis-bundle.is-inserted`.
+
+Returns the exact optional InteractiveHypothesisBundle.isInserted value, retaining undefined.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; hypothesis js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.interactiveHypothesisBundle.isInserted"]
+opaque isInserted
+    (hypothesis : @& Lean.Vir.Js Infoview.InteractiveHypothesisBundle) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr Bool)
+
+/--
+Generated binding for reviewed VIR protocol `infoview.interactive-hypothesis-bundle.is-removed`.
+
+Returns the exact optional InteractiveHypothesisBundle.isRemoved value, retaining undefined.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; hypothesis js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.interactiveHypothesisBundle.isRemoved"]
+opaque isRemoved
+    (hypothesis : @& Lean.Vir.Js Infoview.InteractiveHypothesisBundle) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr Bool)
 
 end Infoview.InteractiveHypothesisBundle
 

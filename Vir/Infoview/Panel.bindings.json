@@ -30,6 +30,60 @@
     "resources": {},
     "protocolOperations": [
       {
+        "id": "infoview.hover.modifier", "group": "hover-dom", "target": "infoview.hover.modifier",
+        "lean": "Lean.Vir.Infoview.HoverDom.modifier", "marker": "vir_js",
+        "reason": "Forwards a PointerEvent or KeyboardEvent receiver and key to getModifierState.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"MouseEvent.getModifierState","semantics":"preserving"},
+        "effect": {"id":"dom","lean":"Lean.Vir.Browser.DomM"},
+        "arguments": [
+          {"name":"event","type":{"lean":"Lean.Vir.Js Browser.Event","representation":"js-resource","resourceInner":"Browser.Event"}},
+          {"name":"key","type":{"lean":"Lean.Vir.Js String","representation":"js-resource","resourceInner":"String"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js Bool","representation":"js-resource","resourceInner":"Bool"}}
+      },
+      {
+        "id": "infoview.hover.rect", "group": "hover-dom", "target": "infoview.hover.rect",
+        "lean": "Lean.Vir.Infoview.HoverDom.rect", "marker": "vir_js",
+        "reason": "Returns the exact DOMRect from Element.getBoundingClientRect; placement policy remains in Lean.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"Element.getBoundingClientRect","semantics":"preserving"},
+        "effect": {"id":"dom","lean":"Lean.Vir.Browser.DomM"},
+        "arguments": [{"name":"element","type":{"lean":"Lean.Vir.Js Browser.Element","representation":"js-resource","resourceInner":"Browser.Element"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js Infoview.HoverRect","representation":"js-resource","resourceInner":"Infoview.HoverRect"}}
+      },
+      {
+        "id": "infoview.hover.portal", "group": "hover-dom", "target": "infoview.hover.portal",
+        "lean": "Lean.Vir.Infoview.HoverDom.portal", "marker": "vir_js",
+        "reason": "Calls ReactDOM.createPortal with the exact node and the embedding document.body as the selected container; no hover behavior is implemented by the host.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"createPortal","semantics":"preserving"},
+        "effect": {"id":"react","lean":"Lean.Vir.React.ReactM"},
+        "arguments": [
+          {"name":"node","type":{"lean":"Lean.Vir.Js React.Node","representation":"js-resource","resourceInner":"React.Node"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js React.Node","representation":"js-resource","resourceInner":"React.Node"}}
+      },
+      {
+        "id": "infoview.hover.observe", "group": "hover-dom", "target": "infoview.hover.observe",
+        "lean": "Lean.Vir.Infoview.HoverDom.observe", "marker": "vir_js",
+        "reason": "Observes reference/popup size and viewport scroll/resize. The exact callback performs Lean placement; returned native cleanup disconnects observers/listeners.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "effect": {"id":"dom","lean":"Lean.Vir.Browser.DomM"},
+        "arguments": [
+          {"name":"reference","type":{"lean":"Lean.Vir.Js Browser.Element","representation":"js-resource","resourceInner":"Browser.Element"}},
+          {"name":"popup","type":{"lean":"Lean.Vir.Js Browser.Element","representation":"js-resource","resourceInner":"Browser.Element"}},
+          {"name":"callback","type":{"lean":"Lean.Vir.Js.Function1 Lean.Vir.Js.Any Unit","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Unary Lean.Vir.Js.Any Unit"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js.Function1 Lean.Vir.Js.Any Unit","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Unary Lean.Vir.Js.Any Unit"}}
+      },
+      {
+        "id": "infoview.interactiveCode", "group": "components", "target": "infoview.interactiveCode",
+        "lean": "Lean.Vir.Infoview.interactiveCode", "marker": "vir_js",
+        "reason": "Returns the exact public upstream InteractiveCode function for React composition, not a Lean-callable render action. Supply native props with the required fmt field; the enclosing infoview owns its contexts.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"InteractiveCode","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [],
+        "result": {"type":{"lean":"React.FunctionComponent React.Props","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Unary (Lean.Vir.Js React.Props) (Lean.Vir.Js React.Node)"}}
+      },
+      {
         "id": "infoview.editorContext", "group": "editor", "target": "infoview.editorContext",
         "lean": "Lean.Vir.Infoview.editorContext", "marker": "vir_js",
         "reason": "Returns the exact upstream EditorContext for React.Hooks.useContext.",
@@ -281,6 +335,96 @@
         "result": { "type": { "lean": "Lean.Vir.Js.UndefinedOr Infoview.CodeWithInfos", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value Infoview.CodeWithInfos" } }
       },
       {
+        "id": "infoview.interactive-goal.goal-prefix", "group": "interactive-goals", "target": "infoview.interactiveGoal.goalPrefix",
+        "lean": "Lean.Vir.Infoview.InteractiveGoal.goalPrefix", "marker": "vir_js",
+        "reason": "Returns the exact optional InteractiveGoal.goalPrefix value, retaining undefined.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"InteractiveGoal.goalPrefix","accessor":"get","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [{"name":"goal","role":"receiver","type":{"lean":"Lean.Vir.Js Infoview.InteractiveGoal","representation":"js-resource","resourceInner":"Infoview.InteractiveGoal"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js.UndefinedOr String","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value String"}}
+      },
+      {
+        "id": "infoview.interactive-hypothesis-bundle.is-type", "group": "interactive-goals", "target": "infoview.interactiveHypothesisBundle.isType",
+        "lean": "Lean.Vir.Infoview.InteractiveHypothesisBundle.isType", "marker": "vir_js",
+        "reason": "Returns the exact optional InteractiveHypothesisBundle.isType value, retaining undefined.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"InteractiveHypothesisBundle.isType","accessor":"get","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [{"name":"hypothesis","role":"receiver","type":{"lean":"Lean.Vir.Js Infoview.InteractiveHypothesisBundle","representation":"js-resource","resourceInner":"Infoview.InteractiveHypothesisBundle"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js.UndefinedOr Bool","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value Bool"}}
+      },
+      {
+        "id": "infoview.interactive-hypothesis-bundle.is-instance", "group": "interactive-goals", "target": "infoview.interactiveHypothesisBundle.isInstance",
+        "lean": "Lean.Vir.Infoview.InteractiveHypothesisBundle.isInstance", "marker": "vir_js",
+        "reason": "Returns the exact optional InteractiveHypothesisBundle.isInstance value, retaining undefined.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"InteractiveHypothesisBundle.isInstance","accessor":"get","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [{"name":"hypothesis","role":"receiver","type":{"lean":"Lean.Vir.Js Infoview.InteractiveHypothesisBundle","representation":"js-resource","resourceInner":"Infoview.InteractiveHypothesisBundle"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js.UndefinedOr Bool","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value Bool"}}
+      },
+      {
+        "id": "infoview.interactive-hypothesis-bundle.is-inserted", "group": "interactive-goals", "target": "infoview.interactiveHypothesisBundle.isInserted",
+        "lean": "Lean.Vir.Infoview.InteractiveHypothesisBundle.isInserted", "marker": "vir_js",
+        "reason": "Returns the exact optional InteractiveHypothesisBundle.isInserted value, retaining undefined.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"InteractiveHypothesisBundle.isInserted","accessor":"get","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [{"name":"hypothesis","role":"receiver","type":{"lean":"Lean.Vir.Js Infoview.InteractiveHypothesisBundle","representation":"js-resource","resourceInner":"Infoview.InteractiveHypothesisBundle"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js.UndefinedOr Bool","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value Bool"}}
+      },
+      {
+        "id": "infoview.interactive-hypothesis-bundle.is-removed", "group": "interactive-goals", "target": "infoview.interactiveHypothesisBundle.isRemoved",
+        "lean": "Lean.Vir.Infoview.InteractiveHypothesisBundle.isRemoved", "marker": "vir_js",
+        "reason": "Returns the exact optional InteractiveHypothesisBundle.isRemoved value, retaining undefined.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"InteractiveHypothesisBundle.isRemoved","accessor":"get","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [{"name":"hypothesis","role":"receiver","type":{"lean":"Lean.Vir.Js Infoview.InteractiveHypothesisBundle","representation":"js-resource","resourceInner":"Infoview.InteractiveHypothesisBundle"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js.UndefinedOr Bool","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value Bool"}}
+      },
+      {
+        "id": "infoview.code-with-infos.text", "group": "code-with-infos", "target": "infoview.codeWithInfos.text",
+        "lean": "Lean.Vir.Infoview.CodeWithInfos.text", "marker": "vir_js",
+        "reason": "Projects TaggedText.text when present, otherwise undefined. The native tagged-text union and all nested values remain unchanged.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"CodeWithInfos","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [{"name":"code","role":"receiver","type":{"lean":"Lean.Vir.Js Infoview.CodeWithInfos","representation":"js-resource","resourceInner":"Infoview.CodeWithInfos"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js.UndefinedOr (String)","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value (String)"}}
+      },
+      {
+        "id": "infoview.code-with-infos.append", "group": "code-with-infos", "target": "infoview.codeWithInfos.append",
+        "lean": "Lean.Vir.Infoview.CodeWithInfos.append", "marker": "vir_js",
+        "reason": "Projects TaggedText.append when present, otherwise undefined. The native tagged-text union and all nested values remain unchanged.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"CodeWithInfos","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [{"name":"code","role":"receiver","type":{"lean":"Lean.Vir.Js Infoview.CodeWithInfos","representation":"js-resource","resourceInner":"Infoview.CodeWithInfos"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js.UndefinedOr (Lean.Vir.Js.Array.Value Infoview.CodeWithInfos)","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value (Lean.Vir.Js.Array.Value Infoview.CodeWithInfos)"}}
+      },
+      {
+        "id": "infoview.code-with-infos.tag", "group": "code-with-infos", "target": "infoview.codeWithInfos.tag",
+        "lean": "Lean.Vir.Infoview.CodeWithInfos.tag", "marker": "vir_js",
+        "reason": "Projects TaggedText.tag when present, otherwise undefined. The native tagged-text union and all nested values remain unchanged.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"CodeWithInfos","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [{"name":"code","role":"receiver","type":{"lean":"Lean.Vir.Js Infoview.CodeWithInfos","representation":"js-resource","resourceInner":"Infoview.CodeWithInfos"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js.UndefinedOr (Lean.Vir.Js.Tuple2.Value Lean.Vir.Js.Any.Value Infoview.CodeWithInfos)","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value (Lean.Vir.Js.Tuple2.Value Lean.Vir.Js.Any.Value Infoview.CodeWithInfos)"}}
+      },
+      {
+        "id": "infoview.info-popup.type", "group": "code-with-infos", "target": "infoview.infoPopup.type",
+        "lean": "Lean.Vir.Infoview.InfoPopup.type", "marker": "vir_js",
+        "reason": "Returns exact optional InfoPopup.type, preserving tagged code and undefined.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"InfoPopup.type","accessor":"get","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [{"name":"popup","role":"receiver","type":{"lean":"Lean.Vir.Js Infoview.InfoPopup","representation":"js-resource","resourceInner":"Infoview.InfoPopup"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js.UndefinedOr (Infoview.CodeWithInfos)","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value (Infoview.CodeWithInfos)"}}
+      },
+      {
+        "id": "infoview.info-popup.expr-explicit", "group": "code-with-infos", "target": "infoview.infoPopup.exprExplicit",
+        "lean": "Lean.Vir.Infoview.InfoPopup.exprExplicit", "marker": "vir_js",
+        "reason": "Returns exact optional InfoPopup.exprExplicit, preserving tagged code and undefined.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"InfoPopup.exprExplicit","accessor":"get","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [{"name":"popup","role":"receiver","type":{"lean":"Lean.Vir.Js Infoview.InfoPopup","representation":"js-resource","resourceInner":"Infoview.InfoPopup"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js.UndefinedOr (Infoview.CodeWithInfos)","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value (Infoview.CodeWithInfos)"}}
+      },
+      {
         "id": "infoview.code-with-infos.strip-tags", "group": "code-with-infos", "target": "infoview.codeWithInfos.stripTags",
         "lean": "Lean.Vir.Infoview.CodeWithInfos.stripTags", "marker": "vir_js",
         "reason": "Specializes upstream TaggedText_stripTags to CodeWithInfos and returns its exact JavaScript string result.",
@@ -292,6 +436,24 @@
     ]
   },
   "roots": [
+    {
+      "id": "hover-dom", "title": "Native hover DOM primitives",
+      "targets": ["infoview.hover.*"],
+      "lean": {"public": ["Lean.Vir.Infoview.HoverDom"]},
+      "upstream": {"kind":"typescript", "package":"typescript",
+        "declarations":["node_modules/typescript/lib/lib.dom.d.ts", "node_modules/@types/react-dom/index.d.ts"],
+        "roots":["Element", "MouseEvent", "ResizeObserver", "createPortal"]}
+    },
+    {
+      "id": "components", "title": "Upstream React components",
+      "targets": ["infoview.interactiveCode"],
+      "lean": {"public": ["Lean.Vir.Infoview.interactiveCode"]},
+      "upstream": {
+        "kind": "typescript", "package": "@leanprover/infoview",
+        "declarations": ["node_modules/@leanprover/infoview/dist/infoview/interactiveCode.d.ts"],
+        "roots": ["InteractiveCode", "InteractiveCodeProps"]
+      }
+    },
     {
       "id": "editor",
       "title": "Native infoview editor API",
@@ -361,12 +523,12 @@
     },
     {
       "id": "code-with-infos", "title": "Native tagged code text",
-      "targets": ["infoview.codeWithInfos.*"],
-      "lean": { "public": ["Lean.Vir.Infoview.CodeWithInfos"] },
+      "targets": ["infoview.codeWithInfos.*", "infoview.infoPopup.*"],
+      "lean": { "public": ["Lean.Vir.Infoview.CodeWithInfos", "Lean.Vir.Infoview.InfoPopup"] },
       "upstream": {
         "kind": "typescript", "package": "@leanprover/infoview-api",
         "declarations": ["node_modules/@leanprover/infoview-api/dist/rpcApi.d.ts", "node_modules/@leanprover/infoview-api/dist/util.d.ts"],
-        "roots": ["CodeWithInfos", "TaggedText_stripTags"]
+        "roots": ["CodeWithInfos", "InfoPopup", "TaggedText_stripTags"]
       }
     }
   ]

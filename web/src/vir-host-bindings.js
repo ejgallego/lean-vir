@@ -134,6 +134,7 @@ export function createBrowserAnimationHostBindings(lifecycle) {
 
 export function createBrowserHostBindings({
   infoviewUseRpcSession = null,
+  infoviewInteractiveCode = null,
   infoviewStripTags = null,
   infoviewUseClientNotificationEffect = null,
   lifecycle = createHostLifecycle(),
@@ -162,6 +163,7 @@ export function createBrowserHostBindings({
     ...reactBindings,
     ...createInfoviewPanelBindings({
       useRpcSession: infoviewUseRpcSession,
+      interactiveCode: infoviewInteractiveCode,
       stripTags: infoviewStripTags,
       editorContext: infoviewEditorContext,
       positionToTdpp: infoviewPositionToTdpp,

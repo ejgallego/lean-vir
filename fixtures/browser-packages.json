@@ -196,13 +196,19 @@
           "roots": [
             "ReactProofWidgetHello.createComponent"
           ]
-        },
-        {
-          "module": "VirNativeInfoview",
-          "roots": [
-            "VirNativeInfoview.createComponent"
-          ]
         }
+      ],
+      "fixtureInputs": []
+    },
+    {
+      "id": "native-infoview",
+      "file": "native-infoview.irpkg",
+      "label": "Native goal panel and interactive code",
+      "report": "build/generated/native-infoview.report.md",
+      "lakeTargets": ["VirInfoview"],
+      "targets": [
+        { "module": "VirNativeInfoview", "roots": ["VirNativeInfoview.createComponent"] },
+        { "module": "VirNativeInfoview.Comparison", "roots": ["VirNativeInfoview.Comparison.createComponent"] }
       ],
       "fixtureInputs": []
     },

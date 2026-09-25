@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import * as ReactDOMClient from "./vir-react-dom-client.js";
 import { createReactRootHostBindings } from "./react/vir-react-root.js";
 
@@ -13,6 +14,7 @@ export function createBrowserReactHostBindings(lifecycle) {
     ...createReactRootHostBindings(lifecycle, ReactDOMClient.createRoot),
     "react.node.createElement": (elementType, props, children) =>
       React.createElement(elementType, props, ...children),
+    "infoview.hover.portal": node => createPortal(node, document.body),
     "react.props.withData.make": (data) => ({ data }),
     "react.props.withData.get": (props) => props.data,
     "react.props.withData.children": (props) => props.children,

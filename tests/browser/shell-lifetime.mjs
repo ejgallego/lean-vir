@@ -58,6 +58,7 @@ async function buildShellLifetime({ withoutRemovalInvalidation = false } = {}) {
         export { TaggedText_stripTags } from '@leanprover/infoview-api';
         export const EditorContext = React.createContext(null);
         export const DocumentPosition = { toTdpp() { throw new Error('unexpected position conversion'); } };
+        export function InteractiveCode() { throw new Error('unexpected interactive code render'); }
         export function useClientNotificationEffect() { throw new Error('unexpected lifecycle notification hook'); }
         export function useRpcSession() { return globalThis.__shellTest.rpc; }`,
           loader: "js",

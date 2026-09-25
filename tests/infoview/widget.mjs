@@ -20,6 +20,7 @@ await writeFile(
     "",
     "export const EditorContext = React.createContext(null);",
     "export const DocumentPosition = {};",
+    "export function InteractiveCode() { throw new Error('unexpected smoke component render'); }",
     "export function TaggedText_stripTags() { throw new Error('unexpected smoke tagged text call'); }",
     "export function useClientNotificationEffect() { throw new Error('unexpected smoke notification hook'); }",
     "",
@@ -31,7 +32,8 @@ await writeFile(
 );
 await writeFile(
   new URL("infoview-react-dom-stub.mjs", buildDir),
-  "export { createRoot } from 'react-dom/client';\n",
+  "export { createRoot } from 'react-dom/client';\n" +
+    "export function createPortal() { throw new Error('unexpected smoke portal render'); }\n",
 );
 const widgetSource = await readFile(
   new URL("build/generated/infoview/vir-infoview-widget.js", repoRoot),
@@ -40,7 +42,7 @@ const widgetSource = await readFile(
 const smokeWidgetSource =
   widgetSource
     .replace('from "@leanprover/infoview"', 'from "./infoview-api-stub.mjs"')
-    .replace('from "react-dom"', 'from "./infoview-react-dom-stub.mjs"');
+    .replaceAll('from "react-dom"', 'from "./infoview-react-dom-stub.mjs"');
 await writeFile(
   new URL("vir-infoview-widget-smoke.mjs", buildDir),
   smokeWidgetSource,
@@ -61,7 +63,7 @@ const wasmBytes = await readFile(
   new URL("web/public/vir-upstream.wasm", repoRoot),
 );
 const packageBytes = await readFile(
-  new URL("web/public/demo-host.irpkg", repoRoot),
+  new URL("web/public/native-infoview.irpkg", repoRoot),
 );
 const runtime = await createVirRuntime({
   wasmBytes,
@@ -74,7 +76,7 @@ let irPackageStatCount = 0;
 let irPackageRevision = "ir-package-v1";
 const assetRevisions = new Map([
   ["web/public/vir-upstream.wasm", "wasm-v1"],
-  ["web/public/demo-host.irpkg", "package-v1"],
+  ["web/public/native-infoview.irpkg", "package-v1"],
 ]);
 const rpcSession = {
   async call(method, params) {
