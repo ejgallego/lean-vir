@@ -29,9 +29,8 @@ structure WidgetProps where
   wasmPath : String := ""
   irPackage : IRPackage
   componentEntry : String
-  /-- An integration-supplied invalidation token. Without one, the shell follows
-  document edit notifications. A fixed token disables edit-triggered refresh;
-  configuration, snapshot position and RPC session changes still acquire. -/
+  /-- Explicit invalidation for manually assembled current-snapshot packages.
+  Generated widgets use `irPackage.fingerprint` instead. -/
   updateToken : Option String := none
   setupHint : String := ""
   deriving Server.RpcEncodable
@@ -48,37 +47,38 @@ def defaultSetupHint : String :=
 
 end WidgetProps
 
-private meta def expandReactWidgetCommand
-    (component : TSyntax `term) : MacroM (TSyntax `command) := do
-  let ns ← Macro.getCurrNamespace
+/--
+Declare a panel widget and capture its package inputs at this command. Creates
+`createComponent`, `irPackage` and `widgetProps`. Later proof/context changes reuse
+the fingerprint; edits affecting this definition recompute it. Package bytes are
+emitted on demand by the server, using the retained inputs.
+-/
+elab "vir_proof_widget " component:term : command => do
+  let ns ← getCurrNamespace
   if ns.isAnonymous then
-    Macro.throwError "`vir_proof_widget` must be used inside a namespace"
+    throwError "`vir_proof_widget` must be used inside a namespace"
   let componentIdent := mkIdent `createComponent
   let irPackageIdent := mkIdent `irPackage
   let propsIdent := mkIdent `widgetProps
-  let componentName : TSyntax `str := ⟨Syntax.mkStrLit ((ns ++ `createComponent).toString)⟩
-  `(
-      def $componentIdent : Lean.Vir.RuntimeM
-          (Lean.Vir.React.FunctionComponent Lean.Vir.Infoview.PanelWidgetProps) :=
-        $component
-
-      def $irPackageIdent : Lean.Vir.Infoview.IRPackage :=
-        { roots := #[$componentName] }
-
-      def $propsIdent : Lean.Vir.Infoview.WidgetProps where
-        wasmPath := Lean.Vir.Infoview.WidgetProps.defaultWasmPath
-        irPackage := $irPackageIdent
-        componentEntry := $componentName
-        setupHint := Lean.Vir.Infoview.WidgetProps.defaultSetupHint
-    )
-
-/--
-Declare a panel widget from a `RuntimeM (React.FunctionComponent PanelWidgetProps)`
-factory. Creates `createComponent`, `irPackage`, and `widgetProps`
-in the current namespace. The package exports only the factory.
--/
-macro "vir_proof_widget " component:term : command =>
-  expandReactWidgetCommand component
+  let root := ns ++ `createComponent
+  let componentName : TSyntax `str := ⟨Syntax.mkStrLit root.toString⟩
+  Lean.Elab.Command.elabCommand (← `(
+    def $componentIdent : Lean.Vir.RuntimeM
+        (Lean.Vir.React.FunctionComponent Lean.Vir.Infoview.PanelWidgetProps) := $component))
+  let (fingerprint, package) ← match ← prepareWidgetPackage (← getFileName) (← getEnv) root with
+    | .ok result => pure result
+    | .error message => throwError "{message}"
+  modifyEnv fun env => widgetPackages.addEntry env (root, fingerprint, package)
+  let fingerprint : TSyntax `str := ⟨Syntax.mkStrLit fingerprint⟩
+  Lean.Elab.Command.elabCommand (← `(
+    def $irPackageIdent : Lean.Vir.Infoview.IRPackage :=
+      { roots := #[$componentName], fingerprint := some $fingerprint }))
+  Lean.Elab.Command.elabCommand (← `(
+    def $propsIdent : Lean.Vir.Infoview.WidgetProps where
+      wasmPath := Lean.Vir.Infoview.WidgetProps.defaultWasmPath
+      irPackage := $irPackageIdent
+      componentEntry := $componentName
+      setupHint := Lean.Vir.Infoview.WidgetProps.defaultSetupHint))
 
 @[widget_module]
 def widget : Widget.Module where

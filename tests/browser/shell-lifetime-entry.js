@@ -19,7 +19,9 @@ const transport = {
   revision: 1,
   builds: 0,
   stats: 0,
+  assetCalls: 0,
   buildRevisions: [],
+  buildRoots: [],
   packageBase64: null,
   buildGate: null,
   failNextBuild: false,
@@ -429,12 +431,33 @@ async function mountedRefresh() {
     "ordinary prop changes with an unchanged token do not acquire",
   );
 
+  const fingerprintBuilds = transport.builds;
+  await shell.update({
+    irPackage: {
+      roots: [prefix + "createComponent"],
+      fingerprint: "generated-shell-lifetime-fingerprint-1",
+    },
+  });
+  await until(
+    () =>
+      transport.builds === fingerprintBuilds + 1 &&
+      shell.container.querySelector('[data-vir-infoview-state="ready"]'),
+    "generated package fingerprint acquires once",
+  );
+  check(
+    states.at(-1) === old && old.cleanups === 0 &&
+      JSON.stringify(transport.buildRoots.at(-1)) ===
+        JSON.stringify([prefix + "createComponent"]),
+    "a generated fingerprint change with identical roots preserves the runtime",
+  );
+
   transport.revision++;
   const revisionOnly = transport.revision;
+  const revisionBuilds = transport.builds;
   await shell.update({ updateToken: "revision-only" });
   await until(
     () =>
-      transport.builds === ordinaryBuilds + 1 &&
+      transport.builds === revisionBuilds + 1 &&
       shell.container.querySelector('[data-vir-infoview-state="ready"]'),
     "same-byte token refresh completes",
   );
@@ -498,6 +521,58 @@ async function mountedRefresh() {
     "refreshed shell generations released",
   );
   transport.packageBase64 = transport.basePackageBase64;
+}
+
+async function unchangedInputsNoAcquisition(updateToken) {
+  transport.packageBase64 = transport.basePackageBase64;
+  const shell = await mountShell({ updateToken });
+  await shell.ready();
+  const state = states.at(-1);
+  const runtime = state.runtime;
+  const builds = transport.builds;
+  const stats = transport.stats;
+  const assetCalls = transport.assetCalls;
+  await shell.update({
+    setupHint: "ordinary prop update",
+    goals: [{ userName: "ordinary goal" }],
+    pos: { uri: "file:///ShellLifetime.lean", line: 4, character: 2 },
+  });
+  await tick();
+  check(
+    transport.builds === builds &&
+      transport.stats === stats &&
+      transport.assetCalls === assetCalls &&
+      states.at(-1) === state &&
+      state.runtime.deref() === runtime.deref(),
+    updateToken === undefined
+      ? "ordinary inputs without updateToken do not acquire"
+      : "ordinary props, goals, and position do not acquire",
+  );
+  const session = harness.rpc;
+  harness.rpc = {
+    call(...args) {
+      return session.call(...args);
+    },
+  };
+  const sessionBuilds = transport.builds;
+  const sessionStats = transport.stats;
+  const sessionAssetCalls = transport.assetCalls;
+  await shell.update({ setupHint: "RPC session wrapper update" });
+  await tick();
+  check(
+    transport.builds === sessionBuilds &&
+      transport.stats === sessionStats &&
+      transport.assetCalls === sessionAssetCalls &&
+      states.at(-1) === state &&
+      state.runtime.deref() === runtime.deref(),
+    "an RPC session wrapper change with the same token does not acquire",
+  );
+  await shell.unmount();
+  state.captured = null;
+  await collectUntil(
+    () => !state.runtime.deref(),
+    "unchanged-input shell generation released",
+  );
 }
 
 async function applicationListenerRetention() {
@@ -1005,6 +1080,7 @@ function installMockRpc(wasmBase64, packageBase64, manifestPackageBase64) {
         transport.builds++;
         const revision = transport.revision;
         transport.buildRevisions.push(String(revision));
+        transport.buildRoots.push([...params.package.roots]);
         if (transport.failNextBuild) {
           transport.failNextBuild = false;
           throw new Error("temporary package transport sentinel");
@@ -1026,6 +1102,7 @@ function installMockRpc(wasmBase64, packageBase64, manifestPackageBase64) {
         method.endsWith("statAsset") || method.endsWith("readAsset"),
         "only mocked shell transport methods expected",
       );
+      transport.assetCalls++;
       return {
         path: params.path,
         mime: "application/wasm",
@@ -1147,6 +1224,8 @@ globalThis.runShellLifetime = async (
   installMockRpc(wasmBase64, packageBase64, manifestPackageBase64);
   try {
     await normalUnmount();
+    await unchangedInputsNoAcquisition("stable");
+    await unchangedInputsNoAcquisition(undefined);
     await mountedRefresh();
     await applicationListenerRetention();
     await explicitShutdown();
@@ -1168,6 +1247,7 @@ globalThis.runShellLifetime = async (
       ok: true,
       generations: states.length,
       normalUnmount: true,
+      unchangedInputs: true,
       refresh: true,
       lateLeanGuards: true,
       lateScheduling: true,

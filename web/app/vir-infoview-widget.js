@@ -32,7 +32,6 @@ const statusStyle = {
 
 export default function VirInfoviewWidget(props) {
   const rpcSession = useRpcSession();
-  const editorConnection = React.useContext(EditorContext);
   const hostContextRef = React.useRef({ rpcSession });
   const [status, setStatus] = React.useState({
     kind: "loading",
@@ -41,21 +40,10 @@ export default function VirInfoviewWidget(props) {
   const loadedRef = React.useRef(null);
   const [loaded, setLoaded] = React.useState(null);
   const refreshGenerationRef = React.useRef(0);
-  const [documentUpdate, setDocumentUpdate] = React.useState(null);
-  useClientNotificationEffect(
-    "textDocument/didChange",
-    (params) => {
-      if (props.updateToken == null && params.textDocument.uri === props.pos?.uri) {
-        setDocumentUpdate(`${params.textDocument.uri}:${params.textDocument.version}`);
-      }
-    },
-    [props.updateToken, props.pos?.uri, editorConnection],
-  );
-  const updateToken = props.updateToken ?? documentUpdate;
   const irPackageKey =
     props.irPackage === null || props.irPackage === undefined
       ? ""
-      : JSON.stringify(props.irPackage);
+      : JSON.stringify(props.irPackage.roots);
   const configurationKey = JSON.stringify([
     props.pos?.uri,
     props.wasmPath,
@@ -64,7 +52,7 @@ export default function VirInfoviewWidget(props) {
   ]);
 
   const requestKey = JSON.stringify([
-    configurationKey, updateToken, props.pos?.line, props.pos?.character,
+    configurationKey, props.irPackage?.fingerprint, props.updateToken,
   ]);
 
   React.useLayoutEffect(() => {
@@ -80,8 +68,7 @@ export default function VirInfoviewWidget(props) {
   async function refreshLoadedWidget(isDisposed) {
     const obsolete = () => isDisposed() ||
       configurationKey !== hostContextRef.current.configurationKey ||
-      requestKey !== hostContextRef.current.requestKey ||
-      rpcSession !== hostContextRef.current.rpcSession;
+      requestKey !== hostContextRef.current.requestKey;
     let setupHint = "";
     let service = null;
     try {
@@ -165,7 +152,7 @@ export default function VirInfoviewWidget(props) {
     return () => {
       disposed = true;
     };
-  }, [requestKey, rpcSession]);
+  }, [requestKey]);
 
   return e(
     "section",
@@ -249,7 +236,9 @@ function requiredIRPackage(value, label) {
   if (roots.length === 0) {
     throw new Error(`VIR widget ${label}.roots must not be empty`);
   }
-  return { roots };
+  return { roots, ...(value.fingerprint == null ? {} : {
+    fingerprint: requiredString(value.fingerprint, `${label}.fingerprint`),
+  }) };
 }
 
 function requiredPosition(value, label) {

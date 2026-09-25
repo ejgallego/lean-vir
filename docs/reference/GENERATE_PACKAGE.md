@@ -80,6 +80,13 @@ locations are provenance for diagnostics and navigation, never loader keys.
 
 ### Live snapshots
 
+The roots-only Infoview RPC uses the requested live snapshot. Generated
+`vir_proof_widget` descriptions instead carry a fingerprint selecting the inputs
+retained at widget elaboration; see [widget package identity](../guides/INFOVIEW.md#package-identity-and-live-editing).
+That path analyzes the definition snapshot once and emits the retained package
+on demand. Its manifest preserves the defining file's provenance, including when
+an imported widget is displayed in a different document.
+
 `prepareSnapshotInput` uses the editor's current environment, including unsaved
 and private local IR. The document requires `module`, even when every requested
 root is imported, but does not need to be saved. Preparation rejects non-module

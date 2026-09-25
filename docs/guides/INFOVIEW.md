@@ -34,49 +34,63 @@ component. React renders that component in the infoview's existing tree and
 passes its native `PanelWidgetProps` without a VIR clone or decode. The binding preserves nested field values; it does not
 promise a stable top-level props-object identity across React renders. All
 surrounding contexts are inherited without a provider bridge. Prop updates reuse
-the component; configuration or package byte changes replace the component and
+the component; configuration or changed package bytes replace the component and
 remount its subtree. Rendering follows ordinary React render rules and error
 boundaries.
 
 The [cleanup contract](../reference/HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal)
 distinguishes normal UI release from hard disposal and failed setup.
 
-Packages use the authoritative active Lean module snapshot, including unsaved
-widget code. Imported changes become visible when that snapshot contains them. Notifications
-for other files are ignored: a changed import also needs a current-document edit,
-snapshot-position/session change, or integration token to request a new package.
-See [module inputs](../reference/GENERATE_PACKAGE.md) for visibility rules.
+### Package identity and live editing
 
-By default, the shell requests a package on mount and on the current document's
-`textDocument/didChange` notifications. It uses the document version as an
-invalidation signal; it does not poll. Configuration, package snapshot position and official RPC session
-changes also request a package. Because upstream sessions are position-specific,
-cursor movement can cause acquisition, but does not itself reset the component.
-Goal and context updates with the same session and configuration do not acquire.
+`vir_proof_widget` analyzes its factory and dependencies at elaboration time. It
+stores a fingerprint in the generated `irPackage` and retains the analyzed IR,
+initializers and complete interface manifest in Lean's environment extension.
+Imported widgets carry those inputs in their compiled module data. The inputs
+contain no live environment, task or RPC reference.
 
-An integration can supply `WidgetProps.updateToken : Option String` instead of
-following document notifications. Change that token whenever its code inputs may
-have changed; `none` selects the default edit-driven behavior. A fixed token
-suppresses edit-triggered acquisition, while configuration/position/session changes still
-acquire. This replaces `autoReloadMs`: remove the old field for automatic updates,
-or supply a fixed token where edit-triggered refresh is intentionally disabled.
-A source-text hash alone is insufficient because imported implementation changes
-can affect a package without changing that source text.
+The shell requests code on mount and when its package fingerprint or configuration
+changes. Ordinary proof edits, goals, cursor positions and position-specific RPC
+session changes update the existing component without package or asset requests.
+There is no edit subscription or polling in the shell. An edit affecting the
+widget definition re-elaborates its description; upstream `getWidgets` supplies
+the updated props. Identical package inputs produce the same fingerprint even if
+source text or declaration positions change.
 
-The token only requests work. The shell compares a SHA-256 digest of the complete
-returned package bytes and the compiled Wasm module before replacing a runtime.
-Unrelated edits or source movement that leave the artifact unchanged preserve the
-component, DOM and React state. This comparison includes interface metadata;
-the server's existing revision is not used as complete artifact identity.
-Package preparation runs in the server's existing dedicated request task, after
-the required snapshot becomes available; it does not move into widget registration.
-Each invalidation still builds and transfers a package before this comparison.
+Package bytes are emitted on demand in the existing server request task from
+exactly the retained inputs. Later declarations or annotations at the display
+position do not alter a generated widget's program. Put package-affecting
+annotations before `vir_proof_widget`. Missing/stale fingerprints fail explicitly;
+they never silently select different code from the cursor snapshot.
 
-A newer acquisition supersedes pending older work. Obsolete candidates cannot
-publish, and unpublished runtimes are disposed. A failed refresh leaves the last
-working widget mounted and presents the error. A subsequent edit, token or session
-change requests again, including after a failed initial load. Restoring identical
-package bytes clears the error without remounting. There is no periodic retry.
+The fingerprint covers the emitted IR, native extern signatures, initializer
+selection and the full manifest, including interface field names and host binding
+metadata. It uses Lean's non-cryptographic hashing as a local change detector,
+like native widget module hashes; collisions are possible and it is not an
+authenticity check. At acquisition,
+the browser also compares the complete package SHA-256 and compiled Wasm module
+against the installed runtime to avoid an unnecessary remount.
+
+For manually assembled `WidgetProps`, roots-only `IRPackage` values retain the
+[current-snapshot acquisition](../reference/GENERATE_PACKAGE.md) contract, including
+unsaved code and imported code visible in that snapshot. Such integrations can
+change `updateToken` when they want to request new code. With no token, they load
+on mount/configuration change. Position or session changes alone do not reload
+code. This replaces `autoReloadMs`; generated widgets need no handwritten token.
+
+New code requests supersede pending older ones. Obsolete unpublished runtimes are
+disposed; a failed acquisition keeps the last working component and presents its
+error. Compilation/fingerprint failures are Lean elaboration diagnostics. No
+fingerprint is published for an invalid package; its display/removal follows the
+upstream widget registration behavior. A later valid code description can load
+normally. There is no periodic retry or Retry button.
+
+Fingerprint generation performs package analysis once per elaboration of the
+widget command. This can increase definition/build time and compiled module size;
+Lean can reuse an unchanged command's elaboration after later proof edits. An
+edit that causes the command to re-elaborate runs analysis again, but an unchanged
+fingerprint still suppresses browser code requests. Binary emission and transfer
+remain deferred until the widget is requested.
 
 Build the optional widget module with `lake build VirInfoview`; see
 [setup](../HARNESS.md#setup) for prerequisites. Restart the Lean server or reopen

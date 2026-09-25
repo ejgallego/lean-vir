@@ -49,8 +49,8 @@ automatic transfer of React state or internal Lean values between generations.
 | --- | --- | --- |
 | Document with two Lean-authored DOM interactions | One page package set may serve both elements; events reuse its runtime, ordinary DOM objects and independent element state. No required React or handwritten per-element bootstrap. | Proposed Verso baseline: still to be built. Existing browser providers alone do not prove this integration. |
 | Infoview props, goals, position or context update | Reuse the component/runtime when code and configuration are unchanged; inherit upstream React context and preserve ordinary hook state. | `tests/infoview/rpc-shell-lifetime-entry.js` checks context and notification-driven RPC updates. |
-| Infoview implementation edit | Document edits (or an integration token) request a package. A newer request immediately makes older work obsolete. Changed package bytes replace the component; identical bytes preserve React state. A fixed integration token suppresses edit-triggered acquisition. | `tests/infoview/rpc-shell-lifetime-entry.js` exercises unsaved implementation changes, a held reply followed by another edit, and broken/fixed source through the actual Lean server and Chromium. An actual editor window is not exercised. |
-| Slow, failed or obsolete load | Keep usable old UI on refresh failure; dispose unpublished candidates; removal prevents late publication. Later edits can recover a failed initial load. A failure of an older cache promise must not erase a newer entry. | Browser and real-server lifetime suites plus `tests/infoview/widget.mjs`. Both suites control late replies. A new edit, token or session requests again after failure; there is no periodic retry. |
+| Infoview implementation edit | Re-elaboration of widget code supplies a new package fingerprint when its analyzed inputs change. Proof edits and cursor/session updates request no package. A newer code request immediately makes older work obsolete. Changed package bytes replace the component; identical bytes preserve React state. | `tests/infoview/rpc-shell-lifetime-entry.js` exercises unsaved implementation changes, a held reply followed by another edit, and broken/fixed source through the actual Lean server and Chromium. An actual editor window is not exercised. |
+| Slow, failed or obsolete load | Keep usable old UI on refresh failure; dispose unpublished candidates; removal prevents late publication. A later valid code description can recover a failed initial load. A failure of an older cache promise must not erase a newer entry. | Browser and real-server lifetime suites plus `tests/infoview/widget.mjs`. Both suites control late replies. A new code fingerprint or explicit manual token requests again after failure; there is no periodic retry. |
 | Promise or callback survives UI replacement | Execute the original Lean continuation and its stale-result guard; never silently enter the successor program. | Browser and real-server shell lifetime suites. |
 | Headless/browser caller runs multiple entries | Keep interpreter state and initialized constants within a generation; calls and callbacks do not instantiate fresh interpreters. | `tests/runtime/interpreter-constant-cache-smoke.mjs`, CLI and module-package tests. |
 | Multi-module package set | Preserve member ordering, identity checks, initialization and startup semantics. A complete set is one generation, not one runtime per member. | `tests/runtime/module-package-set-smoke.mjs` and descriptor tests. |
@@ -93,28 +93,37 @@ bytes and reusing compilation by a digest of those bytes. Compare transport cost
 and invalidation behavior before selecting one. Neither requires a project
 identity registry, general resolver, or additional ownership layer.
 
-For IR packages, the `buildIRPackage` response supplies the authoritative bytes.
-The shell uses document edit notifications by default, or an integration-supplied
-`updateToken`. Configuration, package snapshot position and official RPC session changes also acquire. The
-upstream session is position-specific: cursor movement can request a package.
-No shell timer or `statIRPackage` request is needed. The stat RPC remains available
-to other callers; its revision is not treated as full package identity.
+Generated widgets have a definition-bound package. `vir_proof_widget` analyzes
+the IR closure and complete interface manifest at elaboration time, fingerprints
+the emitted inputs, and retains the immutable analysis in a persistent Lean
+extension. Generated props carry `irPackage.fingerprint`. The RPC emits from those
+exact retained inputs; it does not reinterpret them at the cursor position.
+Imported definitions carry the same analyzed inputs in compiled module data.
+No task, live environment or server RPC reference is persisted.
 
-An invalidation token need not identify exact code. After building, the shell
-compares the SHA-256 of the complete package bytes and the compiled Wasm module
-against its installed generation. Equal artifacts preserve that generation and
-React state, even when a document version or server revision differs. Changed
-interface metadata also requires replacement, even if the server revision agrees.
-Package construction remains in the server's existing dedicated task. Building
-and transferring on each invalidation is the deliberate cost of this simple
-protocol; no environment fingerprint or server cache has been introduced.
+Proof/goal changes, cursor movement and position-specific session updates reuse
+the existing component without acquiring code. A changed widget definition or
+helper re-elaborates the producer; a changed fingerprint requests a package.
+Equal analyzed inputs keep the fingerprint even after source movement or a
+whitespace edit. Metadata-only changes participate in the fingerprint. Binary
+emission and transfer remain in the server request task, after a code request.
 
-New requests invalidate older candidates immediately, including during initial
-loading. UI removal also prevents publication. Errors remain visible until a
-successful acquisition; a later edit, token or session can recover. Restoring the
-installed bytes clears an error without remounting. A fixed token disables edit
-notifications, not configuration, position or session changes. Snapshot visibility remains
-a server responsibility; a token does not make unavailable imported code visible.
+The older roots-only RPC remains explicitly current-snapshot-based for manual
+integrations. An optional `updateToken` requests new code for that path. There is
+no timer, automatic document-version token or session/position reload. Retaining
+both input contracts preserves callers that intentionally package later snapshot
+metadata; generated widgets instead fix that metadata at their definition.
+
+Candidate obsolescence, package-byte equality, old callback ownership and
+unmount versus hard-disposal semantics remain unchanged. Elaboration errors are
+reported by Lean; acquisition errors are reported by the shell. Invalid code does
+not publish a new fingerprint. Widget visibility still follows upstream behavior.
+
+The cost is package analysis during widget elaboration and retained analyzed data
+in module artifacts. Edits that invalidate that command's elaboration repeat the
+analysis; unchanged fingerprints still avoid browser code requests. Proof/context
+updates do not themselves request hashing, binary emission or transfer. Elaboration
+cost and artifact size remain unoptimized.
 
 There will be no Retry button. Ordinary edit/load races are protocol or lifecycle
 bugs to fix, rather than a recovery obligation for the document author or reader.

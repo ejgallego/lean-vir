@@ -8,6 +8,7 @@ module
 
 meta import fixtures.infoview.RpcBrowserServer
 public import ShellLifetime
+public meta import tutorials.RpcReferenceWidget
 import tutorials.RpcReferenceWidget
 
 public section
@@ -29,7 +30,12 @@ def createEditableComponent : RuntimeM (FunctionComponent PanelWidgetProps) :=
     Node.createElement (← ElementType.tag (← JsValue.ofString "span"))
       props (← Js.Array.ofArray #[label])
 
+vir_proof_widget createEditableComponent
+
 end Vir.Fixtures.RpcShellLifetime
+
+show_panel_widgets [Lean.Vir.Infoview.widget with Vir.Fixtures.RpcShellLifetime.widgetProps,
+  Lean.Vir.Infoview.widget with RpcReferenceWidget.widgetProps]
 
 -- Reuse the actual RPC methods and Lean stale-guard component unchanged.
 -- The browser asks the server to package these roots from this live snapshot.

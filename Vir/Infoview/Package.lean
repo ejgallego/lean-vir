@@ -23,6 +23,9 @@ open Lean.IR
 
 structure IRPackage where
   roots : Array String
+  /-- Select package inputs retained by `vir_proof_widget` elaboration. Without
+  this field, the RPC prepares the roots from the requested live snapshot. -/
+  fingerprint : Option String := none
   deriving Server.RpcEncodable
 
 /--
@@ -32,6 +35,7 @@ runtime value because it is embedded in widget props; its generated
 -/
 meta structure IRPackageRpc where
   roots : Array String
+  fingerprint : Option String := none
   deriving Server.RpcEncodable
 
 meta structure IRPackageRequest where
@@ -338,6 +342,63 @@ meta def irPackageRevision
   let rootToken := ",".intercalate (roots.map (fun name => name.toString)).toList
   s!"ir-package:{token}:{rootToken}"
 
+/-- Immutable analyzed inputs, retained at the widget definition. No environment,
+RPC reference or task is stored in the module artifact. Binary emission is deferred
+until the browser requests the package. -/
+meta initialize widgetPackages : SimplePersistentEnvExtension
+    (Name × String × Vir.GeneratePackage.AnalyzedPackage)
+    (NameMap (String × Vir.GeneratePackage.AnalyzedPackage)) ←
+  registerSimplePersistentEnvExtension {
+    addImportedFn := fun _ => {}
+    addEntryFn := fun state (name, fingerprint, package) =>
+      state.insert name (fingerprint, package)
+  }
+
+/-- Fingerprint the inputs of all emitted sections, including the complete
+interface manifest. Source ranges and unrelated declarations are not inputs. -/
+meta def widgetPackageFingerprint (package : Vir.GeneratePackage.AnalyzedPackage) : String := Id.run do
+  let closure := package.closure
+  let mut h := hashArray (hash "vir-widget-package") closure.decls fun loaded =>
+    irDeclHash loaded.decl
+  h := hashArray h closure.externs fun ext =>
+    hashArray (mixHash (hash ext.name) (irTypeHash ext.resultType)) ext.params paramHash
+  h := hashArray h closure.initGlobals fun entry =>
+    mixHash (hash entry.name) (hash entry.initName)
+  h := mixHash h (hash package.manifest.toJson)
+  return s!"vir-widget:{h}"
+
+private meta unsafe def prepareWidgetPackageImpl (source : String) (env : Environment) (root : Name) :
+    IO (Except String (String × Vir.GeneratePackage.AnalyzedPackage)) := do
+  let input ← match Vir.GeneratePackage.prepareSnapshotInput source env #[root] with
+    | .ok input => pure input
+    | .error message => return .error message
+  -- Batch compilation need not load runtime IR for ordinary imports. Complete
+  -- only imported owners; the current module always stays in the live snapshot.
+  let index ← Vir.GeneratePackage.resolveImportedModuleClosure #[input.target] input.index
+  let package ← Vir.GeneratePackage.analyzePackage "widget elaboration" #[input.target] index
+  if Vir.GeneratePackage.hasBlockingDiagnostics package.closure package.manifest then
+    return .error package.report
+  return .ok (widgetPackageFingerprint package, package)
+
+@[implemented_by prepareWidgetPackageImpl]
+meta opaque prepareWidgetPackage (source : String) (env : Environment) (root : Name) :
+    IO (Except String (String × Vir.GeneratePackage.AnalyzedPackage))
+
+private meta def retainedWidgetPackage (env : Environment) (roots : Array Name)
+    (fingerprint : String) : Except RequestError Vir.GeneratePackage.AnalyzedPackage := do
+  let fail : Except RequestError Vir.GeneratePackage.AnalyzedPackage := .error {
+    code := .invalidParams
+    message := "VIR widget package fingerprint is unavailable; refresh the widget description"
+  }
+  let #[root] := roots | fail
+  let found := match env.getModuleIdxFor? root with
+    | some idx => widgetPackages.getModuleEntries env idx |>.findSome? fun (name, key, package) =>
+        if name == root then some (key, package) else none
+    | none => widgetPackages.getState env |>.find? root
+  let some (key, package) := found | fail
+  if key != fingerprint then return ← fail
+  return package
+
 @[server_rpc_method]
 meta def statIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPackageInfo) := do
   let roots ←
@@ -348,6 +409,11 @@ meta def statIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPac
   RequestM.withWaitFindSnapAtPos params.pos fun snap => do
     let doc ← RequestM.readDoc
     let source := documentSourceName doc
+    if let some fingerprint := params.package.fingerprint then
+      discard <| match retainedWidgetPackage snap.env roots fingerprint with
+        | .ok package => pure package
+        | .error error => throwThe RequestError error
+      return { source, roots := roots.map toString, revision := fingerprint }
     let input ← match prepareIRPackageInput source roots snap.env with
       | .ok input => pure input
       | .error error => throwThe RequestError error
@@ -368,6 +434,17 @@ meta def buildIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPa
   RequestM.withWaitFindSnapAtPos params.pos fun snap => do
     let doc ← RequestM.readDoc
     let source := documentSourceName doc
+    if let some fingerprint := params.package.fingerprint then
+      let package ← match retainedWidgetPackage snap.env roots fingerprint with
+        | .ok package => pure package
+        | .error error => throwThe RequestError error
+      let bytes ← match Vir.GeneratePackage.emitPackage package.closure package.manifest with
+        | .ok bytes => pure bytes
+        | .error message => throwThe RequestError { code := .invalidParams, message }
+      return {
+        source, roots := roots.map toString, revision := fingerprint
+        byteSize := toString bytes.size, dataBase64 := base64Encode bytes, report := package.report
+      }
     let input ← match prepareIRPackageInput source roots snap.env with
       | .ok input => pure input
       | .error error => throwThe RequestError error

@@ -1,5 +1,6 @@
 import Vir.Infoview
 import Vir.React
+import ReactTamagotchiWidget
 
 namespace SmokeInfoviewLean
 
@@ -51,21 +52,12 @@ def expectRootsError (roots : Array String) : IO Unit := do
       throw <| IO.userError s!"infoview smoke failed: roots {roots} unexpectedly accepted as {got}"
   | .error _ => pure ()
 
-def AuthoringComponent : Lean.Vir.RuntimeM
-    (Lean.Vir.React.FunctionComponent Lean.Vir.Infoview.PanelWidgetProps) :=
-  Lean.Vir.React.FunctionComponent.ofLean fun _props => do
-    Lean.Vir.React.Node.text (← Lean.Vir.JsValue.ofString "authoring smoke")
-
-vir_proof_widget AuthoringComponent
-
-example : Lean.Vir.RuntimeM
-    (Lean.Vir.React.FunctionComponent Lean.Vir.Infoview.PanelWidgetProps) :=
-  createComponent
+abbrev widgetProps := ReactTamagotchiWidget.widgetProps
 
 def expectAuthoringPackage (package : Lean.Vir.Infoview.IRPackage) : IO Unit := do
   expect "authoring package roots" <|
     package.roots == #[
-      "SmokeInfoviewLean.createComponent"
+      "ReactTamagotchiWidget.createComponent"
     ]
 
 def smokeVar : Lean.IR.VarId :=
@@ -93,6 +85,29 @@ unsafe def snapshotEnvironment (source contents : String) : IO Lean.Environment 
       source `InfoviewSnapshotTest
     | throw <| IO.userError "snapshot frontend failed"
   return env
+
+unsafe def widgetFingerprints : IO Unit := do
+  let source := "untitled:Fingerprint.lean"
+  let headerText := "module\npublic import Vir.Infoview\npublic section\n"
+  let body := "structure Packet where\n  first : Nat\ndef echo (p : Packet) : Packet := p\n"
+  let originalEnv ← snapshotEnvironment source (headerText ++ body)
+  let (original, before) ← IO.ofExcept <| ← Lean.Vir.Infoview.prepareWidgetPackage source originalEnv `echo
+  expect "retained export preserves defining document provenance" <|
+    before.manifest.exports.any fun entry => entry.entry == `echo && entry.source == source
+  let laterEnv ← snapshotEnvironment source
+    (headerText ++ "-- whitespace and source position are not code identity\n" ++ body ++
+      "example (n : Nat) : n = n := by rfl\n")
+  let (later, _) ← IO.ofExcept <| ← Lean.Vir.Infoview.prepareWidgetPackage source laterEnv `echo
+  expect "proof edits and source movement preserve fingerprint" (original == later)
+  let renamedEnv ← snapshotEnvironment source (headerText ++ body.replace "first" "other")
+  let (renamed, after) ← IO.ofExcept <| ← Lean.Vir.Infoview.prepareWidgetPackage source renamedEnv `echo
+  expect "field rename leaves executable closure unchanged" <|
+    Lean.Vir.Infoview.closureIRHash before.closure == Lean.Vir.Infoview.closureIRHash after.closure
+  expect "field rename changes complete widget fingerprint" (original != renamed)
+  let changedInit := { before with closure := { before.closure with
+    initGlobals := before.closure.initGlobals.push { name := `testGlobal, initName := `testInit } } }
+  expect "initializer selection participates in widget fingerprint" <|
+    original != Lean.Vir.Infoview.widgetPackageFingerprint changedInit
 
 unsafe def importedHelperClosure (root : Lean.Name) : IO Vir.GeneratePackage.Closure := do
   let env ← snapshotEnvironment importedHelperTargetSource.toString
@@ -286,8 +301,8 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
   expectRootsError #[]
   expectRootsError #["VirNativeInfoview."]
   expect "authoring widget component entry"
-    (widgetProps.componentEntry == "SmokeInfoviewLean.createComponent")
-  expect "authoring widget follows document edits" (widgetProps.updateToken.isNone)
+    (widgetProps.componentEntry == "ReactTamagotchiWidget.createComponent")
+  expect "authoring widget has an elaborated fingerprint" (widgetProps.irPackage.fingerprint.isSome)
   expect "authoring widget wasm path" (widgetProps.wasmPath == Lean.Vir.Infoview.WidgetProps.defaultWasmPath)
   expectAuthoringPackage widgetProps.irPackage
   expect "IR decl hash tracks body literals" <|
@@ -315,6 +330,7 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
     Lean.Vir.Infoview.closureIRHash beforeClosure !=
       Lean.Vir.Infoview.closureIRHash afterClosure
   IO.FS.createDirAll "build/infoview-smoke"
+  widgetFingerprints
   rejectNonModuleSnapshot
   privateEffectSnapshot
   let firstSnapshot ← snapshotPackage "first"

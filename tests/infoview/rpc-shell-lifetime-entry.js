@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import * as React from "react";
 import { createRoot } from "react-dom/client";
-import { RpcSessions } from "@leanprover/infoview-api";
+import { RpcSessions, Widget_getWidgets } from "@leanprover/infoview-api";
 import { EditorConnection, EditorContext } from "@leanprover/infoview";
 import VirInfoviewWidget from "../../web/app/vir-infoview-widget.js";
 import { describeError, until, withCleanup } from "./rpc-test-support.js";
@@ -94,7 +94,8 @@ async function run() {
   const originalConsole = { error: console.error, warn: console.warn };
   for (const level of ["error", "warn"]) {
     console[level] = (...args) => {
-      consoleDiagnostics.push(args.map(String).join(" "));
+      consoleDiagnostics.push(args.map((arg) =>
+        typeof arg === "object" ? JSON.stringify(describeError(arg)) : String(arg)).join(" "));
       originalConsole[level].apply(console, args);
     };
   }
@@ -192,6 +193,7 @@ async function run() {
       setupHint = "",
       componentEntry = prefix + "createComponent",
       editorConnection = editor,
+      irPackage = { roots: entries },
     } = {}) {
       globalThis.__rpcShell.session = session;
       return React.act(async () =>
@@ -199,7 +201,7 @@ async function run() {
           React.createElement(inheritedContext.Provider, { value: inheritedContextValue },
           React.createElement(EditorContext.Provider, { value: editorConnection }, React.createElement(VirInfoviewWidget, {
             wasmPath: "web/public/vir-upstream.wasm",
-            irPackage: { roots: entries },
+            irPackage,
             componentEntry,
             pos: { uri: config.uri, ...position },
             updateToken,
@@ -236,12 +238,25 @@ async function run() {
         liveText() === text,
       );
     }
+    let manualLiveUpdates = false;
+    let manualToken = 0;
     async function editText(before, after) {
       await React.act(async () => {
         const change = await post("/edit", { replace: { before, after } });
         for (const handler of [...notificationHandlers])
           handler(["textDocument/didChange", change]);
       });
+      if (manualLiveUpdates) {
+        await renderWidget(a, config.a, [liveEntry], {
+          componentEntry: liveEntry, updateToken: `manual-${++manualToken}`,
+        });
+      }
+    }
+    async function generatedProps(session, position, entry) {
+      const result = await Widget_getWidgets(session, position);
+      const props = result.widgets.find((widget) => widget.props.componentEntry === entry)?.props;
+      check(typeof props?.irPackage.fingerprint === "string", `generated fingerprint for ${entry}: ${JSON.stringify(result)}`);
+      return props;
     }
     async function begin(state, session, kind, suffix, held = true) {
       const message = `${state.label}:${kind}:${suffix}`;
@@ -514,7 +529,7 @@ async function run() {
     // actual shell, not a second root with a manually forwarded provider.
     packageReplyDelayMs = 0;
     const tutorialEntries = ["RpcReferenceWidget.createComponent"];
-    const tutorialOptions = { componentEntry: tutorialEntries[0] };
+    const tutorialOptions = await generatedProps(a, config.a, tutorialEntries[0]);
     await renderWidget(a, config.a, tutorialEntries, tutorialOptions);
     await waitFor("all-Lean tutorial ready in actual shell", () => {
       const error = container.querySelector('[data-vir-infoview-state="error"]');
@@ -528,7 +543,7 @@ async function run() {
     const tutorialFirst = tutorialCalls().length;
     const button = container.querySelector("#rpc-reference-view");
     React.act(() => button.click());
-    check(subscriptions === 2 && notificationHandlers.size === 2,
+    check(subscriptions === 1 && notificationHandlers.size === 1,
       "Lean component inherits upstream EditorContext through the shell");
     await renderWidget(a, config.a, tutorialEntries, tutorialOptions);
     await tick();
@@ -549,7 +564,7 @@ async function run() {
     await renderWidget(a, config.a, tutorialEntries,
       { ...tutorialOptions, editorConnection: replacementEditor });
     check(subscriptions === 0 && notificationHandlers.size === 0 &&
-      replacementSubscriptions === 2 && replacementHandlers.size === 2,
+      replacementSubscriptions === 1 && replacementHandlers.size === 1,
       "editor replacement moves the native subscription to the current connection");
     check(tutorialCalls().length === tutorialFirst,
       "editor replacement alone does not restart RPC");
@@ -574,9 +589,10 @@ async function run() {
       container.querySelector("#rpc-reference-view") === button && button.textContent.includes("local 1"),
       "edit refresh preserves runtime, native component, DOM and Lean hook state");
 
-    // Package the local factory from the open document. Changing its literal
-    // through textDocument/didChange must produce a new component generation.
+    // Exercise the manual current-snapshot API first: this integration updates
+    // its explicit token after each edit. Generated props are checked below.
     packageReplyDelayMs = 0;
+    manualLiveUpdates = true;
     await renderWidget(a, config.a, [liveEntry], {
       componentEntry: liveEntry,
       updateToken: null,
@@ -632,7 +648,7 @@ async function run() {
     check(states.at(-1).runtime.disposed, "late obsolete candidate is disposed");
 
     // A broken edit keeps the last working component mounted. Once the source
-    // is repaired, the same mounted shell recovers automatically.
+    // is repaired, the next manual token recovers the same mounted shell.
     const brokenCallStart = calls.length;
     await editText('"implementation-v4"', '"implementation-v4" ++ missingImplementation');
     await waitFor("broken implementation status", () =>
@@ -660,14 +676,10 @@ async function run() {
     await waitForLiveText("next implementation edit", "implementation-v5");
 
     // Also cover a failed initial package. There is no old UI to preserve in
-    // this case, but a later valid edit must still recover through the edit notification.
+    // this case, but a later valid edit must still recover through the manual token.
     await unmountUI();
     const initialBrokenCallStart = calls.length;
     await editText('"implementation-v5"', '"implementation-v5" ++ missingInitialImplementation');
-    await renderWidget(a, config.a, [liveEntry], {
-      componentEntry: liveEntry,
-      updateToken: null,
-    });
     await waitFor("broken initial implementation status", () =>
       container.querySelector('[data-vir-infoview-state="error"]'),
     );
@@ -683,17 +695,11 @@ async function run() {
     const beforePosition = states.at(-1);
     const positionStart = calls.length;
     await renderWidget(a, config.b, [liveEntry], {
-      componentEntry: liveEntry, updateToken: null,
+      componentEntry: liveEntry, updateToken: `manual-${manualToken}`,
     });
-    await waitFor("package snapshot position changes with a stable outer session", () =>
-      calls.slice(positionStart).some((call) =>
-        call.params.method === "Lean.Vir.Infoview.buildIRPackage" && call.settled && call.value &&
-        call.params.params.pos.line === config.b.line &&
-        call.params.params.pos.character === config.b.character,
-      ));
     await tick();
-    check(states.at(-1) === beforePosition,
-      "equal package at a new snapshot position preserves the runtime");
+    check(states.at(-1) === beforePosition && calls.length === positionStart,
+      "position changes do not acquire package code");
 
     const beforeReconnect = states.at(-1);
     const reconnectNode = container.querySelector("#rpc-live-edit");
@@ -702,14 +708,63 @@ async function run() {
     const reconnected = sessionAt(config.a);
     check(reconnected !== a, "reconnect supplies a distinct official session");
     await renderWidget(reconnected, config.a, [liveEntry], {
-      componentEntry: liveEntry, updateToken: null,
+      componentEntry: liveEntry, updateToken: `manual-${manualToken}`,
     });
-    await waitFor("new session reacquires without an edit", () => calls.slice(reconnectStart).some((call) =>
-      call.params.method === "Lean.Vir.Infoview.buildIRPackage" && call.settled && call.value,
-    ));
     await tick();
-    check(states.at(-1) === beforeReconnect && container.querySelector("#rpc-live-edit") === reconnectNode,
-      "same artifact after reconnection preserves the runtime and component");
+    check(states.at(-1) === beforeReconnect && container.querySelector("#rpc-live-edit") === reconnectNode &&
+      calls.length === reconnectStart,
+      "session replacement preserves the runtime without a package request");
+    manualLiveUpdates = false;
+    const generatedEntry = "Vir.Fixtures.RpcShellLifetime.createComponent";
+    let descriptor = await generatedProps(reconnected, config.a, generatedEntry);
+    await renderWidget(reconnected, config.a, descriptor.irPackage.roots, descriptor);
+    await waitForLiveText("generated widget initial load", "implementation-v5");
+    const generatedState = states.at(-1);
+    const generatedNode = container.querySelector("#rpc-live-edit");
+    const generationCount = states.length;
+    const packageCalls = () => calls.filter((call) =>
+      ["Lean.Vir.Infoview.buildIRPackage", "Lean.Vir.Infoview.statIRPackage", "Lean.Vir.Infoview.statAsset", "Lean.Vir.Infoview.readAsset"].includes(call.params.method));
+    const beforeProofEdits = packageCalls().length;
+    for (let i = 0; i < 3; i++) {
+      await editText(i === 0 ? "  exact h" : `  exact (h) -- edit ${i - 1}`, `  exact (h) -- edit ${i}`);
+      const next = await generatedProps(reconnected, config.b, generatedEntry);
+      check(next.irPackage.fingerprint === descriptor.irPackage.fingerprint,
+        "proof edits preserve the elaborated code fingerprint");
+      await renderWidget(sessionAt(config.b), config.b, next.irPackage.roots, next);
+    }
+    await tick();
+    const proofEditPackageRequests = packageCalls().length - beforeProofEdits;
+    check(packageCalls().length === beforeProofEdits && states.length === generationCount &&
+      container.querySelector("#rpc-live-edit") === generatedNode,
+      "real proof edits, new props and cursor sessions cause zero package or asset requests");
+    await editText('"implementation-v5"', '"implementation-v6"');
+    const changedDescriptor = await generatedProps(reconnected, config.a, generatedEntry);
+    check(changedDescriptor.irPackage.fingerprint !== descriptor.irPackage.fingerprint,
+      "transitive helper edit changes the elaborated fingerprint");
+    let staleFingerprintError;
+    try {
+      await reconnected.call("Lean.Vir.Infoview.buildIRPackage", {
+        package: descriptor.irPackage, pos: config.a,
+      });
+    } catch (error) {
+      staleFingerprintError = error;
+      expectedLivePackageFailures.add(calls.at(-1));
+    }
+    check(staleFingerprintError?.code === -32602 &&
+      staleFingerprintError.message.includes("fingerprint is unavailable"),
+      "stale descriptor is rejected instead of packaging different code");
+    await renderWidget(reconnected, config.a, changedDescriptor.irPackage.roots, changedDescriptor);
+    await waitForLiveText("generated fingerprint publishes changed helper code", "implementation-v6");
+    check(states.at(-1) !== generatedState, "generated widget helper edit replaces the runtime");
+    descriptor = changedDescriptor;
+    const beforeWhitespace = packageCalls().length;
+    await editText(':=  "implementation-v6"', ':=   "implementation-v6"');
+    const whitespaceDescriptor = await generatedProps(reconnected, config.a, generatedEntry);
+    check(whitespaceDescriptor.irPackage.fingerprint === descriptor.irPackage.fingerprint,
+      "declaration re-elaboration with identical inputs preserves fingerprint");
+    await renderWidget(reconnected, config.a, whitespaceDescriptor.irPackage.roots, whitespaceDescriptor);
+    await tick();
+    check(packageCalls().length === beforeWhitespace, "equivalent source requests no package bytes");
     check(!calls.some((call) => call.params.method === "Lean.Vir.Infoview.statIRPackage"),
       "the entire shell lifecycle uses no package stat requests");
     await unmountUI();
@@ -740,7 +795,9 @@ async function run() {
       allLeanEditRefresh: { requests: tutorialCalls().length, subscriptionsAfterUnmount: subscriptions },
       liveImplementationEdits: {
         initial: "implementation-v1",
-        final: "implementation-v5",
+        final: "implementation-v6",
+        proofEditPackageRequests,
+        whitespacePackageRequests: packageCalls().length - beforeWhitespace,
         heldReplyDelayMs: heldBuild?.replyDelayMs ?? null,
       },
       consoleDiagnostics,
