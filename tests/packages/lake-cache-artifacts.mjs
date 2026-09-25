@@ -35,14 +35,15 @@ const sourceProducer = path.resolve(options.producer ?? harnessRoot);
 const keep = options.keep || process.env.VIR_LAKE_CACHE_ARTIFACTS_KEEP === "1";
 const temporary = mkdtempSync(path.join(tmpdir(), "vir-lake-cache-artifacts-"));
 const producer = path.join(temporary, "producer");
-const consumer = path.join(temporary, "consumer");
+const consumer = path.join(temporary, "consumer with spaces");
+const consumerBuild = path.join(consumer, "custom build");
 const cache = path.join(temporary, "lake-cache");
 const retained = path.join(temporary, "conventional-builds");
 const logs = path.join(temporary, "logs");
 const hiddenSource = path.join(consumer, "CacheFixture", "Hidden.lean");
 const descriptorPath = path.join(
-  consumer,
-  ".lake/build/vir/module-sets/CacheFixture/Root.irpkg-set.json",
+  consumerBuild,
+  "vir/module-sets/CacheFixture/Root.irpkg-set.json",
 );
 const setupPath = descriptorPath.replace(/[.]irpkg-set[.]json$/, ".setup.json");
 let succeeded = false;
@@ -57,6 +58,13 @@ try {
   mkdirSync(cache, { recursive: true });
   mkdirSync(retained, { recursive: true });
   mkdirSync(logs, { recursive: true });
+
+  if (!options.expectCacheOnlyFailure) {
+    queryInputs("cold");
+    assert.equal(existsSync(path.join(producer, ".lake/build/bin/vir_irpkg")), false,
+      "input acquisition built the package generator");
+    assert.equal(existsSync(descriptorPath), false, "input acquisition generated a package");
+  }
 
   const coldLog = build("cold", false);
   assert.match(coldLog, /Built .*CacheFixture[.]Root:vir/);
@@ -223,7 +231,8 @@ function writeConsumer() {
       "import Lake",
       "open Lake DSL",
       "",
-      "package cache_consumer",
+      "package cache_consumer where",
+      '  buildDir := "custom build"',
       'require lean_vir from "../producer"',
       "",
       "@[default_target]",
@@ -276,7 +285,11 @@ function hiddenModule(increment) {
 }
 
 function runBuild(label, restore) {
-  const result = spawnSync("lake", ["-v", "build", "+CacheFixture.Root:vir"], {
+  return runLake(label, ["-v", "build", "+CacheFixture.Root:vir"], restore);
+}
+
+function runLake(label, args, restore = false) {
+  const result = spawnSync("lake", args, {
     cwd: consumer,
     encoding: "utf8",
     timeout: 10 * 60_000,
@@ -292,7 +305,7 @@ function runBuild(label, restore) {
     (result.error ? `\n${result.error.stack ?? result.error}\n` : "");
   writeFileSync(path.join(logs, `${label}.log`), log);
   assert.ifError(result.error);
-  return { status: result.status, log };
+  return { status: result.status, log, stdout: result.stdout };
 }
 
 function build(label, restore) {
@@ -303,11 +316,10 @@ function build(label, restore) {
 }
 
 function moveConventionalBuilds(label) {
-  for (const [name, root] of [
-    ["consumer", consumer],
-    ["producer", producer],
+  for (const [name, buildDir] of [
+    ["consumer", consumerBuild],
+    ["producer", path.join(producer, ".lake/build")],
   ]) {
-    const buildDir = path.join(root, ".lake", "build");
     assert.ok(
       existsSync(buildDir),
       `missing ${name} build tree before ${label}`,
@@ -318,8 +330,7 @@ function moveConventionalBuilds(label) {
 
 function conventionalCompiledInputs() {
   const found = [];
-  for (const root of [consumer, producer]) {
-    const buildDir = path.join(root, ".lake", "build");
+  for (const buildDir of [consumerBuild, path.join(producer, ".lake/build")]) {
     if (!existsSync(buildDir)) continue;
     walk(buildDir, (file) => {
       if (/[.]ir(?:[.]sig)?$|[.]olean(?:[.]server|[.]private)?$/.test(file)) {
@@ -346,7 +357,7 @@ function assertRestoredCompiledInputs() {
     "CacheFixture/Root.ir",
   ]) {
     assert.ok(
-      existsSync(path.join(consumer, ".lake/build/lib/lean", relative)),
+      existsSync(path.join(consumerBuild, "lib/lean", relative)),
       `restoration control did not restore ${relative}`,
     );
   }
@@ -392,7 +403,7 @@ function assertCacheResolvedSetup() {
 
 function assertRestoredSetup() {
   const setup = JSON.parse(readFileSync(setupPath, "utf8"));
-  const conventional = path.join(consumer, ".lake", "build", "lib", "lean");
+  const conventional = path.join(consumerBuild, "lib", "lean");
   for (const moduleName of [
     "CacheFixture.Base",
     "CacheFixture.Hidden",
@@ -541,7 +552,44 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function queryInputs(label) {
+  const result = runLake(label, ["query", "--json",
+    "+CacheFixture.Root:virInputs", "+CacheFixture.Hidden:virInputs"]);
+  assert.equal(result.status, 0, result.log);
+  const paths = result.stdout.trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  assert.equal(paths.length, 2);
+  for (const file of paths) assert.ok(existsSync(file));
+  return paths;
+}
+
+function generateFromInputs(label) {
+  const paths = queryInputs(`${label}-inputs`);
+  const executable = runLake(`${label}-generator`, ["query", "--json", "@lean_vir/vir_irpkg"]);
+  assert.equal(executable.status, 0, executable.log);
+  const destination = path.join(consumerBuild, "queried.irpkg");
+  // Match the repository producer helper's direct executable + Lake LEAN_PATH
+  // boundary, including toolchain fallback but no restored project artifacts.
+  const leanPath = runLake(`${label}-env`, ["env", process.execPath, "-e",
+    "process.stdout.write(process.env.LEAN_PATH ?? '')"]);
+  assert.equal(leanPath.status, 0, leanPath.log);
+  const result = spawnSync(JSON.parse(executable.stdout), [destination,
+    `${destination}.report.md`, ...paths.flatMap((file) => ["--setup", file]),
+    "--target-marked-module", "CacheFixture.Root"], {
+    cwd: consumer, env: { ...process.env, LEAN_PATH: leanPath.stdout }, encoding: "utf8",
+    timeout: 120_000,
+  });
+  writeFileSync(path.join(logs, `${label}-queried-generation.log`),
+    `${result.stdout ?? ""}\n${result.stderr ?? ""}\n${result.error ?? ""}`);
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const bytes = readFileSync(destination);
+  assert.deepEqual(readIrPackageInfo(bytes).manifest.exports.map((entry) => entry.entry),
+    ["CacheFixture.Root.answer"]);
+  return bytes;
+}
+
 async function assertRuntimeResult(label, expected) {
+  const queried = options.expectCacheOnlyFailure ? undefined : generateFromInputs(label);
   if (!options.wasm) return;
   const { createVirRuntime } = await import("../../web/src/vir-runtime-node.js");
   const descriptor = JSON.parse(readFileSync(descriptorPath, "utf8"));
@@ -554,5 +602,14 @@ async function assertRuntimeResult(label, expected) {
     console.log(`VIR Lake cache Wasm ${label}: ${expected}`);
   } finally {
     runtime.dispose();
+  }
+  if (queried) {
+    const standalone = await createVirRuntime({ wasmBytes, irPackageSet: [queried] });
+    try {
+      assert.equal(standalone.call("CacheFixture.Root.answer"), expected, `${label} inputs API`);
+      console.log(`VIR queried inputs Wasm ${label}: ${expected}`);
+    } finally {
+      standalone.dispose();
+    }
   }
 }

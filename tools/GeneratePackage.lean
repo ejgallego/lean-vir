@@ -71,6 +71,23 @@ partial def parseTargets.go
 def parseTargets (args : List String) : Except String (Array Vir.GeneratePackage.Target) :=
   parseTargets.go args #[]
 
+/-- Combine explicitly resolved modules from one acquisition context. Repeated
+paths are harmless; conflicting paths for the same module are not a policy for
+choosing a winner. Setup options/plugins/target selection are never consumed. -/
+def loadSetups (args : List String) (arts : NameMap ImportArtifacts := {}) :
+    IO (NameMap ImportArtifacts × List String) := do
+  match args with
+  | "--setup" :: setupPath :: rest =>
+    let setup ← ModuleSetup.load setupPath
+    let mut arts := arts
+    for (name, paths) in setup.importArts do
+      if let some previous := arts.find? name then
+        unless toJson previous == toJson paths do
+          throw <| IO.userError s!"conflicting resolved artifacts for module `{name}`"
+      arts := arts.insert name paths
+    loadSetups rest arts
+  | _ => pure (arts, args)
+
 unsafe def main (args : List String) : IO UInt32 := do
   match args with
   | [_, _] =>
@@ -79,11 +96,7 @@ unsafe def main (args : List String) : IO UInt32 := do
   | packagePath :: reportPath :: targetArgs =>
       -- Lake's setup format transports resolved compiled inputs only. The
       -- generator still owns its import context, options and target selection.
-      let (importArts, targetArgs) ← match targetArgs with
-        | "--setup" :: setupPath :: rest => do
-            let setup ← ModuleSetup.load setupPath
-            pure (setup.importArts, rest)
-        | _ => pure (({} : NameMap ImportArtifacts), targetArgs)
+      let (importArts, targetArgs) ← loadSetups targetArgs
       if targetArgs.isEmpty then
         IO.eprintln "at least one explicit package target is required"
         return 2
@@ -104,5 +117,5 @@ unsafe def main (args : List String) : IO UInt32 := do
               IO.eprintln err
               return 2
   | _ =>
-      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--setup <setup.json>] [--module-set-output <set.json> <shard-dir> <root-module> <root-relative-path> <shard-relative-dir>] [--target-module <module> <root>... | --package-module <module> <root>... | --target-all-module <module> | --target-marked-module <module>]"
+      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--setup <setup.json>]... [--module-set-output <set.json> <shard-dir> <root-module> <root-relative-path> <shard-relative-dir>] [--target-module <module> <root>... | --package-module <module> <root>... | --target-all-module <module> | --target-marked-module <module>]"
       return 2
