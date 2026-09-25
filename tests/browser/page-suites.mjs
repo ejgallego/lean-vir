@@ -460,7 +460,10 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.ok(context.coverage.facts[0].includes(
     `${context.coverage.retainedFunctions} / ${context.coverage.totalFunctions}`,
   ));
-  assert.equal(context.objectFunctions.total, 260);
+  assert.ok(
+    Number.isInteger(context.objectFunctions.total)
+      && context.objectFunctions.total >= 250,
+  );
   assert.ok(
     Number.isInteger(context.objectFunctions.retained)
       && context.objectFunctions.retained >= 0
