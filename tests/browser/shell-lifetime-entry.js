@@ -916,6 +916,112 @@ async function failedRefresh() {
   transport.packageBase64 = transport.basePackageBase64;
 }
 
+// A context is position-specific: healthy/pending work must survive its change,
+// while a failed attempt can use a fresh context without a new code token.
+async function failedAcquisitionNewContext() {
+  for (const installed of [false, true]) {
+    for (const changeWhilePending of [false, true]) {
+      const originalRpc = harness.rpc;
+      const fingerprint = (value) => ({ roots: [prefix + "createComponent"], fingerprint: value });
+      transport.packageBase64 = transport.basePackageBase64;
+      const gate = deferred();
+      if (!installed) transport.buildGate = gate;
+      const shell = await mountShell({ updateToken: null, irPackage: fingerprint("recovery-original") });
+      let old = null;
+      if (installed) {
+        await shell.ready();
+        old = states.at(-1);
+        transport.buildGate = gate;
+        await shell.update({ irPackage: fingerprint("recovery-changed") });
+      }
+      await until(() => transport.buildGate === null, "failed acquisition is pending");
+      const builds = transport.builds;
+      const changeContext = async () => {
+        harness.rpc = { call: (...args) => originalRpc.call(...args) };
+        await shell.update({ pos: { uri: "file:///ShellLifetime.lean", line: 3, character: 1 } });
+      };
+      if (changeWhilePending) {
+        await changeContext();
+        await tick();
+        check(transport.builds === builds, "new context does not cancel or duplicate pending work");
+      }
+      await React.act(async () => gate.reject(new Error("recovery transport sentinel")));
+      if (!changeWhilePending) {
+        await until(() => shell.container.querySelector('[data-vir-infoview-state="error"]'),
+          "failed acquisition status");
+        await shell.update({ setupHint: "same context after failure" });
+        await tick();
+        check(transport.builds === builds, "failure does not retry without a new context");
+        await changeContext();
+      }
+      await shell.ready();
+      check(transport.builds === builds + 1, "fresh context recovers failed attempt exactly once");
+      const recovered = states.at(-1);
+      if (old) check(recovered === old && old.cleanups === 0,
+        "failed refresh recovery preserves the installed equal-byte component");
+      await changeContext();
+      await tick();
+      check(transport.builds === builds + 1, "healthy recovery does not acquire on later context changes");
+      await shell.unmount();
+      recovered.captured = null;
+      harness.rpc = originalRpc;
+    }
+  }
+
+  const originalRpc = harness.rpc;
+  const gate = deferred();
+  transport.buildGate = gate;
+  const shell = await mountShell();
+  await until(() => transport.buildGate === null, "healthy initial acquisition pending");
+  const builds = transport.builds;
+  harness.rpc = { call: (...args) => originalRpc.call(...args) };
+  await shell.update({ setupHint: "context changed during healthy load" });
+  await React.act(async () => gate.resolve());
+  await shell.ready();
+  check(transport.builds === builds, "pending successful acquisition survives a context change");
+  const state = states.at(-1);
+  await shell.unmount();
+  state.captured = null;
+  harness.rpc = originalRpc;
+}
+
+async function failedConnectionDoesNotReconnectItself() {
+  const originalRpc = harness.rpc;
+  let contextReads = 0;
+  let failedCalls = 0;
+  // Model the upstream hook replacing a failed connection each time it runs.
+  // Let a third request succeed so the negative control cannot loop forever.
+  Object.defineProperty(harness, "rpc", {
+    configurable: true,
+    get() {
+      contextReads++;
+      return {
+        call(method, params) {
+          if (method.endsWith("buildIRPackage") && failedCalls++ < 2)
+            throw new Error("connection unavailable sentinel");
+          return originalRpc.call(method, params);
+        },
+      };
+    },
+  });
+  let shell;
+  try {
+    shell = await mountShell({ updateToken: null });
+    await tick();
+    check(contextReads === 1 && failedCalls === 1 &&
+      shell.container.querySelector('[data-vir-infoview-state="error"]'),
+      "loading-state renders do not manufacture replacement RPC contexts");
+    await shell.update({ setupHint: "external context update" });
+    await tick();
+    check(contextReads === 2 && failedCalls === 2 &&
+      shell.container.querySelector('[data-vir-infoview-state="error"]'),
+      "another failed connection gets one attempt per external update");
+  } finally {
+    await shell?.unmount();
+    Object.defineProperty(harness, "rpc", { configurable: true, writable: true, value: originalRpc });
+  }
+}
+
 async function failedRefreshThenConfigurationChange() {
   transport.packageBase64 = transport.basePackageBase64;
   const shell = await mountShell({ updateToken: "configuration-failure-initial" });
@@ -1232,6 +1338,8 @@ globalThis.runShellLifetime = async (
     await normalUnmountFailure();
     await failedCandidates();
     await failedRefresh();
+    await failedAcquisitionNewContext();
+    await failedConnectionDoesNotReconnectItself();
     await failedRefreshThenConfigurationChange();
     await temporaryBuildFailure();
     await replacementCleanupFailure();
@@ -1248,6 +1356,7 @@ globalThis.runShellLifetime = async (
       generations: states.length,
       normalUnmount: true,
       unchangedInputs: true,
+      failedAcquisitionRecovery: true,
       refresh: true,
       lateLeanGuards: true,
       lateScheduling: true,

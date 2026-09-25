@@ -51,7 +51,7 @@ contain no live environment, task or RPC reference.
 
 The shell requests code on mount and when its package fingerprint or configuration
 changes. Ordinary proof edits, goals, cursor positions and position-specific RPC
-session changes update the existing component without package or asset requests.
+session changes update a healthy component without package or asset requests.
 There is no edit subscription or polling in the shell. An edit affecting the
 widget definition re-elaborates its description; upstream `getWidgets` supplies
 the updated props. Identical package inputs produce the same fingerprint even if
@@ -76,14 +76,26 @@ For manually assembled `WidgetProps`, roots-only `IRPackage` values retain the
 unsaved code and imported code visible in that snapshot. Such integrations can
 change `updateToken` when they want to request new code. With no token, they load
 on mount/configuration change. Position or session changes alone do not reload
-code. This replaces `autoReloadMs`; generated widgets need no handwritten token.
+healthy code. This replaces `autoReloadMs`; generated widgets need no handwritten token.
 
 New code requests supersede pending older ones. Obsolete unpublished runtimes are
 disposed; a failed acquisition keeps the last working component and presents its
-error. Compilation/fingerprint failures are Lean elaboration diagnostics. No
+error. After a failed attempt, a new upstream RPC context permits one new attempt
+with the same fingerprint/token. Contexts are position-specific, so cursor movement
+can also supply that opportunity. Healthy or pending requests are left alone. If
+the context changes while a request is pending and that request subsequently fails,
+the shell tries the newer context once. Re-rendering with the same context does
+not repeat a failed request. Loading-status updates do not rerun upstream session
+lookup; a broken connection therefore cannot create its own retry loop.
+
+Compilation/fingerprint failures are Lean elaboration diagnostics. No
 fingerprint is published for an invalid package; its display/removal follows the
 upstream widget registration behavior. A later valid code description can load
-normally. There is no periodic retry or Retry button.
+normally. In the generated-widget regression, invalid helper elaboration removes
+the widget description and UI; repair restores it with a fresh component mount,
+even when the fingerprint matches the earlier valid program. Escaped continuations
+still retain their original runtime and execute their cleanup guards. There is no
+periodic retry or Retry button.
 
 Fingerprint generation performs package analysis once per elaboration of the
 widget command. This can increase definition/build time and compiled module size;

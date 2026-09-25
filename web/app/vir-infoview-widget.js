@@ -32,7 +32,13 @@ const statusStyle = {
 
 export default function VirInfoviewWidget(props) {
   const rpcSession = useRpcSession();
-  const hostContextRef = React.useRef({ rpcSession });
+  // Upstream can reconnect when this hook runs. Loading-state updates must not
+  // themselves manufacture fresh contexts and repeatedly retry a broken server.
+  return e(WidgetLoader, { widgetProps: props, rpcSession });
+}
+
+function WidgetLoader({ widgetProps: props, rpcSession }) {
+  const hostContextRef = React.useRef({});
   const [status, setStatus] = React.useState({
     kind: "loading",
     message: "Loading VIR widget...",
@@ -40,6 +46,7 @@ export default function VirInfoviewWidget(props) {
   const loadedRef = React.useRef(null);
   const [loaded, setLoaded] = React.useState(null);
   const refreshGenerationRef = React.useRef(0);
+  const acquisitionRef = React.useRef(null);
   const irPackageKey =
     props.irPackage === null || props.irPackage === undefined
       ? ""
@@ -56,17 +63,16 @@ export default function VirInfoviewWidget(props) {
   ]);
 
   React.useLayoutEffect(() => {
-    hostContextRef.current.rpcSession = rpcSession;
     hostContextRef.current.configurationKey = configurationKey;
     hostContextRef.current.requestKey = requestKey;
     return () => {
       // Invalidate pending candidates at removal, before passive cleanup runs.
       hostContextRef.current.configurationKey = null;
     };
-  }, [rpcSession, configurationKey, requestKey]);
+  }, [configurationKey, requestKey]);
 
-  async function refreshLoadedWidget(isDisposed) {
-    const obsolete = () => isDisposed() ||
+  async function refreshLoadedWidget(attempt, generation) {
+    const obsolete = () => generation !== refreshGenerationRef.current ||
       configurationKey !== hostContextRef.current.configurationKey ||
       requestKey !== hostContextRef.current.requestKey;
     let setupHint = "";
@@ -77,7 +83,7 @@ export default function VirInfoviewWidget(props) {
       const previous = loadedRef.current?.configurationKey === configurationKey
         ? loadedRef.current.service : null;
       service = await loadRuntimeService({
-        rpcSession: hostContextRef.current.rpcSession,
+        rpcSession: attempt.rpcSession,
         config,
         previous,
       });
@@ -123,6 +129,7 @@ export default function VirInfoviewWidget(props) {
         ? error
         : new AggregateError(errors, "VIR widget loading failed");
       if (!obsolete()) {
+        attempt.failed = true;
         setStatus({ kind: "error", message: errorMessage(failure, setupHint) });
       } else {
         console.error(failure);
@@ -139,20 +146,23 @@ export default function VirInfoviewWidget(props) {
   }, [configurationKey]);
 
   React.useEffect(() => {
-    let disposed = false;
+    const previousAttempt = acquisitionRef.current;
+    // Context changes leave healthy and pending acquisitions alone. A failed
+    // attempt may use a new context once, including one received while pending.
+    if (previousAttempt?.requestKey === requestKey &&
+        (!previousAttempt.failed || previousAttempt.rpcSession === rpcSession)) {
+      return;
+    }
+    const attempt = { requestKey, rpcSession, failed: false };
+    acquisitionRef.current = attempt;
     if (loadedRef.current?.configurationKey !== configurationKey) {
       loadedRef.current = null;
       setLoaded(null);
       setStatus({ kind: "loading", message: "Loading VIR widget..." });
     }
     const generation = ++refreshGenerationRef.current;
-    refreshLoadedWidget(
-      () => disposed || generation !== refreshGenerationRef.current,
-    );
-    return () => {
-      disposed = true;
-    };
-  }, [requestKey]);
+    refreshLoadedWidget(attempt, generation);
+  }, [requestKey, rpcSession, status]);
 
   return e(
     "section",

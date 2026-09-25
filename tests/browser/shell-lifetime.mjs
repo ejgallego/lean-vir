@@ -148,14 +148,10 @@ function instrumentShellSource(source, withoutRemovalInvalidation) {
       "      });\n      if (obsolete()) {",
       "        }),\n      );\n      if (obsolete()) {",
     );
-  assert.ok(
-    observed.includes("    return () => {\n      disposed = true;"),
-    "missing passive cleanup observation point",
-  );
-  return observed.replace(
-    "    return () => {\n      disposed = true;",
-    "    return () => {\n      globalThis.__shellTest.widgetPassiveCleanup();\n      disposed = true;",
-  );
+  const passiveCleanup = "      // React owns the descendant UI.";
+  assert.ok(observed.includes(passiveCleanup), "missing passive cleanup observation point");
+  return observed.replace(passiveCleanup,
+    "      globalThis.__shellTest.widgetPassiveCleanup();\n" + passiveCleanup);
 }
 
 async function runPendingRemovalControl(cdp, bundle, wasmBase64, packageBase64) {

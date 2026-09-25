@@ -22,13 +22,18 @@ open Lean.Vir Lean.Vir.React Lean.Vir.Infoview
 -- label proves that the package was rebuilt from unsaved source.
 def implementationLabel : String := "implementation-v1"
 
-def createEditableComponent : RuntimeM (FunctionComponent PanelWidgetProps) :=
-  FunctionComponent.ofLean fun _ => do
+def createEditableComponent : RuntimeM (FunctionComponent PanelWidgetProps) := do
+  let lifecycle ← Vir.Fixtures.ShellLifetime.createComponent
+  FunctionComponent.ofLean fun props => do
     let label ← Node.text (← JsValue.ofString implementationLabel)
-    let props ← Js.Object.empty
-    Js.Object.set props (← JsValue.ofString "id") (← JsValue.ofString "rpc-live-edit")
-    Node.createElement (← ElementType.tag (← JsValue.ofString "span"))
-      props (← Js.Array.ofArray #[label])
+    let editableProps ← Js.Object.empty
+    Js.Object.set editableProps (← JsValue.ofString "id") (← JsValue.ofString "rpc-live-edit")
+    let editable ← Node.createElement (← ElementType.tag (← JsValue.ofString "span"))
+      editableProps (← Js.Array.ofArray #[label])
+    let observer ← Node.functionComponent lifecycle props (← Js.Array.empty)
+    let containerProps ← Js.Object.empty
+    Node.createElement (← ElementType.tag (← JsValue.ofString "div"))
+      containerProps (← Js.Array.ofArray #[editable, observer])
 
 vir_proof_widget createEditableComponent
 

@@ -110,6 +110,7 @@ async function run() {
     sessions,
     root;
   let packageReplyDelayMs = 0;
+  let failNextPackageTransport = null;
   let invalidRootCall;
   const expectedLivePackageFailures = new Set();
   const container = document.getElementById("app");
@@ -154,6 +155,13 @@ async function run() {
         signal?.addEventListener("abort", cancel, { once: true });
         if (signal?.aborted) cancel();
         try {
+          if (failNextPackageTransport !== null &&
+              params.method === "Lean.Vir.Infoview.buildIRPackage") {
+            const error = new Error(failNextPackageTransport);
+            error.code = -32603;
+            failNextPackageTransport = null;
+            throw error;
+          }
           call.value = await post("/call", { id, params });
           // Delay delivery of a genuine server reply, not package generation or
           // its contents. The official RpcSessions client still receives it.
@@ -764,7 +772,125 @@ async function run() {
       "declaration re-elaboration with identical inputs preserves fingerprint");
     await renderWidget(reconnected, config.a, whitespaceDescriptor.irPackage.roots, whitespaceDescriptor);
     await tick();
-    check(packageCalls().length === beforeWhitespace, "equivalent source requests no package bytes");
+    const whitespacePackageRequests = packageCalls().length - beforeWhitespace;
+    check(whitespacePackageRequests === 0, "equivalent source requests no package bytes");
+    const generatedLiveState = states.at(-1);
+
+    // An invalid generated helper is removed from Widget_getWidgets. Repairing
+    // the same source restores its original fingerprint and descriptor; the
+    // next implementation edit then reappears through the generated fingerprint
+    // without an explicit updateToken.
+    const generatedContinuation = await begin(
+      generatedLiveState,
+      reconnected,
+      "success",
+      "generated-invalid",
+    );
+    await editText(
+      '"implementation-v6"',
+      '"implementation-v6" ++ missingGeneratedImplementation',
+    );
+    const invalidGenerated = await Widget_getWidgets(reconnected, config.a);
+    check(
+      !invalidGenerated.widgets.some((widget) =>
+        widget.props?.componentEntry === generatedEntry),
+      "invalid generated helper is removed from Widget_getWidgets",
+    );
+    await unmountUI();
+    check(
+      liveText() === null && !generatedLiveState.runtime.disposed,
+      "invalid generated helper removes the UI without hard-disposing its runtime",
+    );
+    await release(generatedContinuation, true);
+
+    await editText(
+      '"implementation-v6" ++ missingGeneratedImplementation',
+      '"implementation-v6"',
+    );
+    const repairedDescriptor = await generatedProps(reconnected, config.a, generatedEntry);
+    check(
+      repairedDescriptor.irPackage.fingerprint === descriptor.irPackage.fingerprint,
+      "repair restores the original generated fingerprint",
+    );
+    await renderWidget(reconnected, config.a, repairedDescriptor.irPackage.roots, {
+      ...repairedDescriptor,
+      updateToken: null,
+    });
+    await waitForLiveText("repaired generated helper", "implementation-v6");
+    const repairedState = states.at(-1);
+
+    await editText(
+      '"implementation-v6"',
+      '"implementation-v6" ++ missingChangedRepairImplementation',
+    );
+    const invalidChangedRepair = await Widget_getWidgets(reconnected, config.a);
+    check(
+      !invalidChangedRepair.widgets.some((widget) =>
+        widget.props?.componentEntry === generatedEntry),
+      "changed-code repair starts from a removed generated helper",
+    );
+    await unmountUI();
+    check(
+      liveText() === null && !repairedState.runtime.disposed,
+      "removed changed-code helper leaves its prior runtime usable",
+    );
+    await editText(
+      '"implementation-v6" ++ missingChangedRepairImplementation',
+      '"implementation-v7"',
+    );
+    const repairedChangedDescriptor = await generatedProps(reconnected, config.a, generatedEntry);
+    check(
+      repairedChangedDescriptor.irPackage.fingerprint !==
+        repairedDescriptor.irPackage.fingerprint,
+      "changed repaired helper receives a new generated fingerprint",
+    );
+    await renderWidget(
+      reconnected,
+      config.a,
+      repairedChangedDescriptor.irPackage.roots,
+      { ...repairedChangedDescriptor, updateToken: null },
+    );
+    await waitForLiveText("changed repaired generated helper", "implementation-v7");
+    check(
+      states.at(-1) !== repairedState,
+      "changed repaired helper reappears without an explicit updateToken",
+    );
+    descriptor = repairedChangedDescriptor;
+
+    // A failed initial package acquisition can recover on a new official RPC
+    // session while keeping the generated descriptor and fingerprint stable.
+    await unmountUI();
+    const failedInitialStart = calls.length;
+    failNextPackageTransport = "generated initial package transport sentinel";
+    await renderWidget(reconnected, config.a, descriptor.irPackage.roots, {
+      ...descriptor,
+      updateToken: null,
+    });
+    await waitFor("failed generated initial acquisition", () =>
+      container.querySelector('[data-vir-infoview-state="error"]'),
+    );
+    const failedInitialCall = calls.slice(failedInitialStart).find((call) =>
+      call.params.method === "Lean.Vir.Infoview.buildIRPackage",
+    );
+    check(
+      failedInitialCall?.error?.code === -32603,
+      "generated initial acquisition transport failure is observed",
+    );
+    expectedLivePackageFailures.add(failedInitialCall);
+    sessions.closeSessionForFile(config.uri);
+    const recoveredSession = sessionAt(config.a);
+    check(recoveredSession !== reconnected, "failed acquisition reconnects with a new official session");
+    await renderWidget(recoveredSession, config.a, descriptor.irPackage.roots, {
+      ...descriptor,
+      updateToken: null,
+    });
+    await waitForLiveText("recovered generated initial acquisition", "implementation-v7");
+    check(
+      calls.slice(failedInitialStart).filter((call) =>
+        call.params.method === "Lean.Vir.Infoview.buildIRPackage",
+      ).length === 2,
+      "reconnected generated descriptor retries one failed initial acquisition",
+    );
     check(!calls.some((call) => call.params.method === "Lean.Vir.Infoview.statIRPackage"),
       "the entire shell lifecycle uses no package stat requests");
     await unmountUI();
@@ -795,11 +921,13 @@ async function run() {
       allLeanEditRefresh: { requests: tutorialCalls().length, subscriptionsAfterUnmount: subscriptions },
       liveImplementationEdits: {
         initial: "implementation-v1",
-        final: "implementation-v6",
+        final: "implementation-v7",
         proofEditPackageRequests,
-        whitespacePackageRequests: packageCalls().length - beforeWhitespace,
+        whitespacePackageRequests,
         heldReplyDelayMs: heldBuild?.replyDelayMs ?? null,
       },
+      generatedInvalidRepair: true,
+      generatedInitialRecovery: true,
       consoleDiagnostics,
     };
   }, [
