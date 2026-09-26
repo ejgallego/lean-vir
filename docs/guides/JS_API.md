@@ -272,15 +272,18 @@ let vir = await factory.createRuntime({
 const next = await factory.createRuntime({
   irPackageSet: secondPackageMembers,
 });
-vir.dispose();
+const previous = vir;
 vir = next;
+previous.dispose();
 console.log(vir.call("SecondPackage.entry"));
 ```
 
 If creation of `next` fails, the existing `vir` remains usable because it has
 not been disposed. Dispose a generation only when its callbacks, handles and
-host resources should become invalid. User-supplied binding maps shared by
-multiple runtimes retain their existing reference-leased cleanup behavior.
+host resources should become invalid. The new generation is selected before
+disposing the previous one, so a cleanup error propagates while the caller
+still owns `vir`. User-supplied binding maps shared by multiple runtimes retain
+their existing reference-leased cleanup behavior.
 
 ## Calls And Manifest
 
