@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import {
   createVirRuntime,
+  createVirRuntimeFactory,
   VIR_HOST_DISPOSE,
 } from "../../web/src/vir-runtime-node.js";
 import {
@@ -176,9 +177,8 @@ assert.equal(throwingBindingRuntime.liveCallbacks.size, 0);
 assert.throws(() => throwingCallback(1n), /disposed runtime/);
 
 let bindingDisposals = 0;
-const reloadRuntime = await createVirRuntime({
+const hostFactory = createVirRuntimeFactory({
   wasmBytes,
-  irPackageSet: [hostPackageBytes],
   hostBindings: {
     ...createCallbackHostBindings(),
     [VIR_HOST_DISPOSE]() {
@@ -186,20 +186,27 @@ const reloadRuntime = await createVirRuntime({
     },
   },
 });
-assert.equal(reloadRuntime.call("HostInterop.callbackRoundTrip", 3), "10");
-assert.equal(reloadRuntime.liveCallbacks.size, 1);
-const badReloadPackage = Uint8Array.from(hostPackageBytes);
-badReloadPackage[4] ^= 1;
+const firstRuntime = await hostFactory.createRuntime({
+  irPackageSet: [hostPackageBytes],
+});
+assert.equal(firstRuntime.call("HostInterop.callbackRoundTrip", 3), "10");
+assert.equal(firstRuntime.liveCallbacks.size, 1);
+const badPackage = Uint8Array.from(hostPackageBytes);
+badPackage[4] ^= 1;
+const failedCandidate = await hostFactory.createRuntime();
 assert.throws(
-  () => reloadRuntime.loadIrPackageSetBytes([badReloadPackage]),
+  () => failedCandidate.loadIrPackageSetBytes([badPackage]),
   /invalid IR package magic/,
 );
+failedCandidate.dispose();
 assert.equal(bindingDisposals, 0);
-assert.equal(reloadRuntime.liveCallbacks.size, 1);
-reloadRuntime.loadIrPackageSetBytes([defaultPackageBytes]);
-assert.equal(reloadRuntime.liveCallbacks.size, 0);
-assert.equal(reloadRuntime.call("fib", 12), "144");
-reloadRuntime.dispose();
+assert.equal(firstRuntime.liveCallbacks.size, 1);
+const nextRuntime = await hostFactory.createRuntime({
+  irPackageSet: [defaultPackageBytes],
+});
+assert.equal(nextRuntime.call("fib", 12), "144");
+firstRuntime.dispose();
+nextRuntime.dispose();
 assert.equal(bindingDisposals, 1);
 
 assert.throws(

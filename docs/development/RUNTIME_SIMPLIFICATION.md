@@ -34,7 +34,7 @@ inherited without a shell bridge or second React root.
 | `replaceIrPackageManifest`, `encodeInvalidMagicPackage` | **Remove now** from execution responsibilities (separate patch) | Migrate actual tooling/test imports; retain execution accessors and writers. This patch does not relocate them. |
 | Descriptor equality/round-trip tooling | **Remove after changing a supported contract** | Execution does not call these helpers, but `tests/runtime/sdk-import-smoke.mjs` explicitly requires their codec exports. Separate tooling placement from the SDK export decision. |
 | `findTaggedUnionConstructor` | **Remove after changing a supported contract** | Repository search finds only its definition; confirm support for direct source imports before removal. |
-| Stable-facade reload and its adoption/rebinding machinery | **Remove after changing a supported contract** | Documented and tested invalidation behavior; decide whether any consumer requires stable runtime identity, then migrate callers/docs/tests explicitly. |
+| Stable-facade reload and its adoption/rebinding machinery | **Remove now in this candidate; downstream adoption required** | One runtime owns one package generation. A deferred runtime may install its first package; later code uses a fresh runtime from the same factory. The dirty Slides live demo still needs migration before publication. |
 | `HostBindingsLease` and release callbacks | **Remove after changing a supported contract** | Independent runtimes can share bindings with automatic last-owner disposal. Decide separately whether integrations instead own supplied services. |
 | Historical manifest versions and option variants | **Remove after changing a supported contract** | Name supported released artifacts and consumers before narrowing compatibility. |
 | Widget error presentation and JSON-input classifications | **Remove now** from general runtime responsibilities (separate patch) | Preserve application diagnostics and actual consumers; moving code alone is not a simplification claim. |
@@ -43,13 +43,14 @@ inherited without a shell bridge or second React root.
 | Thin native providers, rooting/refcounts, closure/handle retention and cleanup-error collection | **Keep because it protects a specific behavior** | Receiver/property semantics, cross-heap lifetime, partial-construction cleanup and independent teardown after an error. |
 | Structural conversion, including Expr/Level support | **Keep because it protects a specific behavior** | Existing explicit conversion clients; first avoid unnecessary round trips in document/widget paths and establish the specialized consumers. |
 
-The proposed future invariant is **one runtime object, one package generation**.
-It would remove `replaceIrPackageSetBytes`, `replacePackageState`,
-`adoptRuntimeState`, the replacement-factory back-reference and replacement-only
-resets. It does not require a generation manager. It is not implemented here.
+The candidate invariant is **one runtime object, one package generation**. It removes
+`replaceIrPackageSetBytes`, `replacePackageState`, `adoptRuntimeState`, the
+replacement-factory back-reference and replacement-only resets. It does not require
+a generation manager. Compiled `WebAssembly.Module` reuse and shared host-binding
+leases remain available through the factory.
 
 The first patch flattens the Infoview loader. It preserves the package RPC
-protocol, binding ownership, runtime reload API and UI lifetime. Internal shell
+protocol, binding ownership and UI lifetime. Internal shell
 exports used by the smoke test change: `loadRuntimeOptions` is removed and
 `loadWasmModule` takes a path and revision instead of a source record. The shell
 is not an entry in the npm exports map; no repository application imports those
@@ -64,14 +65,16 @@ endpoint are removed. Custom integrations use the generated `irPackage` and
 
 Healthy proof/context updates do not acquire code. A failed acquisition may use
 a new upstream RPC context once; local loading-state renders cannot manufacture
-reconnect attempts. Runtime lifetime contracts remain unchanged.
+reconnect attempts. Infoview UI lifetime contracts remain unchanged; runtime
+package loading now uses one generation per runtime object.
 
 Next, establish one small Verso document example with two independent Lean DOM
 interactions, generated bootstrap wiring, no required React, and a shared page
 package load. Record asset requests and startup work using existing tooling.
-Only then select the reload consumer decision; host-binding ownership is a
-separate decision. Add no public API, manager, generic adapter, compatibility
-fallback or runtime dependency to the loader cleanup. Measure deletions across
+The runtime consumer decision is now explicit: downstream callers must select a
+fresh generation and dispose the previous one when invalidation is intended;
+host-binding ownership is a separate decision. Add no public API, manager, generic
+adapter, compatibility fallback or runtime dependency to the loader cleanup. Measure deletions across
 execution, tests and documentation separately; no latency or bundle-size benefit
 is inferred from source reduction.
 

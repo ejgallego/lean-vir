@@ -34,7 +34,6 @@ export class VirRuntime extends ObjectValueRuntime {
       module = null,
       packageInfo = null,
       hostState = null,
-      createReplacementRuntime = null,
     } = {},
   ) {
     super();
@@ -52,7 +51,6 @@ export class VirRuntime extends ObjectValueRuntime {
     this.disposed = false;
     this.disposing = false;
     this.liveCallbacks = new Set();
-    this.createReplacementRuntime = createReplacementRuntime;
     this.hostState?.attachRuntime(this);
 
     if (!this.exports.memory) {
@@ -88,21 +86,34 @@ export class VirRuntime extends ObjectValueRuntime {
 
   loadIrPackageSetBytes(packages, packageSet = null) {
     this.requireLiveRuntime();
+    if (this.hasPackageState()) {
+      throw new Error(
+        "VirRuntime already owns an IR package set; create a fresh runtime for another generation",
+      );
+    }
+    if (this.liveCallbacks.size !== 0) {
+      throw new Error(
+        "VirRuntime cannot install an IR package set while callbacks are live; create a fresh runtime",
+      );
+    }
     const packageBytes = validateIrPackageSetMembers(packages, {
       members: packageSet?.members ?? null,
     }).bytes;
-    if (this.hasPackageState() || this.liveCallbacks.size !== 0) {
-      if (typeof this.createReplacementRuntime !== "function") {
-        throw new Error(
-          "IR package-set reload requires a factory-managed VirRuntime",
-        );
-      }
-      return this.replaceIrPackageSetBytes(packageBytes, packageSet);
-    }
     return this.installIrPackageSetBytes(packageBytes, packageSet);
   }
 
   installIrPackageSetBytes(packageBytes, packageSet = null) {
+    this.requireLiveRuntime();
+    if (this.hasPackageState()) {
+      throw new Error(
+        "VirRuntime already owns an IR package set; create a fresh runtime for another generation",
+      );
+    }
+    if (this.liveCallbacks.size !== 0) {
+      throw new Error(
+        "VirRuntime cannot install an IR package set while callbacks are live; create a fresh runtime",
+      );
+    }
     this.requireFunction("vir_begin_ir_package_set");
     this.requireFunction("vir_append_ir_package");
     this.requireFunction("vir_prepare_ir_package_set");
@@ -198,57 +209,6 @@ export class VirRuntime extends ObjectValueRuntime {
       packageSet,
     };
     return this.packageInfo;
-  }
-
-  replaceIrPackageSetBytes(packageBytes, packageSet = null) {
-    return this.replacePackageState(
-      (replacement) =>
-        replacement.installIrPackageSetBytes(packageBytes, packageSet),
-      "IR package-set",
-    );
-  }
-
-  replacePackageState(install, label) {
-    const replacement = this.createReplacementRuntime();
-    let packageInfo;
-    try {
-      packageInfo = install(replacement);
-    } catch (error) {
-      const errors = [error];
-      collectCleanupError(errors, () => replacement.dispose());
-      throwCollectedErrors(errors, `${label} replacement setup failed`);
-    }
-
-    try {
-      this.teardownPackageResources();
-    } catch (error) {
-      const errors = [error];
-      collectCleanupError(errors, () => replacement.dispose());
-      this.markDisposed();
-      throwCollectedErrors(errors, `${label} replacement teardown failed`);
-    }
-    this.adoptRuntimeState(replacement);
-    return packageInfo;
-  }
-
-  adoptRuntimeState(replacement) {
-    this.exports = replacement.exports;
-    this.module = replacement.module;
-    this.hostState = replacement.hostState;
-    this.packageInfo = replacement.packageInfo;
-    this.interfaceManifest = replacement.interfaceManifest;
-    this.packageMetadata = replacement.packageMetadata;
-    this.boxedCallEntryNames = replacement.boxedCallEntryNames;
-    this.completedStartupEntries = replacement.completedStartupEntries;
-    this.liveCallbacks = replacement.liveCallbacks;
-    this.hostState?.attachRuntime(this);
-    this.rebuildManifestExports();
-
-    replacement.disposed = true;
-    replacement.disposing = false;
-    replacement.hostState = null;
-    replacement.liveCallbacks = new Set();
-    replacement.exportsByName = Object.create(null);
   }
 
   clearPackageMetadata() {

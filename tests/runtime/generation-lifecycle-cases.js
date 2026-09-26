@@ -22,38 +22,50 @@ function rejects(action, pattern) {
   throw new Error("expected rejection");
 }
 
-export async function runGenerationLifecycleCases(createRuntime, packageBytes) {
-  const first = await makeGeneration(createRuntime, "before replacement");
-  const state = first.runtime.hostState;
+export async function runGenerationLifecycleCases(
+  createRuntime,
+  packageBytes,
+  createDeferredRuntime,
+) {
+  const deferred = await createDeferredRuntime();
   rejects(
-    () => first.runtime.loadIrPackageSetBytes([new Uint8Array([0])]),
+    () => deferred.loadIrPackageSetBytes([new Uint8Array([0])]),
     /package|header|truncated|byte/i,
   );
-  check(first.callback(4n) === 11n, "failed replacement preserves callback");
   check(
-    readJsl(first.runtime, first.jsl) === "before replacement",
-    "failed replacement preserves JSL",
+    deferred.packageInfo === null && deferred.packageDeclCount() === 0,
+    "failed first installation leaves the deferred runtime empty",
   );
-  first.runtime.loadIrPackageSetBytes([packageBytes]);
+  deferred.loadIrPackageSetBytes([packageBytes]);
   check(
-    first.runtime.hostState !== state,
-    "replacement adopts separate host state",
+    deferred.packageInfo !== null,
+    "deferred runtime accepts its first package generation",
+  );
+  rejects(
+    () => deferred.loadIrPackageSetBytes([packageBytes]),
+    /already owns an IR package set/i,
+  );
+  deferred.dispose();
+
+  const first = await makeGeneration(createRuntime, "one generation");
+  const state = first.runtime.hostState;
+  rejects(
+    () => first.runtime.loadIrPackageSetBytes([packageBytes]),
+    /already owns an IR package set/i,
+  );
+  check(first.callback(4n) === 11n, "rejected second load preserves callback");
+  check(
+    readJsl(first.runtime, first.jsl) === "one generation",
+    "rejected second load preserves JSL",
   );
   check(
-    state.leanObjectHandleCells.size === 0,
-    "replacement releases old JSL roots",
-  );
-  rejects(() => first.callback(4n), /disposed runtime/);
-  rejects(() => readJsl(first.runtime, first.jsl), /live Lean object handle/);
-  const replacementJsl = makeJsl(first.runtime, "after replacement");
-  check(
-    readJsl(first.runtime, replacementJsl) === "after replacement",
-    "new heap is usable",
+    first.runtime.hostState === state,
+    "rejected second load preserves host state",
   );
   first.runtime.dispose();
   first.runtime.dispose();
   rejects(
-    () => readJsl(first.runtime, replacementJsl),
+    () => readJsl(first.runtime, first.jsl),
     /live Lean object handle/,
   );
 
@@ -119,8 +131,9 @@ export async function runGenerationLifecycleCases(createRuntime, packageBytes) {
     "finalized roots are not released twice",
   );
   return {
-    replacement: true,
-    failedReplacement: true,
+    deferredFirstInstall: true,
+    failedFirstInstall: true,
+    rejectedReload: true,
     hardShutdown: true,
     cleanupErrors: true,
   };
