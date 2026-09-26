@@ -238,51 +238,87 @@ assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
 const firstWasmModule = irPackageFirstService.runtime.module;
 assert.ok(firstWasmModule instanceof WebAssembly.Module);
 const readsBeforeCacheHit = assetReadCount;
-assert.equal(
-  await loadWasmModule(rpcSession, irPackageServiceConfig.wasmPath, "wasm-v1"),
-  firstWasmModule,
-);
-assert.equal(assetReadCount, readsBeforeCacheHit, "same revision reuses compiled Wasm");
-assert.notEqual(
-  await loadWasmModule(rpcSession, irPackageServiceConfig.wasmPath, "wasm-v2"),
-  firstWasmModule,
-  "new asset revision recompiles Wasm",
-);
-let failAssetRead = true;
-const retrySession = {
-  call(method, params) {
-    if (method.endsWith("readAsset") && failAssetRead) {
-      failAssetRead = false;
-      throw new Error("temporary asset read failure");
-    }
-    return rpcSession.call(method, params);
-  },
+assert.equal(await loadWasmModule(rpcSession, irPackageServiceConfig.wasmPath), firstWasmModule);
+assert.equal(assetReadCount, readsBeforeCacheHit + 1, "acquisition identifies the bytes it reads");
+assetRevisions.set(irPackageServiceConfig.wasmPath, "wasm-v2");
+assert.equal(await loadWasmModule(rpcSession, irPackageServiceConfig.wasmPath), firstWasmModule,
+  "equal bytes reuse compilation despite changed metadata");
+
+function wasmReturning(value) {
+  return Uint8Array.of(
+    0,97,115,109,1,0,0,0, 1,5,1,96,0,1,127, 3,2,1,0,
+    7,5,1,1,102,0,0, 10,6,1,4,0,65,value,11,
+  );
+}
+function assetSource(bytes) {
+  return { async call(method, { path }) {
+    assert.equal(method, "Lean.Vir.Infoview.readAsset");
+    return { path, mime: "application/wasm", byteSize: String(bytes.length),
+      modified: "1", revision: "same-metadata", dataBase64: Buffer.from(bytes).toString("base64") };
+  } };
+}
+const path = "same-project-relative-path.wasm";
+const sourceA = assetSource(wasmReturning(1));
+const sourceB = assetSource(wasmReturning(2));
+const moduleA = await loadWasmModule(sourceA, path);
+const moduleB = await loadWasmModule(sourceB, path);
+assert.notEqual(moduleA, moduleB, "different projects cannot alias through path and metadata");
+assert.equal(new WebAssembly.Instance(moduleB).exports.f(), 2);
+assert.equal(await loadWasmModule(assetSource(wasmReturning(2)), "other-path.wasm"), moduleB,
+  "equal bytes share compilation across sources and paths");
+
+// Concurrent identical reads share compilation, and a failed compile is evicted.
+const originalCompile = WebAssembly.compile;
+let compilations = 0;
+let failCompile = false;
+WebAssembly.compile = (bytes) => {
+  compilations++;
+  if (failCompile) {
+    failCompile = false;
+    return Promise.reject(new Error("compile failure sentinel"));
+  }
+  return originalCompile(bytes);
 };
-await assert.rejects(
-  loadWasmModule(retrySession, irPackageServiceConfig.wasmPath, "wasm-retry"),
-  /temporary asset read failure/,
-);
-assert.ok(
-  await loadWasmModule(retrySession, irPackageServiceConfig.wasmPath, "wasm-retry")
-    instanceof WebAssembly.Module,
-  "failed cache entries permit retry",
-);
-// Failure of a superseded read must not evict the newer cached module.
+try {
+  const pair = await Promise.all([
+    loadWasmModule(assetSource(wasmReturning(3)), path),
+    loadWasmModule(assetSource(wasmReturning(3)), path),
+  ]);
+  assert.equal(pair[0], pair[1]);
+  assert.equal(compilations, 1, "concurrent acquisitions compile identical bytes once");
+  failCompile = true;
+  await assert.rejects(loadWasmModule(assetSource(wasmReturning(4)), path), /compile failure sentinel/);
+  const recovered = await loadWasmModule(assetSource(wasmReturning(4)), path);
+  assert.equal(new WebAssembly.Instance(recovered).exports.f(), 4);
+  assert.equal(compilations, 3, "failed compilation permits a later attempt");
+} finally {
+  WebAssembly.compile = originalCompile;
+}
+
+// A delayed read failure cannot evict another source's successful compilation.
 const staleRead = Promise.withResolvers();
-const staleModule = loadWasmModule({ call: () => staleRead.promise },
-  irPackageServiceConfig.wasmPath, "wasm-stale");
-const staleFailure = assert.rejects(staleModule, /superseded asset read/);
-const currentModule = await loadWasmModule(
-  rpcSession, irPackageServiceConfig.wasmPath, "wasm-current",
-);
+const staleFailure = assert.rejects(
+  loadWasmModule({ call: () => staleRead.promise }, path), /superseded asset read/);
+assert.equal(await loadWasmModule(sourceB, path), moduleB);
 staleRead.reject(new Error("superseded asset read"));
 await staleFailure;
-const readsBeforeStaleRetry = assetReadCount;
-assert.equal(
-  await loadWasmModule(rpcSession, irPackageServiceConfig.wasmPath, "wasm-current"),
-  currentModule,
-);
-assert.equal(assetReadCount, readsBeforeStaleRetry, "stale failure preserves newer cache entry");
+assert.equal(await loadWasmModule(sourceB, path), moduleB);
+
+const statsBeforeNoStat = assetStatCount;
+const latestSnapshot = await loadRuntimeService({
+  rpcSession: {
+    async call(method, params) {
+      assert.notEqual(method, "Lean.Vir.Infoview.statAsset",
+        "Wasm identity uses read bytes, not a pre-read metadata token");
+      const response = await rpcSession.call(method, params);
+      return response;
+    },
+  },
+  config: irPackageServiceConfig,
+});
+assert.equal(assetStatCount, statsBeforeNoStat);
+latestSnapshot.runtime.dispose();
+
 irPackageFingerprint = "ir-package-v2";
 irPackageServiceConfig.irPackage.fingerprint = irPackageFingerprint;
 const irPackageThirdService = await loadRuntimeService({

@@ -273,12 +273,10 @@ export async function loadRuntimeService({ rpcSession, config, previous = null }
   if (position === null || position === undefined) {
     throw new Error("VIR widget irPackage requires an infoview position");
   }
-  const wasmInfo = await statAsset(rpcSession, wasmPath);
-  const wasmModule = await loadWasmModule(rpcSession, wasmPath, wasmInfo.revision);
+  const wasmModule = await loadWasmModule(rpcSession, wasmPath);
   const builtPackage = await buildIRPackage(rpcSession, irPackage, position);
   const packageBytes = decodeBase64Bytes(builtPackage.dataBase64);
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", packageBytes));
-  const packageDigest = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const packageDigest = await contentDigest(packageBytes);
   // Compare the complete artifact, including interfaces and initializers.
   // Distinct descriptions can still emit identical bytes. Preserve the installed
   // component when the acquired artifacts match.
@@ -301,21 +299,27 @@ export async function loadRuntimeService({ rpcSession, config, previous = null }
   return { runtime, packageDigest };
 }
 
-export async function loadWasmModule(rpcSession, path, revision) {
-  let cached = wasmModuleCache.get(path);
-  if (cached === undefined || cached.revision !== revision) {
-    const module = loadAssetBytes(rpcSession, path).then((bytes) =>
-      WebAssembly.compile(bytes),
-    );
-    cached = { revision, module };
-    wasmModuleCache.set(path, cached);
+async function contentDigest(bytes) {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export async function loadWasmModule(rpcSession, path) {
+  // Relative paths and file metadata cannot identify bytes across projects.
+  // Read only on acquisition; ordinary proof/context updates never get here.
+  const bytes = await loadAssetBytes(rpcSession, path);
+  const digest = await contentDigest(bytes);
+  let module = wasmModuleCache.get(digest);
+  if (module === undefined) {
+    module = WebAssembly.compile(bytes);
+    wasmModuleCache.set(digest, module);
     module.catch(() => {
-      if (wasmModuleCache.get(path) === cached) {
-        wasmModuleCache.delete(path);
+      if (wasmModuleCache.get(digest) === module) {
+        wasmModuleCache.delete(digest);
       }
     });
   }
-  return cached.module;
+  return module;
 }
 
 export async function loadAssetBytes(rpcSession, path) {

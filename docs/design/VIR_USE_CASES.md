@@ -87,11 +87,12 @@ the requested artifact. Relative path plus mtime/size does not establish that
 across projects. Client comparison of stat/read tokens alone also cannot prove a
 coherent read when the server samples metadata before reading bytes.
 
-Choose the smallest protocol that establishes that requirement. Candidates are an
-immutable build-selected asset loaded once by its integration, or reading the
-bytes and reusing compilation by a digest of those bytes. Compare transport cost
-and invalidation behavior before selecting one. Neither requires a project
-identity registry, general resolver, or additional ownership layer.
+The shell reads the selected Wasm bytes on acquisition and caches compiled modules
+by the SHA-256 of those bytes. Identical content shares compilation across sources;
+a relative path or metadata collision cannot select another source's module. There
+is no pre-read metadata gate. This trades a Wasm transfer on actual code acquisition
+for a direct identity contract; healthy proof/context updates still fetch nothing.
+An immutable build-selected asset could reduce transfers later, if needed.
 
 Generated widgets have a definition-bound package. `vir_proof_widget` analyzes
 the IR closure and complete interface manifest at elaboration time, fingerprints
