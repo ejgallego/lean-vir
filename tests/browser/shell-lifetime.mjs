@@ -121,7 +121,7 @@ function instrumentShellSource(source, withoutRemovalInvalidation) {
   );
   const layoutInvalidation = `    return () => {
       // Invalidate pending candidates at removal, before passive cleanup runs.
-      hostContextRef.current.configurationKey = null;
+      committedRequestRef.current.configurationKey = null;
     };
 `;
   if (withoutRemovalInvalidation) {
@@ -132,7 +132,7 @@ function instrumentShellSource(source, withoutRemovalInvalidation) {
     observed = observed.replace(layoutInvalidation, "");
   }
   assert.ok(
-    observed.includes("      service = await loadRuntimeService({"),
+    observed.includes("      candidate = await loadRuntimeService({"),
     "missing shell service await observation point",
   );
   assert.ok(
@@ -141,8 +141,8 @@ function instrumentShellSource(source, withoutRemovalInvalidation) {
   );
   observed = observed
     .replace(
-      "      service = await loadRuntimeService({",
-      "      service = await globalThis.__shellTest.afterLoadRuntimeService(\n        loadRuntimeService({",
+      "      candidate = await loadRuntimeService({",
+      "      candidate = await globalThis.__shellTest.afterLoadRuntimeService(\n        loadRuntimeService({",
     )
     .replace(
       "      });\n      if (obsolete()) {",

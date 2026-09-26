@@ -52,7 +52,9 @@ contain no live environment, task or RPC reference.
 The shell requests code on mount and when its package fingerprint or configuration
 changes. Ordinary proof edits, goals, cursor positions and position-specific RPC
 session changes update a healthy component without package or asset requests.
-There is no edit subscription or polling in the shell. An edit affecting the
+There is no edit subscription or polling in the shell. The obsolete
+`statIRPackage` RPC has been removed; consumers request bytes with
+`buildIRPackage` when their code identity changes. An edit affecting the
 widget definition re-elaborates its description; upstream `getWidgets` supplies
 the updated props. Identical package inputs produce the same fingerprint even if
 source text or declaration positions change.
@@ -61,7 +63,8 @@ Package bytes are emitted on demand in the existing server request task from
 exactly the retained inputs. Later declarations or annotations at the display
 position do not alter a generated widget's program. Put package-affecting
 annotations before `vir_proof_widget`. Missing/stale fingerprints fail explicitly;
-they never silently select different code from the cursor snapshot.
+they never silently select different code from the cursor snapshot. The browser
+also rejects a build response whose revision differs from the requested fingerprint.
 
 The fingerprint covers the emitted IR, native extern signatures, initializer
 selection and the full manifest, including interface field names and host binding

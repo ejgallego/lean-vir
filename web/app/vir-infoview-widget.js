@@ -38,14 +38,15 @@ export default function VirInfoviewWidget(props) {
 }
 
 function WidgetLoader({ widgetProps: props, rpcSession }) {
-  const hostContextRef = React.useRef({});
+  const committedRequestRef = React.useRef({});
   const [status, setStatus] = React.useState({
     kind: "loading",
     message: "Loading VIR widget...",
   });
   const loadedRef = React.useRef(null);
   const [loaded, setLoaded] = React.useState(null);
-  const refreshGenerationRef = React.useRef(0);
+  // Counts acquisition attempts, including attempts that reuse the installed code.
+  const acquisitionSequenceRef = React.useRef(0);
   const acquisitionRef = React.useRef(null);
   const irPackageKey =
     props.irPackage === null || props.irPackage === undefined
@@ -63,67 +64,69 @@ function WidgetLoader({ widgetProps: props, rpcSession }) {
   ]);
 
   React.useLayoutEffect(() => {
-    hostContextRef.current.configurationKey = configurationKey;
-    hostContextRef.current.requestKey = requestKey;
+    committedRequestRef.current.configurationKey = configurationKey;
+    committedRequestRef.current.requestKey = requestKey;
     return () => {
       // Invalidate pending candidates at removal, before passive cleanup runs.
-      hostContextRef.current.configurationKey = null;
+      committedRequestRef.current.configurationKey = null;
     };
   }, [configurationKey, requestKey]);
 
-  async function refreshLoadedWidget(attempt, generation) {
-    const obsolete = () => generation !== refreshGenerationRef.current ||
-      configurationKey !== hostContextRef.current.configurationKey ||
-      requestKey !== hostContextRef.current.requestKey;
+  async function acquireAndInstallWidget(attempt, acquisitionId) {
+    const obsolete = () => acquisitionId !== acquisitionSequenceRef.current ||
+      configurationKey !== committedRequestRef.current.configurationKey ||
+      requestKey !== committedRequestRef.current.requestKey;
     let setupHint = "";
-    let service = null;
+    // A fresh candidate is owned here until publication. Clear it when reused,
+    // disposed, or handed to React so failure cleanup only releases unpublished work.
+    let candidate = null;
     try {
       const config = widgetRuntimeConfigFromProps(props);
       setupHint = config.setupHint;
-      const previous = loadedRef.current?.configurationKey === configurationKey
+      const installed = loadedRef.current?.configurationKey === configurationKey
         ? loadedRef.current.service : null;
-      service = await loadRuntimeService({
+      candidate = await loadRuntimeService({
         rpcSession: attempt.rpcSession,
         config,
-        previous,
+        previous: installed,
       });
       if (obsolete()) {
-        if (service !== previous) {
-          const abandoned = service;
-          service = null;
+        if (candidate !== installed) {
+          const abandoned = candidate;
+          candidate = null;
           abandoned.runtime.dispose();
         }
         return;
       }
-      if (service === previous) {
-        service = null;
+      if (candidate === installed) {
+        candidate = null;
         setStatus({ kind: "ready", message: config.componentEntry });
         return;
       }
       const componentEntry = validateWidgetComponentEntry(
-        service.runtime,
+        candidate.runtime,
         config.componentEntry,
       );
-      const component = service.runtime.call(componentEntry.entry);
+      const component = candidate.runtime.call(componentEntry.entry);
       if (typeof component !== "function") {
         throw new Error(
           `VIR widget component entry ${componentEntry.entry} did not return a JavaScript function`,
         );
       }
       const next = {
-        service,
+        service: candidate,
         component,
         configurationKey,
-        generation: refreshGenerationRef.current,
+        generation: acquisitionId,
       };
       loadedRef.current = next;
       setLoaded(next);
-      service = null;
+      candidate = null;
       setStatus({ kind: "ready", message: componentEntry.entry });
     } catch (error) {
       const errors = [error];
-      if (service !== null) {
-        collectCleanupError(errors, () => service.runtime.dispose());
+      if (candidate !== null) {
+        collectCleanupError(errors, () => candidate.runtime.dispose());
       }
       const failure = errors.length === 1
         ? error
@@ -160,8 +163,8 @@ function WidgetLoader({ widgetProps: props, rpcSession }) {
       setLoaded(null);
       setStatus({ kind: "loading", message: "Loading VIR widget..." });
     }
-    const generation = ++refreshGenerationRef.current;
-    refreshLoadedWidget(attempt, generation);
+    const acquisitionId = ++acquisitionSequenceRef.current;
+    acquireAndInstallWidget(attempt, acquisitionId);
   }, [requestKey, rpcSession, status]);
 
   return e(
@@ -292,8 +295,6 @@ export async function loadRuntimeService({ rpcSession, config, previous = null }
   if (previous?.runtime.module === wasmModule && previous.packageDigest === packageDigest) {
     return previous;
   }
-  // The server returns bytes and revision from one prepared snapshot. A prior
-  // stat describes an earlier observation, not a prerequisite for this build.
   const runtime = await createBundledVirRuntime({
     wasmModule,
     irPackageSet: [packageBytes],
@@ -334,20 +335,18 @@ export async function loadAssetBytes(rpcSession, path) {
   return decodeBase64Bytes(assetDataBase64(response, path));
 }
 
-export async function statIRPackage(rpcSession, irPackage, position) {
-  const response = await rpcSession.call("Lean.Vir.Infoview.statIRPackage", {
-    package: irPackage,
-    pos: position,
-  });
-  return irPackageStatInfo(response, irPackage.roots);
-}
-
 export async function buildIRPackage(rpcSession, irPackage, position) {
   const response = await rpcSession.call("Lean.Vir.Infoview.buildIRPackage", {
     package: irPackage,
     pos: position,
   });
-  return irPackageInfo(response, irPackage.roots);
+  const info = irPackageInfo(response, irPackage.roots);
+  if (irPackage.fingerprint != null && info.revision !== irPackage.fingerprint) {
+    throw new Error(
+      `VIR IR package fingerprint mismatch: expected ${irPackage.fingerprint}, got ${info.revision}`,
+    );
+  }
+  return info;
 }
 
 export async function statAsset(rpcSession, path) {
@@ -379,16 +378,6 @@ function assetInfo(response, path) {
 }
 
 function irPackageInfo(response, roots) {
-  const info = irPackageStatInfo(response, roots);
-  return {
-    ...info,
-    byteSize: requiredString(response?.byteSize, "IR package byteSize"),
-    dataBase64: requiredString(response?.dataBase64, "IR package dataBase64"),
-    report: optionalString(response?.report, "IR package report"),
-  };
-}
-
-function irPackageStatInfo(response, roots) {
   const responseRoots = requiredStringArray(
     response?.roots,
     "IR package roots",
@@ -402,6 +391,9 @@ function irPackageStatInfo(response, roots) {
     source: requiredString(response?.source, "IR package source"),
     roots: responseRoots,
     revision: requiredString(response?.revision, "IR package revision"),
+    byteSize: requiredString(response?.byteSize, "IR package byteSize"),
+    dataBase64: requiredString(response?.dataBase64, "IR package dataBase64"),
+    report: optionalString(response?.report, "IR package report"),
   };
 }
 

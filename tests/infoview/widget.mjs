@@ -50,10 +50,10 @@ await writeFile(
 const {
   default: infoviewWidgetComponent,
   decodeBase64Bytes,
+  buildIRPackage,
   loadAssetBytes,
   loadRuntimeService,
   loadWasmModule,
-  statIRPackage,
   statAsset,
   validateWidgetComponentEntry,
 } = await import(new URL("vir-infoview-widget-smoke.mjs", buildDir));
@@ -71,7 +71,6 @@ const runtime = await createVirRuntime({
 let assetReadCount = 0;
 let assetStatCount = 0;
 let irPackageBuildCount = 0;
-let irPackageStatCount = 0;
 let irPackageRevision = "ir-package-v1";
 const assetRevisions = new Map([
   ["web/public/vir-upstream.wasm", "wasm-v1"],
@@ -79,14 +78,6 @@ const assetRevisions = new Map([
 ]);
 const rpcSession = {
   async call(method, params) {
-    if (method === "Lean.Vir.Infoview.statIRPackage") {
-      irPackageStatCount += 1;
-      return {
-        source: "examples/VirNativeInfoview.lean",
-        roots: params.package.roots,
-        revision: irPackageRevision,
-      };
-    }
     if (method === "Lean.Vir.Infoview.buildIRPackage") {
       irPackageBuildCount += 1;
       return {
@@ -146,20 +137,6 @@ assert.equal(
   (await statAsset(rpcSession, "web/public/vir-upstream.wasm")).revision,
   "wasm-v1",
 );
-assert.equal(
-  (
-    await statIRPackage(
-      rpcSession,
-      {
-        roots: [
-          "VirNativeInfoview.createComponent",
-        ],
-      },
-      { line: 0, character: 0 },
-    )
-  ).revision,
-  "ir-package-v1",
-);
 await assert.rejects(
   () =>
     loadAssetBytes(
@@ -176,29 +153,6 @@ await assert.rejects(
     ),
   /path mismatch/,
 );
-const reloadIRPackage = {
-  roots: [
-    "VirNativeInfoview.createComponent",
-  ],
-};
-const reloadPosition = { line: 0, character: 0 };
-const reloadStatCount = irPackageStatCount;
-const reloadBuildCount = irPackageBuildCount;
-assert.equal(
-  (await statIRPackage(rpcSession, reloadIRPackage, reloadPosition)).revision,
-  "ir-package-v1",
-);
-assert.equal(irPackageBuildCount, reloadBuildCount);
-assert.ok(irPackageStatCount > reloadStatCount);
-irPackageRevision = "ir-package-v2";
-const changedReloadStatCount = irPackageStatCount;
-assert.equal(
-  (await statIRPackage(rpcSession, reloadIRPackage, reloadPosition)).revision,
-  "ir-package-v2",
-);
-assert.equal(irPackageBuildCount, reloadBuildCount);
-assert.ok(irPackageStatCount > changedReloadStatCount);
-irPackageRevision = "ir-package-v1";
 const irPackageServiceConfig = {
   wasmPath: "web/public/vir-upstream.wasm",
   irPackage: {
@@ -210,6 +164,29 @@ const irPackageServiceConfig = {
   position: { line: 0, character: 0 },
   setupHint: "",
 };
+const generatedPackage = {
+  ...irPackageServiceConfig.irPackage,
+  fingerprint: irPackageRevision,
+};
+assert.equal(
+  (await buildIRPackage(rpcSession, generatedPackage, irPackageServiceConfig.position)).revision,
+  generatedPackage.fingerprint,
+);
+await assert.rejects(
+  buildIRPackage(rpcSession, { ...generatedPackage, fingerprint: "another-generation" },
+    irPackageServiceConfig.position),
+  /fingerprint mismatch/,
+  "generated packages must reject a response for a different generation",
+);
+await assert.rejects(
+  buildIRPackage({
+    async call(method, params) {
+      return { ...await rpcSession.call(method, params), roots: ["another.factory"] };
+    },
+  }, generatedPackage, irPackageServiceConfig.position),
+  /roots mismatch/,
+  "matching fingerprints do not bypass response root validation",
+);
 const irPackageFirstService = await loadRuntimeService({
   rpcSession,
   config: irPackageServiceConfig,
@@ -235,7 +212,6 @@ assert.equal(
 );
 assert.equal(irPackageFirstService.packageRevision, "ir-package-v1");
 const firstIRPackageBuildCount = irPackageBuildCount;
-const firstIRPackageStatCount = irPackageStatCount;
 const irPackageSecondService = await loadRuntimeService({
   rpcSession,
   config: irPackageServiceConfig,
@@ -256,7 +232,6 @@ assert.notEqual(
   "independent runtimes own separate browser bindings",
 );
 assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
-assert.equal(irPackageStatCount, firstIRPackageStatCount, "loading does not stat the package");
 const firstWasmModule = irPackageFirstService.runtime.module;
 assert.ok(firstWasmModule instanceof WebAssembly.Module);
 const readsBeforeCacheHit = assetReadCount;

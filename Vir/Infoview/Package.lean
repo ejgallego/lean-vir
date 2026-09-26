@@ -52,12 +52,6 @@ meta structure IRPackageResponse where
   report : String
   deriving Server.RpcEncodable
 
-meta structure IRPackageInfo where
-  source : String
-  roots : Array String
-  revision : String
-  deriving Server.RpcEncodable
-
 private meta def irPackageRootNames (roots : Array String) : Except String (Array Name) := do
   if roots.isEmpty then
     throw "at least one root name is required"
@@ -398,31 +392,6 @@ private meta def retainedWidgetPackage (env : Environment) (roots : Array Name)
   let some (key, package) := found | fail
   if key != fingerprint then return ← fail
   return package
-
-@[server_rpc_method]
-meta def statIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPackageInfo) := do
-  let roots ←
-    match irPackageRootNames params.package.roots with
-    | .ok roots => pure roots
-    | .error message =>
-        throwThe RequestError { code := .invalidParams, message := s!"Invalid VIR IR package roots: {message}" }
-  RequestM.withWaitFindSnapAtPos params.pos fun snap => do
-    let doc ← RequestM.readDoc
-    let source := documentSourceName doc
-    if let some fingerprint := params.package.fingerprint then
-      discard <| match retainedWidgetPackage snap.env roots fingerprint with
-        | .ok package => pure package
-        | .error error => throwThe RequestError error
-      return { source, roots := roots.map toString, revision := fingerprint }
-    let input ← match prepareIRPackageInput source roots snap.env with
-      | .ok input => pure input
-      | .error error => throwThe RequestError error
-    let token ← packageClosureToken doc.meta.text source input snap.env
-    return {
-      source := source
-      roots := roots.map (fun name => name.toString)
-      revision := irPackageRevision roots token
-    }
 
 @[server_rpc_method]
 meta def buildIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPackageResponse) := do

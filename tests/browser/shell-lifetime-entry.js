@@ -1199,7 +1199,7 @@ function installMockRpc(wasmBase64, packageBase64, manifestPackageBase64) {
         return {
           source: "fixtures/runtime/ShellLifetime.lean",
           roots: params.package.roots,
-          revision: String(revision),
+          revision: params.package.fingerprint ?? String(revision),
           byteSize: String(atob(transport.packageBase64).length),
           dataBase64: transport.packageBase64,
         };
