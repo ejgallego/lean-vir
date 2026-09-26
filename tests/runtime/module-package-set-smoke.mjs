@@ -116,42 +116,42 @@ assert.equal(
 assert.equal(runtime.packageMetadata.targets[0].mode, "markedModule");
 assert.equal(runtime.packageInfo.packageSet, null);
 assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
-assert.throws(
-  () =>
-    runtime.loadIrPackageSetBytes([
-      packageBytes[0],
-      packageBytes[0],
-      ...packageBytes.slice(1),
-    ]),
-  /duplicates embedded module "ModuleSetFixture\.Shared"/,
-);
-assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
-assert.throws(
-  () =>
-    runtime.loadIrPackageSetBytes([
-      packageBytes.at(-1),
-      ...packageBytes.slice(0, -1),
-    ]),
-  /member 1 embeds role "root"; expected "dependency"/,
-);
-assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
 const mismatchedToolchainManifest = structuredClone(
   packageInfoByModule.get("ModuleSetFixture.Left").manifest,
 );
 mismatchedToolchainManifest.metadata.leanGithash = "different-checkpoint";
-assert.throws(
-  () =>
-    runtime.loadIrPackageSetBytes([
+for (const [members, error] of [
+  [
+    [packageBytes[0], packageBytes[0], ...packageBytes.slice(1)],
+    /duplicates embedded module "ModuleSetFixture\.Shared"/,
+  ],
+  [
+    [packageBytes.at(-1), ...packageBytes.slice(0, -1)],
+    /member 1 embeds role "root"; expected "dependency"/,
+  ],
+  [
+    [
       packageBytes[0],
       replaceIrPackageManifest(packageBytes[1], mismatchedToolchainManifest),
       ...packageBytes.slice(2),
-    ]),
-  /mixes metadata\.leanGithash/,
-);
-assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
-runtime.loadIrPackageSetBytes(packageBytes);
+    ],
+    /mixes metadata\.leanGithash/,
+  ],
+]) {
+  const candidate = await createVirRuntimeFactory({ wasmBytes }).createRuntime();
+  assert.throws(() => candidate.loadIrPackageSetBytes(members), error);
+  assert.equal(candidate.packageInfo, null);
+  candidate.dispose();
+}
 assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
 runtime.dispose();
+
+const nextRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageSet: packageBytes,
+});
+assert.equal(nextRuntime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
+nextRuntime.dispose();
 
 const urlRuntime = await createVirRuntime({
   wasmBytes,

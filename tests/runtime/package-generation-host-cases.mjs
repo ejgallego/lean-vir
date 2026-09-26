@@ -125,13 +125,15 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       readIrPackageInfo(hostPackageBytes).manifest,
     );
     mutate(manifest);
+    const candidate = await hostFactory.createRuntime();
     assert.throws(
       () =>
-        hostRuntime.loadIrPackageSetBytes([
+        candidate.loadIrPackageSetBytes([
           replaceIrPackageManifest(hostPackageBytes, manifest),
         ]),
       new RegExp(`manifest/binary contract mismatch:.*host.*${field}`),
     );
+    candidate.dispose();
   }
   assert.equal(hostRuntime.interfaceManifest.hostImports.length, 18);
   assert.equal(
