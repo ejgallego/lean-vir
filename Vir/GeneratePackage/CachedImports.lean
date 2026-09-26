@@ -32,7 +32,7 @@ public def CompiledImportCache.empty (importArts : NameMap ImportArtifacts := {}
 
 private abbrev CachedImportM := StateRefT ImportState (StateRefT CompiledImportCache IO)
 
-/-- Lean 4.33's `importModulesCore` at exported level, with interpretation IR
+/-- Lean 4.35.0-rc3's `importModulesCore` at exported level, with interpretation IR
 (`loadIRSig = false`). Only its artifact reads are memoized. Each call starts
 with a fresh ImportState, so flags, traversal order and private visibility cannot
 leak from another target. Keep this adapter aligned with the pinned importer. -/

@@ -383,6 +383,20 @@ unsafe def ioRefModifyBoundaryScore : Nat :=
   | .ok score => score
   | .error _ => 1000
 
+/-- Exercise 4.35's ownership-transferring swap and Lean-level set on heap values. -/
+unsafe def ioRefSwapBoundaryScore : Nat :=
+  match unsafeIO do
+    let ref ← IO.mkRef ("before".push '!')
+    let retained ← ref.get
+    let old ← ref.swap ("after".push '?')
+    let current ← ref.get
+    ref.set (old ++ current)
+    let final ← ref.get
+    pure <| if retained == "before!" && old == retained && current == "after?" &&
+        final == "before!after?" then final.length else 1000 with
+  | .ok score => score
+  | .error _ => 1000
+
 def floatScaleScore : Nat :=
   let x := Float.scaleB 1.5 (2 : Int)
   x.toUInt32.toNat
