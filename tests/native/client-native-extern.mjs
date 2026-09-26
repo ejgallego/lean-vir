@@ -21,6 +21,14 @@ const fixtureRoot = repositoryPath("fixtures", "client-native-extern");
 const manifestPath = join(fixtureRoot, "lean-vir-native-externs.json");
 const wrapperTool = repositoryPath(".lake", "build", "bin", "vir_native_wrappers");
 
+// This fixture runs host tools built in VIR's workspace against its own compiled
+// modules. Reject a stale nested pin before Elan downloads another toolchain.
+assert.equal(
+  (await readFile(join(fixtureRoot, "lean-toolchain"), "utf8")).trim(),
+  (await readFile(repositoryPath("lean-toolchain"), "utf8")).trim(),
+  "client-native-extern fixture must use VIR's exact Lean toolchain",
+);
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: options.cwd ?? repoRoot,

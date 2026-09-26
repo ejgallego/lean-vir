@@ -679,6 +679,13 @@
       "unsafe": true
     },
     {
+      "id": "boundary-io-ref-swap",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.ioRefSwapBoundaryScore",
+      "result": { "type": "Nat" },
+      "unsafe": true
+    },
+    {
       "id": "boundary-float-scale",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.floatScaleScore",
