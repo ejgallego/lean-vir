@@ -32,198 +32,135 @@ const statusStyle = {
 
 export default function VirInfoviewWidget(props) {
   const rpcSession = useRpcSession();
-  const hostContextRef = React.useRef({
-    rpcSession,
-    position: null,
-  });
-  const setupHintRef = React.useRef("");
+  // Upstream can reconnect when this hook runs. Loading-state updates must not
+  // themselves manufacture fresh contexts and repeatedly retry a broken server.
+  return e(WidgetLoader, { widgetProps: props, rpcSession });
+}
+
+function WidgetLoader({ widgetProps: props, rpcSession }) {
+  const committedRequestRef = React.useRef({});
   const [status, setStatus] = React.useState({
     kind: "loading",
     message: "Loading VIR widget...",
   });
   const loadedRef = React.useRef(null);
   const [loaded, setLoaded] = React.useState(null);
-  const [reloadToken, setReloadToken] = React.useState(0);
-  const refreshGenerationRef = React.useRef(0);
-  const loadingGenerationRef = React.useRef(null);
-  const irPackageKey =
-    props.irPackage === null || props.irPackage === undefined
-      ? ""
-      : JSON.stringify(props.irPackage);
+  // Counts acquisition attempts, including attempts that reuse the installed code.
+  const acquisitionSequenceRef = React.useRef(0);
+  const acquisitionRef = React.useRef(null);
   const configurationKey = JSON.stringify([
-    props.wasmPath, irPackageKey, props.componentEntry,
+    props.pos?.uri,
+    props.wasmPath,
+    props.irPackage?.entry,
+  ]);
+
+  const requestKey = JSON.stringify([
+    configurationKey, props.irPackage?.fingerprint,
   ]);
 
   React.useLayoutEffect(() => {
-    let position = null;
-    let setupHint = "";
-    try {
-      position = requiredPosition(props.pos, "pos");
-      setupHint = optionalString(props.setupHint, "setupHint");
-    } catch {
-      // The loading effect reports invalid widget configuration.
-    }
-    hostContextRef.current.rpcSession = rpcSession;
-    hostContextRef.current.position = position;
-    hostContextRef.current.configurationKey = configurationKey;
-    setupHintRef.current = setupHint;
+    committedRequestRef.current.configurationKey = configurationKey;
+    committedRequestRef.current.requestKey = requestKey;
     return () => {
       // Invalidate pending candidates at removal, before passive cleanup runs.
-      hostContextRef.current.configurationKey = null;
+      committedRequestRef.current.configurationKey = null;
     };
-  }, [rpcSession, props.pos, props.setupHint, configurationKey]);
+  }, [configurationKey, requestKey]);
 
-  async function refreshLoadedWidget(isDisposed) {
-    const generation = refreshGenerationRef.current;
-    loadingGenerationRef.current = generation;
-    const obsolete = () => isDisposed() ||
-      configurationKey !== hostContextRef.current.configurationKey;
+  async function acquireAndInstallWidget(attempt, acquisitionId) {
+    const obsolete = () => acquisitionId !== acquisitionSequenceRef.current ||
+      configurationKey !== committedRequestRef.current.configurationKey ||
+      requestKey !== committedRequestRef.current.requestKey;
     let setupHint = "";
-    let service = null;
+    // A fresh candidate is owned here until publication. Clear it when reused,
+    // disposed, or handed to React so failure cleanup only releases unpublished work.
+    let candidate = null;
     try {
       const config = widgetRuntimeConfigFromProps(props);
       setupHint = config.setupHint;
-      service = await loadRuntimeService({
-        rpcSession: hostContextRef.current.rpcSession,
+      const installed = loadedRef.current?.configurationKey === configurationKey
+        ? loadedRef.current.service : null;
+      candidate = await loadRuntimeService({
+        rpcSession: attempt.rpcSession,
         config,
+        previous: installed,
       });
       if (obsolete()) {
-        service.runtime.dispose();
+        if (candidate !== installed) {
+          const abandoned = candidate;
+          candidate = null;
+          abandoned.runtime.dispose();
+        }
+        return;
+      }
+      if (candidate === installed) {
+        candidate = null;
+        setStatus({ kind: "ready", message: config.irPackage.entry });
         return;
       }
       const componentEntry = validateWidgetComponentEntry(
-        service.runtime,
-        config.componentEntry,
+        candidate.runtime,
+        config.irPackage.entry,
       );
-      const component = service.runtime.call(componentEntry.entry);
+      const component = candidate.runtime.call(componentEntry.entry);
       if (typeof component !== "function") {
         throw new Error(
           `VIR widget component entry ${componentEntry.entry} did not return a JavaScript function`,
         );
       }
       const next = {
-        service,
+        service: candidate,
         component,
         configurationKey,
-        generation: refreshGenerationRef.current,
+        generation: acquisitionId,
       };
       loadedRef.current = next;
       setLoaded(next);
-      service = null;
-      setReloadToken(0);
+      candidate = null;
       setStatus({ kind: "ready", message: componentEntry.entry });
     } catch (error) {
       const errors = [error];
-      if (service !== null) {
-        collectCleanupError(errors, () => service.runtime.dispose());
+      if (candidate !== null) {
+        collectCleanupError(errors, () => candidate.runtime.dispose());
       }
       const failure = errors.length === 1
         ? error
         : new AggregateError(errors, "VIR widget loading failed");
       if (!obsolete()) {
+        attempt.failed = true;
         setStatus({ kind: "error", message: errorMessage(failure, setupHint) });
       } else {
         console.error(failure);
-      }
-    } finally {
-      if (loadingGenerationRef.current === generation) {
-        loadingGenerationRef.current = null;
       }
     }
   }
 
   React.useEffect(() => {
-    let disposed = false;
-    setLoaded(null);
-    setStatus({ kind: "loading", message: "Loading VIR widget..." });
-    const generation = ++refreshGenerationRef.current;
-    refreshLoadedWidget(
-      () => disposed || generation !== refreshGenerationRef.current,
-    );
     return () => {
-      disposed = true;
-      // React owns the descendant UI. Release shell ownership, not the runtime:
-      // surviving callbacks and JSL still own their original generation.
+      // React owns the descendant UI. Release shell ownership, not the
+      // runtime: surviving callbacks and JSL keep their generation.
       loadedRef.current = null;
     };
-  }, [
-    props.wasmPath,
-    irPackageKey,
-    props.componentEntry,
-  ]);
+  }, [configurationKey]);
 
   React.useEffect(() => {
-    if (reloadToken === 0) {
-      return undefined;
+    const previousAttempt = acquisitionRef.current;
+    // Context changes leave healthy and pending acquisitions alone. A failed
+    // attempt may use a new context once, including one received while pending.
+    if (previousAttempt?.requestKey === requestKey &&
+        (!previousAttempt.failed || previousAttempt.rpcSession === rpcSession)) {
+      return;
     }
-    let disposed = false;
-    const generation = ++refreshGenerationRef.current;
-    refreshLoadedWidget(
-      () => disposed || generation !== refreshGenerationRef.current,
-    );
-    return () => {
-      disposed = true;
-    };
-  }, [
-    props.wasmPath,
-    irPackageKey,
-    props.componentEntry,
-    reloadToken,
-  ]);
-
-  React.useEffect(() => {
-    let intervalId = null;
-    let disposed = false;
-    let inFlight = false;
-    try {
-      const config = widgetRuntimeConfigFromProps(props);
-      if (config.autoReloadMs > 0) {
-        intervalId = setInterval(() => {
-          // The first package has no installed revision yet. Polling here can
-          // continually supersede a slow initial load before it can mount.
-          if (inFlight || loadedRef.current === null || loadingGenerationRef.current !== null) {
-            return;
-          }
-          inFlight = true;
-          shouldReloadIRPackage({
-            rpcSession: hostContextRef.current.rpcSession,
-            irPackage: config.irPackage,
-            position: hostContextRef.current.position,
-            currentRevision: loadedRef.current.service.packageRevision,
-          })
-            .then((shouldReload) => {
-              if (!disposed && shouldReload) {
-                setReloadToken((token) => token + 1);
-              }
-            })
-            .catch((error) => {
-              if (!disposed) {
-                setStatus({
-                  kind: "error",
-                  message: errorMessage(error, setupHintRef.current),
-                });
-              }
-            })
-            .finally(() => {
-              inFlight = false;
-            });
-        }, config.autoReloadMs);
-      }
-    } catch {
-      return undefined;
+    const attempt = { requestKey, rpcSession, failed: false };
+    acquisitionRef.current = attempt;
+    if (loadedRef.current?.configurationKey !== configurationKey) {
+      loadedRef.current = null;
+      setLoaded(null);
+      setStatus({ kind: "loading", message: "Loading VIR widget..." });
     }
-    return () => {
-      disposed = true;
-      if (intervalId !== null) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [
-    props.wasmPath,
-    irPackageKey,
-    props.componentEntry,
-    props.autoReloadMs,
-  ]);
+    const acquisitionId = ++acquisitionSequenceRef.current;
+    acquireAndInstallWidget(attempt, acquisitionId);
+  }, [requestKey, rpcSession, status]);
 
   return e(
     "section",
@@ -292,12 +229,7 @@ function widgetRuntimeConfigFromProps(props) {
   return {
     wasmPath: requiredString(props.wasmPath, "wasmPath"),
     irPackage,
-    componentEntry: requiredString(props.componentEntry, "componentEntry"),
     position: requiredPosition(props.pos, "pos"),
-    autoReloadMs: optionalNonNegativeInteger(
-      props.autoReloadMs,
-      "autoReloadMs",
-    ),
     setupHint: optionalString(props.setupHint, "setupHint"),
   };
 }
@@ -306,11 +238,10 @@ function requiredIRPackage(value, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`VIR widget ${label} must be an object`);
   }
-  const roots = requiredStringArray(value.roots, `${label}.roots`);
-  if (roots.length === 0) {
-    throw new Error(`VIR widget ${label}.roots must not be empty`);
-  }
-  return { roots };
+  return {
+    entry: requiredString(value.entry, `${label}.entry`),
+    fingerprint: requiredString(value.fingerprint, `${label}.fingerprint`),
+  };
 }
 
 function requiredPosition(value, label) {
@@ -333,17 +264,7 @@ function requiredPosition(value, label) {
   };
 }
 
-function optionalNonNegativeInteger(value, label) {
-  if (value === undefined || value === null) {
-    return 0;
-  }
-  if (!Number.isInteger(value) || value < 0) {
-    throw new Error(`VIR widget ${label} must be a non-negative integer`);
-  }
-  return value;
-}
-
-export async function loadRuntimeService({ rpcSession, config }) {
+export async function loadRuntimeService({ rpcSession, config, previous = null }) {
   const { wasmPath, irPackage, position } = config;
   requiredString(wasmPath, "wasmPath");
   if (irPackage === null || irPackage === undefined) {
@@ -353,17 +274,20 @@ export async function loadRuntimeService({ rpcSession, config }) {
     throw new Error("VIR widget irPackage requires an infoview position");
   }
   const wasmInfo = await statAsset(rpcSession, wasmPath);
-  const packageInfo = await statIRPackage(rpcSession, irPackage, position);
   const wasmModule = await loadWasmModule(rpcSession, wasmPath, wasmInfo.revision);
   const builtPackage = await buildIRPackage(rpcSession, irPackage, position);
-  if (builtPackage.revision !== packageInfo.revision) {
-    throw new Error(
-      "VIR IR package changed while loading; reload the widget to use the latest Lean snapshot",
-    );
+  const packageBytes = decodeBase64Bytes(builtPackage.dataBase64);
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", packageBytes));
+  const packageDigest = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  // Compare the complete artifact, including interfaces and initializers.
+  // Distinct descriptions can still emit identical bytes. Preserve the installed
+  // component when the acquired artifacts match.
+  if (previous?.runtime.module === wasmModule && previous.packageDigest === packageDigest) {
+    return previous;
   }
   const runtime = await createBundledVirRuntime({
     wasmModule,
-    irPackageSet: [decodeBase64Bytes(builtPackage.dataBase64)],
+    irPackageSet: [packageBytes],
     defaultHostBindings: () => createBrowserHostBindings({
       infoviewEditorContext: EditorContext,
       infoviewPositionToTdpp: DocumentPosition.toTdpp,
@@ -374,17 +298,7 @@ export async function loadRuntimeService({ rpcSession, config }) {
       infoviewStripTags: TaggedText_stripTags,
     }),
   });
-  return { runtime, packageRevision: builtPackage.revision };
-}
-
-export async function shouldReloadIRPackage({
-  rpcSession,
-  irPackage,
-  position,
-  currentRevision,
-}) {
-  const info = await statIRPackage(rpcSession, irPackage, position);
-  return info.revision !== currentRevision;
+  return { runtime, packageDigest };
 }
 
 export async function loadWasmModule(rpcSession, path, revision) {
@@ -411,20 +325,22 @@ export async function loadAssetBytes(rpcSession, path) {
   return decodeBase64Bytes(assetDataBase64(response, path));
 }
 
-export async function statIRPackage(rpcSession, irPackage, position) {
-  const response = await rpcSession.call("Lean.Vir.Infoview.statIRPackage", {
-    package: irPackage,
-    pos: position,
-  });
-  return irPackageStatInfo(response, irPackage.roots);
-}
-
 export async function buildIRPackage(rpcSession, irPackage, position) {
+  const { entry, fingerprint } = requiredIRPackage(irPackage, "irPackage");
   const response = await rpcSession.call("Lean.Vir.Infoview.buildIRPackage", {
-    package: irPackage,
+    package: { entry, fingerprint },
     pos: position,
   });
-  return irPackageInfo(response, irPackage.roots);
+  if (response?.entry !== entry) {
+    throw new Error(`VIR widget entry mismatch: expected ${entry}, got ${response?.entry}`);
+  }
+  if (response?.fingerprint !== fingerprint) {
+    throw new Error(
+      `VIR IR package fingerprint mismatch: expected ${fingerprint}, got ${response?.fingerprint}`,
+    );
+  }
+  return { entry, fingerprint,
+    dataBase64: requiredString(response?.dataBase64, "IR package dataBase64") };
 }
 
 export async function statAsset(rpcSession, path) {
@@ -453,40 +369,6 @@ function assetInfo(response, path) {
     modified: requiredString(response?.modified, `asset ${path} modified`),
     revision: requiredString(response?.revision, `asset ${path} revision`),
   };
-}
-
-function irPackageInfo(response, roots) {
-  const info = irPackageStatInfo(response, roots);
-  return {
-    ...info,
-    byteSize: requiredString(response?.byteSize, "IR package byteSize"),
-    dataBase64: requiredString(response?.dataBase64, "IR package dataBase64"),
-    report: optionalString(response?.report, "IR package report"),
-  };
-}
-
-function irPackageStatInfo(response, roots) {
-  const responseRoots = requiredStringArray(
-    response?.roots,
-    "IR package roots",
-  );
-  if (JSON.stringify(responseRoots) !== JSON.stringify(roots)) {
-    throw new Error(
-      `VIR IR package roots mismatch: expected ${roots.join(", ")}, got ${responseRoots.join(", ")}`,
-    );
-  }
-  return {
-    source: requiredString(response?.source, "IR package source"),
-    roots: responseRoots,
-    revision: requiredString(response?.revision, "IR package revision"),
-  };
-}
-
-function requiredStringArray(value, label) {
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
-    throw new Error(`VIR widget ${label} must be an array of strings`);
-  }
-  return value;
 }
 
 export function decodeBase64Bytes(base64) {

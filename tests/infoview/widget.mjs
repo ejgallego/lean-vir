@@ -50,11 +50,10 @@ await writeFile(
 const {
   default: infoviewWidgetComponent,
   decodeBase64Bytes,
+  buildIRPackage,
   loadAssetBytes,
   loadRuntimeService,
   loadWasmModule,
-  shouldReloadIRPackage,
-  statIRPackage,
   statAsset,
   validateWidgetComponentEntry,
 } = await import(new URL("vir-infoview-widget-smoke.mjs", buildDir));
@@ -72,31 +71,19 @@ const runtime = await createVirRuntime({
 let assetReadCount = 0;
 let assetStatCount = 0;
 let irPackageBuildCount = 0;
-let irPackageStatCount = 0;
-let irPackageRevision = "ir-package-v1";
+let irPackageFingerprint = "ir-package-v1";
 const assetRevisions = new Map([
   ["web/public/vir-upstream.wasm", "wasm-v1"],
   ["web/public/native-infoview.irpkg", "package-v1"],
 ]);
 const rpcSession = {
   async call(method, params) {
-    if (method === "Lean.Vir.Infoview.statIRPackage") {
-      irPackageStatCount += 1;
-      return {
-        source: "examples/VirNativeInfoview.lean",
-        roots: params.package.roots,
-        revision: irPackageRevision,
-      };
-    }
     if (method === "Lean.Vir.Infoview.buildIRPackage") {
       irPackageBuildCount += 1;
       return {
-        source: "examples/VirNativeInfoview.lean",
-        roots: params.package.roots,
-        byteSize: String(packageBytes.length),
-        revision: irPackageRevision,
+        entry: params.package.entry,
+        fingerprint: irPackageFingerprint,
         dataBase64: packageBytes.toString("base64"),
-        report: "IR package report",
       };
     }
     const bytes = await readFile(new URL(params.path, repoRoot));
@@ -147,20 +134,6 @@ assert.equal(
   (await statAsset(rpcSession, "web/public/vir-upstream.wasm")).revision,
   "wasm-v1",
 );
-assert.equal(
-  (
-    await statIRPackage(
-      rpcSession,
-      {
-        roots: [
-          "VirNativeInfoview.createComponent",
-        ],
-      },
-      { line: 0, character: 0 },
-    )
-  ).revision,
-  "ir-package-v1",
-);
 await assert.rejects(
   () =>
     loadAssetBytes(
@@ -177,50 +150,47 @@ await assert.rejects(
     ),
   /path mismatch/,
 );
-const reloadIRPackage = {
-  roots: [
-    "VirNativeInfoview.createComponent",
-  ],
-};
-const reloadPosition = { line: 0, character: 0 };
-const reloadStatCount = irPackageStatCount;
-const reloadBuildCount = irPackageBuildCount;
-assert.equal(
-  await shouldReloadIRPackage({
-    rpcSession,
-    irPackage: reloadIRPackage,
-    position: reloadPosition,
-    currentRevision: "ir-package-v1",
-  }),
-  false,
-);
-assert.equal(irPackageBuildCount, reloadBuildCount);
-assert.ok(irPackageStatCount > reloadStatCount);
-irPackageRevision = "ir-package-v2";
-const changedReloadStatCount = irPackageStatCount;
-assert.equal(
-  await shouldReloadIRPackage({
-    rpcSession,
-    irPackage: reloadIRPackage,
-    position: reloadPosition,
-    currentRevision: "ir-package-v1",
-  }),
-  true,
-);
-assert.equal(irPackageBuildCount, reloadBuildCount);
-assert.ok(irPackageStatCount > changedReloadStatCount);
-irPackageRevision = "ir-package-v1";
 const irPackageServiceConfig = {
   wasmPath: "web/public/vir-upstream.wasm",
   irPackage: {
-    roots: [
-      "VirNativeInfoview.createComponent",
-    ],
+    entry: "VirNativeInfoview.createComponent",
+    fingerprint: irPackageFingerprint,
   },
-  componentEntry: "VirNativeInfoview.createComponent",
   position: { line: 0, character: 0 },
   setupHint: "",
 };
+const generatedPackage = {
+  ...irPackageServiceConfig.irPackage,
+  fingerprint: irPackageFingerprint,
+};
+assert.equal(
+  (await buildIRPackage(rpcSession, generatedPackage, irPackageServiceConfig.position)).fingerprint,
+  generatedPackage.fingerprint,
+);
+await assert.rejects(
+  buildIRPackage(rpcSession, { ...generatedPackage, fingerprint: "another-generation" },
+    irPackageServiceConfig.position),
+  /fingerprint mismatch/,
+  "generated packages must reject a response for a different generation",
+);
+await assert.rejects(
+  buildIRPackage({
+    async call(method, params) {
+      return { ...await rpcSession.call(method, params), entry: "another.factory" };
+    },
+  }, generatedPackage, irPackageServiceConfig.position),
+  /entry mismatch/,
+  "matching fingerprints do not bypass response entry validation",
+);
+for (const fingerprint of [undefined, null, ""]) {
+  const builds = irPackageBuildCount;
+  await assert.rejects(
+    buildIRPackage(rpcSession, { ...generatedPackage, fingerprint },
+      irPackageServiceConfig.position),
+    /fingerprint must be a non-empty string/,
+  );
+  assert.equal(irPackageBuildCount, builds, "missing identity never requests current-snapshot code");
+}
 const irPackageFirstService = await loadRuntimeService({
   rpcSession,
   config: irPackageServiceConfig,
@@ -244,9 +214,7 @@ assert.equal(
   ],
   "function",
 );
-assert.equal(irPackageFirstService.packageRevision, "ir-package-v1");
 const firstIRPackageBuildCount = irPackageBuildCount;
-const firstIRPackageStatCount = irPackageStatCount;
 const irPackageSecondService = await loadRuntimeService({
   rpcSession,
   config: irPackageServiceConfig,
@@ -267,7 +235,6 @@ assert.notEqual(
   "independent runtimes own separate browser bindings",
 );
 assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
-assert.ok(irPackageStatCount > firstIRPackageStatCount);
 const firstWasmModule = irPackageFirstService.runtime.module;
 assert.ok(firstWasmModule instanceof WebAssembly.Module);
 const readsBeforeCacheHit = assetReadCount;
@@ -316,28 +283,13 @@ assert.equal(
   currentModule,
 );
 assert.equal(assetReadCount, readsBeforeStaleRetry, "stale failure preserves newer cache entry");
-await assert.rejects(
-  loadRuntimeService({
-    rpcSession: {
-      async call(method, params) {
-        const response = await rpcSession.call(method, params);
-        return method.endsWith("buildIRPackage")
-          ? { ...response, revision: "different-snapshot" }
-          : response;
-      },
-    },
-    config: irPackageServiceConfig,
-  }),
-  /IR package changed while loading/,
-  "a package from a different snapshot cannot create a runtime",
-);
-irPackageRevision = "ir-package-v2";
+irPackageFingerprint = "ir-package-v2";
+irPackageServiceConfig.irPackage.fingerprint = irPackageFingerprint;
 const irPackageThirdService = await loadRuntimeService({
   rpcSession,
   config: irPackageServiceConfig,
 });
 assert.notEqual(irPackageThirdService.runtime, irPackageSecondService.runtime);
-assert.equal(irPackageThirdService.packageRevision, "ir-package-v2");
 assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
 irPackageFirstService.runtime.dispose();
 irPackageSecondService.runtime.dispose();

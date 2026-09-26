@@ -63,6 +63,7 @@ export async function runRpcBrowserAcceptance({
   const calls = [];
   const diagnostics = [];
   let documentVersion = 1;
+  let documentText = source;
   let stderr = "";
   let deadline;
 
@@ -176,9 +177,21 @@ export async function runRpcBrowserAcceptance({
           if (body.action === "open") gate.resolve();
           result = gate.ready;
         } else if (req.url === "/edit") {
+          if (body.replace !== undefined) {
+            assert.equal(typeof body.replace?.before, "string", "edit before text");
+            assert.equal(typeof body.replace?.after, "string", "edit after text");
+            const occurrences = documentText.split(body.replace.before).length - 1;
+            assert.equal(occurrences, 1, "edit marker must occur exactly once");
+            documentText = documentText.replace(
+              body.replace.before,
+              body.replace.after,
+            );
+          } else {
+            documentText += `\n-- browser edit ${documentVersion + 1}\n`;
+          }
           const params = {
             textDocument: { uri, version: ++documentVersion },
-            contentChanges: [{ text: `${source}\n-- browser edit ${documentVersion}\n` }],
+            contentChanges: [{ text: documentText }],
           };
           await connection.sendNotification("textDocument/didChange", params);
           await connection.sendRequest("textDocument/waitForDiagnostics", {
@@ -253,8 +266,12 @@ export async function runRpcBrowserAcceptance({
     );
     assert.ok(calls.some((call) => call.position.line === config.a.line));
     assert.ok(calls.some((call) => call.position.line === config.b.line));
+    const currentDiagnostics = diagnostics.filter(
+      (report) => report.uri === uri && report.version === documentVersion,
+    );
+    assert.ok(currentDiagnostics.length > 0, `missing diagnostics for current document version ${documentVersion}`);
     assert.ok(
-      !diagnostics.some((report) =>
+      !currentDiagnostics.some((report) =>
         report.diagnostics.some((d) => d.severity === 1),
       ),
       JSON.stringify(diagnostics),

@@ -5,11 +5,21 @@ Author: Emilio J. Gallego Arias
 */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
-import { evaluate, launchChromium, openChromiumPage } from "./harness.mjs";
+import {
+  evaluate,
+  launchChromium,
+  navigate,
+  openChromiumPage,
+} from "./harness.mjs";
+import {
+  readIrPackageInfo,
+  replaceIrPackageManifest,
+} from "../../scripts/packages/irpkg-format.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -59,7 +69,7 @@ async function buildShellLifetime({ withoutRemovalInvalidation = false } = {}) {
         export const EditorContext = React.createContext(null);
         export const DocumentPosition = { toTdpp() { throw new Error('unexpected position conversion'); } };
         export function InteractiveCode() { throw new Error('unexpected interactive code render'); }
-        export function useClientNotificationEffect() { throw new Error('unexpected lifecycle notification hook'); }
+        export function useClientNotificationEffect() {}
         export function useRpcSession() { return globalThis.__shellTest.rpc; }`,
           loader: "js",
           resolveDir: root,
@@ -111,7 +121,7 @@ function instrumentShellSource(source, withoutRemovalInvalidation) {
   );
   const layoutInvalidation = `    return () => {
       // Invalidate pending candidates at removal, before passive cleanup runs.
-      hostContextRef.current.configurationKey = null;
+      committedRequestRef.current.configurationKey = null;
     };
 `;
   if (withoutRemovalInvalidation) {
@@ -122,7 +132,7 @@ function instrumentShellSource(source, withoutRemovalInvalidation) {
     observed = observed.replace(layoutInvalidation, "");
   }
   assert.ok(
-    observed.includes("      service = await loadRuntimeService({"),
+    observed.includes("      candidate = await loadRuntimeService({"),
     "missing shell service await observation point",
   );
   assert.ok(
@@ -131,21 +141,17 @@ function instrumentShellSource(source, withoutRemovalInvalidation) {
   );
   observed = observed
     .replace(
-      "      service = await loadRuntimeService({",
-      "      service = await globalThis.__shellTest.afterLoadRuntimeService(\n        loadRuntimeService({",
+      "      candidate = await loadRuntimeService({",
+      "      candidate = await globalThis.__shellTest.afterLoadRuntimeService(\n        loadRuntimeService({",
     )
     .replace(
       "      });\n      if (obsolete()) {",
       "        }),\n      );\n      if (obsolete()) {",
     );
-  assert.ok(
-    observed.includes("    return () => {\n      disposed = true;"),
-    "missing passive cleanup observation point",
-  );
-  return observed.replace(
-    "    return () => {\n      disposed = true;",
-    "    return () => {\n      globalThis.__shellTest.widgetPassiveCleanup();\n      disposed = true;",
-  );
+  const passiveCleanup = "      // React owns the descendant UI.";
+  assert.ok(observed.includes(passiveCleanup), "missing passive cleanup observation point");
+  return observed.replace(passiveCleanup,
+    "      globalThis.__shellTest.widgetPassiveCleanup();\n" + passiveCleanup);
 }
 
 async function runPendingRemovalControl(cdp, bundle, wasmBase64, packageBase64) {
@@ -176,10 +182,20 @@ async function main() {
     buildShellLifetime({ withoutRemovalInvalidation: true }),
     buildShellLifetime(),
   ]);
-  const chromium = await launchChromium({ exposeGc: true });
+  const manifest = structuredClone(readIrPackageInfo(pkg).manifest);
+  manifest.metadata.generator = `${manifest.metadata.generator}:shell-lifetime-test`;
+  const manifestChangedPackage = replaceIrPackageManifest(pkg, manifest);
+  const server = createServer((request, response) => {
+    response.writeHead(200, { "content-type": "text/html" });
+    response.end("<!doctype html><div id=\"app\"></div>");
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  let chromium;
   let cdp;
   try {
+    chromium = await launchChromium({ exposeGc: true });
     cdp = await openChromiumPage(chromium);
+    await navigate(cdp, `http://127.0.0.1:${server.address().port}/`);
     const wasmBase64 = wasm.toString("base64");
     const packageBase64 = pkg.toString("base64");
     const red = await runPendingRemovalControl(
@@ -210,13 +226,14 @@ async function main() {
     await evaluate(cdp, `${greenBundle.outputFiles[0].text}\nvoid 0;`);
     const result = await evaluate(
       cdp,
-      `runShellLifetime(${JSON.stringify(wasmBase64)}, ${JSON.stringify(packageBase64)})`,
+      `runShellLifetime(${JSON.stringify(wasmBase64)}, ${JSON.stringify(packageBase64)}, ${JSON.stringify(Buffer.from(manifestChangedPackage).toString("base64"))})`,
     );
     assert.equal(result.ok, true);
     console.log("actual shell/Lean/Chromium lifetime smoke ok", result);
   } finally {
     cdp?.close();
-    await chromium.close();
+    await chromium?.close();
+    await new Promise((resolve) => server.close(resolve));
   }
 }
 

@@ -1,5 +1,6 @@
 import Vir.Infoview
 import Vir.React
+import ReactTamagotchiWidget
 
 namespace SmokeInfoviewLean
 
@@ -39,34 +40,11 @@ def expectPathError (path : String) : IO Unit := do
       throw <| IO.userError s!"infoview smoke failed: {path} unexpectedly accepted as {got}"
   | .error _ => pure ()
 
-def expectRootsOk (roots : Array String) (expected : Array Lean.Name) : IO Unit := do
-  match Lean.Vir.Infoview.irPackageRoots { roots := roots } with
-  | .ok got => expect s!"roots {roots} validate" (got == expected)
-  | .error message =>
-      throw <| IO.userError s!"infoview smoke failed: roots {roots} rejected: {message}"
-
-def expectRootsError (roots : Array String) : IO Unit := do
-  match Lean.Vir.Infoview.irPackageRoots { roots := roots } with
-  | .ok got =>
-      throw <| IO.userError s!"infoview smoke failed: roots {roots} unexpectedly accepted as {got}"
-  | .error _ => pure ()
-
-def AuthoringComponent : Lean.Vir.RuntimeM
-    (Lean.Vir.React.FunctionComponent Lean.Vir.Infoview.PanelWidgetProps) :=
-  Lean.Vir.React.FunctionComponent.ofLean fun _props => do
-    Lean.Vir.React.Node.text (← Lean.Vir.JsValue.ofString "authoring smoke")
-
-vir_proof_widget AuthoringComponent
-
-example : Lean.Vir.RuntimeM
-    (Lean.Vir.React.FunctionComponent Lean.Vir.Infoview.PanelWidgetProps) :=
-  createComponent
+abbrev widgetProps := ReactTamagotchiWidget.widgetProps
 
 def expectAuthoringPackage (package : Lean.Vir.Infoview.IRPackage) : IO Unit := do
-  expect "authoring package roots" <|
-    package.roots == #[
-      "SmokeInfoviewLean.createComponent"
-    ]
+  expect "authoring package entry" <|
+    package.entry == "ReactTamagotchiWidget.createComponent"
 
 def smokeVar : Lean.IR.VarId :=
   { idx := 0 }
@@ -94,12 +72,36 @@ unsafe def snapshotEnvironment (source contents : String) : IO Lean.Environment 
     | throw <| IO.userError "snapshot frontend failed"
   return env
 
+unsafe def widgetFingerprints : IO Unit := do
+  let source := "untitled:Fingerprint.lean"
+  let headerText := "module\npublic import Vir.Infoview\npublic section\n"
+  let body := "structure Packet where\n  first : Nat\ndef echo (p : Packet) : Packet := p\n"
+  let originalEnv ← snapshotEnvironment source (headerText ++ body)
+  let (original, before) ← IO.ofExcept <| ← Lean.Vir.Infoview.prepareWidgetPackage source originalEnv `echo
+  expect "retained export preserves defining document provenance" <|
+    before.manifest.exports.any fun entry => entry.entry == `echo && entry.source == source
+  let laterEnv ← snapshotEnvironment source
+    (headerText ++ "-- whitespace and source position are not code identity\n" ++ body ++
+      "example (n : Nat) : n = n := by rfl\n")
+  let (later, _) ← IO.ofExcept <| ← Lean.Vir.Infoview.prepareWidgetPackage source laterEnv `echo
+  expect "proof edits and source movement preserve fingerprint" (original == later)
+  let renamedEnv ← snapshotEnvironment source (headerText ++ body.replace "first" "other")
+  let (renamed, after) ← IO.ofExcept <| ← Lean.Vir.Infoview.prepareWidgetPackage source renamedEnv `echo
+  expect "field rename leaves executable closure unchanged" <|
+    (before.closure.decls.map (fun d => Lean.Vir.Infoview.irDeclHash d.decl)) ==
+      (after.closure.decls.map (fun d => Lean.Vir.Infoview.irDeclHash d.decl))
+  expect "field rename changes complete widget fingerprint" (original != renamed)
+  let changedInit := { before with closure := { before.closure with
+    initGlobals := before.closure.initGlobals.push { name := `testGlobal, initName := `testInit } } }
+  expect "initializer selection participates in widget fingerprint" <|
+    original != Lean.Vir.Infoview.widgetPackageFingerprint changedInit
+
 unsafe def importedHelperClosure (root : Lean.Name) : IO Vir.GeneratePackage.Closure := do
   let env ← snapshotEnvironment importedHelperTargetSource.toString
     (← IO.FS.readFile importedHelperTargetSource)
   let input ← IO.ofExcept <|
     Vir.GeneratePackage.prepareSnapshotInput importedHelperTargetSource.toString env #[root]
-  return Lean.Vir.Infoview.packageClosure input
+  return Vir.GeneratePackage.collectClosure #[input.target] input.index
 
 def loadedDecl? (closure : Vir.GeneratePackage.Closure) (name : Lean.Name) :
     Option Vir.GeneratePackage.LoadedDecl :=
@@ -117,7 +119,7 @@ def expectImportedDecl
         loaded.module? == some `InfoviewFixtures.ImportedHelper
       return loaded.decl
 
-/-- Exercise the same environment adapter as the RPC handler, without a disk
+/-- Exercise the same environment adapter as widget elaboration, without a disk
 source to fall back to. Local edits must survive imported-owner resolution. -/
 unsafe def snapshotPackage (suffix : String) : IO (String × ByteArray) := do
   let source := "untitled:ModuleSnapshot.lean"
@@ -131,7 +133,7 @@ unsafe def snapshotPackage (suffix : String) : IO (String × ByteArray) := do
   let input ← IO.ofExcept <| Vir.GeneratePackage.prepareSnapshotInput source env roots
   let target := input.target
   let index := input.index
-  let closure := Lean.Vir.Infoview.packageClosure input
+  let closure := Vir.GeneratePackage.collectClosure #[input.target] input.index
   expect "snapshot target preserves document provenance and module identity" <|
     match target.origin with
     | .snapshot document name => document == source && name == env.mainModule
@@ -164,8 +166,8 @@ unsafe def snapshotPackage (suffix : String) : IO (String × ByteArray) := do
   let partitioned := order.flatMap fun name =>
     (closure.forModule name env.mainModule).decls.map (·.decl.name)
   expect "module partitioning preserves every declaration exactly once" <|
-    Lean.Vir.Infoview.sortedNames partitioned ==
-      Lean.Vir.Infoview.sortedNames (closure.decls.map (·.decl.name))
+    partitioned.qsort Lean.Name.quickLt ==
+      (closure.decls.map (·.decl.name)).qsort Lean.Name.quickLt
   expect "every initializer global has a declaration owner" <|
     closure.initGlobals.all fun entry =>
       closure.decls.any (fun loaded => loaded.decl.name == entry.name && loaded.module?.isSome)
@@ -185,25 +187,16 @@ unsafe def snapshotPackage (suffix : String) : IO (String × ByteArray) := do
       entries.all fun entry =>
         closure.decls.any fun loaded =>
           loaded.decl.name == entry.name && loaded.module? == some moduleName
-  let text := Lean.FileMap.ofString contents
-  let token ← Lean.Vir.Infoview.packageClosureToken text source input env
-  let revision := Lean.Vir.Infoview.irPackageRevision roots token
-  let buildInput ← IO.ofExcept <| Vir.GeneratePackage.prepareSnapshotInput source env roots
-  let buildToken ← Lean.Vir.Infoview.packageClosureToken text source buildInput env
-  expect "stat/build preparation gives the same revision for the same snapshot" <|
-    revision == Lean.Vir.Infoview.irPackageRevision roots buildToken
-  let some rangeToken ← Lean.Vir.Infoview.packageRangeToken? text source closure env
-    | throw <| IO.userError "infoview smoke failed: snapshot has no source range token"
-  expect "snapshot revision includes the computed source range token" <|
-    token.endsWith s!":{rangeToken}"
-  match ← Vir.GeneratePackage.buildPackageFromIndex revision #[target] index with
-  | .error message => throw <| IO.userError message
-  | .ok pkg =>
-      let repeated ← IO.ofExcept <| ← Vir.GeneratePackage.buildPackageFromIndex revision
-        #[buildInput.target] buildInput.index
-      expect "same snapshot and revision emit identical bytes" (pkg.bytes == repeated.bytes)
-      IO.FS.writeBinFile s!"build/infoview-smoke/snapshot-{suffix}.irpkg" pkg.bytes
-      return (revision, pkg.bytes)
+  let (fingerprint, analyzed) ← IO.ofExcept <| ←
+    Lean.Vir.Infoview.prepareWidgetPackage source env `snapshotValue
+  let bytes ← IO.ofExcept <| Vir.GeneratePackage.emitPackage analyzed.closure analyzed.manifest
+  let (repeatedFingerprint, repeated) ← IO.ofExcept <| ←
+    Lean.Vir.Infoview.prepareWidgetPackage source env `snapshotValue
+  let repeatedBytes ← IO.ofExcept <| Vir.GeneratePackage.emitPackage repeated.closure repeated.manifest
+  expect "same snapshot emits identical fingerprint and bytes" <|
+    fingerprint == repeatedFingerprint && bytes == repeatedBytes
+  IO.FS.writeBinFile s!"build/infoview-smoke/snapshot-{suffix}.irpkg" bytes
+  return (fingerprint, bytes)
 
 unsafe def privateEffectSnapshot : IO Unit := do
   let source := "untitled:PrivateEffectSnapshot.lean"
@@ -218,7 +211,7 @@ unsafe def privateEffectSnapshot : IO Unit := do
     expect s!"live snapshot retains private effect import {target}" <|
       pkg.manifest.hostImports.any fun entry =>
         entry.target == target && Lean.isPrivateName entry.name
-  for loaded in (Lean.Vir.Infoview.packageClosure input).decls do
+  for loaded in (Vir.GeneratePackage.collectClosure #[input.target] input.index).decls do
     unless Vir.GeneratePackage.isVirJsDecl loaded.decl && Lean.isPrivateName loaded.decl.name do
       continue
     expect "private effect uses captured metadata, not a visible ConstantInfo" <|
@@ -247,12 +240,11 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
   let env ← snapshotEnvironment source
     "import InfoviewFixtures.ImportedHelper\ndef localValue : String := \"plain\"\n"
   for roots in #[#[`localValue], #[`InfoviewFixtures.ImportedHelper.labelBefore]] do
-    match Lean.Vir.Infoview.prepareIRPackageInput source roots env with
-    | .ok _ => throw <| IO.userError "non-module live snapshot was accepted"
-    | .error error =>
-        expect "non-module snapshot has invalidParams RPC error" (error.code == .invalidParams)
-        expect "non-module snapshot explains required header and no-save policy" <|
-          error.message == "VIR IR package failed:\nVIR live packages require a `module` header; add `module` to the document (no save is required)"
+    match ← Lean.Vir.Infoview.prepareWidgetPackage source env roots[0]! with
+    | .ok _ => throw <| IO.userError "non-module widget definition was accepted"
+    | .error message =>
+        expect "non-module definition explains required header and no-save policy" <|
+          message == "VIR live packages require a `module` header; add `module` to the document (no save is required)"
 
 #eval do
   let generatedWidget ←
@@ -271,23 +263,7 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
   expectPathError ""
   expectPathError "/tmp/demo-host.irpkg"
   expectPathError "web/../lakefile.lean"
-  expectRootsOk #["VirNativeInfoview.createComponent"] #[
-    `VirNativeInfoview.createComponent
-  ]
-  expectRootsOk #["ReactProofWidgetHello.createComponent"] #[
-    `ReactProofWidgetHello.createComponent
-  ]
-  expectRootsOk #["ReactTamagotchiWidget.createComponent"] #[
-    `ReactTamagotchiWidget.createComponent
-  ]
-  expectRootsOk #["VirNativeInfoview.createComponent", "VirNativeInfoview.createComponent"] #[
-    `VirNativeInfoview.createComponent
-  ]
-  expectRootsError #[]
-  expectRootsError #["VirNativeInfoview."]
-  expect "authoring widget component entry"
-    (widgetProps.componentEntry == "SmokeInfoviewLean.createComponent")
-  expect "authoring widget reload interval" (widgetProps.autoReloadMs == 1000)
+  expect "authoring widget has an elaborated fingerprint" (!widgetProps.irPackage.fingerprint.isEmpty)
   expect "authoring widget wasm path" (widgetProps.wasmPath == Lean.Vir.Infoview.WidgetProps.defaultWasmPath)
   expectAuthoringPackage widgetProps.irPackage
   expect "IR decl hash tracks body literals" <|
@@ -311,15 +287,13 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
   expect "real imported helper IR hash tracks helper bodies" <|
     Lean.Vir.Infoview.irDeclHash beforeDecl !=
       Lean.Vir.Infoview.irDeclHash afterDecl
-  expect "real imported helper closure hash participates in reload token" <|
-    Lean.Vir.Infoview.closureIRHash beforeClosure !=
-      Lean.Vir.Infoview.closureIRHash afterClosure
   IO.FS.createDirAll "build/infoview-smoke"
+  widgetFingerprints
   rejectNonModuleSnapshot
   privateEffectSnapshot
   let firstSnapshot ← snapshotPackage "first"
   let editedSnapshot ← snapshotPackage "edited"
-  expect "unsaved module edits change the package revision" <|
+  expect "unsaved module edits change the package fingerprint" <|
     firstSnapshot.1 != editedSnapshot.1
   expect "unsaved module edits change the package bytes" <|
     firstSnapshot.2 != editedSnapshot.2

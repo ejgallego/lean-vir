@@ -15,39 +15,102 @@ client and `@[server_rpc_method]` example. This guide owns editor integration;
 Import `Vir.Infoview`. The [hello widget](../../examples/tutorials/ReactProofWidgetHello.lean)
 supplies a `RuntimeM (React.FunctionComponent Infoview.PanelWidgetProps)` factory
 and uses `vir_proof_widget View` inside its namespace. The command generates
-`createComponent`, `irPackage` and `widgetProps`; the package root
-is only the factory. `show_panel_widgets` activates the bundled
+`createComponent`, `irPackage` and `widgetProps`. The package description contains
+exactly one factory `entry` and its required `fingerprint`. `show_panel_widgets` activates the bundled
 `Lean.Vir.Infoview.widget` with those props. This path needs no
 application-authored JavaScript file.
 
-For manual assembly, construct [WidgetProps](../../Vir/Infoview/Widget.lean)
-with the package roots and factory entry name. The factory returns:
+Use the generated [WidgetProps](../../Vir/Infoview/Widget.lean) when embedding a
+widget yourself; its package description carries the required fingerprint. The factory returns:
 
 ```lean
 RuntimeM (React.FunctionComponent Infoview.PanelWidgetProps)
 ```
 
-`WidgetProps` identifies the Wasm asset, `IRPackage` and component factory.
+`WidgetProps` identifies the Wasm asset and `IRPackage`; the shell calls
+`irPackage.entry` to obtain the component. There is no separate component-entry field.
 For each package generation, the default shell loads a fresh runtime with its
 own browser bindings and calls the Lean factory to obtain a native function
 component. React renders that component in the infoview's existing tree and
 passes its native `PanelWidgetProps` without a VIR clone or decode. The binding preserves nested field values; it does not
 promise a stable top-level props-object identity across React renders. All
 surrounding contexts are inherited without a provider bridge. Prop updates reuse
-the component; configuration or package revision changes replace the component and
+the component; configuration or changed package bytes replace the component and
 remount its subtree. Rendering follows ordinary React render rules and error
 boundaries.
 
 The [cleanup contract](../reference/HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal)
 distinguishes normal UI release from hard disposal and failed setup.
 
-Packages use the authoritative active Lean module snapshot, including unsaved
-widget code. Revision checks cover its declaration closure and local source
-ranges; imported changes become visible when the snapshot contains them. See
-[module inputs](../reference/GENERATE_PACKAGE.md) for acquisition and visibility rules.
-`autoReloadMs` controls stat/revision polling: zero disables it, `vir_proof_widget`
-defaults to 1000 ms, and manually constructed `WidgetProps` defaults to zero.
-Cursor movement alone does not request package replacement.
+### Package identity and live editing
+
+`vir_proof_widget` analyzes its factory and dependencies at elaboration time. It
+stores a fingerprint in the generated `irPackage` and retains the analyzed IR,
+initializers and complete interface manifest in Lean's environment extension.
+Imported widgets carry those inputs in their compiled module data. The inputs
+contain no live environment, task or RPC reference.
+
+The shell requests code on mount and when its package fingerprint or configuration
+changes. Ordinary proof edits, goals, cursor positions and position-specific RPC
+session changes update a healthy component without package or asset requests.
+There is no edit subscription or polling in the shell. The obsolete
+`statIRPackage` RPC has been removed; consumers request bytes with
+`buildIRPackage` when their code identity changes. An edit affecting the
+widget definition re-elaborates its description; upstream `getWidgets` supplies
+the updated props. Identical package inputs produce the same fingerprint even if
+source text or declaration positions change.
+
+Package bytes are emitted on demand in the existing server request task from
+exactly the retained inputs. Later declarations or annotations at the display
+position do not alter a generated widget's program. Put package-affecting
+annotations before `vir_proof_widget`. Missing/stale fingerprints fail explicitly;
+they never silently select different code from the cursor snapshot. The browser
+also rejects a build response whose entry or fingerprint differs from the request. The response
+contains only `entry`, `fingerprint`, and `dataBase64`. Defining-file provenance
+remains in the package manifest, including for imported widgets; the requesting
+document is not presented as the package source.
+
+The fingerprint covers the emitted IR, native extern signatures, initializer
+selection and the full manifest, including interface field names and host binding
+metadata. It uses Lean's non-cryptographic hashing as a local change detector,
+like native widget module hashes; collisions are possible and it is not an
+authenticity check. At acquisition,
+the browser also compares the complete package SHA-256 and compiled Wasm module
+against the installed runtime to avoid an unnecessary remount.
+
+`IRPackage.fingerprint` is required. The roots-only build mode, `updateToken`,
+`autoReloadMs`, and `statIRPackage` are removed. The old roots array and separate
+`componentEntry` are replaced by `irPackage.entry`. Integrations should use the
+`irPackage` and `widgetProps` generated by `vir_proof_widget`; arbitrary roots at
+the display position are no longer a widget package request. Package-affecting
+metadata belongs before the widget command. General snapshot preparation remains
+available through [the package generator](../reference/GENERATE_PACKAGE.md).
+
+New code requests supersede pending older ones. Obsolete unpublished runtimes are
+disposed; a failed acquisition keeps the last working component and presents its
+error. After a failed attempt, a new upstream RPC context permits one new attempt
+with the same fingerprint. Contexts are position-specific, so cursor movement
+can also supply that opportunity. Healthy or pending requests are left alone. If
+the context changes while a request is pending and that request subsequently fails,
+the shell tries the newer context once. Re-rendering with the same context does
+not repeat a failed request. Loading-status updates do not rerun upstream session
+lookup; a broken connection therefore cannot create its own retry loop.
+
+Compilation/fingerprint failures are Lean elaboration diagnostics. No
+fingerprint is published for an invalid package; its display/removal follows the
+upstream widget registration behavior. A later valid code description can load
+normally. In the generated-widget regression, invalid helper elaboration removes
+the widget description and UI; repair restores it with a fresh component mount,
+even when the fingerprint matches the earlier valid program. Escaped continuations
+still retain their original runtime and execute their cleanup guards. There is no
+periodic retry or Retry button.
+
+Fingerprint generation performs package analysis once per elaboration of the
+widget command. This can increase definition/build time and compiled module size;
+Lean can reuse an unchanged command's elaboration after later proof edits. An
+edit that causes the command to re-elaborate runs analysis again, but an unchanged
+fingerprint still suppresses browser code requests. Binary emission and transfer
+remain deferred until the widget is requested.
 
 Build the optional widget module with `lake build VirInfoview`; see
 [setup](../HARNESS.md#setup) for prerequisites. Restart the Lean server or reopen
