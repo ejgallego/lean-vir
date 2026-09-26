@@ -13,6 +13,14 @@ import tutorials.RpcReferenceWidget
 
 public section
 
+namespace Vir.Fixtures.RegisteredLifetime
+vir_proof_widget Vir.Fixtures.ShellLifetime.createComponent
+end Vir.Fixtures.RegisteredLifetime
+
+namespace Vir.Fixtures.AlternateLifetime
+vir_proof_widget Vir.Fixtures.ShellLifetime.createComponent
+end Vir.Fixtures.AlternateLifetime
+
 namespace Vir.Fixtures.RpcShellLifetime
 
 open Lean.Vir Lean.Vir.React Lean.Vir.Infoview
@@ -39,11 +47,13 @@ vir_proof_widget createEditableComponent
 
 end Vir.Fixtures.RpcShellLifetime
 
-show_panel_widgets [Lean.Vir.Infoview.widget with Vir.Fixtures.RpcShellLifetime.widgetProps,
+show_panel_widgets [Lean.Vir.Infoview.widget with Vir.Fixtures.RegisteredLifetime.widgetProps,
+  Lean.Vir.Infoview.widget with Vir.Fixtures.AlternateLifetime.widgetProps,
+  Lean.Vir.Infoview.widget with Vir.Fixtures.RpcShellLifetime.widgetProps,
   Lean.Vir.Infoview.widget with RpcReferenceWidget.widgetProps]
 
 -- Reuse the actual RPC methods and Lean stale-guard component unchanged.
--- The browser asks the server to package these roots from this live snapshot.
+-- The browser requests the descriptions retained by these widget commands.
 
 -- rpc-position-a
 example (n : Nat) : n = n := by

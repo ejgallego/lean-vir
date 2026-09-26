@@ -274,6 +274,10 @@ const harness = (globalThis.__shellTest = {
   },
 });
 
+function packageDescription(fingerprint) {
+  return { roots: [prefix + "createComponent"], fingerprint };
+}
+
 async function mountShell(props = {}, { onRemovalLayoutCleanup = null } = {}) {
   const container = document.createElement("div");
   document.body.append(container);
@@ -282,12 +286,9 @@ async function mountShell(props = {}, { onRemovalLayoutCleanup = null } = {}) {
   });
   const config = {
     wasmPath: "shell.wasm",
-    irPackage: {
-      roots: [prefix + "createComponent"],
-    },
+    irPackage: packageDescription("initial"),
     componentEntry: prefix + "createComponent",
     pos: { uri: "file:///ShellLifetime.lean", line: 0, character: 0 },
-    updateToken: "initial",
     ...props,
   };
   await React.act(async () =>
@@ -419,7 +420,7 @@ async function normalUnmount() {
 
 async function mountedRefresh() {
   transport.packageBase64 = transport.basePackageBase64;
-  const shell = await mountShell({ updateToken: "initial" });
+  const shell = await mountShell({ irPackage: packageDescription("initial") });
   await shell.ready();
   const old = states.at(-1);
 
@@ -454,7 +455,7 @@ async function mountedRefresh() {
   transport.revision++;
   const revisionOnly = transport.revision;
   const revisionBuilds = transport.builds;
-  await shell.update({ updateToken: "revision-only" });
+  await shell.update({ irPackage: packageDescription("revision-only") });
   await until(
     () =>
       transport.builds === revisionBuilds + 1 &&
@@ -469,7 +470,7 @@ async function mountedRefresh() {
 
   const late = pending(old);
   transport.packageBase64 = transport.manifestPackageBase64;
-  await shell.update({ updateToken: "manifest-only" });
+  await shell.update({ irPackage: packageDescription("manifest-only") });
   await until(
     () => states.at(-1) !== old &&
       shell.container.textContent.includes(states.at(-1).label),
@@ -523,9 +524,9 @@ async function mountedRefresh() {
   transport.packageBase64 = transport.basePackageBase64;
 }
 
-async function unchangedInputsNoAcquisition(updateToken) {
+async function unchangedInputsNoAcquisition() {
   transport.packageBase64 = transport.basePackageBase64;
-  const shell = await mountShell({ updateToken });
+  const shell = await mountShell();
   await shell.ready();
   const state = states.at(-1);
   const runtime = state.runtime;
@@ -544,9 +545,7 @@ async function unchangedInputsNoAcquisition(updateToken) {
       transport.assetCalls === assetCalls &&
       states.at(-1) === state &&
       state.runtime.deref() === runtime.deref(),
-    updateToken === undefined
-      ? "ordinary inputs without updateToken do not acquire"
-      : "ordinary props, goals, and position do not acquire",
+    "ordinary props, goals, and position do not acquire",
   );
   const session = harness.rpc;
   harness.rpc = {
@@ -724,13 +723,13 @@ function effectCount(state, event) {
 
 async function replacementCleanupFailure() {
   transport.packageBase64 = transport.basePackageBase64;
-  const shell = await mountShell({ updateToken: "cleanup-initial" });
+  const shell = await mountShell({ irPackage: packageDescription("cleanup-initial") });
   await shell.ready();
   const old = states.at(-1);
   old.throwCleanup = true;
   allowConsoleDiagnostic("normal cleanup sentinel", 2);
   transport.packageBase64 = transport.manifestPackageBase64;
-  await shell.update({ updateToken: "cleanup-refresh" });
+  await shell.update({ irPackage: packageDescription("cleanup-refresh") });
   await until(
     () =>
       shell.container.querySelector('[data-shell-error-boundary="true"]'),
@@ -801,7 +800,7 @@ async function obsoleteCandidateAndTokenUpdate() {
     const beforeBuild = states.length;
     const builds = transport.builds;
     transport.buildGate = tokenGate;
-    await mounted.update({ updateToken: "obsolete-same-bytes" });
+    await mounted.update({ irPackage: packageDescription("obsolete-same-bytes") });
     await until(() => transport.buildGate === null, "same-byte token build in flight");
     await mounted.unmount();
     tokenGate.resolve();
@@ -827,7 +826,7 @@ async function obsoleteCandidateAndTokenUpdate() {
     const builds = transport.builds;
     transport.packageBase64 = transport.manifestPackageBase64;
     transport.buildGate = tokenGate;
-    await mounted.update({ updateToken: `obsolete-${rejectBuild}` });
+    await mounted.update({ irPackage: packageDescription(`obsolete-${rejectBuild}`) });
     await until(() => transport.buildGate === null, "token build in flight");
     await mounted.unmount();
     if (rejectBuild) {
@@ -860,12 +859,12 @@ async function obsoleteCandidateAndTokenUpdate() {
 
 async function failedRefresh() {
   transport.packageBase64 = transport.basePackageBase64;
-  const shell = await mountShell({ updateToken: "failure-initial" });
+  const shell = await mountShell({ irPackage: packageDescription("failure-initial") });
   await shell.ready();
   const old = states.at(-1);
   transport.packageBase64 = transport.manifestPackageBase64;
   runtimeFault = { invalidComponent: true };
-  await shell.update({ updateToken: "failed-refresh" });
+  await shell.update({ irPackage: packageDescription("failed-refresh") });
   await until(
     () => shell.container.querySelector('[data-vir-infoview-state="error"]'),
     "failed refresh status",
@@ -891,7 +890,7 @@ async function failedRefresh() {
   check(transport.builds === failedBuilds,
     "ordinary props do not retry a failed token acquisition");
   transport.packageBase64 = transport.basePackageBase64;
-  await shell.update({ updateToken: "restore-installed" });
+  await shell.update({ irPackage: packageDescription("restore-installed") });
   await until(
     () => shell.container.querySelector('[data-vir-infoview-state="ready"]'),
     "restoring installed source clears failed build status",
@@ -901,7 +900,7 @@ async function failedRefresh() {
       harness.loadedRef.current?.service.runtime === old.runtime.deref(),
     "restoring installed source preserves its component");
   transport.packageBase64 = transport.manifestPackageBase64;
-  await shell.update({ updateToken: "source-edit" });
+  await shell.update({ irPackage: packageDescription("source-edit") });
   await until(
     () => old.cleanups === 1 &&
       shell.container.querySelector('[data-vir-infoview-state="ready"]'),
@@ -926,7 +925,7 @@ async function failedAcquisitionNewContext() {
       transport.packageBase64 = transport.basePackageBase64;
       const gate = deferred();
       if (!installed) transport.buildGate = gate;
-      const shell = await mountShell({ updateToken: null, irPackage: fingerprint("recovery-original") });
+      const shell = await mountShell({ irPackage: fingerprint("recovery-original") });
       let old = null;
       if (installed) {
         await shell.ready();
@@ -1006,7 +1005,7 @@ async function failedConnectionDoesNotReconnectItself() {
   });
   let shell;
   try {
-    shell = await mountShell({ updateToken: null });
+    shell = await mountShell({});
     await tick();
     check(contextReads === 1 && failedCalls === 1 &&
       shell.container.querySelector('[data-vir-infoview-state="error"]'),
@@ -1024,12 +1023,12 @@ async function failedConnectionDoesNotReconnectItself() {
 
 async function failedRefreshThenConfigurationChange() {
   transport.packageBase64 = transport.basePackageBase64;
-  const shell = await mountShell({ updateToken: "configuration-failure-initial" });
+  const shell = await mountShell({ irPackage: packageDescription("configuration-failure-initial") });
   await shell.ready();
   const old = states.at(-1);
   transport.packageBase64 = transport.manifestPackageBase64;
   runtimeFault = { invalidComponent: true };
-  await shell.update({ updateToken: "configuration-failure" });
+  await shell.update({ irPackage: packageDescription("configuration-failure") });
   await until(
     () => shell.container.querySelector('[data-vir-infoview-state="error"]'),
     "refresh failure before configuration change",
@@ -1061,12 +1060,12 @@ async function failedRefreshThenConfigurationChange() {
 
 async function temporaryBuildFailure() {
   transport.packageBase64 = transport.basePackageBase64;
-  const shell = await mountShell({ updateToken: "temporary-failure-initial" });
+  const shell = await mountShell({ irPackage: packageDescription("temporary-failure-initial") });
   await shell.ready();
   const old = states.at(-1);
   transport.failNextBuild = true;
   transport.packageBase64 = transport.manifestPackageBase64;
-  await shell.update({ updateToken: "temporary-failure" });
+  await shell.update({ irPackage: packageDescription("temporary-failure") });
   await until(
     () => shell.container.querySelector('[data-vir-infoview-state="error"]'),
     "temporary package acquisition failure",
@@ -1084,7 +1083,7 @@ async function temporaryBuildFailure() {
     "unchanged token suppresses another build after temporary acquisition failure",
   );
   transport.packageBase64 = transport.basePackageBase64;
-  await shell.update({ updateToken: "temporary-recovery-same-bytes" });
+  await shell.update({ irPackage: packageDescription("temporary-recovery-same-bytes") });
   await until(
     () => shell.container.querySelector('[data-vir-infoview-state="ready"]'),
     "same bytes recover temporary failure",
@@ -1092,7 +1091,7 @@ async function temporaryBuildFailure() {
   check(states.at(-1) === old && old.cleanups === 0,
     "same bytes recover without replacing the installed component");
   transport.packageBase64 = transport.manifestPackageBase64;
-  await shell.update({ updateToken: "temporary-recovery-new-bytes" });
+  await shell.update({ irPackage: packageDescription("temporary-recovery-new-bytes") });
   await until(
     () => old.cleanups === 1 &&
       shell.container.querySelector('[data-vir-infoview-state="ready"]'),
@@ -1109,14 +1108,14 @@ async function temporaryBuildFailure() {
 
 async function singlePendingRefresh() {
   transport.packageBase64 = transport.basePackageBase64;
-  const shell = await mountShell({ updateToken: "pending-initial" });
+  const shell = await mountShell({ irPackage: packageDescription("pending-initial") });
   await shell.ready();
   const old = states.at(-1);
   const builds = transport.builds;
   const gate = deferred();
   transport.buildGate = gate;
   transport.packageBase64 = transport.manifestPackageBase64;
-  await shell.update({ updateToken: "pending-refresh" });
+  await shell.update({ irPackage: packageDescription("pending-refresh") });
   await until(() => transport.buildGate === null, "refresh build pending");
   for (let i = 0; i < 5; i++) await tick();
   check(
@@ -1180,7 +1179,7 @@ function installMockRpc(wasmBase64, packageBase64, manifestPackageBase64) {
     async call(method, params) {
       if (method.endsWith("statIRPackage")) {
         transport.stats++;
-        throw new Error("statIRPackage is obsolete under explicit updateToken");
+        throw new Error("statIRPackage is obsolete under fingerprint acquisition");
       }
       if (method.endsWith("buildIRPackage")) {
         transport.builds++;
@@ -1199,7 +1198,7 @@ function installMockRpc(wasmBase64, packageBase64, manifestPackageBase64) {
         return {
           source: "fixtures/runtime/ShellLifetime.lean",
           roots: params.package.roots,
-          revision: params.package.fingerprint ?? String(revision),
+          revision: params.package.fingerprint,
           byteSize: String(atob(transport.packageBase64).length),
           dataBase64: transport.packageBase64,
         };
@@ -1330,8 +1329,7 @@ globalThis.runShellLifetime = async (
   installMockRpc(wasmBase64, packageBase64, manifestPackageBase64);
   try {
     await normalUnmount();
-    await unchangedInputsNoAcquisition("stable");
-    await unchangedInputsNoAcquisition(undefined);
+    await unchangedInputsNoAcquisition();
     await mountedRefresh();
     await applicationListenerRetention();
     await explicitShutdown();

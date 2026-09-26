@@ -60,7 +60,7 @@ function WidgetLoader({ widgetProps: props, rpcSession }) {
   ]);
 
   const requestKey = JSON.stringify([
-    configurationKey, props.irPackage?.fingerprint, props.updateToken,
+    configurationKey, props.irPackage?.fingerprint,
   ]);
 
   React.useLayoutEffect(() => {
@@ -236,7 +236,6 @@ function widgetRuntimeConfigFromProps(props) {
     irPackage,
     componentEntry: requiredString(props.componentEntry, "componentEntry"),
     position: requiredPosition(props.pos, "pos"),
-    updateToken: optionalString(props.updateToken, "updateToken"),
     setupHint: optionalString(props.setupHint, "setupHint"),
   };
 }
@@ -249,9 +248,7 @@ function requiredIRPackage(value, label) {
   if (roots.length === 0) {
     throw new Error(`VIR widget ${label}.roots must not be empty`);
   }
-  return { roots, ...(value.fingerprint == null ? {} : {
-    fingerprint: requiredString(value.fingerprint, `${label}.fingerprint`),
-  }) };
+  return { roots, fingerprint: requiredString(value.fingerprint, `${label}.fingerprint`) };
 }
 
 function requiredPosition(value, label) {
@@ -290,8 +287,8 @@ export async function loadRuntimeService({ rpcSession, config, previous = null }
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", packageBytes));
   const packageDigest = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
   // Compare the complete artifact, including interfaces and initializers.
-  // Source movement or an unrelated edit can change the update token without
-  // changing these bytes. Preserve the installed component in that case.
+  // Distinct descriptions can still emit identical bytes. Preserve the installed
+  // component when the acquired artifacts match.
   if (previous?.runtime.module === wasmModule && previous.packageDigest === packageDigest) {
     return previous;
   }
@@ -308,7 +305,7 @@ export async function loadRuntimeService({ rpcSession, config, previous = null }
       infoviewStripTags: TaggedText_stripTags,
     }),
   });
-  return { runtime, packageRevision: builtPackage.revision, packageDigest };
+  return { runtime, packageDigest };
 }
 
 export async function loadWasmModule(rpcSession, path, revision) {
@@ -336,12 +333,13 @@ export async function loadAssetBytes(rpcSession, path) {
 }
 
 export async function buildIRPackage(rpcSession, irPackage, position) {
+  const fingerprint = requiredString(irPackage.fingerprint, "irPackage.fingerprint");
   const response = await rpcSession.call("Lean.Vir.Infoview.buildIRPackage", {
     package: irPackage,
     pos: position,
   });
   const info = irPackageInfo(response, irPackage.roots);
-  if (irPackage.fingerprint != null && info.revision !== irPackage.fingerprint) {
+  if (info.revision !== fingerprint) {
     throw new Error(
       `VIR IR package fingerprint mismatch: expected ${irPackage.fingerprint}, got ${info.revision}`,
     );

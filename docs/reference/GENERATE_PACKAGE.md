@@ -80,8 +80,8 @@ locations are provenance for diagnostics and navigation, never loader keys.
 
 ### Live snapshots
 
-The roots-only Infoview RPC uses the requested live snapshot. Generated
-`vir_proof_widget` descriptions instead carry a fingerprint selecting the inputs
+Infoview widget requests require a `vir_proof_widget` description with a
+fingerprint selecting the inputs
 retained at widget elaboration; see [widget package identity](../guides/INFOVIEW.md#package-identity-and-live-editing).
 That path analyzes the definition snapshot once and emits the retained package
 on demand. Its manifest preserves the defining file's provenance, including when
@@ -90,14 +90,15 @@ an imported widget is displayed in a different document.
 `prepareSnapshotInput` uses the editor's current environment, including unsaved
 and private local IR. The document requires `module`, even when every requested
 root is imported, but does not need to be saved. Preparation rejects non-module
-environments before closure, revision or emission; both package RPC methods map
-that rejection to `invalidParams`.
+environments before analysis or emission. Widget elaboration reports this failure
+at the defining command; its RPC only retrieves already analyzed inputs.
 
 The prepared input pairs a snapshot target (module identity and document
-provenance) with its `DeclIndex`. Stat, revision and emission use that same
-environment. RPC tasks neither reacquire the source through the filesystem nor
-run another frontend or enable global initializer execution. Declaration lookup
-prefers already-loaded server IR over opaque imported entries, including
+provenance) with its `DeclIndex`. Analysis uses that environment, and emission
+uses the resulting closure and manifest. Widget RPC tasks neither reacquire the
+source through the filesystem nor run another frontend or enable global
+initializer execution. Declaration lookup prefers already-loaded server IR over
+opaque imported entries, including
 private dependency bodies.
 
 The adapter assigns snapshot-local IR, including private/generated helpers, to

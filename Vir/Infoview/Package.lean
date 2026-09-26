@@ -6,7 +6,6 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Lean.DeclarationRange
 public import Lean.Widget
 public meta import Lean.Widget
 public import Init.System.Uri
@@ -23,9 +22,8 @@ open Lean.IR
 
 structure IRPackage where
   roots : Array String
-  /-- Select package inputs retained by `vir_proof_widget` elaboration. Without
-  this field, the RPC prepares the roots from the requested live snapshot. -/
-  fingerprint : Option String := none
+  /-- Select exactly the package inputs retained by `vir_proof_widget` elaboration. -/
+  fingerprint : String
   deriving Server.RpcEncodable
 
 /--
@@ -35,7 +33,7 @@ runtime value because it is embedded in widget props; its generated
 -/
 meta structure IRPackageRpc where
   roots : Array String
-  fingerprint : Option String := none
+  fingerprint : String
   deriving Server.RpcEncodable
 
 meta structure IRPackageRequest where
@@ -69,13 +67,6 @@ meta def documentSourceName (doc : Server.FileWorker.EditableDocument) : String 
   match System.Uri.fileUriToPath? doc.meta.uri with
   | some path => path.toString
   | none => doc.meta.uri
-
-meta def sortedNames (names : Array Name) : Array Name :=
-  names.qsort (fun lhs rhs => lhs.toString < rhs.toString)
-
-meta def dedupNames (names : Array Name) : Array Name :=
-  names.foldl (fun acc name =>
-    if acc.contains name then acc else acc.push name) #[]
 
 meta def hashArray (seed : UInt64) (items : Array α) (hashItem : α → UInt64) : UInt64 :=
   items.foldl (fun h item => mixHash h (hashItem item)) (mixHash seed (hash items.size))
@@ -253,89 +244,6 @@ meta def irDeclHash : Decl → UInt64
         (hashArray (mixHash (mixHash (hash "Decl.extern") (hash name)) (irTypeHash resultType)) params paramHash)
         (virExternMetadataHash decl)
 
-meta def closureIRHash (closure : Vir.GeneratePackage.Closure) : UInt64 :=
-  let decls := closure.decls.qsort fun lhs rhs => lhs.decl.name.toString < rhs.decl.name.toString
-  hashArray (hash "ClosureIR") decls fun loaded =>
-    mixHash (mixHash (hash loaded.source) (hash loaded.decl.name)) (irDeclHash loaded.decl)
-
-meta def sourceRangeHash
-    (text : FileMap)
-    (range : DeclarationRange) : UInt64 :=
-  let start := text.ofPosition range.pos
-  let stop := text.ofPosition range.endPos
-  let text := String.Pos.Raw.extract text.source start stop
-  let positionToken :=
-    s!"{range.pos.line}:{range.pos.column}-{range.endPos.line}:{range.endPos.column}"
-  mixHash (hash text) (hash positionToken)
-
-meta def localClosureDeclNames
-    (source : String)
-    (closure : Vir.GeneratePackage.Closure) : Array Name :=
-  let names := closure.decls.foldl (fun names loaded =>
-    if loaded.source == source then
-      names.push loaded.decl.name
-    else
-      names) #[]
-  sortedNames (dedupNames names)
-
-meta def packageRangeTokenFrom
-    (text : FileMap)
-    (ranges : Array (Name × Option DeclarationRanges)) : Option String := Id.run do
-  let mut count := 0
-  let mut h : UInt64 := 17
-  for (name, range?) in ranges do
-    match range? with
-    | none => pure ()
-    | some ranges =>
-        count := count + 1
-        h := mixHash h (mixHash (hash name) (sourceRangeHash text ranges.range))
-  if count == 0 then
-    none
-  else
-    some s!"source-ranges:{count}:{h}"
-
-meta def prepareIRPackageInput
-    (source : String)
-    (roots : Array Name)
-    (env : Environment) : Except RequestError Vir.GeneratePackage.SnapshotInput :=
-  (Vir.GeneratePackage.prepareSnapshotInput source env roots).mapError fun message =>
-    { code := .invalidParams, message := s!"VIR IR package failed:\n{message}" }
-
-meta def packageClosure (input : Vir.GeneratePackage.SnapshotInput) :
-    Vir.GeneratePackage.Closure :=
-  Vir.GeneratePackage.collectClosure #[input.target] input.index
-
-meta def packageRangeToken?
-    (text : FileMap)
-    (source : String)
-    (closure : Vir.GeneratePackage.Closure)
-    (env : Environment) : IO (Option String) := do
-  let names := localClosureDeclNames source closure
-  if names.isEmpty then
-    return none
-  let ranges ← Vir.GeneratePackage.runCoreForSource source env do
-    let mut result := #[]
-    for name in names do
-      result := result.push (name, ← findDeclarationRanges? name)
-    return result
-  return packageRangeTokenFrom text ranges
-
-meta def packageClosureToken
-    (text : FileMap)
-    (source : String)
-    (input : Vir.GeneratePackage.SnapshotInput)
-    (env : Environment) : IO String := do
-  let closure := packageClosure input
-  let rangeToken? ← packageRangeToken? text source closure env
-  let rangeToken := rangeToken?.getD "source-ranges:none"
-  return s!"closure-ir:{closure.decls.size}:{closureIRHash closure}:{rangeToken}"
-
-meta def irPackageRevision
-    (roots : Array Name)
-    (token : String) : String :=
-  let rootToken := ",".intercalate (roots.map (fun name => name.toString)).toList
-  s!"ir-package:{token}:{rootToken}"
-
 /-- Immutable analyzed inputs, retained at the widget definition. No environment,
 RPC reference or task is stored in the module artifact. Binary emission is deferred
 until the browser requests the package. -/
@@ -403,33 +311,16 @@ meta def buildIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPa
   RequestM.withWaitFindSnapAtPos params.pos fun snap => do
     let doc ← RequestM.readDoc
     let source := documentSourceName doc
-    if let some fingerprint := params.package.fingerprint then
-      let package ← match retainedWidgetPackage snap.env roots fingerprint with
-        | .ok package => pure package
-        | .error error => throwThe RequestError error
-      let bytes ← match Vir.GeneratePackage.emitPackage package.closure package.manifest with
-        | .ok bytes => pure bytes
-        | .error message => throwThe RequestError { code := .invalidParams, message }
-      return {
-        source, roots := roots.map toString, revision := fingerprint
-        byteSize := toString bytes.size, dataBase64 := base64Encode bytes, report := package.report
-      }
-    let input ← match prepareIRPackageInput source roots snap.env with
-      | .ok input => pure input
+    let fingerprint := params.package.fingerprint
+    let package ← match retainedWidgetPackage snap.env roots fingerprint with
+      | .ok package => pure package
       | .error error => throwThe RequestError error
-    let token ← packageClosureToken doc.meta.text source input snap.env
-    let revision := irPackageRevision roots token
-    match ← Vir.GeneratePackage.buildPackageFromIndex revision #[input.target] input.index with
-    | .ok pkg =>
-        return {
-          source := source
-          roots := roots.map (fun name => name.toString)
-          byteSize := toString pkg.bytes.size
-          revision := revision
-          dataBase64 := base64Encode pkg.bytes
-          report := pkg.report
-        }
-    | .error message =>
-        throwThe RequestError { code := .invalidParams, message := s!"VIR IR package failed:\n{message}" }
+    let bytes ← match Vir.GeneratePackage.emitPackage package.closure package.manifest with
+      | .ok bytes => pure bytes
+      | .error message => throwThe RequestError { code := .invalidParams, message }
+    return {
+      source, roots := roots.map toString, revision := fingerprint
+      byteSize := toString bytes.size, dataBase64 := base64Encode bytes, report := package.report
+    }
 
 end Lean.Vir.Infoview

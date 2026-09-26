@@ -50,7 +50,7 @@ automatic transfer of React state or internal Lean values between generations.
 | Document with two Lean-authored DOM interactions | One page package set may serve both elements; events reuse its runtime, ordinary DOM objects and independent element state. No required React or handwritten per-element bootstrap. | Proposed Verso baseline: still to be built. Existing browser providers alone do not prove this integration. |
 | Infoview props, goals, position or context update | Reuse the component/runtime when code and configuration are unchanged; inherit upstream React context and preserve ordinary hook state. | `tests/infoview/rpc-shell-lifetime-entry.js` checks context and notification-driven RPC updates. |
 | Infoview implementation edit | Re-elaboration of widget code supplies a new package fingerprint when its analyzed inputs change. Proof edits and cursor/session updates request no package for healthy widgets. A newer code request immediately makes older work obsolete. Changed package bytes replace the component; identical bytes preserve React state. | `tests/infoview/rpc-shell-lifetime-entry.js` exercises unsaved implementation changes, a held reply followed by another edit, and broken/fixed source through the actual Lean server and Chromium. An actual editor window is not exercised. |
-| Slow, failed or obsolete load | Keep usable old UI on refresh failure; dispose unpublished candidates; removal prevents late publication. A later valid code description can recover a failed initial load. A failure of an older cache promise must not erase a newer entry. | Browser and real-server lifetime suites plus `tests/infoview/widget.mjs`. Both suites control late replies. A new code fingerprint, explicit manual token or new RPC context after failure permits another attempt; there is no periodic retry. |
+| Slow, failed or obsolete load | Keep usable old UI on refresh failure; dispose unpublished candidates; removal prevents late publication. A later valid code description can recover a failed initial load. A failure of an older cache promise must not erase a newer entry. | Browser and real-server lifetime suites plus `tests/infoview/widget.mjs`. Both suites control late replies. A new code fingerprint or new RPC context after failure permits another attempt; there is no periodic retry. |
 | Promise or callback survives UI replacement | Execute the original Lean continuation and its stale-result guard; never silently enter the successor program. | Browser and real-server shell lifetime suites. |
 | Headless/browser caller runs multiple entries | Keep interpreter state and initialized constants within a generation; calls and callbacks do not instantiate fresh interpreters. | `tests/runtime/interpreter-constant-cache-smoke.mjs`, CLI and module-package tests. |
 | Multi-module package set | Preserve member ordering, identity checks, initialization and startup semantics. A complete set is one generation, not one runtime per member. | `tests/runtime/module-package-set-smoke.mjs` and descriptor tests. |
@@ -108,12 +108,12 @@ Equal analyzed inputs keep the fingerprint even after source movement or a
 whitespace edit. Metadata-only changes participate in the fingerprint. Binary
 emission and transfer remain in the server request task, after a code request.
 
-The older roots-only RPC remains explicitly current-snapshot-based for manual
-integrations. An optional `updateToken` requests new code for that path. There is
-no timer or automatic document-version token. After failure, a new RPC context
-permits one attempt at the same requested program; healthy and pending requests
-survive context changes. Retaining both input contracts preserves callers that intentionally package later snapshot
-metadata; generated widgets instead fix that metadata at their definition.
+Every widget package request requires the fingerprint published by elaboration.
+The roots-only RPC mode and manual update token have been removed: there was no
+identified application consumer requiring display-position package analysis.
+Custom integrations pass the generated description. After failure, a new RPC
+context permits one attempt at the same requested program; healthy and pending
+requests survive context changes.
 
 Candidate obsolescence, package-byte equality, old callback ownership and
 unmount versus hard-disposal semantics remain unchanged. Elaboration errors are

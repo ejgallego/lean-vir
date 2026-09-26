@@ -195,13 +195,13 @@ async function run() {
     root = createRoot(container, {
       onUncaughtError: (error) => unexpected.push(error),
     });
-    const roots = [prefix + "createComponent"];
+    const baseDescriptor = await generatedProps(a, config.a, "Vir.Fixtures.RegisteredLifetime.createComponent");
+    const roots = baseDescriptor.irPackage.roots;
     function renderWidget(session, position, entries = roots, {
-      updateToken = "fixed",
       setupHint = "",
-      componentEntry = prefix + "createComponent",
+      componentEntry = baseDescriptor.componentEntry,
       editorConnection = editor,
-      irPackage = { roots: entries },
+      irPackage = { ...baseDescriptor.irPackage, roots: entries },
     } = {}) {
       globalThis.__rpcShell.session = session;
       return React.act(async () =>
@@ -212,7 +212,6 @@ async function run() {
             irPackage,
             componentEntry,
             pos: { uri: config.uri, ...position },
-            updateToken,
             setupHint,
           }))),
         ),
@@ -237,7 +236,6 @@ async function run() {
       });
       return states.at(-1);
     }
-    const liveEntry = "Vir.Fixtures.RpcShellLifetime.createEditableComponent";
     const liveText = () =>
       container.querySelector("#rpc-live-edit")?.textContent ?? null;
     async function waitForLiveText(label, text) {
@@ -246,19 +244,12 @@ async function run() {
         liveText() === text,
       );
     }
-    let manualLiveUpdates = false;
-    let manualToken = 0;
     async function editText(before, after) {
       await React.act(async () => {
         const change = await post("/edit", { replace: { before, after } });
         for (const handler of [...notificationHandlers])
           handler(["textDocument/didChange", change]);
       });
-      if (manualLiveUpdates) {
-        await renderWidget(a, config.a, [liveEntry], {
-          componentEntry: liveEntry, updateToken: `manual-${++manualToken}`,
-        });
-      }
     }
     async function generatedProps(session, position, entry) {
       const result = await Widget_getWidgets(session, position);
@@ -400,9 +391,8 @@ async function run() {
       a,
       "configuration-replacement",
     );
-    // A factory-only package has one root: reversing it no longer changes
-    // configuration. Include an existing fixture export to request a new package.
-    const current = await mount(b, config.b, [...roots, prefix + "record"]);
+    const alternate = await generatedProps(b, config.b, "Vir.Fixtures.AlternateLifetime.createComponent");
+    const current = await mount(b, config.b, alternate.irPackage.roots, alternate);
     check(
       previous.runtime !== current.runtime &&
         !previous.runtime.disposed &&
@@ -480,7 +470,7 @@ async function run() {
     const errorText = container.querySelector(".vir-infoview-widget-status").textContent;
     check(invalidRootCall?.error?.code === -32602, "real invalid-root RPC code");
     check(
-      invalidRootCall.error.message.includes(invalidRoot) &&
+      invalidRootCall.error.message.includes("fingerprint is unavailable") &&
         errorText.includes(invalidRootCall.error.message) &&
         errorText.includes("(-32602)"),
       `original package error message and code rendered: ${errorText}`,
@@ -490,23 +480,35 @@ async function run() {
     check(states.length === 3, "invalid package root installs no runtime");
     await unmountUI();
 
+    let missingIdentityError;
+    try {
+      await a.call("Lean.Vir.Infoview.buildIRPackage", {
+        package: { roots }, pos: config.a,
+      });
+    } catch (error) {
+      missingIdentityError = error;
+      expectedLivePackageFailures.add(calls.at(-1));
+    }
+    check(missingIdentityError?.code === -32602,
+      "server rejects a roots-only request instead of building current-snapshot code");
+
     const startup = [];
-    for (const updateToken of [null, "fixed"]) {
+    {
       const firstCall = calls.length;
       const phaseCalls = (method) => calls.slice(firstCall).filter((call) =>
         call.params.method === `Lean.Vir.Infoview.${method}`,
       );
       packageReplyDelayMs = 2250;
-      const state = await mount(a, config.a, roots, { updateToken });
+      const state = await mount(a, config.a, roots);
       packageReplyDelayMs = 0;
       const packageCall = phaseCalls("buildIRPackage")[0];
       check(packageCall?.replyDelayMs >= 2200, "genuine package reply delayed at least 2.2s");
-      await renderWidget(a, config.a, roots, { updateToken });
+      await renderWidget(a, config.a, roots);
       await tick();
       check(phaseCalls("statIRPackage").length === 0, "shell never polls package revisions");
       check(phaseCalls("buildIRPackage").length === 1, "stable props request one package");
       check(states.at(-1) === state, "stable props preserve the runtime");
-      startup.push({ updateToken, replyDelayMs: packageCall.replyDelayMs,
+      startup.push({ replyDelayMs: packageCall.replyDelayMs,
         builds: phaseCalls("buildIRPackage").length, stats: phaseCalls("statIRPackage").length });
       await unmountUI();
       check(!state.runtime.disposed && state.events.includes(`cleanup:${state.label}`),
@@ -516,7 +518,7 @@ async function run() {
     const beforeAbandon = states.length;
     const abandonedCallStart = calls.length;
     packageReplyDelayMs = 2250;
-    await renderWidget(a, config.a, roots, { updateToken: null });
+    await renderWidget(a, config.a, roots);
     let abandonedCall;
     await waitFor("obsolete initial package reply held", () => {
       abandonedCall = calls.slice(abandonedCallStart).find((call) =>
@@ -597,136 +599,57 @@ async function run() {
       container.querySelector("#rpc-reference-view") === button && button.textContent.includes("local 1"),
       "edit refresh preserves runtime, native component, DOM and Lean hook state");
 
-    // Exercise the manual current-snapshot API first: this integration updates
-    // its explicit token after each edit. Generated props are checked below.
-    packageReplyDelayMs = 0;
-    manualLiveUpdates = true;
-    await renderWidget(a, config.a, [liveEntry], {
-      componentEntry: liveEntry,
-      updateToken: null,
-    });
+    // Actual unsaved edits acquire the descriptions published by widget elaboration.
+    const generatedEntry = "Vir.Fixtures.RpcShellLifetime.createComponent";
+    let descriptor = await generatedProps(a, config.a, generatedEntry);
+    await renderWidget(a, config.a, descriptor.irPackage.roots, descriptor);
     await waitForLiveText("initial editable implementation", "implementation-v1");
     const liveInitial = states.at(-1);
-    await editText('"implementation-v1"', '"implementation-v2"');
+    async function editGenerated(before, after) {
+      await editText(before, after);
+      descriptor = await generatedProps(a, config.a, generatedEntry);
+      await renderWidget(a, config.a, descriptor.irPackage.roots, descriptor);
+    }
+    await editGenerated('"implementation-v1"', '"implementation-v2"');
     await waitForLiveText("first unsaved implementation edit", "implementation-v2");
     check(states.at(-1) !== liveInitial, "an implementation edit installs a fresh generation");
 
-    const unchangedState = states.at(-1);
-    const unchangedNode = container.querySelector("#rpc-live-edit");
-    const unchangedStart = calls.length;
-    // Editing declaration whitespace changes source provenance, not the artifact.
-    await editText(':= "implementation-v2"', ':=  "implementation-v2"');
-    await waitFor("equivalent source package acquired", () => calls.slice(unchangedStart).some((call) =>
-      call.params.method === "Lean.Vir.Infoview.buildIRPackage" && call.settled && call.value,
-    ));
-    await tick();
-    check(states.at(-1) === unchangedState && container.querySelector("#rpc-live-edit") === unchangedNode,
-      "equivalent source preserves the runtime and component DOM");
-    const ignoredStart = calls.length;
-    await React.act(async () => {
-      for (const handler of [...notificationHandlers]) {
-        handler(["textDocument/didChange", { textDocument: { uri: "file:///other.lean", version: 999 } }]);
-        handler(["unrelated/event", { textDocument: { uri: config.uri, version: 999 } }]);
-      }
-    });
-    await tick();
-    check(calls.length === ignoredStart, "unrelated notifications never acquire");
-
-    // A newer edit supersedes a pending acquisition immediately. Deliver the
-    // latest package first, then prove the older reply cannot replace it.
+    // Hold the older build response, publish a newer generation, then release it.
     packageReplyDelayMs = 2250;
     const heldBuildStart = calls.length;
-    await editText('"implementation-v2"', '"implementation-v3"');
+    await editGenerated('"implementation-v2"', '"implementation-v3"');
     await waitFor("held implementation package reply", () =>
       calls.slice(heldBuildStart).some((call) =>
         call.params.method === "Lean.Vir.Infoview.buildIRPackage" &&
-        call.value && !call.settled,
-      ),
-    );
+        call.value && !call.settled));
     packageReplyDelayMs = 0;
-    await editText('"implementation-v3"', '"implementation-v4"');
+    await editGenerated('"implementation-v3"', '"implementation-v4"');
     await waitForLiveText("latest rapid implementation edit", "implementation-v4");
     const heldBuild = calls.slice(heldBuildStart).find((call) =>
-      call.params.method === "Lean.Vir.Infoview.buildIRPackage",
-    );
+      call.params.method === "Lean.Vir.Infoview.buildIRPackage");
     await waitFor("older implementation reply settles", () => heldBuild?.settled);
     check(heldBuild?.replyDelayMs >= 2200, "the older implementation reply was held");
     check(liveText() === "implementation-v4", "rapid edits converge to the latest valid implementation");
-    const workingLiveState = states.findLast((state) => !state.runtime.disposed);
     check(states.at(-1).runtime.disposed, "late obsolete candidate is disposed");
-
-    // A broken edit keeps the last working component mounted. Once the source
-    // is repaired, the next manual token recovers the same mounted shell.
-    const brokenCallStart = calls.length;
-    await editText('"implementation-v4"', '"implementation-v4" ++ missingImplementation');
-    await waitFor("broken implementation status", () =>
-      container.querySelector('[data-vir-infoview-state="error"]'),
-    );
-    check(liveText() === "implementation-v4", "broken edit preserves the last working widget");
-    check(!workingLiveState.runtime.disposed, "broken edit keeps the working runtime live");
-    const repairCallStart = calls.length;
-    for (const call of calls.slice(brokenCallStart, repairCallStart)) {
-      if (call.params.method === "Lean.Vir.Infoview.buildIRPackage") {
-        expectedLivePackageFailures.add(call);
-      }
-    }
-    await editText('"implementation-v4" ++ missingImplementation', '"implementation-v4"');
-    await waitFor("repaired implementation acquisition", () => calls.slice(repairCallStart).some((call) =>
-      call.params.method === "Lean.Vir.Infoview.buildIRPackage" && call.settled && call.value,
-    ));
-    await waitForLiveText("repaired implementation edit", "implementation-v4");
-    check(states.findLast((state) => !state.runtime.disposed) === workingLiveState,
-      "identical repaired package preserves the working generation");
-
-    // Continue from the recovered source so the initial failure below also
-    // has a previously working implementation to restore.
-    await editText('"implementation-v4"', '"implementation-v5"');
+    await editGenerated('"implementation-v4"', '"implementation-v5"');
     await waitForLiveText("next implementation edit", "implementation-v5");
 
-    // Also cover a failed initial package. There is no old UI to preserve in
-    // this case, but a later valid edit must still recover through the manual token.
-    await unmountUI();
-    const initialBrokenCallStart = calls.length;
-    await editText('"implementation-v5"', '"implementation-v5" ++ missingInitialImplementation');
-    await waitFor("broken initial implementation status", () =>
-      container.querySelector('[data-vir-infoview-state="error"]'),
-    );
-    check(liveText() === null, "broken initial source publishes no component");
-    const initialRepairCallStart = calls.length;
-    for (const call of calls.slice(initialBrokenCallStart, initialRepairCallStart)) {
-      if (call.params.method === "Lean.Vir.Infoview.buildIRPackage") {
-        expectedLivePackageFailures.add(call);
-      }
-    }
-    await editText('"implementation-v5" ++ missingInitialImplementation', '"implementation-v5"');
-    await waitForLiveText("repaired initial implementation", "implementation-v5");
     const beforePosition = states.at(-1);
     const positionStart = calls.length;
-    await renderWidget(a, config.b, [liveEntry], {
-      componentEntry: liveEntry, updateToken: `manual-${manualToken}`,
-    });
+    await renderWidget(a, config.b, descriptor.irPackage.roots, descriptor);
     await tick();
     check(states.at(-1) === beforePosition && calls.length === positionStart,
       "position changes do not acquire package code");
-
-    const beforeReconnect = states.at(-1);
     const reconnectNode = container.querySelector("#rpc-live-edit");
-    const reconnectStart = calls.length;
     sessions.closeSessionForFile(config.uri);
     const reconnected = sessionAt(config.a);
     check(reconnected !== a, "reconnect supplies a distinct official session");
-    await renderWidget(reconnected, config.a, [liveEntry], {
-      componentEntry: liveEntry, updateToken: `manual-${manualToken}`,
-    });
+    const reconnectStart = calls.length;
+    await renderWidget(reconnected, config.a, descriptor.irPackage.roots, descriptor);
     await tick();
-    check(states.at(-1) === beforeReconnect && container.querySelector("#rpc-live-edit") === reconnectNode &&
+    check(states.at(-1) === beforePosition && container.querySelector("#rpc-live-edit") === reconnectNode &&
       calls.length === reconnectStart,
       "session replacement preserves the runtime without a package request");
-    manualLiveUpdates = false;
-    const generatedEntry = "Vir.Fixtures.RpcShellLifetime.createComponent";
-    let descriptor = await generatedProps(reconnected, config.a, generatedEntry);
-    await renderWidget(reconnected, config.a, descriptor.irPackage.roots, descriptor);
-    await waitForLiveText("generated widget initial load", "implementation-v5");
     const generatedState = states.at(-1);
     const generatedNode = container.querySelector("#rpc-live-edit");
     const generationCount = states.length;
@@ -766,7 +689,7 @@ async function run() {
     check(states.at(-1) !== generatedState, "generated widget helper edit replaces the runtime");
     descriptor = changedDescriptor;
     const beforeWhitespace = packageCalls().length;
-    await editText(':=  "implementation-v6"', ':=   "implementation-v6"');
+    await editText(':= "implementation-v6"', ':=  "implementation-v6"');
     const whitespaceDescriptor = await generatedProps(reconnected, config.a, generatedEntry);
     check(whitespaceDescriptor.irPackage.fingerprint === descriptor.irPackage.fingerprint,
       "declaration re-elaboration with identical inputs preserves fingerprint");
@@ -779,7 +702,7 @@ async function run() {
     // An invalid generated helper is removed from Widget_getWidgets. Repairing
     // the same source restores its original fingerprint and descriptor; the
     // next implementation edit then reappears through the generated fingerprint
-    // without an explicit updateToken.
+    // from its restored description.
     const generatedContinuation = await begin(
       generatedLiveState,
       reconnected,
@@ -814,7 +737,6 @@ async function run() {
     );
     await renderWidget(reconnected, config.a, repairedDescriptor.irPackage.roots, {
       ...repairedDescriptor,
-      updateToken: null,
     });
     await waitForLiveText("repaired generated helper", "implementation-v6");
     const repairedState = states.at(-1);
@@ -848,12 +770,12 @@ async function run() {
       reconnected,
       config.a,
       repairedChangedDescriptor.irPackage.roots,
-      { ...repairedChangedDescriptor, updateToken: null },
+      repairedChangedDescriptor,
     );
     await waitForLiveText("changed repaired generated helper", "implementation-v7");
     check(
       states.at(-1) !== repairedState,
-      "changed repaired helper reappears without an explicit updateToken",
+      "changed repaired helper reappears from its restored description",
     );
     descriptor = repairedChangedDescriptor;
 
@@ -864,7 +786,6 @@ async function run() {
     failNextPackageTransport = "generated initial package transport sentinel";
     await renderWidget(reconnected, config.a, descriptor.irPackage.roots, {
       ...descriptor,
-      updateToken: null,
     });
     await waitFor("failed generated initial acquisition", () =>
       container.querySelector('[data-vir-infoview-state="error"]'),
@@ -882,7 +803,6 @@ async function run() {
     check(recoveredSession !== reconnected, "failed acquisition reconnects with a new official session");
     await renderWidget(recoveredSession, config.a, descriptor.irPackage.roots, {
       ...descriptor,
-      updateToken: null,
     });
     await waitForLiveText("recovered generated initial acquisition", "implementation-v7");
     check(

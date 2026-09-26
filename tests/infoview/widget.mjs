@@ -159,6 +159,7 @@ const irPackageServiceConfig = {
     roots: [
       "VirNativeInfoview.createComponent",
     ],
+    fingerprint: irPackageRevision,
   },
   componentEntry: "VirNativeInfoview.createComponent",
   position: { line: 0, character: 0 },
@@ -187,6 +188,15 @@ await assert.rejects(
   /roots mismatch/,
   "matching fingerprints do not bypass response root validation",
 );
+for (const fingerprint of [undefined, null, ""]) {
+  const builds = irPackageBuildCount;
+  await assert.rejects(
+    buildIRPackage(rpcSession, { ...generatedPackage, fingerprint },
+      irPackageServiceConfig.position),
+    /fingerprint must be a non-empty string/,
+  );
+  assert.equal(irPackageBuildCount, builds, "missing identity never requests current-snapshot code");
+}
 const irPackageFirstService = await loadRuntimeService({
   rpcSession,
   config: irPackageServiceConfig,
@@ -210,7 +220,6 @@ assert.equal(
   ],
   "function",
 );
-assert.equal(irPackageFirstService.packageRevision, "ir-package-v1");
 const firstIRPackageBuildCount = irPackageBuildCount;
 const irPackageSecondService = await loadRuntimeService({
   rpcSession,
@@ -280,32 +289,13 @@ assert.equal(
   currentModule,
 );
 assert.equal(assetReadCount, readsBeforeStaleRetry, "stale failure preserves newer cache entry");
-const latestSnapshot = await loadRuntimeService({
-  rpcSession: {
-    async call(method, params) {
-      assert.notEqual(method, "Lean.Vir.Infoview.statIRPackage",
-        "package build response is authoritative; no pre-build observation");
-      const response = await rpcSession.call(method, params);
-      return method.endsWith("buildIRPackage")
-        ? { ...response, revision: "newer-build-snapshot" }
-        : response;
-    },
-  },
-  config: irPackageServiceConfig,
-});
-assert.equal(latestSnapshot.packageRevision, "newer-build-snapshot");
-assert.equal(
-  validateWidgetComponentEntry(latestSnapshot.runtime, irPackageServiceConfig.componentEntry).entry,
-  irPackageServiceConfig.componentEntry,
-);
-latestSnapshot.runtime.dispose();
 irPackageRevision = "ir-package-v2";
+irPackageServiceConfig.irPackage.fingerprint = irPackageRevision;
 const irPackageThirdService = await loadRuntimeService({
   rpcSession,
   config: irPackageServiceConfig,
 });
 assert.notEqual(irPackageThirdService.runtime, irPackageSecondService.runtime);
-assert.equal(irPackageThirdService.packageRevision, "ir-package-v2");
 assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
 irPackageFirstService.runtime.dispose();
 irPackageSecondService.runtime.dispose();
