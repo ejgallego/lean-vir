@@ -71,7 +71,7 @@ const runtime = await createVirRuntime({
 let assetReadCount = 0;
 let assetStatCount = 0;
 let irPackageBuildCount = 0;
-let irPackageRevision = "ir-package-v1";
+let irPackageFingerprint = "ir-package-v1";
 const assetRevisions = new Map([
   ["web/public/vir-upstream.wasm", "wasm-v1"],
   ["web/public/native-infoview.irpkg", "package-v1"],
@@ -81,12 +81,9 @@ const rpcSession = {
     if (method === "Lean.Vir.Infoview.buildIRPackage") {
       irPackageBuildCount += 1;
       return {
-        source: "examples/VirNativeInfoview.lean",
-        roots: params.package.roots,
-        byteSize: String(packageBytes.length),
-        revision: irPackageRevision,
+        entry: params.package.entry,
+        fingerprint: irPackageFingerprint,
         dataBase64: packageBytes.toString("base64"),
-        report: "IR package report",
       };
     }
     const bytes = await readFile(new URL(params.path, repoRoot));
@@ -156,21 +153,18 @@ await assert.rejects(
 const irPackageServiceConfig = {
   wasmPath: "web/public/vir-upstream.wasm",
   irPackage: {
-    roots: [
-      "VirNativeInfoview.createComponent",
-    ],
-    fingerprint: irPackageRevision,
+    entry: "VirNativeInfoview.createComponent",
+    fingerprint: irPackageFingerprint,
   },
-  componentEntry: "VirNativeInfoview.createComponent",
   position: { line: 0, character: 0 },
   setupHint: "",
 };
 const generatedPackage = {
   ...irPackageServiceConfig.irPackage,
-  fingerprint: irPackageRevision,
+  fingerprint: irPackageFingerprint,
 };
 assert.equal(
-  (await buildIRPackage(rpcSession, generatedPackage, irPackageServiceConfig.position)).revision,
+  (await buildIRPackage(rpcSession, generatedPackage, irPackageServiceConfig.position)).fingerprint,
   generatedPackage.fingerprint,
 );
 await assert.rejects(
@@ -182,11 +176,11 @@ await assert.rejects(
 await assert.rejects(
   buildIRPackage({
     async call(method, params) {
-      return { ...await rpcSession.call(method, params), roots: ["another.factory"] };
+      return { ...await rpcSession.call(method, params), entry: "another.factory" };
     },
   }, generatedPackage, irPackageServiceConfig.position),
-  /roots mismatch/,
-  "matching fingerprints do not bypass response root validation",
+  /entry mismatch/,
+  "matching fingerprints do not bypass response entry validation",
 );
 for (const fingerprint of [undefined, null, ""]) {
   const builds = irPackageBuildCount;
@@ -289,8 +283,8 @@ assert.equal(
   currentModule,
 );
 assert.equal(assetReadCount, readsBeforeStaleRetry, "stale failure preserves newer cache entry");
-irPackageRevision = "ir-package-v2";
-irPackageServiceConfig.irPackage.fingerprint = irPackageRevision;
+irPackageFingerprint = "ir-package-v2";
+irPackageServiceConfig.irPackage.fingerprint = irPackageFingerprint;
 const irPackageThirdService = await loadRuntimeService({
   rpcSession,
   config: irPackageServiceConfig,

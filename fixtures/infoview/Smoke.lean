@@ -40,25 +40,11 @@ def expectPathError (path : String) : IO Unit := do
       throw <| IO.userError s!"infoview smoke failed: {path} unexpectedly accepted as {got}"
   | .error _ => pure ()
 
-def expectRootsOk (roots : Array String) (expected : Array Lean.Name) : IO Unit := do
-  match Lean.Vir.Infoview.irPackageRoots { roots := roots, fingerprint := "test" } with
-  | .ok got => expect s!"roots {roots} validate" (got == expected)
-  | .error message =>
-      throw <| IO.userError s!"infoview smoke failed: roots {roots} rejected: {message}"
-
-def expectRootsError (roots : Array String) : IO Unit := do
-  match Lean.Vir.Infoview.irPackageRoots { roots := roots, fingerprint := "test" } with
-  | .ok got =>
-      throw <| IO.userError s!"infoview smoke failed: roots {roots} unexpectedly accepted as {got}"
-  | .error _ => pure ()
-
 abbrev widgetProps := ReactTamagotchiWidget.widgetProps
 
 def expectAuthoringPackage (package : Lean.Vir.Infoview.IRPackage) : IO Unit := do
-  expect "authoring package roots" <|
-    package.roots == #[
-      "ReactTamagotchiWidget.createComponent"
-    ]
+  expect "authoring package entry" <|
+    package.entry == "ReactTamagotchiWidget.createComponent"
 
 def smokeVar : Lean.IR.VarId :=
   { idx := 0 }
@@ -277,22 +263,6 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
   expectPathError ""
   expectPathError "/tmp/demo-host.irpkg"
   expectPathError "web/../lakefile.lean"
-  expectRootsOk #["VirNativeInfoview.createComponent"] #[
-    `VirNativeInfoview.createComponent
-  ]
-  expectRootsOk #["ReactProofWidgetHello.createComponent"] #[
-    `ReactProofWidgetHello.createComponent
-  ]
-  expectRootsOk #["ReactTamagotchiWidget.createComponent"] #[
-    `ReactTamagotchiWidget.createComponent
-  ]
-  expectRootsOk #["VirNativeInfoview.createComponent", "VirNativeInfoview.createComponent"] #[
-    `VirNativeInfoview.createComponent
-  ]
-  expectRootsError #[]
-  expectRootsError #["VirNativeInfoview."]
-  expect "authoring widget component entry"
-    (widgetProps.componentEntry == "ReactTamagotchiWidget.createComponent")
   expect "authoring widget has an elaborated fingerprint" (!widgetProps.irPackage.fingerprint.isEmpty)
   expect "authoring widget wasm path" (widgetProps.wasmPath == Lean.Vir.Infoview.WidgetProps.defaultWasmPath)
   expectAuthoringPackage widgetProps.irPackage

@@ -12,7 +12,8 @@ one-runtime-per-generation API.
   DOM interaction needs no React dependency; React is an author choice. Keep
   internal state in Lean and use actual JavaScript objects or opaque Lean
   handles across the boundary where appropriate.
-- **Infoview:** the current Lean snapshot supplies package bytes; a fresh runtime
+- **Infoview:** elaboration retains package inputs under a fingerprint; the RPC
+  selects those inputs from the current environment and emits package bytes; a fresh runtime
   generation invokes a component factory; its returned function renders in the
   existing Infoview React tree. Props, goals, position and context updates use
   normal React/Infoview behavior. Code replacement selects a new component and
@@ -38,7 +39,7 @@ inherited without a shell bridge or second React root.
 | Historical manifest versions and option variants | **Remove after changing a supported contract** | Name supported released artifacts and consumers before narrowing compatibility. |
 | Widget error presentation and JSON-input classifications | **Remove now** from general runtime responsibilities (separate patch) | Preserve application diagnostics and actual consumers; moving code alone is not a simplification claim. |
 | Repeated validation of owned package bytes | **Keep because it protects a specific behavior**, pending an ownership audit | Shape, physical layout and backend metadata checks are distinct. Remove duplicate parsing only after a private immutable validated result can cross the existing internal boundary. |
-| Wasm cache, change polling, obsolete-candidate checks and failed-load cleanup | **Keep because it protects a specific behavior** | Shared compilation, failed cache eviction, snapshot coherence, bounded polling and prevention of stale publication. The package build response replaces the separate pre-build stat/equality gate. |
+| Wasm compilation reuse, obsolete-candidate checks and failed-load cleanup | **Keep because it protects a specific behavior** | Shared compilation, failed cache eviction and prevention of stale publication remain. Polling and package stat are removed; required elaboration fingerprints select retained inputs. |
 | Thin native providers, rooting/refcounts, closure/handle retention and cleanup-error collection | **Keep because it protects a specific behavior** | Receiver/property semantics, cross-heap lifetime, partial-construction cleanup and independent teardown after an error. |
 | Structural conversion, including Expr/Level support | **Keep because it protects a specific behavior** | Existing explicit conversion clients; first avoid unnecessary round trips in document/widget paths and establish the specialized consumers. |
 
@@ -52,14 +53,18 @@ protocol, binding ownership, runtime reload API and UI lifetime. Internal shell
 exports used by the smoke test change: `loadRuntimeOptions` is removed and
 `loadWasmModule` takes a path and revision instead of a source record. The shell
 is not an entry in the npm exports map; no repository application imports those
-helpers. Its default widget export and props remain unchanged.
+helpers. That earlier loader flattening preserved the default export and props; the
+subsequent fingerprint protocol below deliberately narrows the props and RPC API.
 
-The acquisition follow-up uses the package build's own revision and bytes. Stat
-is only for live refresh, whose state records the requested revision rather than
-a numeric reload counter. An unchanged failed revision does not start repeated
-builds; a subsequent edit can recover, including after an initial failure.
-The now redundant internal `shouldReloadIRPackage` wrapper is removed. The server
-RPC schemas, widget props and runtime lifetime contracts remain unchanged.
+The acquisition follow-up requires an elaborated package description containing
+one factory entry and its fingerprint. The RPC returns that identity and encoded
+bytes. The roots array, duplicate component entry, manual update token and stat
+endpoint are removed. Custom integrations use the generated `irPackage` and
+`widgetProps`. No package is rebuilt from arbitrary display-position roots.
+
+Healthy proof/context updates do not acquire code. A failed acquisition may use
+a new upstream RPC context once; local loading-state renders cannot manufacture
+reconnect attempts. Runtime lifetime contracts remain unchanged.
 
 Next, establish one small Verso document example with two independent Lean DOM
 interactions, generated bootstrap wiring, no required React, and a shared page
@@ -72,12 +77,13 @@ is inferred from source reduction.
 
 Acceptance reuses `tests/infoview/widget.mjs`,
 `tests/browser/shell-lifetime.mjs` and `tests/infoview/rpc-shell-lifetime.mjs`:
-cache reuse/retry, authoritative build revisions, out-of-order replies, failed
+cache reuse/retry, required package identities, out-of-order replies, failed
 refreshes, removal during loading, inherited context, prop updates and old native
 Promise continuations after replacement. The real-server suite edits the open
 document through `textDocument/didChange`: comment edits preserve hook state;
 implementation edits replace the visible component; delayed package replies
-converge to the latest source; broken source preserves old UI and recovers when
-fixed, including after an initial failure. This exercises Chromium and the Lean
+converge to the latest source. Acquisition failure preserves working UI. Invalid
+widget elaboration can remove registration and UI; repairing the definition
+restores it. A failed initial acquisition can recover with a new RPC context. This exercises Chromium and the Lean
 server, not an actual editor window or arbitrary state migration. A Retry button
 is explicitly excluded; ordinary edit races are protocol/lifecycle bugs to fix.

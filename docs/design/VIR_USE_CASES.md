@@ -96,7 +96,8 @@ identity registry, general resolver, or additional ownership layer.
 Generated widgets have a definition-bound package. `vir_proof_widget` analyzes
 the IR closure and complete interface manifest at elaboration time, fingerprints
 the emitted inputs, and retains the immutable analysis in a persistent Lean
-extension. Generated props carry `irPackage.fingerprint`. The RPC emits from those
+extension. Generated props carry one `irPackage.entry` and its `fingerprint`.
+The RPC returns the selected entry, fingerprint and encoded bytes from those
 exact retained inputs; it does not reinterpret them at the cursor position.
 Imported definitions carry the same analyzed inputs in compiled module data.
 No task, live environment or server RPC reference is persisted.

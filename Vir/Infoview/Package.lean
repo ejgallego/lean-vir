@@ -8,7 +8,6 @@ module
 
 public import Lean.Widget
 public meta import Lean.Widget
-public import Init.System.Uri
 public import Vir.GeneratePackage
 public meta import Vir.GeneratePackage
 public import Vir.Infoview.Assets
@@ -21,7 +20,7 @@ open Lean Server
 open Lean.IR
 
 structure IRPackage where
-  roots : Array String
+  entry : String
   /-- Select exactly the package inputs retained by `vir_proof_widget` elaboration. -/
   fingerprint : String
   deriving Server.RpcEncodable
@@ -32,7 +31,7 @@ runtime value because it is embedded in widget props; its generated
 `RpcEncodable` instance therefore cannot be called from a `meta` RPC handler.
 -/
 meta structure IRPackageRpc where
-  roots : Array String
+  entry : String
   fingerprint : String
   deriving Server.RpcEncodable
 
@@ -42,31 +41,10 @@ meta structure IRPackageRequest where
   deriving Server.RpcEncodable
 
 meta structure IRPackageResponse where
-  source : String
-  roots : Array String
-  byteSize : String
-  revision : String
+  entry : String
+  fingerprint : String
   dataBase64 : String
-  report : String
   deriving Server.RpcEncodable
-
-private meta def irPackageRootNames (roots : Array String) : Except String (Array Name) := do
-  if roots.isEmpty then
-    throw "at least one root name is required"
-  let mut names : Array Name := #[]
-  for root in roots do
-    let name ← Vir.parseDottedName root
-    if !names.contains name then
-      names := names.push name
-  return names
-
-meta def irPackageRoots (package : IRPackage) : Except String (Array Name) :=
-  irPackageRootNames package.roots
-
-meta def documentSourceName (doc : Server.FileWorker.EditableDocument) : String :=
-  match System.Uri.fileUriToPath? doc.meta.uri with
-  | some path => path.toString
-  | none => doc.meta.uri
 
 meta def hashArray (seed : UInt64) (items : Array α) (hashItem : α → UInt64) : UInt64 :=
   items.foldl (fun h item => mixHash h (hashItem item)) (mixHash seed (hash items.size))
@@ -286,41 +264,35 @@ private meta unsafe def prepareWidgetPackageImpl (source : String) (env : Enviro
 meta opaque prepareWidgetPackage (source : String) (env : Environment) (root : Name) :
     IO (Except String (String × Vir.GeneratePackage.AnalyzedPackage))
 
-private meta def retainedWidgetPackage (env : Environment) (roots : Array Name)
+private meta def retainedWidgetPackage (env : Environment) (entry : Name)
     (fingerprint : String) : Except RequestError Vir.GeneratePackage.AnalyzedPackage := do
   let fail : Except RequestError Vir.GeneratePackage.AnalyzedPackage := .error {
     code := .invalidParams
     message := "VIR widget package fingerprint is unavailable; refresh the widget description"
   }
-  let #[root] := roots | fail
-  let found := match env.getModuleIdxFor? root with
+  let found := match env.getModuleIdxFor? entry with
     | some idx => widgetPackages.getModuleEntries env idx |>.findSome? fun (name, key, package) =>
-        if name == root then some (key, package) else none
-    | none => widgetPackages.getState env |>.find? root
+        if name == entry then some (key, package) else none
+    | none => widgetPackages.getState env |>.find? entry
   let some (key, package) := found | fail
   if key != fingerprint then return ← fail
   return package
 
 @[server_rpc_method]
 meta def buildIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPackageResponse) := do
-  let roots ←
-    match irPackageRootNames params.package.roots with
-    | .ok roots => pure roots
+  let entry ←
+    match Vir.parseDottedName params.package.entry with
+    | .ok entry => pure entry
     | .error message =>
-        throwThe RequestError { code := .invalidParams, message := s!"Invalid VIR IR package roots: {message}" }
+        throwThe RequestError { code := .invalidParams, message := s!"Invalid VIR widget entry: {message}" }
   RequestM.withWaitFindSnapAtPos params.pos fun snap => do
-    let doc ← RequestM.readDoc
-    let source := documentSourceName doc
     let fingerprint := params.package.fingerprint
-    let package ← match retainedWidgetPackage snap.env roots fingerprint with
+    let package ← match retainedWidgetPackage snap.env entry fingerprint with
       | .ok package => pure package
       | .error error => throwThe RequestError error
     let bytes ← match Vir.GeneratePackage.emitPackage package.closure package.manifest with
       | .ok bytes => pure bytes
       | .error message => throwThe RequestError { code := .invalidParams, message }
-    return {
-      source, roots := roots.map toString, revision := fingerprint
-      byteSize := toString bytes.size, dataBase64 := base64Encode bytes, report := package.report
-    }
+    return { entry := entry.toString, fingerprint, dataBase64 := base64Encode bytes }
 
 end Lean.Vir.Infoview

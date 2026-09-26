@@ -28,7 +28,6 @@ original generation.
 structure WidgetProps where
   wasmPath : String := ""
   irPackage : IRPackage
-  componentEntry : String
   setupHint : String := ""
   deriving Server.RpcEncodable
 
@@ -69,12 +68,11 @@ elab "vir_proof_widget " component:term : command => do
   let fingerprint : TSyntax `str := ⟨Syntax.mkStrLit fingerprint⟩
   Lean.Elab.Command.elabCommand (← `(
     def $irPackageIdent : Lean.Vir.Infoview.IRPackage :=
-      { roots := #[$componentName], fingerprint := $fingerprint }))
+      { entry := $componentName, fingerprint := $fingerprint }))
   Lean.Elab.Command.elabCommand (← `(
     def $propsIdent : Lean.Vir.Infoview.WidgetProps where
       wasmPath := Lean.Vir.Infoview.WidgetProps.defaultWasmPath
       irPackage := $irPackageIdent
-      componentEntry := $componentName
       setupHint := Lean.Vir.Infoview.WidgetProps.defaultSetupHint))
 
 @[widget_module]

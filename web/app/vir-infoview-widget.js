@@ -48,15 +48,10 @@ function WidgetLoader({ widgetProps: props, rpcSession }) {
   // Counts acquisition attempts, including attempts that reuse the installed code.
   const acquisitionSequenceRef = React.useRef(0);
   const acquisitionRef = React.useRef(null);
-  const irPackageKey =
-    props.irPackage === null || props.irPackage === undefined
-      ? ""
-      : JSON.stringify(props.irPackage.roots);
   const configurationKey = JSON.stringify([
     props.pos?.uri,
     props.wasmPath,
-    irPackageKey,
-    props.componentEntry,
+    props.irPackage?.entry,
   ]);
 
   const requestKey = JSON.stringify([
@@ -100,12 +95,12 @@ function WidgetLoader({ widgetProps: props, rpcSession }) {
       }
       if (candidate === installed) {
         candidate = null;
-        setStatus({ kind: "ready", message: config.componentEntry });
+        setStatus({ kind: "ready", message: config.irPackage.entry });
         return;
       }
       const componentEntry = validateWidgetComponentEntry(
         candidate.runtime,
-        config.componentEntry,
+        config.irPackage.entry,
       );
       const component = candidate.runtime.call(componentEntry.entry);
       if (typeof component !== "function") {
@@ -234,7 +229,6 @@ function widgetRuntimeConfigFromProps(props) {
   return {
     wasmPath: requiredString(props.wasmPath, "wasmPath"),
     irPackage,
-    componentEntry: requiredString(props.componentEntry, "componentEntry"),
     position: requiredPosition(props.pos, "pos"),
     setupHint: optionalString(props.setupHint, "setupHint"),
   };
@@ -244,11 +238,10 @@ function requiredIRPackage(value, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`VIR widget ${label} must be an object`);
   }
-  const roots = requiredStringArray(value.roots, `${label}.roots`);
-  if (roots.length === 0) {
-    throw new Error(`VIR widget ${label}.roots must not be empty`);
-  }
-  return { roots, fingerprint: requiredString(value.fingerprint, `${label}.fingerprint`) };
+  return {
+    entry: requiredString(value.entry, `${label}.entry`),
+    fingerprint: requiredString(value.fingerprint, `${label}.fingerprint`),
+  };
 }
 
 function requiredPosition(value, label) {
@@ -333,18 +326,21 @@ export async function loadAssetBytes(rpcSession, path) {
 }
 
 export async function buildIRPackage(rpcSession, irPackage, position) {
-  const fingerprint = requiredString(irPackage.fingerprint, "irPackage.fingerprint");
+  const { entry, fingerprint } = requiredIRPackage(irPackage, "irPackage");
   const response = await rpcSession.call("Lean.Vir.Infoview.buildIRPackage", {
-    package: irPackage,
+    package: { entry, fingerprint },
     pos: position,
   });
-  const info = irPackageInfo(response, irPackage.roots);
-  if (info.revision !== fingerprint) {
+  if (response?.entry !== entry) {
+    throw new Error(`VIR widget entry mismatch: expected ${entry}, got ${response?.entry}`);
+  }
+  if (response?.fingerprint !== fingerprint) {
     throw new Error(
-      `VIR IR package fingerprint mismatch: expected ${irPackage.fingerprint}, got ${info.revision}`,
+      `VIR IR package fingerprint mismatch: expected ${fingerprint}, got ${response?.fingerprint}`,
     );
   }
-  return info;
+  return { entry, fingerprint,
+    dataBase64: requiredString(response?.dataBase64, "IR package dataBase64") };
 }
 
 export async function statAsset(rpcSession, path) {
@@ -373,33 +369,6 @@ function assetInfo(response, path) {
     modified: requiredString(response?.modified, `asset ${path} modified`),
     revision: requiredString(response?.revision, `asset ${path} revision`),
   };
-}
-
-function irPackageInfo(response, roots) {
-  const responseRoots = requiredStringArray(
-    response?.roots,
-    "IR package roots",
-  );
-  if (JSON.stringify(responseRoots) !== JSON.stringify(roots)) {
-    throw new Error(
-      `VIR IR package roots mismatch: expected ${roots.join(", ")}, got ${responseRoots.join(", ")}`,
-    );
-  }
-  return {
-    source: requiredString(response?.source, "IR package source"),
-    roots: responseRoots,
-    revision: requiredString(response?.revision, "IR package revision"),
-    byteSize: requiredString(response?.byteSize, "IR package byteSize"),
-    dataBase64: requiredString(response?.dataBase64, "IR package dataBase64"),
-    report: optionalString(response?.report, "IR package report"),
-  };
-}
-
-function requiredStringArray(value, label) {
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
-    throw new Error(`VIR widget ${label} must be an array of strings`);
-  }
-  return value;
 }
 
 export function decodeBase64Bytes(base64) {

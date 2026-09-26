@@ -111,7 +111,7 @@ async function run() {
     root;
   let packageReplyDelayMs = 0;
   let failNextPackageTransport = null;
-  let invalidRootCall;
+  let invalidEntryCall;
   const expectedLivePackageFailures = new Set();
   const container = document.getElementById("app");
   const tick = () =>
@@ -196,12 +196,11 @@ async function run() {
       onUncaughtError: (error) => unexpected.push(error),
     });
     const baseDescriptor = await generatedProps(a, config.a, "Vir.Fixtures.RegisteredLifetime.createComponent");
-    const roots = baseDescriptor.irPackage.roots;
-    function renderWidget(session, position, entries = roots, {
+    const entry = baseDescriptor.irPackage.entry;
+    function renderWidget(session, position, entryName = entry, {
       setupHint = "",
-      componentEntry = baseDescriptor.componentEntry,
       editorConnection = editor,
-      irPackage = { ...baseDescriptor.irPackage, roots: entries },
+      irPackage = { ...baseDescriptor.irPackage, entry: entryName },
     } = {}) {
       globalThis.__rpcShell.session = session;
       return React.act(async () =>
@@ -210,16 +209,15 @@ async function run() {
           React.createElement(EditorContext.Provider, { value: editorConnection }, React.createElement(VirInfoviewWidget, {
             wasmPath: "web/public/vir-upstream.wasm",
             irPackage,
-            componentEntry,
             pos: { uri: config.uri, ...position },
             setupHint,
           }))),
         ),
       );
     }
-    async function mount(session, position, entries = roots, options = {}) {
+    async function mount(session, position, entryName = entry, options = {}) {
       const count = states.length;
-      await renderWidget(session, position, entries, options);
+      await renderWidget(session, position, entryName, options);
       await waitFor("real-server shell ready", () => {
         if (unexpected.length !== 0) throw unexpected[0];
         const error = container.querySelector(
@@ -253,7 +251,7 @@ async function run() {
     }
     async function generatedProps(session, position, entry) {
       const result = await Widget_getWidgets(session, position);
-      const props = result.widgets.find((widget) => widget.props.componentEntry === entry)?.props;
+      const props = result.widgets.find((widget) => widget.props.irPackage.entry === entry)?.props;
       check(typeof props?.irPackage.fingerprint === "string", `generated fingerprint for ${entry}: ${JSON.stringify(result)}`);
       return props;
     }
@@ -392,7 +390,7 @@ async function run() {
       "configuration-replacement",
     );
     const alternate = await generatedProps(b, config.b, "Vir.Fixtures.AlternateLifetime.createComponent");
-    const current = await mount(b, config.b, alternate.irPackage.roots, alternate);
+    const current = await mount(b, config.b, alternate.irPackage.entry, alternate);
     check(
       previous.runtime !== current.runtime &&
         !previous.runtime.disposed &&
@@ -445,7 +443,7 @@ async function run() {
           );
           const digest = await crypto.subtle.digest("SHA-256", bytes);
           return {
-            revision: call.value.revision,
+            fingerprint: call.value.fingerprint,
             byteSize: bytes.length,
             sha256: [...new Uint8Array(digest)]
               .map((x) => x.toString(16).padStart(2, "0"))
@@ -455,42 +453,42 @@ async function run() {
     );
     const lifetimeStates = states.slice();
 
-    // A server-side package-root failure must survive the shell's presentation
+    // A server-side package-entry failure must survive the shell's presentation
     // boundary, including its original text/code and the configured setup hint.
-    const invalidRoot = "Vir.Fixtures.ShellLifetime.MissingStartupRoot";
-    const setupHint = "Build the widget module and check its export roots.";
-    await renderWidget(a, config.a, [invalidRoot], { setupHint });
-    await waitFor("invalid package root error UI", () =>
+    const invalidEntry = "Vir.Fixtures.ShellLifetime.MissingStartupRoot";
+    const setupHint = "Build the widget module and check its factory entry.";
+    await renderWidget(a, config.a, invalidEntry, { setupHint });
+    await waitFor("invalid package entry error UI", () =>
       container.querySelector('[data-vir-infoview-state="error"]'),
     );
-    invalidRootCall = calls.find((call) =>
+    invalidEntryCall = calls.find((call) =>
       call.params.method === "Lean.Vir.Infoview.buildIRPackage" &&
-      call.params.params?.package?.roots?.includes(invalidRoot),
+      call.params.params?.package?.entry === invalidEntry,
     );
     const errorText = container.querySelector(".vir-infoview-widget-status").textContent;
-    check(invalidRootCall?.error?.code === -32602, "real invalid-root RPC code");
+    check(invalidEntryCall?.error?.code === -32602, "real invalid-entry RPC code");
     check(
-      invalidRootCall.error.message.includes("fingerprint is unavailable") &&
-        errorText.includes(invalidRootCall.error.message) &&
+      invalidEntryCall.error.message.includes("fingerprint is unavailable") &&
+        errorText.includes(invalidEntryCall.error.message) &&
         errorText.includes("(-32602)"),
       `original package error message and code rendered: ${errorText}`,
     );
     check(errorText.includes(setupHint), "setup hint remains visible");
     check(!errorText.includes("[object Object]"), "plain RPC error is readable");
-    check(states.length === 3, "invalid package root installs no runtime");
+    check(states.length === 3, "invalid package entry installs no runtime");
     await unmountUI();
 
     let missingIdentityError;
     try {
       await a.call("Lean.Vir.Infoview.buildIRPackage", {
-        package: { roots }, pos: config.a,
+        package: { entry }, pos: config.a,
       });
     } catch (error) {
       missingIdentityError = error;
       expectedLivePackageFailures.add(calls.at(-1));
     }
     check(missingIdentityError?.code === -32602,
-      "server rejects a roots-only request instead of building current-snapshot code");
+      "server rejects a request without a fingerprint instead of building current-snapshot code");
 
     const startup = [];
     {
@@ -499,11 +497,11 @@ async function run() {
         call.params.method === `Lean.Vir.Infoview.${method}`,
       );
       packageReplyDelayMs = 2250;
-      const state = await mount(a, config.a, roots);
+      const state = await mount(a, config.a, entry);
       packageReplyDelayMs = 0;
       const packageCall = phaseCalls("buildIRPackage")[0];
       check(packageCall?.replyDelayMs >= 2200, "genuine package reply delayed at least 2.2s");
-      await renderWidget(a, config.a, roots);
+      await renderWidget(a, config.a, entry);
       await tick();
       check(phaseCalls("statIRPackage").length === 0, "shell never polls package revisions");
       check(phaseCalls("buildIRPackage").length === 1, "stable props request one package");
@@ -518,7 +516,7 @@ async function run() {
     const beforeAbandon = states.length;
     const abandonedCallStart = calls.length;
     packageReplyDelayMs = 2250;
-    await renderWidget(a, config.a, roots);
+    await renderWidget(a, config.a, entry);
     let abandonedCall;
     await waitFor("obsolete initial package reply held", () => {
       abandonedCall = calls.slice(abandonedCallStart).find((call) =>
@@ -538,9 +536,9 @@ async function run() {
     // Exercise inherited upstream context with the all-Lean tutorial in the
     // actual shell, not a second root with a manually forwarded provider.
     packageReplyDelayMs = 0;
-    const tutorialEntries = ["RpcReferenceWidget.createComponent"];
-    const tutorialOptions = await generatedProps(a, config.a, tutorialEntries[0]);
-    await renderWidget(a, config.a, tutorialEntries, tutorialOptions);
+    const tutorialEntry = "RpcReferenceWidget.createComponent";
+    const tutorialOptions = await generatedProps(a, config.a, tutorialEntry);
+    await renderWidget(a, config.a, tutorialEntry, tutorialOptions);
     await waitFor("all-Lean tutorial ready in actual shell", () => {
       const error = container.querySelector('[data-vir-infoview-state="error"]');
       if (error) throw new Error(error.textContent);
@@ -555,7 +553,7 @@ async function run() {
     React.act(() => button.click());
     check(subscriptions === 1 && notificationHandlers.size === 1,
       "Lean component inherits upstream EditorContext through the shell");
-    await renderWidget(a, config.a, tutorialEntries, tutorialOptions);
+    await renderWidget(a, config.a, tutorialEntry, tutorialOptions);
     await tick();
     check(tutorialCalls().length === tutorialFirst, "unchanged shell render does not request");
     const replacementHandlers = new Set();
@@ -571,7 +569,7 @@ async function run() {
         },
       },
     });
-    await renderWidget(a, config.a, tutorialEntries,
+    await renderWidget(a, config.a, tutorialEntry,
       { ...tutorialOptions, editorConnection: replacementEditor });
     check(subscriptions === 0 && notificationHandlers.size === 0 &&
       replacementSubscriptions === 1 && replacementHandlers.size === 1,
@@ -602,13 +600,13 @@ async function run() {
     // Actual unsaved edits acquire the descriptions published by widget elaboration.
     const generatedEntry = "Vir.Fixtures.RpcShellLifetime.createComponent";
     let descriptor = await generatedProps(a, config.a, generatedEntry);
-    await renderWidget(a, config.a, descriptor.irPackage.roots, descriptor);
+    await renderWidget(a, config.a, descriptor.irPackage.entry, descriptor);
     await waitForLiveText("initial editable implementation", "implementation-v1");
     const liveInitial = states.at(-1);
     async function editGenerated(before, after) {
       await editText(before, after);
       descriptor = await generatedProps(a, config.a, generatedEntry);
-      await renderWidget(a, config.a, descriptor.irPackage.roots, descriptor);
+      await renderWidget(a, config.a, descriptor.irPackage.entry, descriptor);
     }
     await editGenerated('"implementation-v1"', '"implementation-v2"');
     await waitForLiveText("first unsaved implementation edit", "implementation-v2");
@@ -636,7 +634,7 @@ async function run() {
 
     const beforePosition = states.at(-1);
     const positionStart = calls.length;
-    await renderWidget(a, config.b, descriptor.irPackage.roots, descriptor);
+    await renderWidget(a, config.b, descriptor.irPackage.entry, descriptor);
     await tick();
     check(states.at(-1) === beforePosition && calls.length === positionStart,
       "position changes do not acquire package code");
@@ -645,7 +643,7 @@ async function run() {
     const reconnected = sessionAt(config.a);
     check(reconnected !== a, "reconnect supplies a distinct official session");
     const reconnectStart = calls.length;
-    await renderWidget(reconnected, config.a, descriptor.irPackage.roots, descriptor);
+    await renderWidget(reconnected, config.a, descriptor.irPackage.entry, descriptor);
     await tick();
     check(states.at(-1) === beforePosition && container.querySelector("#rpc-live-edit") === reconnectNode &&
       calls.length === reconnectStart,
@@ -661,7 +659,7 @@ async function run() {
       const next = await generatedProps(reconnected, config.b, generatedEntry);
       check(next.irPackage.fingerprint === descriptor.irPackage.fingerprint,
         "proof edits preserve the elaborated code fingerprint");
-      await renderWidget(sessionAt(config.b), config.b, next.irPackage.roots, next);
+      await renderWidget(sessionAt(config.b), config.b, next.irPackage.entry, next);
     }
     await tick();
     const proofEditPackageRequests = packageCalls().length - beforeProofEdits;
@@ -684,7 +682,7 @@ async function run() {
     check(staleFingerprintError?.code === -32602 &&
       staleFingerprintError.message.includes("fingerprint is unavailable"),
       "stale descriptor is rejected instead of packaging different code");
-    await renderWidget(reconnected, config.a, changedDescriptor.irPackage.roots, changedDescriptor);
+    await renderWidget(reconnected, config.a, changedDescriptor.irPackage.entry, changedDescriptor);
     await waitForLiveText("generated fingerprint publishes changed helper code", "implementation-v6");
     check(states.at(-1) !== generatedState, "generated widget helper edit replaces the runtime");
     descriptor = changedDescriptor;
@@ -693,7 +691,7 @@ async function run() {
     const whitespaceDescriptor = await generatedProps(reconnected, config.a, generatedEntry);
     check(whitespaceDescriptor.irPackage.fingerprint === descriptor.irPackage.fingerprint,
       "declaration re-elaboration with identical inputs preserves fingerprint");
-    await renderWidget(reconnected, config.a, whitespaceDescriptor.irPackage.roots, whitespaceDescriptor);
+    await renderWidget(reconnected, config.a, whitespaceDescriptor.irPackage.entry, whitespaceDescriptor);
     await tick();
     const whitespacePackageRequests = packageCalls().length - beforeWhitespace;
     check(whitespacePackageRequests === 0, "equivalent source requests no package bytes");
@@ -716,7 +714,7 @@ async function run() {
     const invalidGenerated = await Widget_getWidgets(reconnected, config.a);
     check(
       !invalidGenerated.widgets.some((widget) =>
-        widget.props?.componentEntry === generatedEntry),
+        widget.props?.irPackage?.entry === generatedEntry),
       "invalid generated helper is removed from Widget_getWidgets",
     );
     await unmountUI();
@@ -735,7 +733,7 @@ async function run() {
       repairedDescriptor.irPackage.fingerprint === descriptor.irPackage.fingerprint,
       "repair restores the original generated fingerprint",
     );
-    await renderWidget(reconnected, config.a, repairedDescriptor.irPackage.roots, {
+    await renderWidget(reconnected, config.a, repairedDescriptor.irPackage.entry, {
       ...repairedDescriptor,
     });
     await waitForLiveText("repaired generated helper", "implementation-v6");
@@ -748,7 +746,7 @@ async function run() {
     const invalidChangedRepair = await Widget_getWidgets(reconnected, config.a);
     check(
       !invalidChangedRepair.widgets.some((widget) =>
-        widget.props?.componentEntry === generatedEntry),
+        widget.props?.irPackage?.entry === generatedEntry),
       "changed-code repair starts from a removed generated helper",
     );
     await unmountUI();
@@ -769,7 +767,7 @@ async function run() {
     await renderWidget(
       reconnected,
       config.a,
-      repairedChangedDescriptor.irPackage.roots,
+      repairedChangedDescriptor.irPackage.entry,
       repairedChangedDescriptor,
     );
     await waitForLiveText("changed repaired generated helper", "implementation-v7");
@@ -784,7 +782,7 @@ async function run() {
     await unmountUI();
     const failedInitialStart = calls.length;
     failNextPackageTransport = "generated initial package transport sentinel";
-    await renderWidget(reconnected, config.a, descriptor.irPackage.roots, {
+    await renderWidget(reconnected, config.a, descriptor.irPackage.entry, {
       ...descriptor,
     });
     await waitFor("failed generated initial acquisition", () =>
@@ -801,7 +799,7 @@ async function run() {
     sessions.closeSessionForFile(config.uri);
     const recoveredSession = sessionAt(config.a);
     check(recoveredSession !== reconnected, "failed acquisition reconnects with a new official session");
-    await renderWidget(recoveredSession, config.a, descriptor.irPackage.roots, {
+    await renderWidget(recoveredSession, config.a, descriptor.irPackage.entry, {
       ...descriptor,
     });
     await waitForLiveText("recovered generated initial acquisition", "implementation-v7");
@@ -831,7 +829,7 @@ async function run() {
         bridgeError: task.bridgeError?.message ?? null,
       })),
       packages,
-      invalidPackage: { error: invalidRootCall.error, rendered: errorText },
+      invalidPackage: { error: invalidEntryCall.error, rendered: errorText },
       startup,
       obsoleteInitial: {
         replyDelayMs: abandonedCall.replyDelayMs,
@@ -907,7 +905,7 @@ async function run() {
         const failures = calls.filter(
           (call) =>
             call.error &&
-            call !== invalidRootCall &&
+            call !== invalidEntryCall &&
             !expectedLivePackageFailures.has(call) &&
             !(
               call.params.method === "RpcBrowserServer.create" &&

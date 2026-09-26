@@ -21,7 +21,7 @@ const transport = {
   stats: 0,
   assetCalls: 0,
   buildRevisions: [],
-  buildRoots: [],
+  buildEntries: [],
   packageBase64: null,
   buildGate: null,
   failNextBuild: false,
@@ -275,7 +275,7 @@ const harness = (globalThis.__shellTest = {
 });
 
 function packageDescription(fingerprint) {
-  return { roots: [prefix + "createComponent"], fingerprint };
+  return { entry: prefix + "createComponent", fingerprint };
 }
 
 async function mountShell(props = {}, { onRemovalLayoutCleanup = null } = {}) {
@@ -287,7 +287,6 @@ async function mountShell(props = {}, { onRemovalLayoutCleanup = null } = {}) {
   const config = {
     wasmPath: "shell.wasm",
     irPackage: packageDescription("initial"),
-    componentEntry: prefix + "createComponent",
     pos: { uri: "file:///ShellLifetime.lean", line: 0, character: 0 },
     ...props,
   };
@@ -429,13 +428,13 @@ async function mountedRefresh() {
   await tick();
   check(
     transport.builds === ordinaryBuilds && states.at(-1) === old,
-    "ordinary prop changes with an unchanged token do not acquire",
+    "ordinary prop changes with an unchanged fingerprint do not acquire",
   );
 
   const fingerprintBuilds = transport.builds;
   await shell.update({
     irPackage: {
-      roots: [prefix + "createComponent"],
+      entry: prefix + "createComponent",
       fingerprint: "generated-shell-lifetime-fingerprint-1",
     },
   });
@@ -447,20 +446,19 @@ async function mountedRefresh() {
   );
   check(
     states.at(-1) === old && old.cleanups === 0 &&
-      JSON.stringify(transport.buildRoots.at(-1)) ===
-        JSON.stringify([prefix + "createComponent"]),
-    "a generated fingerprint change with identical roots preserves the runtime",
+      transport.buildEntries.at(-1) === prefix + "createComponent",
+    "a generated fingerprint change with identical entry preserves the runtime",
   );
 
   transport.revision++;
   const revisionOnly = transport.revision;
   const revisionBuilds = transport.builds;
-  await shell.update({ irPackage: packageDescription("revision-only") });
+  await shell.update({ irPackage: packageDescription("fingerprint-only") });
   await until(
     () =>
       transport.builds === revisionBuilds + 1 &&
       shell.container.querySelector('[data-vir-infoview-state="ready"]'),
-    "same-byte token refresh completes",
+    "same-byte fingerprint refresh completes",
   );
   check(
     states.at(-1) === old && old.cleanups === 0 &&
@@ -564,7 +562,7 @@ async function unchangedInputsNoAcquisition() {
       transport.assetCalls === sessionAssetCalls &&
       states.at(-1) === state &&
       state.runtime.deref() === runtime.deref(),
-    "an RPC session wrapper change with the same token does not acquire",
+    "an RPC session wrapper change with the same fingerprint does not acquire",
   );
   await shell.unmount();
   state.captured = null;
@@ -699,7 +697,7 @@ async function failedCandidates() {
 
   runtimeFault = { throwDispose: true };
   const setupFailure = await mountShell({
-    componentEntry: "Missing.component",
+    irPackage: { ...packageDescription("missing"), entry: "Missing.component" },
   });
   await until(
     () =>
@@ -770,7 +768,7 @@ async function replacementCleanupFailure() {
   transport.packageBase64 = transport.basePackageBase64;
 }
 
-async function obsoleteCandidateAndTokenUpdate() {
+async function obsoleteCandidateAndFingerprintUpdate() {
   runtimeFault = { throwDispose: true };
   allowConsoleDiagnostic("candidate disposal sentinel", 1);
   const buildGate = deferred();
@@ -796,14 +794,14 @@ async function obsoleteCandidateAndTokenUpdate() {
     const mounted = await mountShell();
     await mounted.ready();
     const state = states.at(-1);
-    const tokenGate = deferred();
+    const fingerprintGate = deferred();
     const beforeBuild = states.length;
     const builds = transport.builds;
-    transport.buildGate = tokenGate;
+    transport.buildGate = fingerprintGate;
     await mounted.update({ irPackage: packageDescription("obsolete-same-bytes") });
-    await until(() => transport.buildGate === null, "same-byte token build in flight");
+    await until(() => transport.buildGate === null, "same-byte fingerprint build in flight");
     await mounted.unmount();
-    tokenGate.resolve();
+    fingerprintGate.resolve();
     await tick();
     await tick();
     check(
@@ -812,7 +810,7 @@ async function obsoleteCandidateAndTokenUpdate() {
         state.disposed === 0 &&
         shellIntervalCount === 0 &&
         harness.loadedRef.current === null,
-      "obsolete same-byte token reuses its runtime without creating a candidate",
+      "obsolete same-byte fingerprint reuses its runtime without creating a candidate",
     );
     state.captured = null;
   }
@@ -821,19 +819,19 @@ async function obsoleteCandidateAndTokenUpdate() {
     const mounted = await mountShell();
     await mounted.ready();
     const state = states.at(-1);
-    const tokenGate = deferred();
+    const fingerprintGate = deferred();
     const beforeBuild = states.length;
     const builds = transport.builds;
     transport.packageBase64 = transport.manifestPackageBase64;
-    transport.buildGate = tokenGate;
+    transport.buildGate = fingerprintGate;
     await mounted.update({ irPackage: packageDescription(`obsolete-${rejectBuild}`) });
-    await until(() => transport.buildGate === null, "token build in flight");
+    await until(() => transport.buildGate === null, "fingerprint build in flight");
     await mounted.unmount();
     if (rejectBuild) {
-      allowConsoleDiagnostic("obsolete token sentinel", 1);
-      tokenGate.reject(new Error("obsolete token sentinel"));
+      allowConsoleDiagnostic("obsolete fingerprint sentinel", 1);
+      fingerprintGate.reject(new Error("obsolete fingerprint sentinel"));
     } else {
-      tokenGate.resolve();
+      fingerprintGate.resolve();
     }
     await tick();
     await tick();
@@ -841,15 +839,15 @@ async function obsoleteCandidateAndTokenUpdate() {
       transport.builds === builds + 1 &&
         shellIntervalCount === 0 &&
         harness.loadedRef.current === null,
-      "late token acquisition cannot install after removal",
+      "late fingerprint acquisition cannot install after removal",
     );
     if (rejectBuild) {
-      check(states.length === beforeBuild, "failed obsolete token creates no runtime");
+      check(states.length === beforeBuild, "failed obsolete fingerprint creates no runtime");
     } else {
       await until(() => states.length === beforeBuild + 1,
-        "obsolete token candidate finishes");
+        "obsolete fingerprint candidate finishes");
       check(states.at(-1).disposed === 1,
-        "obsolete token candidate is hard-disposed");
+        "obsolete fingerprint candidate is hard-disposed");
       states.at(-1).captured = null;
     }
     state.captured = null;
@@ -888,7 +886,7 @@ async function failedRefresh() {
   await shell.update({ setupHint: "ordinary update after failure" });
   await tick();
   check(transport.builds === failedBuilds,
-    "ordinary props do not retry a failed token acquisition");
+    "ordinary props do not retry a failed fingerprint acquisition");
   transport.packageBase64 = transport.basePackageBase64;
   await shell.update({ irPackage: packageDescription("restore-installed") });
   await until(
@@ -916,12 +914,12 @@ async function failedRefresh() {
 }
 
 // A context is position-specific: healthy/pending work must survive its change,
-// while a failed attempt can use a fresh context without a new code token.
+// while a failed attempt can use a fresh context without a new code fingerprint.
 async function failedAcquisitionNewContext() {
   for (const installed of [false, true]) {
     for (const changeWhilePending of [false, true]) {
       const originalRpc = harness.rpc;
-      const fingerprint = (value) => ({ roots: [prefix + "createComponent"], fingerprint: value });
+      const fingerprint = (value) => ({ entry: prefix + "createComponent", fingerprint: value });
       transport.packageBase64 = transport.basePackageBase64;
       const gate = deferred();
       if (!installed) transport.buildGate = gate;
@@ -1080,7 +1078,7 @@ async function temporaryBuildFailure() {
   check(
     transport.builds === failedBuilds &&
       shell.container.querySelector('[data-vir-infoview-state="error"]') !== null,
-    "unchanged token suppresses another build after temporary acquisition failure",
+    "unchanged fingerprint suppresses another build after temporary acquisition failure",
   );
   transport.packageBase64 = transport.basePackageBase64;
   await shell.update({ irPackage: packageDescription("temporary-recovery-same-bytes") });
@@ -1120,7 +1118,7 @@ async function singlePendingRefresh() {
   for (let i = 0; i < 5; i++) await tick();
   check(
     transport.builds === builds + 1,
-    "one token admits only one refresh while its package build is pending",
+    "one fingerprint admits only one refresh while its package build is pending",
   );
   gate.resolve();
   await until(
@@ -1185,7 +1183,7 @@ function installMockRpc(wasmBase64, packageBase64, manifestPackageBase64) {
         transport.builds++;
         const revision = transport.revision;
         transport.buildRevisions.push(String(revision));
-        transport.buildRoots.push([...params.package.roots]);
+        transport.buildEntries.push(params.package.entry);
         if (transport.failNextBuild) {
           transport.failNextBuild = false;
           throw new Error("temporary package transport sentinel");
@@ -1196,10 +1194,8 @@ function installMockRpc(wasmBase64, packageBase64, manifestPackageBase64) {
           await gate.promise;
         }
         return {
-          source: "fixtures/runtime/ShellLifetime.lean",
-          roots: params.package.roots,
-          revision: params.package.fingerprint,
-          byteSize: String(atob(transport.packageBase64).length),
+          entry: params.package.entry,
+          fingerprint: params.package.fingerprint,
           dataBase64: transport.packageBase64,
         };
       }
@@ -1343,7 +1339,7 @@ globalThis.runShellLifetime = async (
     await replacementCleanupFailure();
     await singlePendingRefresh();
     await obsoleteConfigurationCandidate();
-    await obsoleteCandidateAndTokenUpdate();
+    await obsoleteCandidateAndFingerprintUpdate();
     await tick();
     check(
       failures.every((failure) => failure.includes("normal cleanup sentinel")),
@@ -1366,7 +1362,7 @@ globalThis.runShellLifetime = async (
       singlePendingRefresh: true,
       obsoleteConfigurationCandidate: true,
       consoleDiagnostics: consoleMessages.length,
-      obsoleteLoadAndTokenUpdate: true,
+      obsoleteLoadAndFingerprintUpdate: true,
       unhandled: unhandled.length,
     };
   } finally {
