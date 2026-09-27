@@ -20,7 +20,11 @@ const factory = createVirRuntimeFactory({ wasmBytes });
 const renamedExportManifest = structuredClone(
   readIrPackageInfo(defaultPackageBytes).manifest,
 );
-renamedExportManifest.exports[0].entry = "Review.RenamedExport";
+if (renamedExportManifest.version >= 9) {
+  renamedExportManifest.exports[0].nameKey = "s526576696577/s52656e616d65644578706f7274/";
+} else {
+  renamedExportManifest.exports[0].entry = "Review.RenamedExport";
+}
 await assert.rejects(
   () =>
     factory.createRuntime({
@@ -67,7 +71,8 @@ assert.equal(validateContract(Uint8Array.from([...contract, 0])), 0);
 assert.match(first.lastPackageError(), /trailing bytes/);
 const invalidBooleanContract = Uint8Array.from(contract);
 invalidBooleanContract[
-  12 + new TextEncoder().encode(first.interfaceManifest.exports[0].entry).length
+  13 + new TextEncoder().encode(first.interfaceManifest.version >= 9
+    ? first.interfaceManifest.exports[0].nameKey : first.interfaceManifest.exports[0].entry).length
 ] = 2;
 assert.equal(validateContract(invalidBooleanContract), 0);
 assert.match(first.lastPackageError(), /invalid boolean tag 2/);

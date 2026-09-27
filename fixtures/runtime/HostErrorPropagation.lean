@@ -48,4 +48,7 @@ def invocationCallback (callback : Js.Function1 Js.Any Unit) : RuntimeM (Js.Func
 def failLean : IO Unit :=
   throw (IO.userError "Lean IO failure")
 
+def makeIoFailureCallback : IO (Nat → IO Nat) :=
+  pure (fun _ => throw (IO.userError "Lean IO callback failure"))
+
 end Vir.Fixtures.HostErrorPropagation

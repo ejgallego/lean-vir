@@ -21,13 +21,18 @@ source checkout lacks vendored mimalloc sources for a WASI rebuild; Lean's
 ordinary allocator is used. The `githash.h` overlay records the source commit,
 and `LEAN_BUILD_TYPE` is supplied to the platform implementation.
 
-Local `Name`, `Level` and `Expr` constructors let the package decoder and object
-ABI create real Lean objects without loading the full generated Lean-library
-constructor modules. Their fields and cached hash/data layout must agree with
-the linked kernel operations. `VIR_USE_UPSTREAM_KERNEL_EXPR_DATA` disables
-duplicate local cached-data exports when upstream `expr.cpp`/`level.cpp` supply
-them. The remaining level hash/depth helpers read that layout, and the binder-info
-helper reads the actual binder field, returning `.default` for non-binders.
+Pinned generated `Init/Prelude.c`, `Lean/Level.c` and `Lean/Expr.c` supply the
+`Name`, `Level` and `Expr` constructors and their consuming accessors. Upstream
+`expr.cpp`/`level.cpp` supply the cached-data primitives; section garbage
+collection retains only the linked dependency closure. The shim does not
+duplicate constructor hashes, flags or reference-counting formulas. Identifier
+wrapper structures erase to `Name` at runtime, but their generated hashes
+include the wrapper's hash seed. `npm run test:constructor-providers` compares
+native Lean and Wasm metadata and ownership, including large Nat values.
+
+Typed expressions use packed binder/let metadata. The raw bound-variable
+constructor rejects indices above `1048574` before the kernel's fatal range
+check; the JavaScript adapter validates the same limit.
 
 Native lookup is closed: `dlsym` accepts only the generated native registry and
 finite package host-import trampoline symbols. An `@[extern]` declaration alone
@@ -150,8 +155,11 @@ The package-set transaction inside the fresh instance is:
 2. `vir_append_ir_package` decodes each format-11 member transactionally.
    Duplicate declarations, initializer globals, host imports/symbols and export
    summaries are rejected before append.
-3. `vir_prepare_ir_package_set` builds aggregate indices without running user
-   initializers. The final root member supplies the manifest and export summaries.
+3. `vir_prepare_ir_package_set` builds aggregate indices and resolves each public
+   export against all appended declarations without running user initializers.
+   Missing declarations and required boxed wrappers are rejected here. Call slots
+   are opaque, package-local handles for these resolved exports. The final root
+   member supplies the manifest and export summaries.
 4. JavaScript validates the manifest's format/member/target invariants and calls
    `vir_validate_package_contract` before installing its host-import manifest.
    That check compares ordered binary export/host-import fields with one manifest
@@ -161,19 +169,51 @@ The package-set transaction inside the fresh instance is:
    once for a successful set. Generated descriptors order members dependency-first,
    with each member retaining its owning initializer metadata.
 
-Decode, prepare, manifest or initializer failure aborts staged state.
+The JS loader aborts staged state on decode, prepare, manifest or initializer
+failure.
 Manifest checksums detect corruption but do not prove agreement with binary call
-tables; the contract comparison is separately required. Runtime ABI 2 rejects
+tables; the contract comparison is separately required. Runtime ABI 4 rejects
 Wasm without `vir_validate_package_contract`, rather than skipping validation.
 Use matching JavaScript and Wasm revisions. The check does not authenticate a
 package or prove that its IR implements its interface types; see the
 [format contract](IRPKG_FORMAT.md#section-directory).
 
-Rollback protects staged provider state and candidate construction. It cannot
-undo arbitrary external effects, such as console output or unmanaged DOM
-mutation performed by an initializer before a later initializer fails. Browser
-activity should use reached `@[vir_startup]` entries and managed host resources
-so candidate disposal can release it.
+The raw loader exports are trusted primitives for matching hosts, not an
+independent manifest validator. The supported JS loader checks member order and
+schema, compares the manifest with binary tables, and installs host bindings
+before finish. The standalone benchmark uses its build-time generated package
+and export indices. Raw callers must establish those same preconditions for
+their inputs; they must not reset a package while calls or retained roots are
+live, or invoke lifecycle operations from an initializer.
+
+Since runtime ABI 3, begin/append/prepare/finish return `1` on success and `0` on
+failure. `vir_package_decl_count` reports the count separately. A package set
+must contain at least one member, but a well-formed member or entire set may
+contain zero declarations. Query the root manifest after preparation and the
+final count after successful finish. Returned string pointers are borrowed and
+must be copied before another loader operation can invalidate them.
+
+The provider has one state owner and phases idle, appending, prepared,
+initializing, ready and failed. A failed append leaves previously staged members
+intact; failed index/export resolution during preparation requires abort or
+begin before appending again. Preparing before any member is appended leaves
+the transaction open.
+Initializer failure retires the interpreter and clears the package. Invalid or
+repeated transitions return failure without changing state, so a repeated finish
+neither reruns initializers nor unloads a ready package. Abort is idempotent and
+preserves the last diagnostic; begin clears it and starts a fresh transaction.
+The JS loader aborts on any failed transaction step. Package retirement also
+clears upstream initializer names and cached native-symbol lookups so a later
+installation cannot reuse their values or package-local host slots. Upstream
+marks initialized values persistent; this cleanup removes names
+but does not reclaim their storage. Ordinary call errors retain initialized
+globals.
+
+Rollback protects staged provider state and candidate construction. It cannot undo arbitrary
+external effects, such as console output or unmanaged DOM mutation performed by
+an initializer before a later initializer fails. Browser activity should use
+reached `@[vir_startup]` entries and managed host resources so candidate disposal
+can release it.
 
 Manifest export indices belong to the root manifest. Individual member unload,
 version solving, remote resolution and hot replacement of one member are not
@@ -188,13 +228,26 @@ present. The result is a package-local, 1-based slot; `0` means failure.
 Repeated calls use `vir_call_resolved_objects(slot, argv, argc)`, without reparsing
 a display name.
 
+Manifest 9 uses canonical structural `nameKey` values for binary agreement and
+native registry lookup. Human-readable names remain aliases. Runtime ABI 4 adds
+an identity-mode byte to the transient package validation message; matching JS
+and Wasm must be installed together. Manifest 6–8 packages retain their legacy
+printer comparison. Their compatibility path is deliberate until supported
+consumers migrate; it is not used for new manifests or native lookup.
+
 The call requires a package-owned summary specifying argument count, effect
 handling and boxed wasm32 boundary requirements. It consumes owned argument
 objects after accepting the argument array and returns one owned object on
 success or `0` on a reported call failure. A base declaration may be used without
 a packaged `_boxed` declaration only when its signature does not require that
 boxed boundary. IO calls supply the world token and unwrap the successful IO
-result; an IO error is reported as call failure.
+result; an IO error is reported as call failure. Read `vir_call_error` only when
+the call returns `0`: a successful outer call can retain a diagnostic from a
+caught nested failure.
+
+These entry points do not use upstream `interpreter::run_main`. That unlinked
+command-line path needs `lean_io_result_show_error`, which the shim does not
+provide; enabling it would require an explicit error-display implementation.
 
 JavaScript drives construction and inspection through `vir_obj_*`, and releases
 temporary arguments/results on its success and failure paths. Supported
@@ -217,6 +270,22 @@ and effect information. The shim passes borrowed object arguments to
 `env.vir_js_call_objects`; JavaScript lifts them with manifest descriptors and
 lowers the returned value to an owned Lean object.
 
+The reusable trampoline grid covers slots 0–127 and IR arities 0–6. The producer's
+`maxHostImportSlots` and `maxHostImportArity` definitions generate the C++ limits
+through `scripts/packages/check-package-abi.mjs --write` during a Wasm build.
+Compile-time index sequences generate each slot's seven fixed function
+signatures and their lookup tables. Preparation rejects aggregate slot overflow,
+excess arity, and impossible erased-prefix/world counts before initialization.
+The dispatch path retains its argument cleanup and excludes erased/world
+arguments from the values borrowed by JavaScript.
+
+Package generation and preparation reject nullary pure host declarations: upstream native lookup treats
+zero-arity declarations as addresses of constant storage, not callable function
+pointers. The retained arity-0 trampoline does not provide that constant adapter.
+Use an explicit `Unit` argument for a callable pure import. This is distinct
+from an effectful import with no JavaScript arguments, whose IR
+arity includes its world argument.
+
 For converted Lean functions, `vir_obj_closure_root` retains a closure with its
 arity and effect bit. JavaScript keeps the full function descriptor privately,
 lowers callback inputs to owned objects, and lifts the owned result of
@@ -226,12 +295,29 @@ and effect flag, retaining no table-entry pointer across application.
 [HOST_BINDINGS.md](HOST_BINDINGS.md#lean-backed-javascript-values) owns collection
 and explicit `vir_closure_release` lifetime rules.
 
-Synchronous host exceptions use a shared out-of-band error slot because the C++
-trampoline must return a structurally valid Lean object. Both top-level object
-calls and closure calls clear and consume that slot around execution; the boxed
-placeholder must never turn an exception into success. Callbacks created while
-lifting a host call are released if any later phase fails. Successful calls may
-retain them under the host contract's reachability rules.
+Synchronous host exceptions use an out-of-band error slot, preserving the
+original JavaScript Error at the owning named/closure/initializer boundary.
+Effectful imports return `IO.Result.error` so Lean bind stops; ordinary IO
+failure leaves the instance reusable. Pure imports have no error carrier and
+trap rather than returning a fabricated value. Named calls, callbacks and
+initializers include Lean's formatted IO error text in their diagnostics.
+
+The SDK transfers consuming call arguments before Wasm entry. Any exception
+escaping an exported Wasm function retires that instance: further calls,
+callbacks, startup and package replacement reject. A binding cannot swallow a
+nested fatal call and resume its outer Lean frame; transactional host resources
+roll back. The guarded export facade is runtime-owned and must not be replaced
+or bypassed with raw exports. Constructor failure before the facade exists is
+an instantiation failure; the factory never returns that instance.
+
+Disposal after a fatal failure runs JavaScript cleanup and clears host roots,
+but does not call Wasm decrements, frees, closure releases or package abort.
+Those allocations remain with the abandoned instance until it is collectible.
+This makes no claim that traps unwind C++ frames or release every Lean object.
+Recovery creates a fresh factory runtime. Raw Wasm callers must likewise discard
+an instance after a trap; the raw ABI does not implement stack recovery.
+Callbacks and Lean-backed JS handles retain ordinary reachability semantics
+until disposal; they cannot invoke the failed instance.
 
 ## Explicit limitations
 
@@ -243,12 +329,35 @@ retain them under the host contract's reachability rules.
 | Parser environment policy | `evalConstCore` delegates to upstream `lean_eval_const`; `isReservedName` delegates to packaged IR; the raw `evalCheckMeta` provider accepts the check. This is not full Lean environment-policy fidelity. |
 | Budget, tracing and options | System/heartbeat, stack-info, timing and trace hooks are inert. Boolean option lookup returns its default; option registration exposes no discovery. Do not infer cancellation, budget enforcement or trace-sensitive behavior. |
 | Environment queries | Sorry-dependency and export-name lookup return `none`. Initializer-name queries are instead package-backed and aligned with the table run through `lean_run_init`. |
-| Local IO/reference providers | `IO.initializing` is scoped true during package initializer execution and restored afterward. ST references implement single-threaded allocation, get, set and take. Stderr/error-printing helpers are no-ops. |
-| Native exceptions | Unsupported C++ exception throwing and assertion-violation paths trap; they do not provide ordinary native exception recovery. |
+| Lazy constant providers | Pinned generated constants use eight local single-threaded `*_once_cold` providers. They preserve exactly-once initialization and persistent object roots without native atomic waits or WASI clocks. Recursive initialization of one cell traps and retires the instance. The build renames only the upstream definitions in `object.cpp`; pinned sources remain unchanged. |
+| Local IO/reference providers | `IO.initializing` is scoped true during package initializer execution and restored afterward. ST references implement single-threaded allocation, get, set and take. `lean_io_eprintln` consumes and discards its string; no stderr sink is installed. Call/initializer IO errors have separate detailed diagnostics. |
+| Native exceptions | Unsupported C++ exception throwing and assertion-violation paths trap; the SDK retires the instance. They do not provide ordinary native exception recovery. |
 | Expression pretty printing | The fixture supports `Std.Format.pretty`. `Lean.PrettyPrinter.ppExpr` additionally needs Meta/Environment tasks/promises and parenthesizer/formatter support; see [the existing boundary analysis](../development/EXAMPLES_AND_FIXTURES.md#known-pretty-printer-boundary). |
 
 Use the resolved native catalog and [fixture coverage](../development/EXAMPLES_AND_FIXTURES.md) for
 the supported surface, not an inferred promise of full Lean runtime support.
+
+### Provider capability boundaries
+
+These providers serve the packaged interpreter, whose environment and options
+are fixed. They do not emulate a compiler session.
+
+| Provider | Live role | Supported limit |
+| --- | --- | --- |
+| `check_system`, `reset_heartbeat`, `save_stack_info` | Interpreter/kernel budget checkpoints | No cancellation, timeout or stack-budget enforcement. Clients needing interruption must own a worker/process boundary. |
+| `time_task`, `scope_trace_env` | Interpreter entry instrumentation | No timing/trace capture from these hooks; SDK call timing measures its own boundaries. |
+| `options::get_bool`, `register_option` | Interpreter's default policy and option setup | Returns the supplied Boolean default; no general option store or declaration discovery. |
+| `elab_environment::to_kernel_env` | Fixed environment reference plumbing | Retains the existing object; does not construct missing compiler metadata. |
+| `lean_decl_get_sorry_dep`, `lean_get_export_name_for` | Upstream interpreter declaration admission/native-name fallback | Return `none`; neither sorry checking nor compiler `@[export]` metadata is supplied. Native lookup remains allowlisted. |
+| `lean_eval_check_meta` | Packaged parser/evaluation policy | Accepts the meta check. Packages requiring full compiler phase enforcement are outside this environment. |
+| `lean_is_reserved_name` | Parser reserved-name query | Delegates to packaged Lean IR; its declaration closure must be included. |
+| Initializer-name lookup, `IO.initializing`, ST refs | Package initialization and runtime state | Real package-backed lookup and single-threaded reference ownership; no general concurrent runtime. |
+| `lean_io_eprintln` | Lean IO diagnostic side effect | Intentionally silent. Existing explicit console host bindings are available to client-authored code; no additional diagnostic sink was found necessary. |
+
+These limits remain unchanged because live callers depend on the narrow
+package environment. The parser/Expr and upstream fixture checks cover exercised
+behavior, not general elaborator, kernel-environment or scheduler support.
+
 
 ## Validation
 

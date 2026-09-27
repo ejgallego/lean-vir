@@ -154,6 +154,7 @@ export class VirHostState {
   }
 
   callObjectsImpl(slot, argvPtr, argc) {
+    if (this.runtime?.failure != null) throw this.runtime.failure;
     // A recorded exception belongs to the active JS call. Even if Lean catches
     // the IO error used for propagation, it must not dispatch further host work.
     if (this.callError !== null) throw this.callError;
@@ -210,6 +211,7 @@ export class VirHostState {
     const transaction = beginHostCallTransaction();
     try {
       const value = binding(...args);
+      if (this.runtime.failure != null) throw this.runtime.failure;
       if (
         !isGenericJsResourceDescriptor(entry.result) &&
         isPromiseLike(value)
@@ -222,6 +224,7 @@ export class VirHostState {
       const resultObject = explicitConversionTarget
         ? this.runtime.makeObjectValue(entry.result, value, resultLabel)
         : this.runtime.makeJsObjectValue(entry.result, value, resultLabel);
+      if (this.runtime.failure != null) throw this.runtime.failure;
       commitHostCallTransaction(transaction);
       return resultObject;
     } catch (error) {

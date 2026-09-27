@@ -21,9 +21,11 @@ export function encodePackageContract(manifest) {
     writer.u32(bytes.length);
     for (const byte of bytes) writer.u8(byte);
   };
+  const structuralNames = manifest.version >= 9;
+  writer.u8(structuralNames ? 1 : 0);
   writer.u32(manifest.exports.length);
   for (const entry of manifest.exports) {
-    string(entry.entry);
+    string(structuralNames ? entry.nameKey : entry.entry);
     writer.u32(entry.args.length);
     writer.u8(entry.effect !== "pure" ? 1 : 0);
     writer.u8(
@@ -36,7 +38,7 @@ export function encodePackageContract(manifest) {
   const imports = manifest.hostImports ?? [];
   writer.u32(imports.length);
   for (const entry of imports) {
-    string(entry.name);
+    string(structuralNames ? entry.nameKey : entry.name);
     string(entry.target);
     string(entry.symbol);
     writer.u32(entry.arity);

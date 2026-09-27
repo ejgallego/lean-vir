@@ -18,7 +18,7 @@ write_sdk_manifest() {
   local sdk_dir="$1"
   local commit="$2"
   local hash="$3"
-  local abi="${4:-2}"
+  local abi="${4:-4}"
   printf '%s\n' 'export const companion = true;' > "$sdk_dir/js/sdk-helper.js"
   local helper_hash
   helper_hash="$(sha256sum "$sdk_dir/js/sdk-helper.js" | cut -d' ' -f1)"
@@ -420,7 +420,7 @@ grep -q 'checksum mismatch for js/sdk-helper.js:' "$tmp/bad-sdk.stderr"
 
 mkdir -p "$tmp/sdk-old-abi/lean-vir-sdk/js"
 cp "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js" "$tmp/sdk-old-abi/lean-vir-sdk/js/vir-runtime.js"
-write_sdk_manifest "$tmp/sdk-old-abi/lean-vir-sdk" "lake-facet-smoke" "$sdk_hash" 1
+write_sdk_manifest "$tmp/sdk-old-abi/lean-vir-sdk" "lake-facet-smoke" "$sdk_hash" 3
 tar -czf "$tmp/lean-vir-sdk-old-abi.tar.gz" -C "$tmp/sdk-old-abi" lean-vir-sdk
 if lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk-old-abi.tar.gz" --out "$tmp/existing-sdk" \
     > "$tmp/old-abi-sdk.stdout" 2> "$tmp/old-abi-sdk.stderr"; then
@@ -428,7 +428,7 @@ if lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk-old-abi.tar.gz" --out "$t
   exit 1
 fi
 test "$(cat "$tmp/existing-sdk/marker.txt")" = 'keep-existing-sdk'
-grep -q 'unsupported SDK runtime ABI version: 1' "$tmp/old-abi-sdk.stderr"
+grep -q 'unsupported SDK runtime ABI version: 3' "$tmp/old-abi-sdk.stderr"
 
 if lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk.tar.gz" --expect-version 9.9.9 \
     --out "$tmp/existing-sdk" > "$tmp/version-sdk.stdout" 2> "$tmp/version-sdk.stderr"; then

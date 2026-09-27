@@ -25,6 +25,25 @@ int main() {
     using lean::ir::type;
     using namespace lean::vir::package_ir;
 
+    // Builders consume their prefix. Keep one caller reference to verify
+    // the generated Name provider owns exactly the transferred reference.
+    lean::object * prefix = mk_name_str(lean_box(0), "Prefix");
+    lean_inc(prefix);
+    lean::object * named = mk_name_str(prefix, "suffix");
+    bool names_ok = lean_internal_get_rc(prefix) == 2;
+    lean_dec(named);
+    names_ok = names_ok && lean_internal_get_rc(prefix) == 1;
+    lean_inc(prefix);
+    named = mk_name_num(prefix, 42);
+    names_ok = names_ok && lean_internal_get_rc(prefix) == 2;
+    lean_dec(named);
+    names_ok = names_ok && lean_internal_get_rc(prefix) == 1;
+    lean_dec(prefix);
+    if (!names_ok) {
+        fputs("Name builders must transfer child ownership exactly once\n", stderr);
+        return 1;
+    }
+
     lean::object * fdecl = mk_fun_decl(
         lean_box(0),
         lean_alloc_array(0, 0),

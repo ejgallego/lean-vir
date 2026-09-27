@@ -82,7 +82,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     [
       "name",
       (m) => {
-        m.hostImports[0].name += ".mismatch";
+        m.hostImports[0].nameKey += "s6d69736d61746368/";
       },
     ],
     [

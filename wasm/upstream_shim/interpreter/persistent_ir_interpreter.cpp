@@ -157,4 +157,17 @@ void reset_package_interpreter() {
     g_package_interpreter = nullptr;
 }
 
+void clear_package_interpreter_globals() {
+    // Cached host trampolines encode package-local slots. A failed install may
+    // be retried with the same Lean names at different slots.
+    if (ir::g_native_symbol_cache != nullptr) {
+        ir::g_native_symbol_cache->clear();
+    }
+    if (ir::g_init_globals != nullptr) {
+        // Upstream marks the values persistent: removing names prevents stale
+        // lookup on retry but does not reclaim those values or undo side effects.
+        ir::g_init_globals->clear();
+    }
+}
+
 } // namespace lean::vir

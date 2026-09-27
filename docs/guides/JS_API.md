@@ -465,6 +465,23 @@ the same shape with `kind` values `zero`, `succ`, `max`, `imax`, `param`, and
 expression objects. Metadata expression inputs are accepted by lowering their
 inner expression; metadata results preserve a structural `mdata` wrapper.
 
+Bound-variable indices must be in `0..1048574`: the pinned kernel stores
+`index + 1` in a 20-bit range. Larger indices reject before Wasm execution.
+This limit does not restrict arbitrary-precision Nat literals or projection indices.
+
+Names inside these structural expression and level values use a restricted
+text spelling: non-empty Lean identifier components separated by single dots.
+Unicode components accepted by the pinned Lean identifier predicates are
+supported, such as `café` and `αβ₁`; these predicates differ from JavaScript's
+Unicode identifier grammar. Numeric components (including
+large numerals), empty components, escaped components such as
+`A.«B.C»`, and other internal or non-identifier spellings are rejected at the
+JavaScript boundary instead of being normalized into a different `Lean.Name`.
+The empty string and `[anonymous]` are retained as explicit spellings for the
+anonymous name. Package and manifest names have their separate structural
+identity contract; this restriction applies only to the specialized Expr and
+Level adapter.
+
 Package loading validates the embedded interface manifest before any generated
 entry is exposed. Malformed type trees, invalid structure layouts, unsupported
 interface descriptor tags, duplicate export names, and bad enum constructor
@@ -627,6 +644,24 @@ Follow [Packages](PACKAGES.md#generate-a-local-package) for module registration,
 root selection, configuration, inspection and the development runner. Supply
 the resulting bytes or descriptor URL through `irPackageSet`, as described in
 [Module Package Sets](#module-package-sets).
+
+## Errors and recovery
+
+Ordinary Lean IO failures report their message, and synchronous effectful host
+failures preserve the original JavaScript Error. The runtime remains reusable
+after those failures.
+
+A failed **pure** host import or an exception escaping Wasm execution makes the
+runtime unusable. Calls, callbacks, startup and package installation then reject;
+create a fresh runtime from the factory to recover. Catching a nested fatal
+callback in a host binding does not let the outer Lean call continue. Other
+runtime instances remain usable.
+
+`dispose()` remains idempotent after failure. It releases JavaScript-owned host
+resources and invalidates callbacks/handles without re-entering failed Wasm.
+Traps do not unwind the interpreter's C++ frames: its remaining allocations are
+reclaimed with the Wasm instance when no references retain it. Keep the
+runtime-owned `exports` facade intact; replacing it bypasses these guards.
 
 ## Current Limits
 

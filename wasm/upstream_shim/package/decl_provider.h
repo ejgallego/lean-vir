@@ -50,6 +50,11 @@ uint32_t package_format_version();
 
 extern "C" void * vir_alloc_bytes(uint32_t size);
 extern "C" void vir_free_bytes(void * ptr);
+// Loader operations return 1 on success, 0 on failure (since runtime ABI 3).
+// Query vir_package_decl_count separately; zero declarations is valid.
+// These are trusted primitives: callers validate member order, manifest schema
+// and binary agreement before finish, and install the required host bindings.
+// Never reset a package with live calls/roots or mutate it during initialization.
 extern "C" uint32_t vir_begin_ir_package_set(void);
 extern "C" uint32_t vir_append_ir_package(uint8_t const * data, uint32_t size);
 extern "C" uint32_t vir_prepare_ir_package_set(void);

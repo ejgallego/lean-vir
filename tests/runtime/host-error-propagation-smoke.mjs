@@ -21,7 +21,7 @@ try {
     path, join(temp, "host-error.report.md"), "--target-module", "HostErrorPropagation",
     ...[
       "newCounter", "readCounter", "failThenWork", "failureCallback",
-      "invoke", "invocationCallback", "failLean",
+      "invoke", "invocationCallback", "failLean", "makeIoFailureCallback",
     ].map(x => prefix + x),
   ]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
@@ -94,10 +94,16 @@ try {
       }
     }
     for (const method of ["call", "callTimed"]) {
-      assert.throws(() => runtime[method](prefix + "failLean"), /IO action failed/,
+      assert.throws(() => runtime[method](prefix + "failLean"), /IO action failed:.*Lean IO failure/,
         "a null result must still report the Lean call error");
       assert.equal(runtime.call(prefix + "readCounter", counter), "0");
     }
+    const ioFailureCallback = runtime.call(prefix + "makeIoFailureCallback");
+    assert.throws(
+      () => ioFailureCallback(0),
+      /IO callback failed:.*Lean IO callback failure/,
+      "closure IO errors should retain the Lean IO.Error text",
+    );
     shouldThrow = false;
     runtime.call(prefix + "failThenWork", counter);
     assert.equal(runtime.call(prefix + "readCounter", counter), "1");

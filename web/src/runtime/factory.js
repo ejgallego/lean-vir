@@ -91,8 +91,12 @@ export function createVirImports(module, overrides = {}, hostState = null) {
     imports.env ??= {};
     imports.env.vir_js_call_objects = (slot, argvPtr, argc) => {
       try {
-        return hostState.callObjects(slot, argvPtr, argc);
+        const value = hostState.callObjects(slot, argvPtr, argc);
+        if (hostState.runtime?.failure != null) throw hostState.runtime.failure;
+        return value;
       } catch (error) {
+        // A caught nested trap must not resume an abandoned interpreter frame.
+        if (hostState.runtime?.failure != null) throw hostState.runtime.failure;
         hostState.recordCallError(error);
         return 0;
       }
@@ -251,6 +255,7 @@ export class VirRuntimeFactory {
           : createVirImports(module, this.imports ?? {}, hostState);
       const instance = new WebAssembly.Instance(module, imports);
       hostState.attach(instance.exports);
+      // Constructor failure cannot expose a runtime; the catch releases leases.
       instance.exports.__wasm_call_ctors?.();
       return new VirRuntime(instance.exports, {
         module,

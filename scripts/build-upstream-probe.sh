@@ -108,6 +108,7 @@ mkdir -p "$generated_dir"
 mkdir -p "$overlay_include/lean"
 mkdir -p web/public
 
+node scripts/packages/check-package-abi.mjs --write
 npm run --silent generate:ir-codec-tags
 npm run --silent generate:boundary-registry
 
@@ -269,8 +270,16 @@ while IFS= read -r relative_path; do
 done < "$lean_stage0_support_manifest"
 
 local_native_support_sources=(
-  "wasm/upstream_shim/runtime/lean_object_constructors.cpp"
   "wasm/upstream_shim/runtime/native_symbols.cpp"
+)
+
+# These providers are generated from the pinned Lean sources.  Their raw
+# constructors/accessors carry the runtime ownership and packed-metadata
+# contract used by the upstream kernel; keep the boundary adapters above
+# independent from that generated implementation.
+constructor_support_sources=(
+  "$src/stage0/stdlib/Lean/Level.c"
+  "$src/stage0/stdlib/Lean/Expr.c"
 )
 
 shim_sources=(
@@ -278,6 +287,8 @@ shim_sources=(
   "wasm/upstream_shim/interpreter/interpreter_bridge.cpp"
   "wasm/upstream_shim/abi/call_abi.cpp"
   "wasm/upstream_shim/runtime/name_utils.cpp"
+  "wasm/upstream_shim/runtime/io_error.cpp"
+  "wasm/upstream_shim/runtime/once.cpp"
   "wasm/upstream_shim/abi/object_abi.cpp"
   "wasm/upstream_shim/abi/object_expr_abi.cpp"
   "wasm/upstream_shim/abi/closure_abi.cpp"
@@ -301,8 +312,11 @@ shim_deps=(
   "wasm/upstream_shim/package/package_decl_provider_types.h"
   "wasm/upstream_shim/package/package_ir_builders.h"
   "build/generated/wasm/package/package_ir_tags.h"
+  "build/generated/wasm/package/host_import_limits.h"
   "wasm/upstream_shim/package/package_section_directory.h"
   "wasm/upstream_shim/runtime/name_utils.h"
+  "wasm/upstream_shim/runtime/io_error.h"
+  "wasm/upstream_shim/runtime/name_identity.h"
   "wasm/upstream_shim/abi/resource_abi.h"
 )
 
@@ -315,7 +329,6 @@ common_flags=(
   "--target=$target"
   -DNDEBUG
   -DLEAN_BUILD_TYPE=Release
-  -DVIR_USE_UPSTREAM_KERNEL_EXPR_DATA=1
   "$wasm_opt_level"
   -DLEAN_DEFAULT_INTERPRETER_PREFER_NATIVE=false
   "-I$overlay_include"
@@ -330,6 +343,13 @@ common_flags=(
   -fdata-sections
 )
 
+# Only object.cpp defines these upstream providers. Keep its source unchanged
+# while selecting the local single-threaded implementation at the WASI boundary.
+once_provider_flags=()
+for once_type in obj uint8 uint16 uint32 uint64 usize float32 float; do
+  once_provider_flags+=("-Dlean_${once_type}_once_cold=vir_upstream_${once_type}_once_cold")
+done
+
 compile_stamp="$obj_dir/compile-flags.stamp"
 compile_stamp_tmp="$compile_stamp.tmp"
 {
@@ -343,6 +363,7 @@ compile_stamp_tmp="$compile_stamp.tmp"
   printf 'cpp_standard=%s\n' c++20
   printf 'client_c_standard=%s\n' c11
   printf 'flag=%s\n' "${common_flags[@]}"
+  printf 'object_cpp_flag=%s\n' "${once_provider_flags[@]}"
 } > "$compile_stamp_tmp"
 if ! cmp -s "$compile_stamp_tmp" "$compile_stamp"; then
   mv "$compile_stamp_tmp" "$compile_stamp"
@@ -388,6 +409,9 @@ compile_one() {
         language_flags=(-x c++ -std=c++20)
       fi
     fi
+    if [ "$source" = "$src/src/runtime/object.cpp" ]; then
+      language_flags+=("${once_provider_flags[@]}")
+    fi
     mkdir -p "$(dirname "$object")"
     echo "compile $source"
     compiled_count=$((compiled_count + 1))
@@ -417,7 +441,8 @@ done
 native_support_objects=()
 client_native_provider_objects=()
 for source in "${local_native_support_sources[@]}" "$generated_native_wrappers" \
-    "${client_native_provider_sources[@]}" "${lean_stage0_support_sources[@]}"; do
+    "${client_native_provider_sources[@]}" "${constructor_support_sources[@]}" \
+    "${lean_stage0_support_sources[@]}"; do
   object="$(object_for_source "$source")"
   if [[ "$source" == wasm/upstream_shim/* ]]; then
     compile_one "$source" "$object" "${shim_deps[@]}"
@@ -462,7 +487,7 @@ native_support_duplicate_symbols="$obj_dir/native-support-duplicate-symbols.txt"
 native_support_allowed_duplicates="$obj_dir/native-support-allowed-duplicates.txt"
 native_support_unexpected_duplicates="$obj_dir/native-support-unexpected-duplicates.txt"
 {
-  printf '%s\n' l_ByteArray_empty lean_name_mk_numeral lean_name_mk_string
+  printf '%s\n' l_ByteArray_empty
   "$llvm_nm" --format=posix --defined-only --extern-only \
     "$(object_for_source "$generated_native_wrappers")" | awk 'NF >= 2 { print $1 }'
 } | sort -u > "$native_support_allowed_duplicates"
@@ -898,9 +923,9 @@ report_start=$SECONDS
   echo "closure roots and callback calls. \`package/host_import_trampolines.cpp\` supplies the"
   echo "package-scoped JavaScript host-import trampoline grid."
   echo "\`package/package_decl_provider.cpp\` owns direct package-call summaries,"
-  echo "including arity, IO, and boxed-boundary requirements. \`runtime/name_utils.cpp\` contains shared"
-  echo "Lean name construction helpers. \`abi/object_abi.cpp\` supplies generic owned"
-  echo "Lean object helpers, \`abi/object_expr_abi.cpp\` supplies temporary Level/Expr"
+  echo "including arity, IO, and boxed-boundary requirements. \`runtime/name_utils.cpp\` contains restricted"
+  echo "dotted-name conversion. \`abi/object_abi.cpp\` supplies generic owned"
+  echo "Lean object helpers, \`abi/object_expr_abi.cpp\` supplies specialized Level/Expr"
   echo "helpers, and \`abi/resource_abi.cpp\` supplies JavaScript resource helpers used"
   echo "by the runtime object-call path."
   echo "\`wasm/upstream_shim/runtime/native_symbols.cpp\` supplies shim-specific native"
@@ -911,8 +936,9 @@ report_start=$SECONDS
   echo "include, restricted \`dlsym\` lookup, symbol-stem lookup, and C++ exception"
   echo "stubs. \`runtime/runtime_environment_stubs.cpp\`, \`package/package_init_bridge.cpp\`,"
   echo "\`runtime/runtime_value_stubs.cpp\`, and \`runtime/io_stubs.cpp\` contain the remaining"
-  echo "host/platform stubs. \`package/package_loader_abi.cpp\` supplies the package-load"
-  echo "WASM exports. \`package/package_section_directory.cpp\` reads the v10"
+  echo "host/platform providers, including ST references and constrained environment behavior."
+  echo "\`package/package_loader_abi.cpp\` supplies the package-load"
+  echo "WASM exports. \`package/package_section_directory.cpp\` reads the v11"
   echo "package section directory. \`package/package_ir_decoder.cpp\` decodes"
   echo "the \`build/generated/*.irpkg\` packages emitted from typed"
   echo "\`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`; \`package/package_ir_builders.cpp\`"

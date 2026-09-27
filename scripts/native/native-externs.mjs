@@ -22,8 +22,13 @@ export async function loadNativeExterns() {
     { cwd: repositoryRoot, maxBuffer: 16 * 1024 * 1024 },
   );
   const catalog = JSON.parse(stdout);
-  if (catalog.format !== "lean-vir-native-extern-catalog" || catalog.version !== 1) {
+  if (catalog.format !== "lean-vir-native-extern-catalog" || catalog.version !== 2) {
     throw new Error("unsupported native extern catalog");
+  }
+  for (const [index, entry] of catalog.externs.entries()) {
+    if (typeof entry.name !== "string" || typeof entry.nameKey !== "string") {
+      throw new Error(`native extern catalog entry ${index} lacks name/nameKey`);
+    }
   }
   return catalog.externs;
 }

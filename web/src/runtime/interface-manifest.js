@@ -14,7 +14,7 @@ import { validatePackageTargets } from "./package-targets.js";
 import { requireModuleIdentity } from "./module-name.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 8;
+export const INTERFACE_MANIFEST_VERSION = 9;
 export const MIN_INTERFACE_MANIFEST_VERSION = 6;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",
@@ -39,6 +39,24 @@ function requireString(value, label) {
 function requireOptionalString(value, label) {
   if (value !== undefined && typeof value !== "string") {
     throw new Error(`${label} must be a string`);
+  }
+}
+
+// Machine identity is independent of the user-facing display/call aliases.
+function requireNameKey(value, label) {
+  if (typeof value !== "string" || !/^(?:s(?:[0-9a-f]{2})*\/|n(?:0|[1-9][0-9]*)\/)*$/.test(value)) {
+    throw new Error(`${label} must be a canonical structural Lean name key`);
+  }
+  try {
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    for (const part of value.split("/")) {
+      if (part.startsWith("s")) {
+        const bytes = Uint8Array.from(part.slice(1).match(/../g) ?? [], byte => parseInt(byte, 16));
+        decoder.decode(bytes);
+      }
+    }
+  } catch {
+    throw new Error(`${label} contains invalid UTF-8 in a structural Lean name key`);
   }
 }
 
@@ -89,7 +107,7 @@ export function validateInterfaceManifest(
   );
   const exports = validateManifestExports(manifest.exports, manifest.version);
   const hostImports = manifest.hostImports ?? [];
-  validateManifestHostImports(hostImports);
+  validateManifestHostImports(hostImports, manifest.version);
   validatePackageSetSurface(
     manifest.metadata.packageSetMember,
     exports,
@@ -140,6 +158,7 @@ function validateManifestMetadata(
 
 function validateManifestExports(exports, manifestVersion) {
   const entries = new Set();
+  const identities = new Set();
   const ids = new Set();
   const jsNames = new Set();
   return exports.map((entry, index) => {
@@ -176,6 +195,10 @@ function validateManifestExports(exports, manifestVersion) {
       validateInterfaceRootType(arg.type, `${argLabel}.type`);
     });
     validateInterfaceRootType(entry.result, `${label}.result`);
+    if (manifestVersion >= 9) {
+      requireNameKey(entry.nameKey, `${label}.nameKey`);
+      requireUnique(identities, entry.nameKey, `${label}.nameKey`);
+    }
     return manifestVersion < 7 && entry.startup === undefined
       ? { ...entry, startup: false }
       : entry;
@@ -225,8 +248,9 @@ function validatePackageSetSurface(member, exports, hostImports) {
   }
 }
 
-function validateManifestHostImports(hostImports) {
+function validateManifestHostImports(hostImports, manifestVersion) {
   const names = new Set();
+  const identities = new Set();
   const symbols = new Set();
   hostImports.forEach((entry, index) => {
     const label = `embedded interface manifest hostImports[${index}]`;
@@ -270,6 +294,10 @@ function validateManifestHostImports(hostImports) {
       );
     }
     requireHostImportBoundary(entry.boundary, `${label}.boundary`);
+    if (manifestVersion >= 9) {
+      requireNameKey(entry.nameKey, `${label}.nameKey`);
+      requireUnique(identities, entry.nameKey, `${label}.nameKey`, "host import");
+    }
   });
 }
 

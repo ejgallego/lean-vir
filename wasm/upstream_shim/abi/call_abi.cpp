@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 #include "interpreter/interpreter_bridge.h"
 
 #include "package/decl_provider.h"
+#include "runtime/io_error.h"
 
 #include <stdint.h>
 
@@ -102,8 +103,13 @@ extern "C" lean::object * vir_call_resolved_objects(
     }
     if (summary.is_io) {
         if (!lean_io_result_is_ok(result)) {
+            std::string detail = lean::vir::io_result_error_message(result);
             lean_dec(result);
             lean::vir::g_call_error = "IO action failed";
+            if (!detail.empty()) {
+                lean::vir::g_call_error += ": ";
+                lean::vir::g_call_error += detail;
+            }
             return nullptr;
         }
         result = lean_io_result_take_value(result);

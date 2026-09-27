@@ -140,14 +140,10 @@ export function loadIrPackageSet(exports, packageMembers) {
   if (exports.vir_prepare_ir_package_set() === 0) {
     throw new Error("IR package-set validation failed");
   }
-  const loadedDecls = exports.vir_finish_ir_package_set();
-  if (loadedDecls === 0) throw new Error("IR package-set finalization failed");
-  if (exports.vir_package_decl_count() !== loadedDecls) {
-    throw new Error(
-      "loaded declaration count does not match package provider state",
-    );
+  if (exports.vir_finish_ir_package_set() === 0) {
+    throw new Error("IR package-set finalization failed");
   }
-  return loadedDecls;
+  return exports.vir_package_decl_count();
 }
 
 function assertRequiredExports(exports) {

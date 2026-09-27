@@ -23,6 +23,7 @@ function hostImport(overrides = {}) {
   return {
     slot: 0,
     name: "Example.jsHost",
+    nameKey: "s4578616d706c65/s6a73486f7374/",
     source: "Example.lean",
     target: "test.host",
     boundary: "hostResource",
@@ -42,6 +43,23 @@ function hostImport(overrides = {}) {
 }
 
 export const invalidManifestCases = [
+  ...[undefined, "s0/", "n01/", "n-1/", "S41/", "sff/"].map(key => ({
+    name: `invalid structural export name key ${String(key)}`,
+    mutate: manifest => { manifest.exports[0].nameKey = key; },
+    pattern: /exports\[0\]\.nameKey.*structural Lean name key/,
+  })),
+  {
+    name: "duplicate structural export identity with distinct aliases",
+    mutate: manifest => { manifest.exports.push({ ...structuredClone(manifest.exports[0]),
+      entry: "another alias", id: "anotherId", jsName: "anotherJsName" }); },
+    pattern: /nameKey duplicates another interface export/,
+  },
+  {
+    name: "duplicate structural host identity with distinct aliases",
+    mutate: manifest => { manifest.hostImports = [hostImport(),
+      hostImport({ slot: 1, name: "another alias", symbol: "anotherSymbol" })]; },
+    pattern: /nameKey duplicates another host import/,
+  },
   {
     name: "missing manifest version",
     mutate: (manifest) => {

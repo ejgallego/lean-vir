@@ -8,6 +8,7 @@ module
 
 public import Vir.GeneratePackage.Interface.Encode
 public import Vir.GeneratePackage.Manifest
+public import Vir.LeanName
 
 public section
 
@@ -37,6 +38,7 @@ def InterfaceExport.toJson (entry : InterfaceExport) : String :=
     ("id", jsonString entry.id),
     ("jsName", jsonString entry.jsName),
     ("entry", jsonName entry.entry),
+    ("nameKey", jsonString (Vir.nameKey entry.entry)),
     ("source", jsonString entry.source),
     ("args", jsonArray (entry.args.map InterfaceArg.toJson)),
     ("result", entry.result.toJson),
@@ -48,6 +50,7 @@ def HostImport.toJson (entry : HostImport) : String :=
   jsonObject #[
     ("slot", jsonNat entry.slot),
     ("name", jsonName entry.name),
+    ("nameKey", jsonString (Vir.nameKey entry.name)),
     ("source", jsonString entry.source),
     ("target", jsonString entry.target),
     ("boundary", jsonString entry.boundary.label),
