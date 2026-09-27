@@ -1,8 +1,9 @@
 # Embedded resources: review and acceptance
 
 This is a draft implementation, not yet the default cold-install client workflow.
-The API and an actual downstream Slides PrettyM demo work with a verified,
-maintainer-seeded runtime. The checked-in runtime lock uses available-only
+The API uses main's Lean 4.34.0 toolchain. A historical downstream Slides PrettyM
+demo remains pinned to its separate, qualified Lean 4.35.0-rc3 resource checkpoint;
+unstacking this PR does not migrate that demo. The checked-in runtime lock uses available-only
 selection (`source: "-"`); it does not identify a public download. Publication of
 a durable runtime distribution remains a release prerequisite.
 
@@ -22,9 +23,9 @@ a durable runtime distribution remains a release prerequisite.
 6. `fixtures/resources/` and `tests/resources/`: ordinary leaf builds and negative
    cases. The resource API contains no PrettyM or Slides-specific policy.
 
-See [the contract and compiling recipe](RESOURCE_BUNDLES.md). This is stacked on
-the separate Lean 4.35.0-rc3 support change; it does not resolve unrelated
-Infoview/toolchain CI findings.
+See [the contract and compiling recipe](RESOURCE_BUNDLES.md). This is based on
+main, independently of the Lean 4.35 support PR. Runtime packs must match the
+selected compiler exactly; a 4.35 pack cannot be reused under 4.34.
 
 ## Acceptance scope
 
@@ -55,7 +56,7 @@ checks. The downstream Slides tests belong to Slides and are not run by VIR CI.
 | T18 Concurrent/interrupted production | Covered at installer boundary | Concurrent same-identity native installations and interrupted/failed transport checks. |
 | T19 Compiled bytes | Covered | Native generator works with raw program packs unavailable; focused embedding also covers removed raw inputs. |
 | T20 Site relocation | Covered | Actual Slides program executes at root and nested URL prefixes. |
-| T21 Real PrettyM | Covered | Downstream browser/native shared 21-case semantic corpus. |
+| T21 Real PrettyM | Covered on historical 4.35 demo | Downstream browser/native shared 21-case semantic corpus; no automatic 4.34 Slides adoption claim. |
 | T22 Format edges | Covered | Shared corpus includes Unicode, tags, groups and alignment/width cases. |
 | T23 Invalid requests | Partial | Shared browser error cases and 13 additional native bounds cases; the full generated bounds set is not yet replayed in Wasm. |
 | T24 Calls/disposal | Partial | Independent runtimes, sequential disposal/remount and deferred client mount races pass; retained-memory measurements remain. |

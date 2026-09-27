@@ -320,19 +320,20 @@ and a downstream library prerequisite with a custom build directory. Transport
 fault injection uses a test-only curl stub; it is not anonymous HTTPS acceptance.
 The compiled leaf still runs from another directory after raw inputs disappear.
 
-The selected baseline is Lean `v4.35.0-rc3`, exact
-`470d5ce1400764999581fd26d5d72b00d990b0f4`. The baseline port follows its new
-`ST.Prim.Ref.swap`/`put` ABI (`set` is now Lean code), registers
-`Array.propagateMark`, and retains the exported-interpretation specialization of
-the pinned importer. Source builds and native-to-Wasm reference/format/parser
-checks do not substitute for the complete PrettyM/resource acceptance. The browser
+The selected baseline is main's Lean `v4.34.0`, exact
+`293d5d0c0c3f3dded4688b3ccd6a33939ac5102b`. The resource API does not require the
+separate Lean 4.35 support change. Runtime packs are nevertheless compiler-specific:
+select a matching pack rather than copying Wasm or a lock from another toolchain.
+Source builds and native-to-Wasm reference/format/parser checks do not substitute
+for the complete PrettyM/resource acceptance. The browser
 facade additionally tests role calls, independent instances, disposal/remount,
 root/nested hosting, corrupt payload/identity, MIME, duplicate JSON keys, depth,
 missing exports, undeclared members, incompatibility and rejected redirects.
 Negative cases assert that no Wasm instance was created.
 
 Next gates are runtime distribution and the remaining cases enumerated in the
-acceptance status. Actual downstream browser PrettyM calls pass. The client
+acceptance status. The historical downstream PrettyM demo remains qualified on
+its frozen Lean 4.35.0-rc3 pair; changing this PR's base does not repin it. The client
 build regression covers cold
 and warm ordinary builds, program edits without runtime replacement, missing and
 corrupt staging repair, carrier-cycle rejection, and native execution with the

@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 module
 
+import Lean
 import Vir.Resources
 import Vir.Resources.Pack
 import Vir.Resources.Sha256
@@ -29,6 +30,7 @@ private def failure (code : String) (value : Except ResourceError α) : IO Unit 
   | .ok _ => throw <| IO.userError s!"expected failure {code}"
   | .error e => check s!"expected {code}, got {repr e}" (e.code == code)
 
+-- Fixed cross-language identity vector, independent of the executing compiler.
 private def compatibility : Compatibility := {
   leanBuildId := "470d5ce1400764999581fd26d5d72b00d990b0f4"
   runtimeAbi := "test-abi"
@@ -63,6 +65,11 @@ private def program : Bundle := Id.run do
 
 private def withDescriptor (bundle : Bundle) (descriptor : Descriptor) : Bundle :=
   { bundle with descriptor, contentId := descriptor.contentId }
+
+-- Native acquisition must instead check the actual pinned compiler identity.
+private def nativeRuntime : Bundle :=
+  withDescriptor runtime { runtime.descriptor with
+    compatibility := { compatibility with leanBuildId := Lean.githash } }
 
 private def rawPack (descriptor : String) (payload : ByteArray := ByteArray.empty) : ByteArray := Id.run do
   let mut out : ByteArray := ⟨#[86, 73, 82, 82, 69, 83, 0, 1]⟩
@@ -165,8 +172,12 @@ public def main (args : List String) : IO Unit := do
   match args with
   | [] => unitTests
   | ["descriptor"] => IO.println (String.fromUTF8! (encodeDescriptor runtime.descriptor))
+  | ["native-descriptor"] =>
+    IO.println (String.fromUTF8! (encodeDescriptor nativeRuntime.descriptor))
   | ["pack", path] =>
     IO.FS.writeBinFile path (← success "prepare embedding fixture" (Pack.encode runtime))
+  | ["native-pack", path] =>
+    IO.FS.writeBinFile path (← success "prepare acquisition fixture" (Pack.encode nativeRuntime))
   | "hash" :: paths =>
     for path in paths do IO.println (sha256 (← IO.FS.readBinFile path))
-  | _ => throw <| IO.userError "usage: vir_resource_tests [descriptor | pack FILE | hash FILE...]"
+  | _ => throw <| IO.userError "usage: vir_resource_tests [descriptor | native-descriptor | pack FILE | native-pack FILE | hash FILE...]"

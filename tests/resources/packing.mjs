@@ -59,7 +59,9 @@ function invoke(
     assert.match(log, error, label);
   } else assert.equal(result.status, 0, `${label}: ${log}`);
 }
-const identity = spawnSync(fixture, ["descriptor"], { encoding: "utf8" });
+const identity = spawnSync(fixture, ["native-descriptor"], {
+  encoding: "utf8",
+});
 assert.equal(identity.status, 0, identity.stderr);
 const compatibility = JSON.parse(identity.stdout).compatibility;
 const js = Buffer.from("export const runtime = 42;\n");

@@ -22,7 +22,6 @@ const tool = join(root, ".lake/build/bin/vir_resource_pack");
 const source = join(evidence, "source pack.virres");
 const cache = join(evidence, "cache with spaces/pack");
 const stage = join(evidence, "stage with spaces/pack");
-const expected = "59bea0c0be16a07242d4f516971f465532b7c5b9d31e8bf90e8bda39b1c54866";
 function run(cmd, args, label, { cwd = evidence, env = process.env, error } = {}) {
   const result = spawnSync(cmd, args, { cwd, env, encoding: "utf8", timeout: 180000 });
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
@@ -40,8 +39,10 @@ const snapshot = (path) => {
   const s = statSync(path, { bigint: true });
   return [s.ino, s.mtimeNs, s.size];
 };
-run(join(root, ".lake/build/bin/vir_resource_tests"), ["pack", source], "fixture");
+run(join(root, ".lake/build/bin/vir_resource_tests"), ["native-pack", source], "fixture");
 const bytes = readFileSync(source);
+const expected = createHash("sha256").update("vir-resource-bundle-v1\n")
+  .update(bytes.subarray(12, 12 + bytes.readUInt32LE(8))).digest("hex");
 acquire("cold");
 assert.deepEqual(readFileSync(stage), bytes);
 assert.deepEqual(readFileSync(cache), bytes);
