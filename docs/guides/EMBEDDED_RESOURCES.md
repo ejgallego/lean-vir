@@ -59,8 +59,8 @@ Create `vir-resources/ClientResources.json`:
 }
 ```
 
-The recipe filename matches the carrier library. `module` is singular; the old
-experimental `modules` array is rejected. Roles are stable client-facing names;
+The recipe filename matches the carrier library. `module` names one composition
+root. Roles are stable client-facing names;
 `interfaceId` records the call contract, not a generated type check.
 
 In `resources/Client/Resources.lean`, embed the prepared pack:
@@ -95,11 +95,31 @@ A publisher validates `ResourceSet.bundles`, writes each complete bundle under
 its content ID, and writes a `bundle.json` envelope containing `contentId` and
 `descriptor`. Keep file paths relative to that manifest and all program members
 intact. The resulting site is movable and needs no Lean build directory.
+The root `bundle.json` name is reserved, including descendants such as
+`bundle.json/child`; a nested payload such as `assets/bundle.json` is allowed.
 
-From the published runtime module, use `createProgram` with explicit runtime and
-program manifest URLs. Call `program.call("greet", "world")` and dispose the
-program when its host lifetime ends. Separate `createProgram` calls have separate
-Lean runtime state, even when they use the same resource files.
+The publisher supplies site-relative URLs for the runtime module and the two
+manifests. Resolve them relative to the generated page (including its deployment
+prefix), not to a Lean build directory:
+
+```js
+// These paths come from the publisher's verified bundle plan.
+const runtimeModuleUrl = new URL(published.runtimeModule, document.baseURI);
+const runtimeManifestUrl = new URL(published.runtimeManifest, document.baseURI);
+const programManifestUrl = new URL(published.programManifest, document.baseURI);
+const { createProgram } = await import(runtimeModuleUrl.href);
+const program = await createProgram({ runtimeManifestUrl, programManifestUrl });
+try {
+  console.log(program.call("greet", "world"));
+} finally {
+  program.dispose();
+}
+```
+
+For an interactive component, keep the program until the component is unmounted
+and dispose it there. Separate `createProgram` calls have separate Lean runtime
+state, even when they use the same resource files. `interfaceId` remains
+client-owned protocol metadata, not a runtime proof of argument/result types.
 
 The [resource contract](../development/RESOURCE_BUNDLES.md) describes integrity,
 publication and loader rules; the [acceptance checklist](../development/RESOURCE_ACCEPTANCE.md)

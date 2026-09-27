@@ -42,7 +42,7 @@ checks. The downstream Slides tests belong to Slides and are not run by VIR CI.
 | T04 Cold three-package build | Partial | Fresh source builds pass; runtime bytes are seeded, not anonymously downloaded. |
 | T05 Client-owned program | Covered | Intermediary recipe/facet builds the registered marked program. |
 | T06 Source-relative staging | Covered | Isolated dependency copies, build directory with spaces, native execution from another cwd. |
-| T07 Cache restoration | Partial | Complete native artifact-cache restoration and packaging from cache-only inputs pass; a deliberately Lean-only cache still needs qualification. |
+| T07 Cache restoration | Covered | Full-cache restoration and cache-only packaging pass. With only Lean module artifacts retained, the ordinary leaf build rebuilds native tools/objects and its executable, reproduces every pack, and keeps setup inputs cache-resolved. |
 | T08 Deleted staging | Covered | Missing program staging repaired on both conventional and cache-only paths. |
 | T09 Corrupt/missing bytes | Covered | Integrity negatives and corrupt staging repair. |
 | T10 No-op build | Covered | Warm staging inode/mtime and bytes unchanged; no carrier recompilation. |
@@ -61,7 +61,7 @@ checks. The downstream Slides tests belong to Slides and are not run by VIR CI.
 | T23 Invalid requests | Partial | Shared browser error cases and 13 additional native bounds cases; the full generated bounds set is not yet replayed in Wasm. |
 | T24 Calls/disposal | Partial | Independent runtimes, sequential disposal/remount and deferred client mount races pass; retained-memory measurements remain. |
 | T25 Paths/collisions | Covered | Portable path, case/prefix collision, integrity and link/hardlink tests; seven real-facet aliases preserve sentinels before rejection, including Lake trace/hash writes and warm-cache paths. Slides reserves publisher namespaces. |
-| T26 Shared producer | Partial | Two independent carrier libraries share one producer/runtime in a cold cache build; distinct intermediary packages remain to be exercised. |
+| T26 Shared producer | Covered | Two distinct intermediary packages, each with two carriers, share one producer/runtime in a cold build. Publication contains one runtime plus four programs; client-specific edits preserve peer program bytes. |
 | T27 Build cycles | Covered | Program importing its owning carrier rejected before compiled jobs wait. |
 | T28 Execution modes | Covered for documented modes | Compiled native and focused interpreted byte access; raw carrier elaboration without prerequisites is unsupported. |
 | T29 Identity vectors | Covered | Cross-language canonical descriptor/hash and mutation/reordering checks. |

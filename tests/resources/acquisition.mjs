@@ -14,11 +14,13 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { encodeDescriptor } from "../../web/src/resources/descriptor.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const evidence = mkdtempSync(join(root, "build/resource-acquisition-"));
 console.log(`acquisition evidence: ${evidence}`);
 const tool = join(root, ".lake/build/bin/vir_resource_pack");
+const compat = join(root, "vir-resources/compatibility.json");
 const source = join(evidence, "source pack.virres");
 const cache = join(evidence, "cache with spaces/pack");
 const stage = join(evidence, "stage with spaces/pack");
@@ -34,7 +36,7 @@ function run(cmd, args, label, { cwd = evidence, env = process.env, error } = {}
   return output;
 }
 const acquire = (label, src = source, options = {}) => run(tool,
-  ["acquire", expected, src, cache, stage, ...(options.offline ? ["--offline"] : [])], label, options);
+  ["acquire", compat, expected, src, cache, stage, ...(options.offline ? ["--offline"] : [])], label, options);
 const snapshot = (path) => {
   const s = statSync(path, { bigint: true });
   return [s.ino, s.mtimeNs, s.size];
@@ -80,14 +82,14 @@ acquire("reject-leaf-link", source, { error: /UNSAFE_RESOURCE_FILE/ });
 unlinkSync(stage);
 const alias = join(evidence, "alias");
 symlinkSync(join(evidence, "stage with spaces"), alias);
-run(tool, ["acquire", expected, source, cache, join(alias, "pack")], "reject-parent-link",
+run(tool, ["acquire", compat, expected, source, cache, join(alias, "pack")], "reject-parent-link",
   { error: /UNSAFE_RESOURCE_DIRECTORY/ });
 assert.equal(readFileSync(retained, "utf8"), "old retained artifact");
 unlinkSync(cache);
 acquire("exact-offline-miss", "https://invalid.example/never-fetched",
   { offline: true, error: new RegExp(`RESOURCE_OFFLINE_MISS.*${expected}`) });
 assert.ok(!existsSync(cache) && !existsSync(stage));
-run(tool, ["acquire", "bad", source, cache, stage], "invalid-id", { error: /INVALID_CONTENT_ID/ });
+run(tool, ["acquire", compat, "bad", source, cache, stage], "invalid-id", { error: /INVALID_CONTENT_ID/ });
 const badSource = join(evidence, "corrupt-source");
 writeFileSync(badSource, bytes.subarray(0, bytes.length - 1));
 acquire("reject-truncated-source", badSource, { error: /TRUNCATED_PACK/ });
@@ -109,13 +111,39 @@ const other = join(evidence, "other-compiler");
 writeFileSync(other, Buffer.concat([header, json, bytes.subarray(12 + descriptorSize)]));
 acquire("reject-transport-identity", other, { error: /CONTENT_ID_MISMATCH/ });
 const otherId = createHash("sha256").update("vir-resource-bundle-v1\n").update(json).digest("hex");
-run(tool, ["acquire", otherId, other, cache, stage], "reject-compiler",
+run(tool, ["acquire", compat, otherId, other, cache, stage], "reject-compiler",
   { error: /LEAN_BUILD_MISMATCH/ });
 assert.ok(!existsSync(cache) && !existsSync(stage));
 
+// Matching content identity is not sufficient: enforce every compatibility field
+// before touching either destination, including already-cached/staged candidates.
+for (const [field, value] of [["runtimeAbi", "3"], ["jsApiVersion", 2], ["irFormatVersion", 12]]) {
+  const descriptor = JSON.parse(originalJson);
+  descriptor.compatibility[field] = value;
+  const changedJson = Buffer.from(encodeDescriptor(descriptor));
+  const changedHeader = Buffer.from(header);
+  changedHeader.writeUInt32LE(changedJson.length, 8);
+  const changed = Buffer.concat([changedHeader, changedJson, bytes.subarray(12 + descriptorSize)]);
+  const changedId = createHash("sha256").update("vir-resource-bundle-v1\n").update(changedJson).digest("hex");
+  const changedSource = join(evidence, `incompatible-${field}`);
+  writeFileSync(changedSource, changed);
+  for (const candidate of ["source", "cache", "stage"]) {
+    const caseCache = join(evidence, `${field}-${candidate}-cache`);
+    const caseStage = join(evidence, `${field}-${candidate}-stage`);
+    const cacheBefore = candidate === "cache" ? changed : bytes;
+    const stageBefore = candidate === "stage" ? changed : bytes;
+    writeFileSync(caseCache, cacheBefore);
+    writeFileSync(caseStage, stageBefore);
+    run(tool, ["acquire", compat, changedId, changedSource, caseCache, caseStage],
+      `incompatible-${field}-${candidate}`, { error: /INCOMPATIBLE/ });
+    assert.deepEqual(readFileSync(caseCache), cacheBefore);
+    assert.deepEqual(readFileSync(caseStage), stageBefore);
+  }
+}
+
 // Concurrent producers may only install the selected complete pack.
 await Promise.all(Array.from({ length: 8 }, (_, i) => new Promise((resolve, reject) => {
-  const child = spawn(tool, ["acquire", expected, source, cache, stage]);
+  const child = spawn(tool, ["acquire", compat, expected, source, cache, stage]);
   let output = "";
   child.stdout.on("data", (chunk) => { output += chunk; });
   child.stderr.on("data", (chunk) => { output += chunk; });
@@ -159,7 +187,7 @@ const curlLog = join(transport, "args.json");
 const transportEnv = { ...process.env, PATH: `${transport}:${process.env.PATH}`,
   TEST_CURL_LOG: curlLog, TEST_CURL_PACK: source, TEST_CURL_STARTED: started,
   TEST_CURL_MODE: "pause" };
-const interrupted = spawn(tool, ["acquire", expected, "https://test.invalid/pack", cache, stage],
+const interrupted = spawn(tool, ["acquire", compat, expected, "https://test.invalid/pack", cache, stage],
   { env: transportEnv, detached: true });
 let interruptedLog = "";
 interrupted.stdout.on("data", (chunk) => { interruptedLog += chunk; });
@@ -222,7 +250,7 @@ target prepared (pkg) : System.FilePath := do
     let stage := pkg.dir / ".vir-generated/fixture.virres"
     addLeanTrace
     addPureTrace ${JSON.stringify(expected)} "resource identity"
-    proc { cmd := exe.toString, args := #["acquire", ${JSON.stringify(expected)},
+    proc { cmd := exe.toString, args := #["acquire", ${JSON.stringify(compat)}, ${JSON.stringify(expected)},
       pack.toString, (pkg.buildDir / "resource-cache/pack").toString, stage.toString] }
     addTrace (← computeTrace stage)
     return stage

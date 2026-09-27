@@ -36,7 +36,9 @@ const exportKeys = ["role", "declaration", "interfaceId"];
 const hex64 = /^[0-9a-f]{64}$/;
 const pathPart = /^[A-Za-z0-9._-]+$/;
 
-export function validateDescriptor(value) {
+// Only this private boundary constructs a normalized descriptor and its encoding.
+// Public entry points keep validating arbitrary caller-owned input.
+function prepareDescriptor(value) {
   const descriptor = requireObject(value, "INVALID_DESCRIPTOR");
   requireExactKeys(descriptor, descriptorKeys, "INVALID_DESCRIPTOR");
 
@@ -100,14 +102,19 @@ export function validateDescriptor(value) {
     fileEntries: fileEntries.sort((a, b) => compareUtf8(a.role, b.role)),
     exports: exports.sort((a, b) => compareUtf8(a.role, b.role)),
   };
-  if (encodeCanonical(normalized).byteLength > MAX_DESCRIPTOR_BYTES) {
+  const encoded = encodeCanonical(normalized);
+  if (encoded.byteLength > MAX_DESCRIPTOR_BYTES) {
     fail("DESCRIPTOR_LIMIT");
   }
-  return normalized;
+  return { descriptor: normalized, encoded };
+}
+
+export function validateDescriptor(value) {
+  return prepareDescriptor(value).descriptor;
 }
 
 export function encodeDescriptor(value) {
-  return encodeCanonical(validateDescriptor(value));
+  return prepareDescriptor(value).encoded;
 }
 
 export async function sha256Hex(bytes) {
@@ -130,7 +137,10 @@ export async function sha256Hex(bytes) {
 }
 
 export async function descriptorContentId(value) {
-  const encoded = encodeDescriptor(value);
+  return encodedContentId(encodeDescriptor(value));
+}
+
+async function encodedContentId(encoded) {
   const input = new Uint8Array(DOMAIN_PREFIX.byteLength + encoded.byteLength);
   input.set(DOMAIN_PREFIX);
   input.set(encoded, DOMAIN_PREFIX.byteLength);
@@ -142,8 +152,8 @@ export async function validateEnvelope(value) {
   requireExactKeys(envelope, ["contentId", "descriptor"], "INVALID_ENVELOPE");
   if (typeof envelope.contentId !== "string") fail("CONTENT_ID_MISMATCH");
   const contentId = envelope.contentId;
-  const descriptor = validateDescriptor(envelope.descriptor);
-  if (contentId !== (await descriptorContentId(descriptor))) {
+  const { descriptor, encoded } = prepareDescriptor(envelope.descriptor);
+  if (contentId !== (await encodedContentId(encoded))) {
     fail("CONTENT_ID_MISMATCH");
   }
   return { contentId, descriptor };
@@ -209,7 +219,7 @@ function requirePath(value) {
   const path = requireString(value, "INVALID_PATH");
   if (
     utf8Length(path) > MAX_METADATA_BYTES ||
-    path.toLowerCase() === "bundle.json"
+    path.split("/", 1)[0].toLowerCase() === "bundle.json"
   ) {
     fail("INVALID_PATH");
   }

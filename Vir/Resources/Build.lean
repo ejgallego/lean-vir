@@ -206,21 +206,24 @@ def atomicInstall (destination : FilePath) (bytes : ByteArray) : IO Unit := do
     checkFile destination
     IO.FS.rename temporary destination
 
-def verifyIdentity (expected : String) (bundle : Bundle) : IO Unit := do
+def verifyIdentity (expected : String) (profile : Compatibility) (bundle : Bundle) : IO Unit := do
   unless bundle.contentId == expected do
     fail "CONTENT_ID_MISMATCH" s!"expected {expected}, got {bundle.contentId}"
   unless bundle.descriptor.compatibility.leanBuildId == Lean.githash do
     fail "LEAN_BUILD_MISMATCH"
       s!"expected {Lean.githash}, got {bundle.descriptor.compatibility.leanBuildId}"
+  unless bundle.descriptor.compatibility == profile do
+    fail "INCOMPATIBLE"
+      s!"bundle {bundle.descriptor.logicalId} has {repr bundle.descriptor.compatibility}; expected {repr profile}"
 
-def verify (expected : String) (bytes : ByteArray) : IO Unit := do
+def verify (expected : String) (profile : Compatibility) (bytes : ByteArray) : IO Unit := do
   match Pack.decode bytes with
-  | .ok bundle => verifyIdentity expected bundle
+  | .ok bundle => verifyIdentity expected profile bundle
   | .error e => fail e.code (reprStr e)
 
 /-! A corrupt cache is a rejected candidate, never a new expected identity.
 Path/permission errors remain errors rather than triggering network fallback. -/
-def candidate (expected : String) (path : FilePath) : IO (Option ByteArray) := do
+def candidate (expected : String) (profile : Compatibility) (path : FilePath) : IO (Option ByteArray) := do
   checkFile path
   unless (← metadata? path).isSome do return none
   let m ← path.metadata
@@ -230,7 +233,7 @@ def candidate (expected : String) (path : FilePath) : IO (Option ByteArray) := d
   | .error _ => return none
   | .ok bundle =>
     if bundle.contentId != expected then return none
-    verifyIdentity expected bundle
+    verifyIdentity expected profile bundle
     return some bytes
 
 def runtimePlan (compatibilityPath lockPath root : FilePath) : IO Unit := do
