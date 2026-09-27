@@ -59,6 +59,14 @@ jobs:
       - run: npm run test:pages
       - run: npm run test:pages:browser
       - run: npm run test:infoview:browser
+      - run: npm run test:resources:browser
+      - name: Retain resource browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resource-browser-diagnostics
+          path: build/resources-browser/
+          if-no-files-found: ignore
       - run: npm run test:upstream:no-build
       - name: Upload SDK artifact
         uses: actions/upload-artifact@v4
@@ -115,6 +123,37 @@ jobs:
       - run: npm ci
       - run: npm run test:lake:facets
       - run: npm run test:generator:imports
+      - run: npm run test:resources:core
+      - run: npm run test:resources:embedding
+      - run: npm run test:resources:acquisition
+      - run: npm run test:resources:packing
+      - run: npm run test:resources:program
+      - run: npm run test:resources:cache
+      - name: Preserve failed resource cache campaign
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resource-cache-failure
+          path: |
+            /tmp/vir-resource-cache-*/*.log
+            /tmp/vir-resource-cache-*/producer/vir-resources/*.json
+            /tmp/vir-resource-cache-*/client/vir-resources/*.json
+            /tmp/vir-resource-cache-*/client/build with spaces/vir/resources/programs/*
+            /tmp/vir-resource-cache-*/client/.vir-generated/*
+          if-no-files-found: ignore
+      - run: npm run test:resources:descriptor
+      - name: Retain resource diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resource-diagnostics
+          path: |
+            build/resource-embedding-*/*.log
+            build/resource-acquisition-*/*.log
+            build/resource-acquisition-*/interrupted.json
+            build/resource-acquisition-*/transport/args.json
+            build/resource-packing-*/
+          if-no-files-found: ignore
       - run: npm run test:interface
       - run: npm run test:generator:memory
       - name: Download demo artifacts

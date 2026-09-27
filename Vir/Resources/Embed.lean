@@ -1,0 +1,55 @@
+/-
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+-/
+module
+
+public import Vir.Resources.Types
+public import Vir.Resources.Bytes
+public meta import Lean.Elab.Term
+meta import Lean.Elab.Deriving.ToExpr
+meta import Vir.Resources.Types
+meta import Vir.Resources.Bytes
+public meta import Vir.Resources.Pack
+
+/-! Inclusion is only an elaboration operation on a prepared, complete pack.
+Lake owns preparation and tracing. No downloader, build, or runtime file access. -/
+
+namespace Vir.Resources
+open Lean Elab Term
+
+meta section
+
+private instance : ToExpr ByteArray where
+  toTypeExpr := mkConst ``ByteArray
+  toExpr bytes := mkApp2 (mkConst ``Bytes.decode!)
+    (mkStrLit (Bytes.encode bytes)) (toExpr bytes.size)
+
+deriving instance ToExpr for BundleKind
+deriving instance ToExpr for Compatibility
+deriving instance ToExpr for FileInfo
+deriving instance ToExpr for FileEntry
+deriving instance ToExpr for ProgramExport
+deriving instance ToExpr for Descriptor
+deriving instance ToExpr for File
+deriving instance ToExpr for Bundle
+
+/-- Embed validated bytes from a source-relative prepared pack. The producer's
+library prerequisite must establish this file and trace all semantic inputs. -/
+elab "include_vir_bundle " path:str : term => do
+  let source := System.FilePath.mk (← readThe Lean.Core.Context).fileName
+  let some directory := source.parent | throwError "resource source has no parent: {source}"
+  let relative := System.FilePath.mk path.getString
+  if relative.isAbsolute then throwError "include_vir_bundle expects a source-relative path"
+  let resolved := directory / relative
+  let size := (← resolved.metadata).byteSize
+  if size.toNat > maxPayloadBytes + maxDescriptorBytes + 12 then
+    throwError "PACK_LIMIT: {resolved}"
+  let bytes ← IO.FS.readBinFile resolved
+  match Pack.decode bytes with
+  | .error error => throwError "invalid resource pack {resolved}: {repr error}"
+  | .ok bundle => return toExpr bundle
+
+end
+end Vir.Resources

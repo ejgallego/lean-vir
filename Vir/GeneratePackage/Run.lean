@@ -192,6 +192,7 @@ private structure PendingPackageSetMember where
   relativePath : String
   outputPath : System.FilePath
   byteLength : Nat
+  nativeHash : String := ""
 
 unsafe def runModuleSet
     (targets : Array Target)
@@ -199,7 +200,9 @@ unsafe def runModuleSet
     (packagePath descriptorPath shardDir : System.FilePath)
     (rootRelativePath shardRelativeDir : String)
     (reportPath : System.FilePath)
-    (importArts : NameMap ImportArtifacts := {}) : IO UInt32 := do
+    (importArts : NameMap ImportArtifacts := {})
+    (requiredExports : Array Name := #[])
+    (hashBytes? : Option (ByteArray → String) := none) : IO UInt32 := do
   if targets.size != 1 then
     IO.eprintln s!"module package-set generation requires exactly one target, got {targets.size}"
     return 1
@@ -221,12 +224,19 @@ unsafe def runModuleSet
   let closure := analysis.closure
   let manifest := analysis.manifest
   let report := analysis.report
-  writeTextFile reportPath report
   if hasBlockingDiagnostics closure manifest then
+    writeTextFile reportPath report
     printBlockingDiagnostics closure manifest
       "missing IR declarations after loading imported module IR:"
     IO.eprintln s!"see {reportPath}"
     return 1
+
+  for required in requiredExports do
+    unless manifest.exports.any (·.entry == required) do
+      IO.eprintln s!"required VIR interface export `{required}` is absent from marked module `{rootModule}`"
+      return 1
+
+  writeTextFile reportPath report
 
   let moduleOrder? ← match closure.moduleInitializationOrder index target rootModule with
     | .ok moduleOrder => pure (some moduleOrder)
@@ -262,6 +272,7 @@ unsafe def runModuleSet
           relativePath := (System.FilePath.mk shardRelativeDir / fileName).toString
           outputPath
           byteLength := bytes.size
+          nativeHash := hashBytes?.map (· bytes) |>.getD ""
         }
 
   let rootClosure := closure.forModule rootModule rootModule
@@ -284,8 +295,11 @@ unsafe def runModuleSet
         relativePath := rootRelativePath
         outputPath := packagePath
         byteLength := bytes.size
+        nativeHash := hashBytes?.map (· bytes) |>.getD ""
       }
-      let hashes ← Vir.sha256Files (pendingMembers.map (fun member => member.outputPath))
+      let hashes ← match hashBytes? with
+        | some _ => pure (pendingMembers.map (·.nativeHash))
+        | none => Vir.sha256Files (pendingMembers.map (fun member => member.outputPath))
       let members := pendingMembers.zip hashes |>.map fun (member, sha256) =>
         packageSetMemberJson member.moduleName.toString member.relativePath member.role
           member.byteLength sha256

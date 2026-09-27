@@ -35,6 +35,19 @@ target infoviewBundle (pkg) : System.FilePath := do
 lean_lib Vir where
   roots := #[`Vir]
 
+/-- Resource data/tools must never depend on the optional runtime carrier. -/
+lean_lib VirResourceCore where
+  roots := #[]
+  globs := #[.one `Vir.Resources, .one `Vir.Resources.Types, .one `Vir.Resources.Bytes,
+    .one `Vir.Resources.Sha256, .one `Vir.Resources.Validate, .one `Vir.Resources.Pack]
+
+lean_lib VirResourceEmbed where
+  roots := #[]
+  globs := #[.one `Vir.Resources.Embed]
+
+lean_lib VirResourceBrowserFixture where
+  roots := #[`tests.resources.BrowserProgram]
+
 /-- Optional Lean infoview integration and its generated JavaScript shell. -/
 lean_lib VirInfoview where
   roots := #[`Vir.Infoview]
@@ -84,6 +97,19 @@ lean_exe vir_irpkg where
 
 lean_exe vir_fetch_sdk where
   root := `tools.VirFetchSdk
+  supportInterpreter := true
+
+/-- Pure resource-format regression tests, independent of runtime acquisition. -/
+lean_exe vir_resource_tests where
+  root := `tests.resources.Unit
+
+/-- Native preparation only; never depends on a resource carrier. -/
+lean_exe vir_resource_pack where
+  root := `tools.VirResourcePack
+
+/-- Compiled program production; kept below both carrier libraries. -/
+lean_exe vir_resource_program where
+  root := `tools.VirResourceProgram
   supportInterpreter := true
 
 lean_exe vir_native_wrappers where
@@ -347,3 +373,123 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
         env := ← getAugmentedEnv
       }
     return manifestPath
+
+/- Embedded resource preparation. These declarations use Lake/Lean only: no
+import of an unbuilt VIR implementation into downstream lake configurations. -/
+
+input_file virResourceCompatibility where
+  path := "vir-resources/compatibility.json"
+  text := true
+
+input_file virResourceRuntimeLock where
+  path := "vir-resources/runtime.json"
+  text := true
+
+target virRuntimePack (pkg) : System.FilePath := do
+  let tool ← vir_resource_pack.fetch
+  let validator ← vir_resource_program.fetch
+  let profile ← virResourceCompatibility.fetch
+  let lock ← virResourceRuntimeLock.fetch
+  tool.bindM fun tool => validator.bindM fun validator =>
+    profile.bindM fun profile => lock.mapM fun lock => do
+      let plan ← captureProc {
+        cmd := validator.toString
+        args := #["runtime-plan", profile.toString, lock.toString, pkg.dir.toString] }
+      let json ← IO.ofExcept (Lean.Json.parse plan)
+      let contentId ← IO.ofExcept <| json.getObjValAs? String "contentId"
+      let source ← IO.ofExcept <| json.getObjValAs? String "source"
+      if source != "-" && !source.startsWith "https://" then
+        addTrace (← computeTrace (System.FilePath.mk source))
+      addLeanTrace
+      let cache := pkg.buildDir / "vir/resources/runtime" / s!"{contentId}.virres"
+      let stage := pkg.dir / ".vir-generated/VirResourceRuntime.virres"
+      proc { cmd := tool.toString, args := #["acquire", contentId, source,
+        cache.toString, stage.toString] }
+      -- The lock selects concrete bytes; the profile independently checks their ABI.
+      discard <| captureProc {
+        cmd := validator.toString
+        args := #["stage", profile.toString, cache.toString, stage.toString] }
+      addTrace (← computeTrace stage)
+      return stage
+
+/-- Optional carrier: no other VIR library or native tool imports it. -/
+lean_lib VirResourceRuntime where
+  roots := #[]
+  globs := #[.one `Vir.Resources.Runtime]
+  needs := #[virRuntimePack]
+
+private def sameResourceLibrary (a b : LeanLib) : Bool :=
+  a.name == b.name && a.pkg.keyName == b.pkg.keyName
+
+private def resourceLibraryStem (lib : LeanLib) : Except String String := do
+  let stem := lib.name.toString
+  unless !stem.isEmpty && stem.toList.all (fun c =>
+      c.isAlphanum && c.toNat < 128 || c == '_') do
+    throw "virResourcePack requires an ASCII alphanumeric/underscore library name"
+  return stem
+
+/-- Resolve only independent program inputs; never fetch the carrier's modules
+or extra dependencies while producing the prerequisite for that carrier. -/
+library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
+  let stem ← IO.ofExcept (resourceLibraryStem lib)
+  let recipe ← inputTextFile (lib.pkg.dir / "vir-resources" / s!"{stem}.json")
+  let profile ← virResourceCompatibility.fetch
+  let tool ← vir_resource_program.fetch
+  tool.bindM fun tool => profile.bindM fun profile => recipe.bindM fun recipe => do
+    let planText ← captureProc {
+      cmd := tool.toString
+      args := #["plan", recipe.toString, profile.toString, lib.pkg.dir.toString] }
+    let plan ← IO.ofExcept (Lean.Json.parse planText)
+    let moduleName ← IO.ofExcept <| plan.getObjValAs? String "module"
+    let supportPaths ← IO.ofExcept <| plan.getObjValAs? (Array String) "supportFiles"
+    let some mod ← findModule? moduleName.toName
+      | error s!"VIR resource program module `{moduleName}` is not Lake-registered"
+    if sameResourceLibrary mod.lib lib then
+      error s!"VIR resource cycle: program `{moduleName}` belongs to its carrier library `{lib.name}`"
+    let imports ← mod.transImports.fetch
+    imports.bindM fun imports => do
+      for imported in imports do
+        if sameResourceLibrary imported.lib lib then
+          error s!"VIR resource cycle: `{moduleName}` imports carrier module `{imported.name}` in `{lib.name}`"
+      -- Source-only transImports was checked before requesting compilation, so
+      -- the common carrier/program cycle produces a diagnostic, not a job wait.
+      let modules := imports.push mod
+      let artifacts ← modules.mapM fun input => do
+        (← input.exportInfo.fetch).mapM fun info => do
+          addTrace info.allArtsTrace
+          return (input.name, info.allArts)
+      let artifacts := Job.collectArray artifacts "VIR resource compiled inputs"
+      let support ← supportPaths.mapM fun path => inputBinFile (lib.pkg.dir / System.FilePath.mk path)
+      let support := Job.collectArray support "VIR resource support files"
+      artifacts.bindM fun artifacts => support.mapM fun _ => do
+        let arts := artifacts.foldl (init := ({} : Lean.NameMap Lean.ImportArtifacts))
+          fun map (name, paths) => map.insert name paths
+        let some rootArts := arts.find? mod.name
+          | error "missing VIR root artifacts"
+        unless rootArts.ir?.isSome do
+          error s!"VIR resource program `{moduleName}` requires a module header and compiled IR"
+        addLeanTrace
+        addPureTrace "virResourcePack/v1" "VIR resource producer contract"
+        -- Path maps can change on cache relocation without changing content.
+        let setup : Lean.ModuleSetup := { name := mod.name, importArts := arts }
+        let setupText := (Lean.toJson setup).compress
+        addPureTrace setupText "VIR resolved input locations"
+        let output := lib.pkg.buildDir / "vir/resources/programs" / s!"{stem}.virres"
+        let setupPath := output.addExtension "setup.json"
+        let inputTrace ← getTrace
+        let artifact ← buildArtifactUnlessUpToDate output (ext := "virres") do
+          createParentDirs output
+          IO.FS.writeFile setupPath setupText
+          proc {
+            cmd := tool.toString
+            args := #["build", recipe.toString, profile.toString, setupPath.toString,
+              lib.pkg.dir.toString, output.toString], env := ← getAugmentedEnv }
+        let stage := lib.pkg.dir / ".vir-generated" / s!"{stem}.virres"
+        -- Always repair/verify staging, even when Lake returns a cached artifact
+        -- somewhere other than output. No restoration of conventional IR paths.
+        discard <| captureProc {
+          cmd := tool.toString
+          args := #["stage", profile.toString, artifact.path.toString, stage.toString] }
+        addTrace inputTrace
+        addTrace (← computeTrace stage)
+        return artifact.path
