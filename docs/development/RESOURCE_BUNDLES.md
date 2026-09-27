@@ -144,6 +144,9 @@ recording the exact compiler/runtime pair.
 
 ## Client libraries and automatic preparation
 
+For the short authoring path, start with the
+[client-library guide](../guides/EMBEDDED_RESOURCES.md).
+
 `import Vir.Resources.Runtime` exposes `Vir.Resources.Runtime.bundle`. Its
 optional `VirResourceRuntime` library fetches and validates the selected runtime
 before elaboration. Core types, the native producer and browser program modules
@@ -179,7 +182,7 @@ The owning package supplies `vir-resources/ClientResources.json`:
 {
   "schemaVersion": 1,
   "logicalId": "client-fixture/greeting",
-  "modules": ["Client.Program"],
+  "module": "Client.Program",
   "exports": [{
     "role": "greet",
     "declaration": "Client.Program.greet",
@@ -192,7 +195,8 @@ The owning package supplies `vir-resources/ClientResources.json`:
 The program uses `module`, `meta import Vir.Attributes`, and public declarations
 marked `@[vir_export]`. Each requested export must exist in the generated root
 package. V1 accepts one registered composition root; import contributions there
-and expose the intended public wrappers. Multiple roots are rejected explicitly.
+and expose the intended public wrappers. The recipe has one `module` field;
+the obsolete experimental `modules` array is rejected, even with one element.
 Export roles must be unique; distinct roles may name the same declaration.
 Optional support entries contain `source`, `path`, and `mediaType`: sources are
 portable paths relative to the owning package, destinations relative to the
@@ -213,6 +217,16 @@ and full compiled artifact groups, including private implementation traces.
 Setup maps remain producer-local. No Node, nested Lake or npm is used in this
 application preparation path. Every build validates/repairs staging from the
 actual returned artifact, including cache hits, while retaining semantic traces.
+Before Lake touches the program output, setup, trace or hash file, the facet
+rejects symlink ancestors and nonregular leaves. Native checks alone would be too
+late: Lake can remove outputs or write trace/hash files before invoking the tool.
+These checks assume trusted single-writer directories, not hostile concurrent
+replacement. Setup replacement also preserves existing hardlink aliases.
+
+Runtime planning and staging use the lightweight `vir_resource_pack` tool.
+They share bounded native file/JSON operations with program production, but do
+not depend on the generator or acquire program inputs. Neither runtime selection
+nor compatible JavaScript-only runtime changes are program recipe inputs.
 
 Native rendering consumes compiled bytes only; moving the executable or removing
 raw program packs does not turn rendering into acquisition. The complete test
@@ -328,4 +342,4 @@ of larger hardlinked outputs without altering their other names.
 Anonymous cold acquisition needs a durable prebuilt distribution; a local archive
 is not evidence for that requirement. The full T01–T30 campaign and resource
 size/compile-memory/browser measurements remain outstanding. The actual Slides
-pixel-measured formatter is untouched; the proposed canary uses columns only.
+pixel-measured formatter is untouched; the accepted local canary uses columns only.

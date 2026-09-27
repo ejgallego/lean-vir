@@ -20,9 +20,10 @@ import {
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Run after `lake build vir_resource_program +tests.resources.BrowserProgram:vir`.
+// Run after building both native resource tools and the BrowserProgram :vir fixture.
 const repo = resolve(fileURLToPath(new URL("../../", import.meta.url)));
 const tool = join(repo, ".lake/build/bin/vir_resource_program");
+const packTool = join(repo, ".lake/build/bin/vir_resource_pack");
 const setup = join(
   repo,
   ".lake/build/vir/module-sets/tests/resources/BrowserProgram.setup.json",
@@ -38,7 +39,7 @@ const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const recipe = {
   schemaVersion: 1,
   logicalId: "resource-program-test/pretty",
-  modules: ["tests.resources.BrowserProgram"],
+  module: "tests.resources.BrowserProgram",
   exports: [
     {
       role: "prettyM",
@@ -63,7 +64,8 @@ const runtimeLock = {
 const writeRuntimeLock = (value) =>
   writeFileSync(runtimeLockPath, JSON.stringify(value));
 function run(label, args, error) {
-  const result = spawnSync("lake", ["env", tool, ...args], {
+  const command = ["runtime-plan", "stage"].includes(args[0]) ? packTool : tool;
+  const result = spawnSync("lake", ["env", command, ...args], {
     cwd: repo,
     encoding: "utf8",
     timeout: 180000,
@@ -184,11 +186,26 @@ writeRecipe({
   ...recipe,
   modules: ["tests.resources.BrowserProgram", "fixtures.Basic"],
 });
+run("multiple-roots", ["plan", recipePath, compat, repo], /INVALID_RECIPE/);
+writeRecipe({ ...recipe, module: undefined, modules: [recipe.module] });
 run(
-  "multiple-roots",
+  "obsolete-singleton",
   ["plan", recipePath, compat, repo],
-  /COMPOSITION_MODULE_REQUIRED/,
+  /obsolete `modules`/,
 );
+for (const [index, module] of [
+  "",
+  "Bad..Name",
+  ["tests.resources.BrowserProgram"],
+  "A".repeat(4097),
+].entries()) {
+  writeRecipe({ ...recipe, module });
+  run(
+    `invalid-module-${index}`,
+    ["plan", recipePath, compat, repo],
+    /INVALID_RECIPE/,
+  );
+}
 writeRecipe({
   ...recipe,
   supportFiles: [{ ...recipe.supportFiles[0], source: "../outside" }],

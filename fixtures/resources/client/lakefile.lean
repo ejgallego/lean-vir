@@ -10,7 +10,7 @@ package client_fixture where
 lean_lib ClientProgram where
   srcDir := "program"
   roots := #[]
-  globs := #[.one `Client.Program]
+  globs := #[.one `Client.Program, .one `Client.Helper]
 
 lean_lib ClientResources where
   srcDir := "resources"

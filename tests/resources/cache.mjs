@@ -16,6 +16,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { checkFacetOutputSafety } from "./output-safety.mjs";
 import {
   encodeDescriptor,
   descriptorContentId,
@@ -161,24 +162,39 @@ const env = {
   LAKE_ARTIFACT_CACHE: "true",
   LAKE_RESTORE_ARTIFACTS: "false",
 };
-function build(label) {
-  const result = spawnSync(
-    "lake",
-    ["-v", "exe", "generate-site", join(evidence, "site")],
-    {
-      cwd: leaf,
-      env,
-      encoding: "utf8",
-      timeout: 600000,
-      maxBuffer: 32 * 1024 * 1024,
-    },
-  );
+function runLake(label, cwd, args, buildEnv = env) {
+  const result = spawnSync("lake", ["-v", ...args], {
+    cwd,
+    env: buildEnv,
+    encoding: "utf8",
+    timeout: 600000,
+    maxBuffer: 32 * 1024 * 1024,
+  });
   const log = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   writeFileSync(join(evidence, `${label}.log`), log);
   assert.ifError(result.error);
   assert.equal(result.status, 0, `${label}: ${log.slice(-18000)}`);
   return log;
 }
+const build = (label, buildEnv = env) =>
+  runLake(
+    label,
+    leaf,
+    ["exe", "generate-site", join(evidence, "site")],
+    buildEnv,
+  );
+const runtimeOnly = runLake("runtime-only", producer, [
+  "build",
+  "VirResourceRuntime",
+]);
+assert.doesNotMatch(
+  runtimeOnly,
+  /Built.*(?:GeneratePackage|ResourceProgram|vir_resource_program)/,
+);
+assert.equal(
+  existsSync(join(producer, ".lake/build/bin/vir_resource_program")),
+  false,
+);
 const stages = [
   join(producer, ".vir-generated/VirResourceRuntime.virres"),
   ...["ClientResources", "OtherResources"].map((n) =>
@@ -196,6 +212,139 @@ const warm = build("warm-shared");
 assert.deepEqual(stages.map(signature), signatures);
 assert.doesNotMatch(warm, /Built.*(?:Client|Main|Runtime)/);
 assert.equal(readdirSync(join(evidence, "site")).length, 3);
+checkFacetOutputSafety({ client, env, evidence });
+
+// Full implementation traces must invalidate the new facet even when public
+// interfaces and conventional artifact locations are unchanged.
+const helper = join(client, "program/Client/Helper.lean");
+const helperSource = readFileSync(helper, "utf8");
+// The same campaign tests conventional paths as well as the cache-only phase
+// below. Here, changed content-addressed paths must NOT mask lost input traces.
+const conventionalEnv = { ...env, LAKE_ARTIFACT_CACHE: "false" };
+build("conventional-inputs", conventionalEnv);
+const setupPath = join(
+  client,
+  "build with spaces/vir/resources/programs/ClientResources.virres.setup.json",
+);
+const setupBefore = readFileSync(setupPath);
+const beforeSetup = JSON.parse(setupBefore);
+for (const name of ["Client.Helper", "Client.Program"])
+  for (const path of beforeSetup.importArts[name].flat())
+    assert.ok(path.startsWith(join(client, "build with spaces") + "/"), path);
+const publicPaths = ["Helper", "Program"].map((name) =>
+  join(client, "build with spaces/lib/lean/Client", `${name}.olean`),
+);
+const publicBytes = publicPaths.map((path) => readFileSync(path));
+writeFileSync(helper, helperSource.replace('"Hello, "', '"Welcome, "'));
+build("private-transitive-edit", conventionalEnv);
+assert.deepEqual(
+  readFileSync(setupPath),
+  setupBefore,
+  "identical paths must still invalidate packaging",
+);
+assert.deepEqual(
+  publicPaths.map((path) => readFileSync(path)),
+  publicBytes,
+);
+assert.notDeepEqual(readFileSync(stages[1]), packs[1]);
+assert.notDeepEqual(readFileSync(stages[2]), packs[2]);
+assert.deepEqual(signature(stages[0]), signatures[0]);
+writeFileSync(helper, helperSource);
+build("private-transitive-restored", conventionalEnv);
+assert.deepEqual(
+  stages.map((path) => readFileSync(path)),
+  packs,
+);
+
+// Exercise every support-file input independently, without recompiling program IR.
+const recipePath = join(client, "vir-resources/ClientResources.json");
+const supportSource = join(client, "support.txt");
+const support = {
+  source: "support.txt",
+  path: "data/message.txt",
+  mediaType: "text/plain",
+};
+writeFileSync(supportSource, "first\n");
+let previous = packs[1];
+for (const [label, entry, contents] of [
+  ["support-added", support, "first\n"],
+  ["support-bytes", support, "second\n"],
+  ["support-path", { ...support, path: "data/renamed.txt" }, "second\n"],
+  ["support-type", { ...support, mediaType: "text/markdown" }, "second\n"],
+]) {
+  writeFileSync(supportSource, contents);
+  writeFileSync(
+    recipePath,
+    JSON.stringify({ ...recipe, supportFiles: [entry] }),
+  );
+  const log = build(label);
+  const current = readFileSync(stages[1]);
+  assert.notDeepEqual(current, previous);
+  previous = current;
+  assert.deepEqual(readFileSync(stages[2]), packs[2]);
+  assert.deepEqual(signature(stages[0]), signatures[0]);
+  assert.doesNotMatch(log, /Built.*Client\.(?:Program|Helper)(?:\s|:)/);
+}
+writeFileSync(recipePath, JSON.stringify(recipe));
+build("support-removed");
+assert.deepEqual(
+  stages.map((path) => readFileSync(path)),
+  packs,
+);
+
+// Selecting compatible JS-only runtime bytes must not rebuild either program.
+// This also works with the real selected pack; a comment leaves JS semantics intact.
+const length = runtimeBytes.readUInt32LE(8);
+const descriptor = JSON.parse(runtimeBytes.subarray(12, 12 + length));
+const runtimeModule = descriptor.fileEntries.find(
+  (entry) => entry.role === "runtimeModule",
+).path;
+let offset = 12 + length;
+const payloads = descriptor.files.map((file) => {
+  let bytes = runtimeBytes.subarray(offset, offset + file.byteLength);
+  offset += file.byteLength;
+  if (file.path === runtimeModule) {
+    bytes = Buffer.concat([
+      bytes,
+      Buffer.from("\n// compatible JS-only invalidation fixture\n"),
+    ]);
+    file.byteLength = bytes.length;
+    file.sha256 = createHash("sha256").update(bytes).digest("hex");
+  }
+  return bytes;
+});
+const encoded = Buffer.from(encodeDescriptor(descriptor));
+const encodedLength = Buffer.alloc(4);
+encodedLength.writeUInt32LE(encoded.length);
+const changedRuntime = Buffer.concat([
+  runtimeBytes.subarray(0, 8),
+  encodedLength,
+  encoded,
+  ...payloads,
+]);
+const changedId = await descriptorContentId(descriptor);
+const runtimeDir = join(producer, ".lake/build/vir/resources/runtime");
+writeFileSync(join(runtimeDir, `${changedId}.virres`), changedRuntime);
+writeFileSync(
+  join(producer, "vir-resources/runtime.json"),
+  JSON.stringify({ ...lock, contentId: changedId }),
+);
+const programSignatures = stages.slice(1).map(signature);
+const runtimeEdit = build("runtime-js-only");
+assert.deepEqual(readFileSync(stages[0]), changedRuntime);
+assert.deepEqual(stages.slice(1).map(signature), programSignatures);
+assert.doesNotMatch(runtimeEdit, /Built.*:virResourcePack/);
+writeFileSync(
+  join(producer, "vir-resources/runtime.json"),
+  JSON.stringify(lock),
+);
+build("runtime-restored");
+assert.deepEqual(
+  stages.map((path) => readFileSync(path)),
+  packs,
+);
+// Subsequent cache-only checks compare against the restored runtime's identity.
+signatures[0] = signature(stages[0]);
 
 // Drop only this campaign's conventional build outputs; no global cache edits.
 for (const [name, path] of [
@@ -236,9 +385,8 @@ assert.deepEqual(
 const facetDir = join(client, "build with spaces/vir/resources/programs");
 if (existsSync(facetDir))
   renameSync(facetDir, join(evidence, "retained-facet-traces"));
-// Change only the role metadata: compilation stays cached, but both packaging
-// entry points must still consume the complete returned private/IR artifacts.
-const recipePath = join(client, "vir-resources/ClientResources.json");
+// Change only the recipe identity: compilation stays cached, but packaging
+// must still consume the complete returned private/IR artifacts.
 writeFileSync(
   recipePath,
   JSON.stringify({ ...recipe, logicalId: "client-fixture/renamed" }),

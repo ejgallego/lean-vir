@@ -39,7 +39,8 @@ lean_lib Vir where
 lean_lib VirResourceCore where
   roots := #[]
   globs := #[.one `Vir.Resources, .one `Vir.Resources.Types, .one `Vir.Resources.Bytes,
-    .one `Vir.Resources.Sha256, .one `Vir.Resources.Validate, .one `Vir.Resources.Pack]
+    .one `Vir.Resources.Sha256, .one `Vir.Resources.Validate, .one `Vir.Resources.Pack,
+    .one `Vir.Resources.Build]
 
 lean_lib VirResourceEmbed where
   roots := #[]
@@ -387,13 +388,11 @@ input_file virResourceRuntimeLock where
 
 target virRuntimePack (pkg) : System.FilePath := do
   let tool ← vir_resource_pack.fetch
-  let validator ← vir_resource_program.fetch
   let profile ← virResourceCompatibility.fetch
   let lock ← virResourceRuntimeLock.fetch
-  tool.bindM fun tool => validator.bindM fun validator =>
-    profile.bindM fun profile => lock.mapM fun lock => do
+  tool.bindM fun tool => profile.bindM fun profile => lock.mapM fun lock => do
       let plan ← captureProc {
-        cmd := validator.toString
+        cmd := tool.toString
         args := #["runtime-plan", profile.toString, lock.toString, pkg.dir.toString] }
       let json ← IO.ofExcept (Lean.Json.parse plan)
       let contentId ← IO.ofExcept <| json.getObjValAs? String "contentId"
@@ -407,7 +406,7 @@ target virRuntimePack (pkg) : System.FilePath := do
         cache.toString, stage.toString] }
       -- The lock selects concrete bytes; the profile independently checks their ABI.
       discard <| captureProc {
-        cmd := validator.toString
+        cmd := tool.toString
         args := #["stage", profile.toString, cache.toString, stage.toString] }
       addTrace (← computeTrace stage)
       return stage
@@ -428,6 +427,29 @@ private def resourceLibraryStem (lib : LeanLib) : Except String String := do
     throw "virResourcePack requires an ASCII alphanumeric/underscore library name"
   return stem
 
+/- Keep this small preflight in the Lake configuration: importing the unbuilt
+native tool here would create a bootstrap dependency. Lake may remove the output
+or write its trace/hash *before* invoking the tool, including on cache hits.
+This rejects accidental aliases, not concurrent hostile directory replacement. -/
+private def resourceMetadata? (path : System.FilePath) : IO (Option IO.FS.Metadata) := do
+  try return some (← path.symlinkMetadata)
+  catch e => match e with
+    | .noFileOrDirectory .. => return none
+    | _ => throw e
+
+private partial def checkResourceDirectory (path : System.FilePath) : IO Unit := do
+  if let some parent := path.parent then
+    if parent != path then checkResourceDirectory parent
+  if let some metadata ← resourceMetadata? path then
+    unless metadata.type == .dir do
+      throw <| IO.userError s!"UNSAFE_RESOURCE_DIRECTORY: {path}"
+
+private def checkResourceOutput (path : System.FilePath) : IO Unit := do
+  checkResourceDirectory (path.parent.getD ".")
+  if let some metadata ← resourceMetadata? path then
+    unless metadata.type == .file do
+      throw <| IO.userError s!"UNSAFE_RESOURCE_FILE: {path}"
+
 /-- Resolve only independent program inputs; never fetch the carrier's modules
 or extra dependencies while producing the prerequisite for that carrier. -/
 library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
@@ -435,7 +457,9 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
   let recipe ← inputTextFile (lib.pkg.dir / "vir-resources" / s!"{stem}.json")
   let profile ← virResourceCompatibility.fetch
   let tool ← vir_resource_program.fetch
-  tool.bindM fun tool => profile.bindM fun profile => recipe.bindM fun recipe => do
+  let packTool ← vir_resource_pack.fetch
+  tool.bindM fun tool => packTool.bindM fun packTool => profile.bindM fun profile =>
+  recipe.bindM fun recipe => do
     let planText ← captureProc {
       cmd := tool.toString
       args := #["plan", recipe.toString, profile.toString, lib.pkg.dir.toString] }
@@ -476,9 +500,13 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
         addPureTrace setupText "VIR resolved input locations"
         let output := lib.pkg.buildDir / "vir/resources/programs" / s!"{stem}.virres"
         let setupPath := output.addExtension "setup.json"
+        for path in #[output, setupPath, output.addExtension "trace", output.addExtension "hash"] do
+          checkResourceOutput path
         let inputTrace ← getTrace
         let artifact ← buildArtifactUnlessUpToDate output (ext := "virres") do
           createParentDirs output
+          -- Setup files are private transport, never mutate another hardlink name.
+          removeFileIfExists setupPath
           IO.FS.writeFile setupPath setupText
           proc {
             cmd := tool.toString
@@ -488,7 +516,7 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
         -- Always repair/verify staging, even when Lake returns a cached artifact
         -- somewhere other than output. No restoration of conventional IR paths.
         discard <| captureProc {
-          cmd := tool.toString
+          cmd := packTool.toString
           args := #["stage", profile.toString, artifact.path.toString, stage.toString] }
         addTrace inputTrace
         addTrace (← computeTrace stage)

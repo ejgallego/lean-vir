@@ -93,7 +93,7 @@ assert.deepEqual(readFileSync(programStage), programFirst);
 
 const programSource = join(client, "program/Client/Program.lean");
 const initialSource = readFileSync(programSource, "utf8");
-writeFileSync(programSource, initialSource.replace('"Hello, "', '"Welcome, "'));
+writeFileSync(programSource, initialSource.replace(' ++ name', ' ++ name ++ "!"'));
 build("program-edit");
 assert.notDeepEqual(readFileSync(programStage), programFirst);
 assert.deepEqual(snapshot(runtimeStage), first[1]);
