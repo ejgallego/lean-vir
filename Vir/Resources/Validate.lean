@@ -74,7 +74,8 @@ private def deviceComponent (s : String) : Bool :=
 
 /-- No normalization: unsafe spellings are rejected, not reinterpreted. -/
 def validPath (path : String) : Bool :=
-  path.utf8ByteSize ≤ maxMetadataBytes && path.toLower != "bundle.json" &&
+  path.utf8ByteSize ≤ maxMetadataBytes &&
+  (path.toLower.splitOn "/").head! != "bundle.json" &&
   (path.splitOn "/").all fun part =>
     !part.isEmpty && part != "." && part != ".." && !part.endsWith "." &&
     part.toList.all pathChar && !deviceComponent part

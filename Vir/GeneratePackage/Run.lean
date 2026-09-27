@@ -192,7 +192,7 @@ private structure PendingPackageSetMember where
   relativePath : String
   outputPath : System.FilePath
   byteLength : Nat
-  nativeHash : String := ""
+  nativeHash? : Option String := none
 
 unsafe def runModuleSet
     (targets : Array Target)
@@ -272,7 +272,7 @@ unsafe def runModuleSet
           relativePath := (System.FilePath.mk shardRelativeDir / fileName).toString
           outputPath
           byteLength := bytes.size
-          nativeHash := hashBytes?.map (· bytes) |>.getD ""
+          nativeHash? := hashBytes?.map (· bytes)
         }
 
   let rootClosure := closure.forModule rootModule rootModule
@@ -295,10 +295,13 @@ unsafe def runModuleSet
         relativePath := rootRelativePath
         outputPath := packagePath
         byteLength := bytes.size
-        nativeHash := hashBytes?.map (· bytes) |>.getD ""
+        nativeHash? := hashBytes?.map (· bytes)
       }
       let hashes ← match hashBytes? with
-        | some _ => pure (pendingMembers.map (·.nativeHash))
+        | some _ => pendingMembers.mapM fun member =>
+          match member.nativeHash? with
+          | some digest => pure digest
+          | none => throw <| IO.userError s!"missing native digest for {member.moduleName}"
         | none => Vir.sha256Files (pendingMembers.map (fun member => member.outputPath))
       let members := pendingMembers.zip hashes |>.map fun (member, sha256) =>
         packageSetMemberJson member.moduleName.toString member.relativePath member.role

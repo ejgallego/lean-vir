@@ -127,6 +127,20 @@ assert.equal(after.ino, before.ino);
 assert.equal(after.mtimeNs, before.mtimeNs);
 
 const altered = (value) => writeDescriptor(Buffer.from(canonical(value)));
+for (const path of ["bundle.json/child", "BUNDLE.JSON/child/nested"]) {
+  altered({
+    ...descriptor,
+    files: [{ ...descriptor.files[0], path }, descriptor.files[1]],
+  });
+  invoke(
+    "reserved-envelope-prefix",
+    descriptorPath,
+    payloadRoot,
+    output,
+    /INVALID_PATH/,
+  );
+  assert.deepEqual(readFileSync(output), pack);
+}
 altered({
   ...descriptor,
   files: descriptor.files.map((f, i) =>

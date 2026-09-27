@@ -42,15 +42,17 @@ private def pack (descriptorPath root destination : FilePath) : IO Unit := do
     | .error e => fail e.code (reprStr e)
   Build.atomicInstall destination bytes
 
-private def acquire (expected source : String) (cache stage : FilePath) (offline : Bool) : IO Unit := do
+private def acquire (compatibilityPath : FilePath) (expected source : String)
+    (cache stage : FilePath) (offline : Bool) : IO Unit := do
+  let profile ← Build.compatibility compatibilityPath
   unless expected.length == 64 && expected.toList.all ("0123456789abcdef".contains ·) do
     fail "INVALID_CONTENT_ID" expected
   -- Check both destinations before doing any acquisition or committing a cache.
   Build.checkFile cache
   Build.checkFile stage
-  let bytes ← match ← Build.candidate expected cache with
+  let bytes ← match ← Build.candidate expected profile cache with
     | some bytes => pure bytes
-    | none => match ← Build.candidate expected stage with
+    | none => match ← Build.candidate expected profile stage with
       | some bytes => pure bytes
       | none =>
         if source == "-" || (offline && source.startsWith "https://") then
@@ -73,7 +75,7 @@ private def acquire (expected source : String) (cache stage : FilePath) (offline
           if (source.splitOn "://").length > 1 then
             fail "UNSUPPORTED_RESOURCE_TRANSPORT" source
           Build.readInput source Build.packLimit "PACK_LIMIT"
-        Build.verify expected bytes
+        Build.verify expected profile bytes
         pure bytes
   Build.atomicInstall cache bytes
   Build.atomicInstall stage bytes
@@ -87,7 +89,7 @@ private def stage (compatibilityPath packPath outputPath : FilePath) : IO Unit :
 
 def usage : String :=
   "usage: vir_resource_pack pack DESCRIPTOR ROOT OUT\n" ++
-  "       vir_resource_pack acquire CONTENT_ID SOURCE CACHE STAGE [--offline]\n" ++
+  "       vir_resource_pack acquire COMPAT CONTENT_ID SOURCE CACHE STAGE [--offline]\n" ++
   "       vir_resource_pack runtime-plan COMPAT LOCK OWNERROOT\n" ++
   "       vir_resource_pack stage COMPAT PACK OUT\n" ++
   "SOURCE is a local pack, anonymous HTTPS URL, or '-' (available bytes only).\n" ++
@@ -99,10 +101,10 @@ def main (args : List String) : IO Unit := do
   match args with
   | ["pack", descriptor, root, out] =>
     Vir.ResourcePack.pack descriptor root out
-  | ["acquire", expected, source, cache, stage] =>
-    Vir.ResourcePack.acquire expected source cache stage false
-  | ["acquire", expected, source, cache, stage, "--offline"] =>
-    Vir.ResourcePack.acquire expected source cache stage true
+  | ["acquire", compatibility, expected, source, cache, stage] =>
+    Vir.ResourcePack.acquire compatibility expected source cache stage false
+  | ["acquire", compatibility, expected, source, cache, stage, "--offline"] =>
+    Vir.ResourcePack.acquire compatibility expected source cache stage true
   | ["runtime-plan", compatibility, lock, root] =>
     Vir.ResourcePack.runtimePlan compatibility lock root
   | ["stage", compatibility, pack, out] =>

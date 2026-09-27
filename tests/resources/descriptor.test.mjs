@@ -136,6 +136,32 @@ test("envelope validates its canonical content identity", async () => {
   );
 });
 
+test("reserves the envelope's complete root namespace, not nested filenames", () => {
+  for (const path of [
+    "bundle.json",
+    "BUNDLE.JSON",
+    "bundle.json/child",
+    "BUNDLE.JSON/child/nested",
+  ]) {
+    const descriptor = runtime();
+    descriptor.files.push({
+      path,
+      mediaType: "text/plain",
+      byteLength: 0,
+      sha256: emptySha256,
+    });
+    assert.throws(() => validateDescriptor(descriptor), /INVALID_PATH/);
+  }
+  const descriptor = runtime();
+  descriptor.files.push({
+    path: "assets/bundle.json",
+    mediaType: "application/json",
+    byteLength: 0,
+    sha256: emptySha256,
+  });
+  assert.doesNotThrow(() => validateDescriptor(descriptor));
+});
+
 test("rejects representative v1 schema, metadata, path, and role failures", () => {
   const cases = [
     [runtime({ extra: true }), "INVALID_DESCRIPTOR"],

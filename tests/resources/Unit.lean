@@ -69,7 +69,7 @@ private def withDescriptor (bundle : Bundle) (descriptor : Descriptor) : Bundle 
 -- Native acquisition must instead check the actual pinned compiler identity.
 private def nativeRuntime : Bundle :=
   withDescriptor runtime { runtime.descriptor with
-    compatibility := { compatibility with leanBuildId := Lean.githash } }
+    compatibility := { compatibility with leanBuildId := Lean.githash, runtimeAbi := "2" } }
 
 private def rawPack (descriptor : String) (payload : ByteArray := ByteArray.empty) : ByteArray := Id.run do
   let mut out : ByteArray := ⟨#[86, 73, 82, 82, 69, 83, 0, 1]⟩
@@ -124,9 +124,10 @@ private def unitTests : IO Unit := do
   failure "DUPLICATE_PATH" { r with files := r.files.push ⟨"RUNTIME.JS", ByteArray.empty⟩ }.validate
   failure "PATH_PREFIX_CONFLICT" { r with files := r.files.push ⟨"runtime.js/child", ByteArray.empty⟩ }.validate
   for bad in #["", ".", "..", "/a", "a/", "a//b", "a/../b", "a\\b", "C:/a", "https://x", "a\x00b",
-      "CON", "aux.txt", "LPT1", "com9.bin", "a/PRN.txt", "bundle.json", "BUNDLE.JSON", "a.", "é"] do
+      "CON", "aux.txt", "LPT1", "com9.bin", "a/PRN.txt", "bundle.json", "BUNDLE.JSON",
+      "bundle.json/child", "BUNDLE.JSON/child/nested", "a.", "é"] do
     check s!"unsafe path {repr bad}" (!validPath bad)
-  for good in #["a", "a/b.c", "LICENSE", "a-_.B", "com10", "normal.name"] do
+  for good in #["a", "a/b.c", "LICENSE", "a-_.B", "com10", "normal.name", "assets/bundle.json"] do
     check s!"safe path {good}" (validPath good)
   let set : ResourceSet := ⟨r, #[program, program]⟩
   let bundles ← success "set normalization" set.bundles

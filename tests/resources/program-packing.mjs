@@ -176,6 +176,14 @@ run("stage-warm", ["stage", compat, packPath, stagedPath]);
 assert.equal(statSync(stagedPath, { bigint: true }).ino, stageBefore.ino);
 
 // A prior good pack survives all validation failures.
+for (const path of ["bundle.json/child", "BUNDLE.JSON/child/nested"]) {
+  writeRecipe({
+    ...recipe,
+    supportFiles: [{ ...recipe.supportFiles[0], path }],
+  });
+  build("reserved-envelope-prefix", /INVALID_RECIPE/);
+  assert.deepEqual(readFileSync(packPath), first);
+}
 writeRecipe({
   ...recipe,
   exports: [{ ...recipe.exports[0], declaration: "Missing.export" }],

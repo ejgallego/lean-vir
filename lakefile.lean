@@ -402,12 +402,9 @@ target virRuntimePack (pkg) : System.FilePath := do
       addLeanTrace
       let cache := pkg.buildDir / "vir/resources/runtime" / s!"{contentId}.virres"
       let stage := pkg.dir / ".vir-generated/VirResourceRuntime.virres"
-      proc { cmd := tool.toString, args := #["acquire", contentId, source,
+      -- Check the full profile before installation, in the same acquisition pass.
+      proc { cmd := tool.toString, args := #["acquire", profile.toString, contentId, source,
         cache.toString, stage.toString] }
-      -- The lock selects concrete bytes; the profile independently checks their ABI.
-      discard <| captureProc {
-        cmd := tool.toString
-        args := #["stage", profile.toString, cache.toString, stage.toString] }
       addTrace (← computeTrace stage)
       return stage
 

@@ -60,6 +60,9 @@ from expanding a short exponent token into an enormous integer. Quoted metadata
 is unaffected. Version fields are positive
 JavaScript-safe integers. Runtime packages must still contain their full JS/data/
 notice closure; these bounds do not permit missing dependencies.
+The root envelope namespace `bundle.json` is reserved case-insensitively, both
+as a payload filename and as a directory prefix. Nested payload names such as
+`assets/bundle.json` do not conflict with the root envelope.
 
 ## Embedding
 
@@ -98,13 +101,13 @@ raw invocations that skip its library prerequisites are not promised.
 application authors should run. Its internal operations are:
 
 ```text
-vir_resource_pack acquire CONTENT_ID SOURCE CACHE STAGE [--offline]
+vir_resource_pack acquire COMPAT CONTENT_ID SOURCE CACHE STAGE [--offline]
 vir_resource_pack pack DESCRIPTOR ROOT OUT
 ```
 
 The producer supplies a pinned bundle identity. `SOURCE` is a local complete pack,
 an anonymous HTTPS URL, or `-` for already-available bytes only. Cache and staging
-are checked against that identity and the native tool's exact Lean build identity;
+are checked against that identity and the complete compatibility profile before installation;
 a transport override cannot change either. The content identity also binds all
 ABI compatibility fields. Source-distributed packs need no external host tool;
 HTTPS uses `curl`, with user curl configuration disabled, HTTPS-only redirects,

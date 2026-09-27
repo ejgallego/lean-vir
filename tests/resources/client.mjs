@@ -65,7 +65,14 @@ run(
   root,
   "seed-maintainer-runtime",
   join(root, ".lake/build/bin/vir_resource_pack"),
-  ["acquire", lock.contentId, resolve(source), runtimeCache, runtimeStage],
+  [
+    "acquire",
+    join(root, "vir-resources/compatibility.json"),
+    lock.contentId,
+    resolve(source),
+    runtimeCache,
+    runtimeStage,
+  ],
 );
 const build = (label) =>
   run(leaf, label, "lake", ["exe", "generate-site", join(evidence, "site")]);
@@ -93,7 +100,10 @@ assert.deepEqual(readFileSync(programStage), programFirst);
 
 const programSource = join(client, "program/Client/Program.lean");
 const initialSource = readFileSync(programSource, "utf8");
-writeFileSync(programSource, initialSource.replace(' ++ name', ' ++ name ++ "!"'));
+writeFileSync(
+  programSource,
+  initialSource.replace(" ++ name", ' ++ name ++ "!"'),
+);
 build("program-edit");
 assert.notDeepEqual(readFileSync(programStage), programFirst);
 assert.deepEqual(snapshot(runtimeStage), first[1]);
