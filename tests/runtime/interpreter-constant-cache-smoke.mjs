@@ -163,19 +163,23 @@ try {
 
   assertCallbackCache("fresh package generation");
 
-  const replacementFirst = runtime.callTimed(
+  const nextGenerationFirst = runtime.callTimed(
     "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
   );
-  const replacementSecond = runtime.callTimed(
+  const nextGenerationSecond = runtime.callTimed(
     "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
   );
-  assertWarmCache(replacementFirst, replacementSecond, "replacement package");
+  assertWarmCache(
+    nextGenerationFirst,
+    nextGenerationSecond,
+    "fresh package generation",
+  );
 
   console.log(
     "interpreter constant cache smoke ok: callback identity/release/generation; " +
       `initial=${first.timings.executeMs.toFixed(3)}/${second.timings.executeMs.toFixed(3)}ms ` +
-      `replacement=${replacementFirst.timings.executeMs.toFixed(3)}/` +
-      `${replacementSecond.timings.executeMs.toFixed(3)}ms`,
+      `nextGeneration=${nextGenerationFirst.timings.executeMs.toFixed(3)}/` +
+      `${nextGenerationSecond.timings.executeMs.toFixed(3)}ms`,
   );
 } finally {
   try {

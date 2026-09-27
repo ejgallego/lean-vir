@@ -32,10 +32,10 @@ export async function runIrPackageLifecycleSmoke({
   wasmBytes,
   leanPackageBytes,
 }) {
-  const firstPackage = join(freshDir, "reload-host-first.irpkg");
-  const firstReport = join(freshDir, "reload-host-first.report.md");
-  const secondPackage = join(freshDir, "reload-host-second.irpkg");
-  const secondReport = join(freshDir, "reload-host-second.report.md");
+  const firstPackage = join(freshDir, "generation-host-first.irpkg");
+  const firstReport = join(freshDir, "generation-host-first.report.md");
+  const secondPackage = join(freshDir, "generation-host-second.irpkg");
+  const secondReport = join(freshDir, "generation-host-second.report.md");
 
   const builtHost = spawnSync("lake", ["build", "+fixtures.HostInterop"], { encoding: "utf8" });
   assert.equal(builtHost.status, 0, builtHost.stderr || builtHost.stdout);
@@ -74,7 +74,7 @@ export async function runIrPackageLifecycleSmoke({
     imports: (module, hostState) => {
       if (failNextInstantiation) {
         failNextInstantiation = false;
-        throw new Error("replacement import construction failed");
+        throw new Error("candidate import construction failed");
       }
       return createVirImports(module, {}, hostState);
     },
@@ -109,13 +109,12 @@ export async function runIrPackageLifecycleSmoke({
     "the first runtime uses the factory's compiled module",
   );
   const firstGenerationLifecycle = bindingGenerations[0];
-  const ordinaryValue = { generation: "first" };
   const firstImport = hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.name === sharedStringImportName,
   );
   assert.ok(
     firstImport,
-    `${sharedStringImportName} missing from first reload package`,
+    `${sharedStringImportName} missing from first generation package`,
   );
   assert.equal(
     hostRuntime.call("HostInterop.titleHandshake", "first"),
@@ -126,7 +125,7 @@ export async function runIrPackageLifecycleSmoke({
   failNextInstantiation = true;
   await assert.rejects(
     () => hostFactory.createRuntime({ irPackageSet: [secondPackageBytes] }),
-    /replacement import construction failed/,
+    /candidate import construction failed/,
   );
   const failedGenerationLifecycle = bindingGenerations[1];
   assert.equal(
@@ -138,7 +137,7 @@ export async function runIrPackageLifecycleSmoke({
   assert.equal(
     sharedBindingDisposals,
     0,
-    "failed replacement must preserve a binding map leased by the live runtime",
+    "failed candidate must preserve a binding map leased by the live runtime",
   );
 
   const secondRuntime = await hostFactory.createRuntime({
@@ -157,11 +156,6 @@ export async function runIrPackageLifecycleSmoke({
   );
   assert.equal(firstGenerationLifecycle.phase, "active");
   assert.equal(secondGenerationLifecycle.phase, "active");
-  assert.deepEqual(
-    ordinaryValue,
-    { generation: "first" },
-    "a new runtime must not invalidate ordinary JavaScript values",
-  );
   const secondImport = secondRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.name === sharedStringImportName,
   );

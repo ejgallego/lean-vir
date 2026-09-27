@@ -203,12 +203,13 @@ After that, distinguish releasing UI ownership from shutting down the interprete
 | --- | --- |
 | Normal infoview unmount or mounted-generation refresh | React removes the descendant UI and the shell releases its references; surviving callbacks/JSL remain usable in their original generation. |
 | Explicit runtime disposal | Invalidates Lean callbacks/JSL and attempts all runtime-owned cleanup. |
-| Runtime generation selection | A factory creates a fresh instance and may reuse the compiled module. Old Lean roots stay with the old runtime until its owner calls `dispose`; they are never moved into a new generation. |
+| Runtime generation selection | A factory creates a fresh instance and may reuse the compiled module. Reachable callbacks/JSL retain their original generation; explicit `dispose` invalidates them. They never move into a new generation. |
 
 Normal shell cleanup detaches its loaded reference; React owns descendant
-unmount and cleanup errors. Unmount stops shell polling; auto-refresh keeps its polling
-effect. Obsolete load results cannot install UI. Each refreshed generation uses
-a fresh runtime and browser/React bindings, reusing compiled Wasm.
+unmount and cleanup errors. Package fingerprints and configuration props drive
+code acquisition without polling. Healthy proof/context updates preserve the
+loaded component, and obsolete load results cannot install UI. Each new generation
+uses a fresh runtime and browser/React bindings, reusing compiled Wasm.
 Components read the current native editor connection through React context;
 there is no mutable command-dispatch proxy between the component and editor.
 The widget participates in the infoview's existing React tree, inheriting its

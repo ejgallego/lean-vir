@@ -49,19 +49,21 @@ export async function runGenerationLifecycleCases(
 
   const first = await makeGeneration(createRuntime, "one generation");
   const state = first.runtime.hostState;
-  rejects(
-    () => first.runtime.loadIrPackageSetBytes([packageBytes]),
-    /already owns an IR package set/i,
-  );
-  check(first.callback(4n) === 11n, "rejected second load preserves callback");
-  check(
-    readJsl(first.runtime, first.jsl) === "one generation",
-    "rejected second load preserves JSL",
-  );
-  check(
-    first.runtime.hostState === state,
-    "rejected second load preserves host state",
-  );
+  for (const method of ["loadIrPackageSetBytes", "installIrPackageSetBytes"]) {
+    rejects(
+      () => first.runtime[method]([packageBytes]),
+      /already owns an IR package set/i,
+    );
+    check(first.callback(4n) === 11n, `${method} rejection preserves callback`);
+    check(
+      readJsl(first.runtime, first.jsl) === "one generation",
+      `${method} rejection preserves JSL`,
+    );
+    check(
+      first.runtime.hostState === state,
+      `${method} rejection preserves host state`,
+    );
+  }
   first.runtime.dispose();
   first.runtime.dispose();
   rejects(
