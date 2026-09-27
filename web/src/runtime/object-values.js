@@ -1130,12 +1130,11 @@ export class ObjectValueRuntime {
       if (hostError) {
         throw hostError;
       }
-      const error = this.lastCallError();
-      if (error !== "") {
-        throw new Error(error);
-      }
       if (resultObj === 0) {
-        throw new Error(`object call failed: ${entry.entry}`);
+        // A caught reentrant call can leave its diagnostic behind even when
+        // this call succeeds. The ABI signals failure with a null result.
+        const error = this.lastCallError();
+        throw new Error(error || `object call failed: ${entry.entry}`);
       }
       return liftResult(resultObj);
     } finally {

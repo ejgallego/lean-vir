@@ -16,7 +16,7 @@ import {
 import {
   readIrPackageInfo,
   replaceIrPackageManifest,
-} from "../../web/src/runtime/ir-package.js";
+} from "../../scripts/packages/irpkg-format.mjs";
 import {
   packageTargetModeLabel,
   validatePackageTargets,
@@ -408,6 +408,26 @@ for (const inputKind of ["fetched", "bytes"]) {
     runtime.dispose();
   }
 }
+
+// One member validation plus the effective manifest returned by the backend.
+// Counting actual JSON parses catches duplicate decoding across those layers.
+const parse = JSON.parse;
+let manifestParses = 0;
+let countedRuntime;
+try {
+  JSON.parse = (text, ...args) => {
+    const value = parse(text, ...args);
+    if (value?.artifact === "lean-vir-ir-package") manifestParses++;
+    return value;
+  };
+  countedRuntime = await createVirRuntimeFactory({ wasmBytes }).createRuntime({
+    irPackageSet: [defaultPackageBytes],
+  });
+} finally {
+  JSON.parse = parse;
+  countedRuntime?.dispose();
+}
+assert.equal(manifestParses, 2);
 
 console.log("IR package-set descriptor smoke ok");
 

@@ -110,7 +110,7 @@ async function main() {
     "fixtures/infoview/RpcBrowserServer.lean",
     "fixtures/infoview/RpcShellLifetimeServer.lean",
     "web/app/vir-infoview-widget.js",
-    "web/src/vir-widget-errors.js",
+    "web/app/vir-widget-errors.js",
     "tests/infoview/rpc-shell-lifetime-entry.js",
   ])
     sources[path] = sha256(await readFile(join(root, path)));

@@ -40,6 +40,7 @@ try {
     "package-lock.json",
     "scripts/build-infoview-widget.mjs",
     "web/app/vir-infoview-widget.js",
+    "web/app/vir-widget-errors.js",
     "web/src",
   ]) {
     const destination = path.join(producer, file);
@@ -124,6 +125,11 @@ try {
       "web/app/vir-infoview-widget.js",
       '\nglobalThis.__virEntryTrace = "entry-trace";\n',
       "entry-trace",
+    ],
+    [
+      "web/app/vir-widget-errors.js",
+      '\nglobalThis.__virErrorsTrace = "errors-trace";\n',
+      "errors-trace",
     ],
     [
       "web/src/runtime/interface-effects.js",

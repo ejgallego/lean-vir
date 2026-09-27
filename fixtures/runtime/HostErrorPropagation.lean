@@ -42,4 +42,10 @@ def failureCallback (counter : JSL (RuntimeRef Nat)) : RuntimeM (Js.Function1 Js
 def invoke (callback : Js.Function1 Js.Any Unit) : RuntimeM Unit :=
   invokeHost callback
 
+def invocationCallback (callback : Js.Function1 Js.Any Unit) : RuntimeM (Js.Function1 Js.Any Unit) :=
+  Js.Function.ofLeanVoid fun (_ : Js.Any) => invokeHost callback
+
+def failLean : IO Unit :=
+  throw (IO.userError "Lean IO failure")
+
 end Vir.Fixtures.HostErrorPropagation

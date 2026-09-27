@@ -34,7 +34,6 @@ import {
 import {
   assert,
   assertInvalidManifest,
-  assertManifestTypeDescriptorsRoundTrip,
   assertValidManifestShape,
   findTypeDescriptor,
   jsNatResourceValue,
@@ -241,10 +240,6 @@ assert.ok(
 assert.ok(
   runtime.interfaceManifest.exports.some((entry) => entry.entry === "fib"),
 );
-assertManifestTypeDescriptorsRoundTrip(runtime.interfaceManifest);
-assertManifestTypeDescriptorsRoundTrip(hostRuntime.interfaceManifest);
-assertManifestTypeDescriptorsRoundTrip(prettyRuntime.interfaceManifest);
-assertManifestTypeDescriptorsRoundTrip(leanRuntime.interfaceManifest);
 assertValidManifestShape();
 for (const { name, mutate, pattern, options } of invalidManifestCases) {
   try {

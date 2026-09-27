@@ -75,14 +75,16 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 
 | Module                               | Role                                                                                                      |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `vir-runtime.js`                     | Public runtime facade, WASM instantiation, package loading helpers, and host import wiring.               |
+| `vir-runtime.js`                     | Public browser entry point selecting default host providers.               |
 | `vir-runtime-node.js`                | Node wrapper with environment-neutral JavaScript value and console bindings.                             |
+| `runtime/factory.js`               | Shared acquisition, WASM instantiation, package input validation and host import wiring. |
+| `host/vir-common-host-bindings.js` | Environment-neutral JavaScript value and console providers. |
 | `runtime/call-timing.js`             | Internal accumulator for opt-in synchronous runtime call phase attribution.                               |
 | `runtime/callbacks.js`               | Private Lean closure roots associated with ordinary JavaScript functions.                                 |
 | `runtime/cleanup.js`                 | Cleanup error collection with deterministic single-error and aggregate reporting.                         |
 | `runtime/core.js`                    | Package loading, manifest export tables, call resolution, memory helpers, and runtime/callback lifecycle. |
 | `runtime/object-values.js`           | Object ABI lowering and lifting between JavaScript values and owned Lean objects.                         |
-| `runtime/vir-codec.js`               | Binary reader/writer and interface type descriptor codec.                                                 |
+| `runtime/vir-codec.js`               | Byte normalization, contract writer and live descriptor accessors.                                                 |
 | `runtime/host-state.js`              | Host import dispatch, exact-value externref roots, binding lookup, and disposal.                          |
 | `runtime/object-abi.js`              | Object ABI support checks, layout planning, scalar packing, and unpacking helpers.                        |
 | `runtime/object-abi-exports.js`      | Shared object ABI export-name manifest used by runtime checks and Wasm linker tooling.                    |
@@ -94,7 +96,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `react/vir-react-root.js`            | Exact React root creation, rendering, and teardown forwarding.                                            |
 | `vir-react-host-bindings.js`         | Browser React root/component/hook bindings; imports `react` and `react-dom/client`.                       |
 | `runtime/interface-manifest.js`      | Manifest validation, diagnostics, and type formatting helpers.                                            |
-| `runtime/interface-tags.js`          | Shared interface descriptor tag constants and JSON-input tag set.                                         |
+| `runtime/interface-tags.js`          | Shared interface descriptor tag constants.                                         |
 
 Application code normally imports only `lean-vir`, `lean-vir/vir-runtime-node`,
 `lean-vir/host-bindings`, or `lean-vir/react-host-bindings`. React browser
@@ -108,8 +110,8 @@ names an entry point above.
 
 ## Host Bindings
 
-The browser runtime installs the built-in `common.*` and `browser.*` host
-bindings by default. The complete target map, factory list, custom binding
+The browser runtime installs the built-in JavaScript value, browser and Infoview
+host bindings by default. The complete target map, factory list, custom binding
 rules, and cleanup behavior are documented in
 `docs/reference/HOST_BINDINGS.md`.
 
@@ -523,6 +525,10 @@ the browser host. The Node wrapper does not provide document, event, or React
 operations. Supply an external host explicitly when a non-browser environment
 can implement them.
 
+The entry points select their default providers; acquisition and instantiation
+share an environment-neutral factory. Importing the Node entry does not load
+DOM, timer, animation, Infoview or React providers.
+
 Custom target bindings are passed through `hostBindings`; user bindings
 override defaults. Bindings receive the exact JavaScript values and return a
 value matching the manifest host boundary mode. `Js.Nullable` is the actual
@@ -536,6 +542,14 @@ overrides on top of the generated import table. If you provide a custom
 `imports` function to `createVirRuntimeFactory`, call
 `createVirImports(module, overrides, hostState)` or otherwise install
 `env.vir_js_call_objects` plus the `env.vir_resource_*` root-table imports.
+
+The default import table recognizes the VIR hooks and the Preview 1 imports
+linked by the shipped reactor. It provides no WASI process arguments,
+environment, clock, file descriptors or polling service: these calls return
+`NOSYS` or `BADF`; `sched_yield` succeeds and `proc_exit` throws. Supply explicit
+overrides when an extension needs these services. Any other unresolved import
+is rejected by name before instantiation. Hostless low-level linking is allowed,
+but calling a VIR hook without an attached host state throws.
 
 Custom imports can be declared directly:
 

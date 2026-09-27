@@ -5,9 +5,13 @@ public import Vir.React
 
 public section
 
+@[vir_js "test.runtime.echoString"]
+opaque freshEchoStringHost (value : @& Lean.Vir.Js String) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js String)
+
 def freshEchoBang (s : String) : Lean.Vir.RuntimeM String := do
   Lean.Vir.JsValue.toString
-    (← Lean.Vir.Common.echoString (← Lean.Vir.JsValue.ofString (s ++ "!")))
+    (← freshEchoStringHost (← Lean.Vir.JsValue.ofString (s ++ "!")))
 
 def freshTitleRoundtrip (s : String) : Lean.Vir.Browser.DomM String := do
   let document ← Lean.Vir.Browser.Document.current

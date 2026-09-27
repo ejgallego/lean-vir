@@ -57,6 +57,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       },
       "test.react.value": () => 7n,
       "test.runtime.value": () => 9n,
+      "test.runtime.echoString": (value) => value,
     },
   });
   const hostPackageBytes = await readFile(hostPackage);
@@ -214,13 +215,13 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     )?.boundary,
     "hostResource",
   );
-  const commonEchoImport = hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "common.echoString",
+  const fixtureEchoImport = hostRuntime.interfaceManifest.hostImports.find(
+    (entry) => entry.target === "test.runtime.echoString",
   );
-  assert.equal(commonEchoImport?.effect, "runtime");
-  assert.equal(commonEchoImport?.boundary, "hostResource");
-  assert.equal(commonEchoImport?.args[0]?.type?.type, "Js");
-  assert.equal(commonEchoImport?.result?.type, "Js");
+  assert.equal(fixtureEchoImport?.effect, "runtime");
+  assert.equal(fixtureEchoImport?.boundary, "hostResource");
+  assert.equal(fixtureEchoImport?.args[0]?.type?.type, "Js");
+  assert.equal(fixtureEchoImport?.result?.type, "Js");
   const nullableOfImport = hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "js.nullable.of",
   );

@@ -19,13 +19,18 @@ try {
   const path = join(temp, "host-error.irpkg");
   const generated = runVirIrpkg([
     path, join(temp, "host-error.report.md"), "--target-module", "HostErrorPropagation",
-    ...["newCounter", "readCounter", "failThenWork", "failureCallback", "invoke"].map(x => prefix + x),
+    ...[
+      "newCounter", "readCounter", "failThenWork", "failureCallback",
+      "invoke", "invocationCallback", "failLean",
+    ].map(x => prefix + x),
   ]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
   const failure = new Error("original host error");
   let hostCalls = 0;
   let shouldThrow = true;
   let catchNested = false;
+  let nestedMethod = "closure";
+  let callAfterCatch = false;
   let runtime;
   runtime = await createVirRuntime({
     wasmBytes: await readFile(new URL("../../web/public/vir-upstream.wasm", import.meta.url)),
@@ -34,10 +39,14 @@ try {
       "test.hostError.fail": () => { if (shouldThrow) throw failure; },
       "test.hostError.record": () => { hostCalls += 1; },
       "test.hostError.invoke": (callback) => {
-        if (!catchNested) return callback(undefined);
-        assert.throws(() => callback(undefined), error => error === failure);
-        // A host can catch a completed nested JS call's error and reenter.
-        assert.equal(runtime.call(prefix + "readCounter", counter), "0");
+        const invokeNested = () => nestedMethod === "closure"
+          ? callback(undefined)
+          : runtime[nestedMethod](prefix + "failThenWork", counter);
+        if (!catchNested) return invokeNested();
+        assert.throws(invokeNested, error => error === failure);
+        if (callAfterCatch) {
+          assert.equal(runtime.call(prefix + "readCounter", counter), "0");
+        }
       },
     },
   });
@@ -55,13 +64,40 @@ try {
         "failed calls must release their temporary argument roots");
     }
     const callback = runtime.call(prefix + "failureCallback", counter);
+    const invokeCallback = runtime.call(prefix + "invocationCallback", callback);
     const roots = runtime.liveCallbacks.size;
+    const resourceRoots = runtime.hostState.resourceRoots.debugCounts().active;
     assert.throws(() => callback(undefined), error => error === failure);
-    assert.throws(() => runtime.call(prefix + "invoke", callback), error => error === failure);
-    catchNested = true;
-    runtime.call(prefix + "invoke", callback);
-    assert.equal(runtime.liveCallbacks.size, roots);
-    assert.equal(runtime.call(prefix + "readCounter", counter), "0");
+    for (nestedMethod of ["call", "callTimed", "closure"]) {
+      for (const [outer, invoke] of [
+        ["call", () => runtime.call(prefix + "invoke", callback)],
+        ["callTimed", () => runtime.callTimed(prefix + "invoke", callback)],
+        ["closure", () => invokeCallback(undefined)],
+      ]) {
+        catchNested = false;
+        assert.throws(invoke, error => error === failure,
+          `${outer} must preserve an uncaught ${nestedMethod} error`);
+        catchNested = true;
+        for (callAfterCatch of [false, true]) {
+          // Checking the outer result before any further named call is essential:
+          // another call clears the C++ diagnostic left by the nested failure.
+          assert.doesNotThrow(invoke,
+            `${outer} must succeed after catching ${nestedMethod}; subsequent call: ${callAfterCatch}`);
+          assert.equal(runtime.hostState.callError, null);
+          assert.equal(runtime.hostState.callTimings.length, 0);
+          assert.equal(runtime.liveCallbacks.size, roots);
+          assert.equal(runtime.hostState.resourceRoots.debugCounts().active, resourceRoots,
+            "nested calls must release their temporary argument roots");
+          assert.equal(runtime.call(prefix + "readCounter", counter), "0");
+          assert.equal(hostCalls, 0, "caught errors must still stop the failed Lean continuation");
+        }
+      }
+    }
+    for (const method of ["call", "callTimed"]) {
+      assert.throws(() => runtime[method](prefix + "failLean"), /IO action failed/,
+        "a null result must still report the Lean call error");
+      assert.equal(runtime.call(prefix + "readCounter", counter), "0");
+    }
     shouldThrow = false;
     runtime.call(prefix + "failThenWork", counter);
     assert.equal(runtime.call(prefix + "readCounter", counter), "1");

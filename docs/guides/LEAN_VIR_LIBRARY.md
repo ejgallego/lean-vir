@@ -19,7 +19,6 @@ effects and reviewed protocol operations.
 | `Vir` | The common library, browser/React helpers, ProofWidgets notation and package markers. |
 | `Vir.Runtime` | `RuntimeM` and Lean-owned mutable `RuntimeRef` cells. |
 | `Vir.Js` | Exact JavaScript values, collections, functions, Promises and explicit conversions. |
-| `Vir.Common` | Small environment-neutral helpers such as string echo and natural-number addition. |
 | `Vir.Browser` | DOM receivers, events, timers, animation and canvas. |
 | `Vir.React.Core` | Native React nodes, roots, components and hooks. |
 | `Vir.React` | Convenience import for native React bindings. |
