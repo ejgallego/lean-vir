@@ -5,6 +5,8 @@ Start with the [quickstart](../README.md) to use VIR, or the
 
 ## Guides: use VIR
 
+- [Embedded resources (draft)](guides/EMBEDDED_RESOURCES.md): prepare portable
+  browser programs in a client library and publish them from a native application.
 - [Packages](guides/PACKAGES.md): register modules, select exports, build/load packages
   and install the browser SDK.
 - [Lean library](guides/LEAN_VIR_LIBRARY.md): effects, boundary values and API entry points.

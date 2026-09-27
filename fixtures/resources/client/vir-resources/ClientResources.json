@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "logicalId": "client-fixture/greeting",
+  "module": "Client.Program",
+  "exports": [
+    {
+      "role": "greet",
+      "declaration": "Client.Program.greet",
+      "interfaceId": "vir-fixture-greet-v1"
+    }
+  ],
+  "supportFiles": []
+}
