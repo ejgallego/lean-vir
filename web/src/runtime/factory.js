@@ -105,10 +105,9 @@ export function createVirImports(module, overrides = {}, hostState = null) {
   }
 
   for (const spec of specs) {
-    if (
-      !Object.hasOwn(imports[spec.module], spec.name) ||
-      imports[spec.module][spec.name] === undefined
-    ) {
+    // Presence is distinct from validity: undefined is a valid externref
+    // global. Let WebAssembly.Instance validate explicitly supplied values.
+    if (!Object.hasOwn(imports[spec.module], spec.name)) {
       throw new Error(
         `Unsupported WebAssembly import ${spec.module}.${spec.name} (${spec.kind}); ` +
           "supply an explicit imports override",

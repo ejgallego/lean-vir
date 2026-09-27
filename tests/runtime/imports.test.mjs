@@ -8,17 +8,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createVirImports } from "../../web/src/vir-runtime.js";
 
-// One imported () -> i32 function, re-exported as call. This exercises actual
+// One imported function, memory or externref global, re-exported as call. Exercises
 // WebAssembly linking without requiring generated VIR artifacts.
 function importModule(namespace, name, kind = "function") {
   const string = (text) => [text.length, ...new TextEncoder().encode(text)];
   const section = (id, bytes) => [id, bytes.length, ...bytes];
+  const descriptor = kind === "memory" ? [2, 0, 1]
+    : kind === "global" ? [3, 0x6f, 0] : [0, 0];
   return new WebAssembly.Module(Uint8Array.from([
     0, 97, 115, 109, 1, 0, 0, 0,
     ...section(1, [1, 0x60, 0, 1, 0x7f]),
     ...section(2, [1, ...string(namespace), ...string(name),
-      ...(kind === "memory" ? [2, 0, 1] : [0, 0])]),
-    ...section(7, [1, ...string("call"), kind === "memory" ? 2 : 0, 0]),
+      ...descriptor]),
+    ...section(7, [1, ...string("call"), descriptor[0], 0]),
   ]));
 }
 
@@ -47,6 +49,26 @@ test("explicit overrides satisfy custom functions and memories", () => {
   const memory = new WebAssembly.Memory({ initial: 1 });
   assert.equal(new WebAssembly.Instance(memoryModule,
     createVirImports(memoryModule, { extension: { heap: memory } })).exports.call, memory);
+});
+
+test("explicit undefined externref globals are present imports", () => {
+  const module = importModule("extension", "value", "global");
+  const overrides = { extension: { value: undefined } };
+  assert.equal(new WebAssembly.Instance(module, overrides).exports.call.value, undefined);
+  const imports = createVirImports(module, overrides);
+  assert.equal(Object.hasOwn(imports.extension, "value"), true);
+  assert.equal(new WebAssembly.Instance(module, imports).exports.call.value, undefined);
+  for (const missing of [{}, { extension: {} }]) {
+    assert.throws(() => createVirImports(module, missing), /extension.value \(global\)/);
+  }
+});
+
+test("the engine rejects explicitly supplied invalid function values", () => {
+  const module = importModule("extension", "operation");
+  for (const operation of [undefined, null, 42]) {
+    const imports = createVirImports(module, { extension: { operation } });
+    assert.throws(() => new WebAssembly.Instance(module, imports), WebAssembly.LinkError);
+  }
 });
 
 test("WASI defaults report unavailable services rather than false success", () => {
