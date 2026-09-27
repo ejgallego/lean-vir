@@ -192,10 +192,13 @@ console.log(vir.call("ModuleSetFixture.Root.answer"));
 
 `irPackageSet` accepts a descriptor URL, the structured value returned by
 `fetchIrPackageSet`, or a non-empty array of member bytes in descriptor order.
-On an existing factory-managed runtime,
-`vir.loadIrPackageSetBytes(members)` validates the complete set in a fresh WASM
-instance before handover. `packageInfo.count` is the aggregate declaration count;
-`packageInfo.byteLength` is the sum of all members.
+`factory.createRuntime()` may also omit `irPackageSet`; in that case,
+`vir.loadIrPackageSetBytes(members)` installs the first package set after the
+Wasm module has been compiled. A runtime owns at most one package generation.
+Calling the method after a successful installation throws before changing the
+installed generation; create another runtime from the same factory instead.
+`packageInfo.count` is the aggregate declaration count; `packageInfo.byteLength`
+is the sum of all members.
 
 To separate transport from runtime creation, use the factory fetch API:
 
@@ -254,38 +257,33 @@ const second = await factory.createRuntime({
 });
 ```
 
-## Replacing A Package Set
+## Runtime Generations
 
-`vir.loadIrPackageSetBytes(members)` is synchronous once the Wasm module has been
-compiled. Calling it on a loaded, factory-managed runtime preserves the public
-`vir` object but replaces its underlying Wasm instance:
+Use a factory to create a fresh runtime for each package generation. The
+compiled `WebAssembly.Module` is reused, while interpreter state, callbacks,
+handles, host resources and package-local caches remain generation-local:
 
 ```js
 const factory = createVirRuntimeFactory({ wasmUrl: "vir-upstream.wasm" });
-const vir = await factory.createRuntime({
+let vir = await factory.createRuntime({
   irPackageSet: firstPackageMembers,
 });
 
-vir.loadIrPackageSetBytes(secondPackageMembers);
+const next = await factory.createRuntime({
+  irPackageSet: secondPackageMembers,
+});
+const previous = vir;
+vir = next;
+previous.dispose();
 console.log(vir.call("SecondPackage.entry"));
 ```
 
-The second package set is loaded and prepared, then manifest-validated before
-its initializers run in a fresh candidate instance. If that work fails, the candidate is
-disposed and the first package remains usable. After a successful handover,
-old object pointers, Lean-backed callback/JSL roots, externref roots, active
-registrations, and resolved call slots are invalid. The runtime releases the old set's resources once,
-reattaches the new host state to the same public wrapper, and rebuilds its
-manifest lookup and call caches.
-
-If cleanup of the old instance throws during handover, cleanup still attempts
-every old resource and callback, the candidate is discarded, and the public
-wrapper becomes disposed. This avoids exposing either a partially torn-down
-old instance or a partially adopted replacement.
-
-Factories reuse the compiled `WebAssembly.Module`, not interpreter state.
-User-supplied binding maps shared across a handover are reference-leased so
-their cleanup hook runs once when the final runtime using the map is disposed.
+If creation of `next` fails, the existing `vir` remains usable because it has
+not been disposed. Dispose a generation only when its callbacks, handles and
+host resources should become invalid. The new generation is selected before
+disposing the previous one, so a cleanup error propagates while the caller
+still owns `vir`. User-supplied binding maps shared by multiple runtimes retain
+their existing reference-leased cleanup behavior.
 
 ## Calls And Manifest
 
@@ -583,10 +581,9 @@ can still enter Lean. Normal infoview shell unmount instead releases UI ownershi
 without hard disposal. The full rules, including failure teardown and collection
 limits, live in [HOST_BINDINGS.md](../reference/HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal).
 
-Package replacement is a separate operation: see
-[Replacing A Package Set](#replacing-a-package-set) for atomic handover, candidate
-failure and invalidation of old values. Neither disposal nor replacement makes
-an old Lean component function usable with a new interpreter.
+Each runtime generation is a separate operation. Disposal invalidates that
+generation's callbacks and handles; it does not transfer them to another
+runtime.
 
 ## Trust Boundary
 
@@ -623,9 +620,9 @@ The browser loads descriptor-ordered sets of format-11 `.irpkg` members. A
 focused package is represented as a one-member set. It does not load `.olean` or
 Lean's raw `.ir` format in the browser. Unsupported requested
 exports fail during package generation instead of being omitted silently.
-A failed replacement leaves the active runtime and its metadata intact; failed
-initial installation exposes no package. If old-runtime cleanup fails during
-handover, the wrapper becomes disposed, as described above.
+A failed first installation leaves the deferred runtime without a package;
+failed creation exposes no runtime to the caller. A failed new-generation
+creation leaves an already-owned runtime unchanged.
 JavaScript host imports execute synchronously and
 are limited to 128 imported declarations with IR arity at most 6. Native
 Promises may cross as exact `Js` values and be observed with ordinary Promise

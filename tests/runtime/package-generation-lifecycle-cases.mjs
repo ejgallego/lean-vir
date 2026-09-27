@@ -32,10 +32,10 @@ export async function runIrPackageLifecycleSmoke({
   wasmBytes,
   leanPackageBytes,
 }) {
-  const firstPackage = join(freshDir, "reload-host-first.irpkg");
-  const firstReport = join(freshDir, "reload-host-first.report.md");
-  const secondPackage = join(freshDir, "reload-host-second.irpkg");
-  const secondReport = join(freshDir, "reload-host-second.report.md");
+  const firstPackage = join(freshDir, "generation-host-first.irpkg");
+  const firstReport = join(freshDir, "generation-host-first.report.md");
+  const secondPackage = join(freshDir, "generation-host-second.irpkg");
+  const secondReport = join(freshDir, "generation-host-second.report.md");
 
   const builtHost = spawnSync("lake", ["build", "+fixtures.HostInterop"], { encoding: "utf8" });
   assert.equal(builtHost.status, 0, builtHost.stderr || builtHost.stdout);
@@ -69,12 +69,12 @@ export async function runIrPackageLifecycleSmoke({
   const bindingGenerations = [];
   let failNextInstantiation = false;
   let sharedBindingDisposals = 0;
-  const hostRuntime = await createVirRuntimeFactory({
+  const hostFactory = createVirRuntimeFactory({
     wasmBytes,
     imports: (module, hostState) => {
       if (failNextInstantiation) {
         failNextInstantiation = false;
-        throw new Error("replacement import construction failed");
+        throw new Error("candidate import construction failed");
       }
       return createVirImports(module, {}, hostState);
     },
@@ -98,15 +98,23 @@ export async function runIrPackageLifecycleSmoke({
         [VIR_HOST_DISPOSE]: () => lifecycle.dispose(),
       };
     },
-  }).createRuntime({ irPackageSet: [await readFile(firstPackage)] });
+  });
+  const compiledModule = await hostFactory.module();
+  const hostRuntime = await hostFactory.createRuntime({
+    irPackageSet: [await readFile(firstPackage)],
+  });
+  assert.equal(
+    hostRuntime.module,
+    compiledModule,
+    "the first runtime uses the factory's compiled module",
+  );
   const firstGenerationLifecycle = bindingGenerations[0];
-  const ordinaryValue = { generation: "first" };
   const firstImport = hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.name === sharedStringImportName,
   );
   assert.ok(
     firstImport,
-    `${sharedStringImportName} missing from first reload package`,
+    `${sharedStringImportName} missing from first generation package`,
   );
   assert.equal(
     hostRuntime.call("HostInterop.titleHandshake", "first"),
@@ -115,83 +123,74 @@ export async function runIrPackageLifecycleSmoke({
 
   const secondPackageBytes = await readFile(secondPackage);
   failNextInstantiation = true;
-  assert.throws(
-    () => hostRuntime.loadIrPackageSetBytes([secondPackageBytes]),
-    /replacement import construction failed/,
+  await assert.rejects(
+    () => hostFactory.createRuntime({ irPackageSet: [secondPackageBytes] }),
+    /candidate import construction failed/,
   );
   const failedGenerationLifecycle = bindingGenerations[1];
   assert.equal(
     failedGenerationLifecycle.phase,
     "disposed",
-    "failed replacement must dispose its fresh active-resource lifecycle",
+    "failed generation must dispose its fresh active-resource lifecycle",
   );
   assert.equal(firstGenerationLifecycle.phase, "active");
   assert.equal(
     sharedBindingDisposals,
     0,
-    "failed replacement must preserve a binding map leased by the live runtime",
+    "failed candidate must preserve a binding map leased by the live runtime",
   );
 
-  hostRuntime.loadIrPackageSetBytes([secondPackageBytes]);
+  const secondRuntime = await hostFactory.createRuntime({
+    irPackageSet: [secondPackageBytes],
+  });
+  assert.equal(
+    secondRuntime.module,
+    compiledModule,
+    "fresh generations reuse the compiled module",
+  );
   const secondGenerationLifecycle = bindingGenerations[2];
   assert.notEqual(
     secondGenerationLifecycle,
     firstGenerationLifecycle,
-    "package replacement should install a fresh active-resource lifecycle",
+    "a fresh runtime should install a fresh active-resource lifecycle",
   );
-  assert.equal(firstGenerationLifecycle.phase, "disposed");
+  assert.equal(firstGenerationLifecycle.phase, "active");
   assert.equal(secondGenerationLifecycle.phase, "active");
-  assert.deepEqual(
-    ordinaryValue,
-    { generation: "first" },
-    "package replacement must not invalidate ordinary JavaScript values",
-  );
-  let rolledBack = 0;
-  assert.throws(
-    () => firstGenerationLifecycle.addDisposable({}, () => rolledBack++),
-    /cannot register active resources/,
-  );
-  assert.equal(rolledBack, 1);
-  const secondImport = hostRuntime.interfaceManifest.hostImports.find(
+  const secondImport = secondRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.name === sharedStringImportName,
   );
   assert.ok(
     secondImport,
-    `${sharedStringImportName} missing from second reload package`,
+    `${sharedStringImportName} missing from second generation package`,
   );
   assert.notEqual(
     secondImport.slot,
     firstImport.slot,
-    `${sharedStringImportName} must move slots for the reload regression`,
+    `${sharedStringImportName} must use its own generation slot`,
   );
   assert.equal(
-    hostRuntime.call("HostInterop.titleHandshake", "second"),
+    secondRuntime.call("HostInterop.titleHandshake", "second"),
     "Lean VIR host: second",
   );
   hostRuntime.dispose();
+  assert.equal(firstGenerationLifecycle.phase, "disposed");
+  assert.equal(sharedBindingDisposals, 0);
+  secondRuntime.dispose();
   assert.equal(sharedBindingDisposals, 1);
 
-  const initializerRuntime = await createVirRuntimeFactory({
+  const initializerFactory = createVirRuntimeFactory({
     wasmBytes,
-  }).createRuntime({ irPackageSet: [leanPackageBytes] });
+  });
+  const initializerRuntime = await initializerFactory.createRuntime({
+    irPackageSet: [leanPackageBytes],
+  });
   assert.equal(initializerRuntime.call(parserScoreEntry), "1123");
-  initializerRuntime.loadIrPackageSetBytes([leanPackageBytes]);
-  assert.equal(initializerRuntime.call(parserScoreEntry), "1123");
-  const replacementPages = [];
-  for (let iteration = 0; iteration < 12; iteration += 1) {
-    initializerRuntime.loadIrPackageSetBytes([leanPackageBytes]);
-    assert.equal(initializerRuntime.call(parserScoreEntry), "1123");
-    replacementPages.push(
-      initializerRuntime.exports.memory.buffer.byteLength / 65536,
-    );
-  }
-  const warmedReplacementPages = replacementPages.slice(2);
-  assert.ok(
-    Math.max(...warmedReplacementPages) - Math.min(...warmedReplacementPages) <=
-      1,
-    `package replacement should keep active Wasm memory bounded; pages: ${replacementPages.join(", ")}`,
-  );
+  const secondInitializerRuntime = await initializerFactory.createRuntime({
+    irPackageSet: [leanPackageBytes],
+  });
+  assert.equal(secondInitializerRuntime.call(parserScoreEntry), "1123");
   initializerRuntime.dispose();
+  secondInitializerRuntime.dispose();
 
   const fallbackSource = join(freshDir, "ExternFallback.lean");
   const fallbackPackage = join(freshDir, "extern-fallback-runtime.irpkg");

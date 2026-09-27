@@ -214,10 +214,10 @@ vir.runStartupEntries();
 ```
 
 Startup hooks run in manifest order and are recorded only after success. A
-retry skips completed hooks and resumes at the failed hook. Successful package
-replacement resets that state; failed replacement preserves it. The
-[replacement API](JS_API.md#replacing-a-package-set) owns candidate failure,
-old-generation invalidation and cleanup-failure behavior.
+retry skips completed hooks and resumes at the failed hook. Each fresh runtime
+has its own startup state; create a new runtime when selecting another package
+generation, then dispose the previous runtime when its callbacks and resources
+should become invalid.
 
 The [SlidesCanvas example](../../examples/SlidesCanvas.lean) creates its DOM and
 canvas and schedules animation frames entirely from Lean:

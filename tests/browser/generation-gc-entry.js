@@ -31,6 +31,7 @@ globalThis.runVirGenerationGc = async (wasm, pkg) => {
   const lifecycle = await runGenerationLifecycleCases(
     createRuntime,
     irPackageSet[0],
+    () => createVirRuntime({ wasmModule }),
   );
   const sharedBindings = {};
   const shared = await runSharedBindingGcCases(

@@ -55,30 +55,31 @@ automatic transfer of React state or internal Lean values between generations.
 | Headless/browser caller runs multiple entries | Keep interpreter state and initialized constants within a generation; calls and callbacks do not instantiate fresh interpreters. | `tests/runtime/interpreter-constant-cache-smoke.mjs`, CLI and module-package tests. |
 | Multi-module package set | Preserve member ordering, identity checks, initialization and startup semantics. A complete set is one generation, not one runtime per member. | `tests/runtime/module-package-set-smoke.mjs` and descriptor tests. |
 | Several runtimes share compiled Wasm and host services | Isolate Lean heaps and per-runtime resources; reuse compilation. Preserve the current shared-binding disposal contract while removing reload. | `tests/infoview/widget.mjs`, `tests/runtime/generation-lifecycle-cases.js`. |
-| Host intentionally resets a computation | Create a fresh runtime, select it, then explicitly dispose the previous one when invalidation is intended. An old cleanup failure must be surfaced; ordering and partial effects need a documented migration. | Reload lifecycle tests exercise reset, failure and cleanup contracts; migration to fresh objects remains to be demonstrated. |
-| Separate fetching or raw instantiation from installation | Keep useful transport control and Wasm-only clients. Determine whether public deferred first installation is required; first installation is distinct from replacing loaded code. | Factory/descriptor and low-level runtime callers require a targeted audit before deleting loader entry points. |
+| Host intentionally resets a computation | Create a fresh runtime, select it, then explicitly dispose the previous one when invalidation is intended. An old cleanup failure must be surfaced while the selected runtime remains owned. | Generation lifecycle tests exercise fresh creation, failed candidates, explicit disposal and shared binding ownership; the JavaScript guide shows the handover order. |
+| Separate fetching or raw instantiation from installation | Keep useful transport control and Wasm-only clients. Deferred first installation remains a supported synchronous operation; replacing loaded code requires a fresh runtime. | Factory/descriptor and low-level runtime callers exercise deferred installation and candidate failure without requiring stable runtime identity. |
 
 ## Contracts that cannot be silently removed
 
-The current `loadIrPackageSetBytes` API explicitly supports synchronous replacement
-after compilation, stable JavaScript runtime-object identity, invalidation of old
-handles, and a specific terminal outcome when teardown fails. These are documented
-in [JS_API.md](../guides/JS_API.md#replacing-a-package-set) and tested. Fresh-object
-creation does not automatically preserve synchronous timing or stable identity.
+The runtime API now treats `loadIrPackageSetBytes` as a one-time installation
+operation. A deferred runtime may install its first package synchronously; after a
+successful installation, another package requires a fresh runtime from the same
+factory. This deliberately changes stable JavaScript runtime-object identity and
+the old in-place invalidation behavior. The generation-local contract is documented
+in [JS_API.md](../guides/JS_API.md#runtime-generations) and tested.
 
-The application search in `web/app`, `examples`, `benchmarks`, `tools` and
-`scripts` found no runtime reload consumer. The developer runner already creates
-a candidate and selects it; demos use factory-created runtimes. Tests and public
-documentation do use reload. This establishes a migration opportunity, not the
-absence of downstream users. Before removing it, identify any caller requiring
-stable object identity, synchronous replacement or deferred first installation,
-and either preserve the use case or explicitly agree its contract change.
+Callers that previously replaced packages through `loadIrPackageSetBytes` must
+await a fresh runtime, then select it explicitly. Their callbacks, getters and
+page teardown must refer to the intended generation. Candidate creation failure
+leaves the current generation usable. When old-generation invalidation is
+intended, dispose it after selecting the new runtime; unmount UI-owned resources
+before hard disposal. This changes synchronous replacement and stable facade
+identity, rather than preserving them through a compatibility wrapper.
 
-Keep tests for meaningful behavior: failed preparation preserves the old runtime,
-explicit disposal invalidates handles, initialization and per-generation constant
-identity remain correct, shared services survive another runtime's disposal.
-Replace assertions that merely require adoption into the same wrapper only when
-that API change is selected. Keep host-service ownership as a separate decision.
+Keep tests for meaningful behavior: failed first installation leaves a deferred
+runtime empty, explicit disposal invalidates handles, initialization and
+per-generation constant identity remain correct, shared services survive another
+runtime's disposal, and a rejected second load leaves the installed generation
+unchanged. Keep host-service ownership as a separate decision.
 
 ## Small acquisition protocol
 

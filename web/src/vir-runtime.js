@@ -204,7 +204,6 @@ export class VirRuntimeFactory {
       return new VirRuntime(instance.exports, {
         module,
         hostState,
-        createReplacementRuntime: () => this.instantiateModule(module),
       });
     } catch (error) {
       const errors = [error];

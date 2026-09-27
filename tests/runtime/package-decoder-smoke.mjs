@@ -217,29 +217,29 @@ partialSetRuntime.loadIrPackageSetBytes([defaultPackageBytes]);
 assert.equal(partialSetRuntime.call("fib", 8), "21");
 partialSetRuntime.dispose();
 
+const previousManifest = first.interfaceManifest;
 assert.throws(
   () => first.loadIrPackageSetBytes([badPackage]),
-  /invalid IR package magic/,
+  /already owns an IR package set/,
 );
 assert.notEqual(first.packageInfo, null);
 assert.notEqual(first.interfaceManifest, null);
 assert.notEqual(first.packageMetadata, null);
 assert.equal(first.call("fib", 8), "21");
-
 assert.throws(
   () =>
     first.loadIrPackageSetBytes([
       replaceIrPackageManifest(defaultPackageBytes, renamedExportManifest),
     ]),
-  /manifest\/binary contract mismatch:.*export.*entry/,
+  /already owns an IR package set/,
 );
 assert.equal(first.call("fib", 8), "21");
-
-const previousManifest = first.interfaceManifest;
-first.loadIrPackageSetBytes([defaultPackageBytes]);
-assert.notEqual(first.interfaceManifest, previousManifest);
+assert.equal(first.interfaceManifest, previousManifest);
 assert.ok(Object.isFrozen(first.interfaceManifest.exports[0].args[0].type));
 assert.equal(first.call("fib", 8), "21");
+
+badPackageRuntime.loadIrPackageSetBytes([defaultPackageBytes]);
+assert.equal(badPackageRuntime.call("fib", 8), "21");
 
 first.dispose();
 second.dispose();

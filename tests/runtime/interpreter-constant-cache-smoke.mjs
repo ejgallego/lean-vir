@@ -106,20 +106,23 @@ try {
   await writeRuntimeFixture(source, "InterpreterConstantCache.lean");
   await generateIrPackage("InterpreterConstantCache", source, packagePath, "marked");
   const packageBytes = await readFile(packagePath);
-  runtime = await createVirRuntimeFactory({
+  const factory = createVirRuntimeFactory({
     wasmBytes,
     hostBindings: {
       "test.retainDenseTableCallback": callback => {
         callbacks.push(callback);
       },
     },
-  }).createRuntime({
+  });
+  runtime = await factory.createRuntime({
     irPackageSet: [packageBytes],
   });
 
   assertCallbackCache("initial package");
-  // Start cold again for the existing named-entry timing control.
-  runtime.loadIrPackageSetBytes([packageBytes]);
+  runtime.dispose();
+  runtime = await factory.createRuntime({
+    irPackageSet: [packageBytes],
+  });
 
   const first = runtime.callTimed(
     "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
@@ -142,34 +145,41 @@ try {
     "the packaged implementation must use the dense-table implemented_by body",
   );
 
-  runtime.loadIrPackageSetBytes([packageBytes]);
+  const previousRuntime = runtime;
+  runtime = await factory.createRuntime({
+    irPackageSet: [packageBytes],
+  });
+  previousRuntime.dispose();
   assert.equal(
     firstCell.live,
     false,
-    "replacement must release the old first cell",
+    "disposing the previous generation releases the old first cell",
   );
   assert.equal(
     secondCell.live,
     false,
-    "replacement must release the old second cell",
+    "disposing the previous generation releases the old second cell",
   );
 
-  assertCallbackCache("replacement package");
-  runtime.loadIrPackageSetBytes([packageBytes]);
+  assertCallbackCache("fresh package generation");
 
-  const replacementFirst = runtime.callTimed(
+  const nextGenerationFirst = runtime.callTimed(
     "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
   );
-  const replacementSecond = runtime.callTimed(
+  const nextGenerationSecond = runtime.callTimed(
     "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
   );
-  assertWarmCache(replacementFirst, replacementSecond, "replacement package");
+  assertWarmCache(
+    nextGenerationFirst,
+    nextGenerationSecond,
+    "fresh package generation",
+  );
 
   console.log(
-    "interpreter constant cache smoke ok: callback identity/release/replacement; " +
+    "interpreter constant cache smoke ok: callback identity/release/generation; " +
       `initial=${first.timings.executeMs.toFixed(3)}/${second.timings.executeMs.toFixed(3)}ms ` +
-      `replacement=${replacementFirst.timings.executeMs.toFixed(3)}/` +
-      `${replacementSecond.timings.executeMs.toFixed(3)}ms`,
+      `nextGeneration=${nextGenerationFirst.timings.executeMs.toFixed(3)}/` +
+      `${nextGenerationSecond.timings.executeMs.toFixed(3)}ms`,
   );
 } finally {
   try {

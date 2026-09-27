@@ -44,19 +44,6 @@ assert.deepEqual(calls, ["first", "second"]);
 assert.equal(runtime.runStartupEntries(), undefined);
 assert.deepEqual(calls, ["first", "second"]);
 
-runtime.completedStartupEntries = new Set(["first", "second"]);
-runtime.createReplacementRuntime = () => ({
-  installIrPackageSetBytes() {
-    throw new Error("replacement rejected");
-  },
-  dispose() {},
-});
-assert.throws(
-  () => runtime.replaceIrPackageSetBytes([new Uint8Array()]),
-  /replacement rejected/,
-);
-assert.deepEqual([...runtime.completedStartupEntries], ["first", "second"]);
-
 runtime.completedStartupEntries = new Set();
 runtime.interfaceManifest = {
   exports: [

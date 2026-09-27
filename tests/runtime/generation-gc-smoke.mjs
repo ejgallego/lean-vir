@@ -25,6 +25,7 @@ const result = await runGenerationGcCases(createRuntime);
 const lifecycle = await runGenerationLifecycleCases(
   createRuntime,
   hostPackageBytes,
+  () => createVirRuntime({ wasmBytes }),
 );
 const sharedBindings = {};
 const shared = await runSharedBindingGcCases(

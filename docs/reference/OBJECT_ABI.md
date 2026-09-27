@@ -184,7 +184,7 @@ JS should use; Lean's runtime treats scalars as no-ops for refcounting.
 Object pointers are scoped to one wasm runtime instance. They must not survive:
 
 - `VirRuntime.dispose`
-- package reload
+- runtime generation disposal
 - wasm instance teardown
 
 Longer-lived Lean values need an explicit Lean root. Closures and JSL values

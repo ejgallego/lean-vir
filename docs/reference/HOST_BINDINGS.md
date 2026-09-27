@@ -203,12 +203,13 @@ After that, distinguish releasing UI ownership from shutting down the interprete
 | --- | --- |
 | Normal infoview unmount or mounted-generation refresh | React removes the descendant UI and the shell releases its references; surviving callbacks/JSL remain usable in their original generation. |
 | Explicit runtime disposal | Invalidates Lean callbacks/JSL and attempts all runtime-owned cleanup. |
-| Core in-place package replacement | Invalidates old Lean roots; never moves them into the new exports. Public factory-managed replacement is described in [JS_API.md](../guides/JS_API.md#replacing-a-package-set). |
+| Runtime generation selection | A factory creates a fresh instance and may reuse the compiled module. Reachable callbacks/JSL retain their original generation; explicit `dispose` invalidates them. They never move into a new generation. |
 
 Normal shell cleanup detaches its loaded reference; React owns descendant
-unmount and cleanup errors. Unmount stops shell polling; auto-refresh keeps its polling
-effect. Obsolete load results cannot install UI. Each refreshed generation uses
-a fresh runtime and browser/React bindings, reusing compiled Wasm.
+unmount and cleanup errors. Package fingerprints and configuration props drive
+code acquisition without polling. Healthy proof/context updates preserve the
+loaded component, and obsolete load results cannot install UI. Each new generation
+uses a fresh runtime and browser/React bindings, reusing compiled Wasm.
 Components read the current native editor connection through React context;
 there is no mutable command-dispatch proxy between the component and editor.
 The widget participates in the infoview's existing React tree, inheriting its
@@ -243,10 +244,10 @@ its registration only after the platform unmount succeeds, so a failed unmount
 remains visible to runtime teardown.
 
 Each browser binding-factory invocation owns a fresh lifecycle unless the
-caller explicitly supplies one. Package replacement can therefore dispose a
-failed or superseded generation without invalidating the live generation.
+caller explicitly supplies one. A factory-created runtime generation can
+therefore be disposed without invalidating another live generation.
 Preconstructed binding maps are reference-counted only so intentional sharing
-across an atomic replacement remains safe.
+across generations remains safe.
 
 New lifecycle-managed resources are published transactionally. Before invoking a
 binding, the runtime opens a private transaction. An active resource created by

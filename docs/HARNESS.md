@@ -222,7 +222,8 @@ CHROMIUM=/path/to/chromium npm run test:infoview:lifetime
 ```
 
 The runner builds its fixture package and checks generation isolation, retained
-application activity, stale guards, polling, failure cleanup and controlled GC.
+application activity, stale guards, prop-driven acquisition without polling,
+failure cleanup and controlled GC.
 A red/green control resolves a pending load after committed removal but before
 passive cleanup. Unexpected console diagnostics and unhandled rejections fail
 the checks. Transport is mocked; the actual-server checks remain separate.
@@ -254,9 +255,11 @@ site build; use `npm run build:demo` for missing or changed Wasm.
   accessor supplies official sessions; runtime instrumentation observes
   generations and supplies test bindings. Package/source/artifact hashes are
   reported after awaited teardown. It also checks readable build errors, slow
-  initial packages with polling enabled or disabled, polling after installation,
-  and abandoned-candidate teardown. This is not GC, warm-refresh recovery or
-  server-restart acceptance.
+  initial acquisition, abandoned-candidate teardown, actual source edits,
+  out-of-order replies, invalid-definition removal and repair, and recovery from
+  failed initial acquisition with a new RPC context. These are real-server
+  lifecycle checks; controlled GC is covered separately, and server restart is
+  not covered here.
 
 The shared LSP/cancellation/response-gate/Chromium harness has focused units:
 `node --test tests/infoview/rpc-browser-harness.test.mjs`. The separate

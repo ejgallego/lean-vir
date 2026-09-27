@@ -135,15 +135,13 @@ evaluation exceptions rather than reusing possibly unwound private stacks.
 Beginning or clearing a package set destroys the session before releasing its
 package-owned declarations.
 
-Public replacement requires a fresh `WebAssembly.Instance`; the compiled
-`WebAssembly.Module` may be reused. The existing public JS wrapper adopts a
-candidate only after loading, validation and initialization succeed. Candidate
-failure disposes that candidate and leaves the active generation callable.
-Successful handover tears down old callbacks, resources, host state and binding
-leases before adopting new exports. Old pointers, closure roots and package-local
-slots never cross the handover. If old-generation cleanup fails, cleanup still
-attempts all resources, disposes the candidate and leaves the public wrapper
-terminally disposed. See [the replacement API](../guides/JS_API.md#replacing-a-package-set)
+Each package generation uses a fresh `WebAssembly.Instance`; the compiled
+`WebAssembly.Module` may be reused. A factory creates and validates a candidate
+runtime before returning it. Candidate failure disposes that candidate and does
+not affect an already-owned generation. Old pointers, closure roots and
+package-local slots never cross between runtimes. Callers select the new
+generation and explicitly dispose the old one when its callbacks and resources
+should become invalid. See [runtime generations](../guides/JS_API.md#runtime-generations)
 and [cleanup rules](HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal).
 
 The package-set transaction inside the fresh instance is:
@@ -171,15 +169,15 @@ Use matching JavaScript and Wasm revisions. The check does not authenticate a
 package or prove that its IR implements its interface types; see the
 [format contract](IRPKG_FORMAT.md#section-directory).
 
-Rollback protects provider state and public handover. It cannot undo arbitrary
-external effects, such as console output or unmanaged DOM mutation performed by
-an initializer before a later initializer fails. Browser activity should use
-reached `@[vir_startup]` entries and managed host resources so candidate disposal
-can release it.
+Rollback protects staged provider state and candidate construction. It cannot
+undo arbitrary external effects, such as console output or unmanaged DOM
+mutation performed by an initializer before a later initializer fails. Browser
+activity should use reached `@[vir_startup]` entries and managed host resources
+so candidate disposal can release it.
 
 Manifest export indices belong to the root manifest. Individual member unload,
 version solving, remote resolution and hot replacement of one member are not
-implemented; replacement installs a complete set.
+implemented; each runtime installs one complete set.
 
 ## Package call ABI
 
