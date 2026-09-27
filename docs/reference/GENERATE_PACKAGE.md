@@ -233,12 +233,13 @@ Lean/Lake/C++/JS, plus interface tags and host-boundary tables.
 
 Runtime ABI is SDK metadata, not embedded package metadata. The same artifact
 metadata records exact build-time React/ReactDOM versions from
-`package-lock.json` for the optional React host. ABI 3 separates package-loader
-success status from declaration counts, including successful empty packages.
-ABI 4 carries structural name identity in the manifest/binary validation message
-and requires matching JavaScript/Wasm. Manifest 9 adds structural keys while
-retaining versions 6–8 for existing artifacts. Installed manifest metadata remains
-deeply frozen; installers reject older ABIs before replacing an SDK.
+`package-lock.json` for the optional React host. ABI 4 is the current SDK
+contract: loader success status and declaration counts remain separate,
+including for successful empty packages. It requires manifest 9, package
+format 11, and matching JavaScript/Wasm artifacts. Installed manifest metadata
+remains deeply frozen; installers reject older ABIs before replacing an SDK.
+When the generator or runtime revision changes, regenerate the package set and
+install the SDK produced from that same revision.
 
 Name and declaration-IR tags are a separate wire contract owned by
 `PackageIRTags.lean`; `scripts/native/ir-codec-tags.mjs` maps C++ enums and

@@ -71,8 +71,7 @@ assert.equal(validateContract(Uint8Array.from([...contract, 0])), 0);
 assert.match(first.lastPackageError(), /trailing bytes/);
 const invalidBooleanContract = Uint8Array.from(contract);
 invalidBooleanContract[
-  13 + new TextEncoder().encode(first.interfaceManifest.version >= 9
-    ? first.interfaceManifest.exports[0].nameKey : first.interfaceManifest.exports[0].entry).length
+  12 + new TextEncoder().encode(first.interfaceManifest.exports[0].nameKey).length
 ] = 2;
 assert.equal(validateContract(invalidBooleanContract), 0);
 assert.match(first.lastPackageError(), /invalid boolean tag 2/);

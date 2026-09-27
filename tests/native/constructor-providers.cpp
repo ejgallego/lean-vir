@@ -9,6 +9,7 @@ Author: Emilio J. Gallego Arias
 #include <lean/lean.h>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <initializer_list>
 
 using O = lean_object;
@@ -92,6 +93,67 @@ template <class T> static T init_scalar() { ++init_count<T>; return T(37); }
 static int object_init_count = 0;
 static O * init_object() { ++object_init_count; return lean_mk_string("once"); }
 
+static lean_once_cell_t * nested_inner_tok = nullptr;
+static uint32_t * nested_inner_loc = nullptr;
+static int nested_inner_init_count = 0;
+static int nested_outer_init_count = 0;
+
+static uint32_t init_nested_inner() {
+    ++nested_inner_init_count;
+    return 41;
+}
+
+static uint32_t init_nested_outer() {
+    ++nested_outer_init_count;
+    return lean_uint32_once_cold(nested_inner_loc, nested_inner_tok, init_nested_inner) + 1;
+}
+
+static void nested_once_providers() {
+    lean_once_cell_t inner_tok = LEAN_ONCE_CELL_INITIALIZER;
+    lean_once_cell_t outer_tok = LEAN_ONCE_CELL_INITIALIZER;
+    uint32_t inner_loc = 0;
+    uint32_t outer_loc = 0;
+    nested_inner_tok = &inner_tok;
+    nested_inner_loc = &inner_loc;
+
+    check(lean_uint32_once_cold(&outer_loc, &outer_tok, init_nested_outer) == 42,
+        "once nested initial value");
+    check(outer_tok.state == 1 && outer_tok.lock == 0, "once nested outer initialized");
+    check(inner_tok.state == 1 && inner_tok.lock == 0, "once nested inner initialized");
+    check(nested_outer_init_count == 1 && nested_inner_init_count == 1,
+        "once nested cells initialized once");
+    check(lean_uint32_once_cold(&outer_loc, &outer_tok, init_nested_outer) == 42,
+        "once nested repeated outer value");
+    check(lean_uint32_once(&inner_loc, &inner_tok, init_nested_inner) == 41,
+        "once nested repeated inner value");
+    check(nested_outer_init_count == 1 && nested_inner_init_count == 1,
+        "once nested repeated cells initialized once");
+    nested_inner_tok = nullptr;
+    nested_inner_loc = nullptr;
+    puts("nested once providers: distinct cells initialized once");
+}
+
+// This mode is invoked only by the Wasm test in an isolated instance. Calling
+// the pinned native cold provider recursively would wait forever, so native
+// execution deliberately never exercises this path.
+static uint32_t * recursive_loc = nullptr;
+static lean_once_cell_t * recursive_tok = nullptr;
+static int recursive_init_count = 0;
+
+static uint32_t init_same_cell_recursively() {
+    check(++recursive_init_count == 1, "same-cell initializer must not be re-entered");
+    return lean_uint32_once_cold(recursive_loc, recursive_tok, init_same_cell_recursively);
+}
+
+static void same_cell_recursion() {
+    lean_once_cell_t tok = LEAN_ONCE_CELL_INITIALIZER;
+    uint32_t loc = 0;
+    recursive_tok = &tok;
+    recursive_loc = &loc;
+    (void)lean_uint32_once_cold(&loc, &tok, init_same_cell_recursively);
+    check(false, "same-cell recursion must trap");
+}
+
 template <class T, class F> static void scalar_once(F cold) {
     lean_once_cell_t tok = LEAN_ONCE_CELL_INITIALIZER;
     T loc = 0;
@@ -117,9 +179,18 @@ static void once_providers() {
     check(object_init_count == 1 && tok.state == 1, "once object initialized once");
     check(lean_is_persistent(value), "once object persistent");
     puts("once providers: 8 initialized once, object persistent");
+    nested_once_providers();
 }
 
-int main() {
+int main(int argc, char ** argv) {
+    if (argc > 1 && std::strcmp(argv[1], "--same-cell-recursion") == 0) {
+#if defined(__wasm__)
+        same_cell_recursion();
+#else
+        check(false, "same-cell recursion is a Wasm-only test");
+#endif
+        return 0;
+    }
     once_providers();
     O * prefix = name("αβ₁");
     O * suffix = lean_mk_string("child");

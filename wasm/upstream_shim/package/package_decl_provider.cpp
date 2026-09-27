@@ -21,12 +21,8 @@ Author: Emilio J. Gallego Arias
 #include <unordered_set>
 #include <vector>
 
-#include "runtime/utf8.h"
 #include "util/name.h"
 #include "util/name_hash_map.h"
-
-extern "C" uint8_t l_Lean_isIdFirst(uint32_t c);
-extern "C" uint8_t l_Lean_isIdRest(uint32_t c);
 
 namespace lean::vir {
 namespace {
@@ -63,62 +59,6 @@ static package_state g_package;
 static std::string lean_name_string(object * value) {
     name n(value, true);
     return n.to_string();
-}
-
-static std::string manifest_name_part(std::string const & part, bool escape) {
-    if (!escape || part.find("»") != std::string::npos) {
-        return part;
-    }
-    size_t offset = 0;
-    bool identifier = !part.empty() && l_Lean_isIdFirst(next_utf8(part, offset));
-    while (identifier && offset < part.size()) {
-        identifier = l_Lean_isIdRest(next_utf8(part, offset));
-    }
-    return identifier ? part : "«" + part + "»";
-}
-
-static std::string legacy_manifest_name_string(object * value) {
-    // Legacy manifests 6–8 lack structural identity keys. Retain their pinned
-    // display contract until those consumers migrate; manifest 9 bypasses it.
-    // Mirror the pinned Init/Data/ToString/Name.lean printer over structural
-    // Names, using Lean's compiled character predicates (no module initializer
-    // is needed). C++ name::escape differs for Unicode and internal names;
-    // linking the full Lean printer would also retain its module initializers.
-    std::vector<name> parts;
-    for (name n(value, true); n; n = n.get_prefix()) {
-        parts.push_back(n);
-    }
-    if (parts.empty()) {
-        return "[anonymous]";
-    }
-    bool escape = true;
-    // isInaccessibleUserName and hasMacroScopes both inspect the last string
-    // component, skipping only trailing numeral components.
-    for (name const & part : parts) {
-        if (part.is_string()) {
-            std::string text = part.get_string().to_std_string();
-            escape = text != "_hyg" && text != "_inaccessible" &&
-                text.find("✝") == std::string::npos;
-            break;
-        }
-    }
-    name const & root = parts.back();
-    if (root.is_string()) {
-        std::string text = root.get_string().to_std_string();
-        if (!text.empty() && (text[0] == '#' || text[0] == '?')) {
-            escape = false;
-        }
-    }
-    std::string result;
-    for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-        if (it != parts.rbegin()) {
-            result += '.';
-        }
-        result += it->is_string()
-            ? manifest_name_part(it->get_string().to_std_string(), escape)
-            : it->get_numeral().to_std_string();
-    }
-    return result;
 }
 
 static bool build_decl_indices() {
@@ -449,10 +389,6 @@ bool validate_package_contract(uint8_t const * data, size_t size) {
         return true;
     };
 
-    bool structural_names = r.boolean();
-    auto contract_name = [&](object * value) {
-        return structural_names ? name_key(name(value, true)) : legacy_manifest_name_string(value);
-    };
     uint32_t export_count = r.u32();
     if (!matches(export_count == g_package.records.export_summaries.size(), "export count")) {
         return false;
@@ -464,7 +400,7 @@ bool validate_package_contract(uint8_t const * data, size_t size) {
         uint32_t arg_count = r.u32();
         bool is_io = r.boolean();
         bool boxed = r.boolean();
-        if (!matches(entry == contract_name(actual.name), field + "entry") ||
+        if (!matches(entry == name_key(lean::name(actual.name, true)), field + "entry") ||
             !matches(arg_count == actual.arg_count, field + "argument count") ||
             !matches(is_io == actual.is_io, field + "effect") ||
             !matches(boxed == actual.needs_boxed_wasm32_boundary, field + "boxed boundary")) {
@@ -485,7 +421,7 @@ bool validate_package_contract(uint8_t const * data, size_t size) {
         uint32_t arity = r.u32();
         uint32_t erased_prefix_args = r.u32();
         bool is_io = r.boolean();
-        if (!matches(name == contract_name(actual.name), field + "name") ||
+        if (!matches(name == name_key(lean::name(actual.name, true)), field + "name") ||
             !matches(target == actual.target, field + "target") ||
             !matches(symbol == actual.symbol, field + "symbol") ||
             !matches(arity == actual.arity, field + "arity") ||
@@ -535,11 +471,6 @@ object * package_call_slot_name(uint32_t slot) {
     return package_entry_call_name(*entry);
 }
 
-bool package_call_slot_has_boxed_decl(uint32_t slot) {
-    decl_entry const * entry = package_entry_for_call_slot(slot);
-    return entry != nullptr && entry->boxed_base != nullptr;
-}
-
 bool package_call_summary(uint32_t slot, package_call_runtime_summary & out) {
     export_call_summary_entry const * summary = package_call_summary_entry(slot);
     if (summary == nullptr) {
@@ -547,7 +478,6 @@ bool package_call_summary(uint32_t slot, package_call_runtime_summary & out) {
     }
     out.arg_count = summary->arg_count;
     out.is_io = summary->is_io;
-    out.needs_boxed_wasm32_boundary = summary->needs_boxed_wasm32_boundary;
     return true;
 }
 

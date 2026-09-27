@@ -6,7 +6,6 @@ Author: Emilio J. Gallego Arias
 
 import {
   INTERFACE_MANIFEST_VERSION,
-  MIN_INTERFACE_MANIFEST_VERSION,
 } from "../../web/src/runtime/interface-manifest.js";
 
 function packageTarget(overrides = {}) {
@@ -84,7 +83,7 @@ export const invalidManifestCases = [
   {
     name: "obsolete manifest version",
     mutate: (manifest) => {
-      manifest.version = MIN_INTERFACE_MANIFEST_VERSION - 1;
+      manifest.version = INTERFACE_MANIFEST_VERSION - 1;
     },
     pattern: /embedded interface manifest must be/,
   },

@@ -42,6 +42,8 @@ public def CallPreparation.wide (value : UInt64) : UInt64 := value
   const renamedManifest = structuredClone(info.manifest);
   renamedManifest.exports.find(entry => entry.entry === "CallPreparation.nat").entry =
     "CallPreparation.bad";
+  renamedManifest.exports.find(entry => entry.entry === "CallPreparation.bad").nameKey =
+    "s43616c6c5072657061726174696f6e/s626164/";
   const missingExport = replaceIrPackageManifest(
     replaceSectionBytes(bytes, SECTION.EXPORT_SUMMARIES,
       encodeName("CallPreparation.nat"), encodeName("CallPreparation.bad")),

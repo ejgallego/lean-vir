@@ -69,7 +69,7 @@ try {
   );
   assert.equal(
     runtime.packageTargetModeLabel("markedModules"),
-    "marked declarations across imported modules",
+    null,
   );
   assert.equal(runtime.VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
   assert.equal(runtime.VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
@@ -107,7 +107,7 @@ try {
       mode: "markedModules",
       resolvedRoots: ["Example.value"],
     }),
-    "Example.lean [marked declarations across imported modules] roots: Example.value",
+    "Example.lean [unknown selection] roots: Example.value",
   );
   assert.equal(interfaceTags.INTERFACE_TAG.NAT, 0);
   assert.equal(

@@ -265,14 +265,13 @@ for (const origin of [
       resolvedRoots: ["Example.value"],
     };
     assert.doesNotThrow(() =>
-      validatePackageTargets([target], "targets", { manifestVersion: 8 }),
+      validatePackageTargets([target], "targets"),
     );
     assert.throws(
       () =>
         validatePackageTargets(
           [{ ...target, roots: explicitRoots ? [] : ["Example.value"] }],
           "targets",
-          { manifestVersion: 8 },
         ),
       explicitRoots ? /roots must be non-empty/ : /roots must be empty/,
     );
@@ -289,7 +288,6 @@ for (const origin of [
           },
         ],
         "targets",
-        { manifestVersion: 8 },
       ),
     origin.module
       ? /module requires mode markedModule/
@@ -302,23 +300,9 @@ const legacyTarget = {
   roots: [],
   resolvedRoots: [],
 };
-for (const manifestVersion of [6, 7]) {
-  assert.doesNotThrow(() =>
-    validatePackageTargets([legacyTarget], "targets", { manifestVersion }),
-  );
-  assert.throws(
-    () =>
-      validatePackageTargets(
-        [{ ...legacyTarget, source: undefined, module: "Example" }],
-        "targets",
-        { manifestVersion },
-      ),
-    /module requires mode markedModule/,
-  );
-}
 assert.throws(
   () =>
-    validatePackageTargets([legacyTarget], "targets", { manifestVersion: 8 }),
+    validatePackageTargets([legacyTarget], "targets"),
   /mode must be one of/,
 );
 

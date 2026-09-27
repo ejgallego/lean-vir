@@ -67,16 +67,10 @@ extern "C" lean::object * vir_call_resolved_objects(
         lean::vir::g_call_error = "call slot is not registered";
         return nullptr;
     }
-    bool has_boxed_decl = lean::vir::package_call_slot_has_boxed_decl(call_slot);
     lean::vir::package_call_runtime_summary summary{};
     if (!lean::vir::package_call_summary(call_slot, summary)) {
         lean::vir::cleanup_object_call_args(argc, argv);
         lean::vir::g_call_error = "object call requires a package-owned call summary";
-        return nullptr;
-    }
-    if (!has_boxed_decl && summary.needs_boxed_wasm32_boundary) {
-        lean::vir::cleanup_object_call_args(argc, argv);
-        lean::vir::g_call_error = "object call requires a boxed package declaration for this call summary";
         return nullptr;
     }
     if (argc != summary.arg_count) {

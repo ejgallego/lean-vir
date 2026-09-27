@@ -191,12 +191,17 @@ Longer-lived Lean values need an explicit Lean root. Closures and JSL values
 already follow that pattern through private state associated with ordinary
 JavaScript functions and objects.
 
+If a pure host failure or other exception escapes an exported Wasm function,
+the generation is abandoned. Recoverable effectful host errors do not retire it. The call has already consumed its argument objects; JavaScript
+cleanup must not attempt to re-enter the failed instance to release or inspect
+them. Disposal releases JavaScript-owned resources, while the abandoned Wasm
+objects are reclaimed with the instance. Create a fresh runtime for subsequent
+object calls.
+
 ## Call path
 
-The runtime value path uses owned Lean objects. Primitive lane helpers are
-still useful for the hottest exact scalar signatures because they avoid object
-allocation, but the JavaScript-facing runtime no longer has a value byte
-fallback.
+The runtime value path uses owned Lean objects, including immediate scalar
+objects. There is no separate primitive call lane or value-byte fallback.
 `VirRuntime.call` lowers and lifts the
 [supported manifest value types](../guides/JS_API.md#calls-and-manifest).
 Constructors may mix object fields, raw `USize` slots and packed scalar fields,

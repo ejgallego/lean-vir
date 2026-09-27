@@ -69,24 +69,6 @@ try {
     } finally { runtime.dispose(); }
   });
 
-  await test("legacy manifests retain host-name validation and dispatch", async () => {
-    for (const version of [6, 7, 8]) {
-      const legacy = structuredClone(info.manifest);
-      legacy.version = version;
-      legacy.metadata.manifestVersion = version;
-      for (const entry of [...legacy.exports, ...legacy.hostImports]) delete entry.nameKey;
-      if (version === 6) for (const entry of legacy.exports) delete entry.startup;
-      const runtime = await factory.createRuntime({ irPackageSet: [replaceIrPackageManifest(bytes, legacy)] });
-      try {
-        assert.equal(runtime.call("HostLimits.call127", "a", "b", "c", "d", "e"), "127:a/b/c/d/e");
-        legacy.hostImports[0].name += ".mismatch";
-        await assert.rejects(
-          factory.createRuntime({ irPackageSet: [replaceIrPackageManifest(bytes, legacy)] }),
-          /manifest\/binary contract mismatch:.*host.*name/);
-      } finally { runtime.dispose(); }
-    }
-  });
-
   await test("producer rejects slot 128 and IR arity 7 including erased/world arguments", async () => {
     for (const [module, pattern] of [
       ["Nullary", /nullary JavaScript host imports are unsupported/],

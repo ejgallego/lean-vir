@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import test from "node:test";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import { readIrPackageInfo, replaceIrPackageManifest } from "../../scripts/packages/irpkg-format.mjs";
+import { IR_PACKAGE_SECTION, irPackageManifestChecksum } from "../../web/src/runtime/ir-package.js";
 import { assert, createRuntimeModuleProject, join, readFile } from "./shared.mjs";
 
 const directory = await mkdtemp(join(tmpdir(), "vir-name-identity-"));
@@ -74,17 +75,42 @@ try {
       assert.equal(runtime.call("café", 10), "13");
     } finally { runtime.dispose(); }
   });
-  await test("legacy manifest 6–8 name contracts remain readable", async () => {
+  await test("old manifests reject before initialization and permit a current-package retry", async () => {
+    const canonical = replaceIrPackageManifest(bytes, info.manifest);
+    const section = readIrPackageInfo(canonical).package.sections.find(
+      value => value.kind === IR_PACKAGE_SECTION.INTERFACE_MANIFEST,
+    );
     for (const version of [6, 7, 8]) {
       const legacy = structuredClone(info.manifest);
       legacy.version = legacy.metadata.manifestVersion = version;
-      for (const entry of legacy.exports) {
-        delete entry.nameKey;
-        if (version === 6) delete entry.startup;
-      }
-      const runtime = await factory.createRuntime({ irPackageSet: [replaceIrPackageManifest(bytes, legacy)] });
-      try { for (const [entry, , increment] of cases) assert.equal(runtime.call(entry, 10), String(10 + increment)); }
-      finally { runtime.dispose(); }
+      // Bypass the writer's current-schema validation. Changing only the two
+      // version digits preserves section offsets and isolates version admission.
+      const manifestBytes = new TextEncoder().encode(JSON.stringify(legacy));
+      assert.equal(manifestBytes.byteLength, section.byteLength - 12);
+      const oldPackage = canonical.slice();
+      oldPackage.set(manifestBytes, section.offset + 12);
+      new DataView(oldPackage.buffer, oldPackage.byteOffset, oldPackage.byteLength)
+        .setBigUint64(section.offset, irPackageManifestChecksum(manifestBytes), true);
+      const runtime = await factory.createRuntime();
+      let finishes = 0;
+      const original = runtime.exports;
+      runtime.exports = { ...original, vir_finish_ir_package_set() {
+        finishes++;
+        return original.vir_finish_ir_package_set();
+      } };
+      try {
+        assert.throws(
+          () => runtime.loadIrPackageSetBytes([oldPackage]),
+          /version: 9.*regenerate packages with the matching SDK/,
+        );
+        assert.equal(finishes, 0);
+        assert.equal(runtime.packageDeclCount(), 0);
+        assert.equal(runtime.interfaceManifest, null);
+        assert.equal(runtime.failure, null);
+        runtime.loadIrPackageSetBytes([bytes]);
+        assert.equal(finishes, 1);
+        assert.equal(runtime.call("café", 10), "13");
+      } finally { runtime.dispose(); }
     }
   });
   await test("package numeral components above the binary u32 domain reject explicitly", () => {

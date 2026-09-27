@@ -133,8 +133,10 @@ one transient binary projection of the validated manifest is compared with the
 decoded call tables. It checks ordered export names, argument counts, IO and
 boxed-boundary flags, and ordered host-import names, targets, symbols, arities,
 erased-prefix counts and IO flags. Manifest 9 compares canonical structural
-name keys; versions 6–8 retain the pinned Lean display-printing contract.
-Neither path parses names from text. Recomputing a manifest checksum
+name keys. The current loader does not accept older manifest schemas or
+display-name fallback contracts.
+The contract compares structural keys rather than reparsing display names.
+Recomputing a manifest checksum
 cannot bypass this comparison. Detailed interface types and effect labels are
 not independently stored in those tables and remain producer-owned metadata;
 this check does not authenticate a package or prove its IR implements its types.
@@ -176,12 +178,10 @@ The generator embeds the recursive interface type tree in section 5. Its
 | Host import | `slot`, display `name`, structural `nameKey`, `source`, JS `target`, `boundary`, generated Wasm `symbol`, IR `arity`, `erasedPrefixArgs`, `args`, descriptor `result`, `effect`. |
 | Diagnostic | `name`, `source`, `reason`. |
 
-The current manifest version is 9. Runtime validation accepts versions 6–9:
-version 6 may omit `startup`, normalized to `false`; versions 7–9 require an
-explicit Boolean on every export. Version 6 removed `wireTag` and the `wire`
-host-boundary label without aliases. Version 8 omits volatile generation time
-from embedded metadata and validates the five target modes and root arrays.
-Only the adjacent Markdown report records wall-clock generation time.
+The current manifest version is 9 and every generated package must use it.
+Every export carries an explicit Boolean `startup` field. Volatile generation
+time is omitted from embedded metadata; only the adjacent Markdown report
+records wall-clock generation time.
 
 Version 9 adds `nameKey` to exports and host imports. It is the machine identity
 compared with the independently decoded binary Name; `entry`, `id`, `jsName`
@@ -197,18 +197,21 @@ an empty string component is `s/`. Thus string `"1"` (`s31/`) and numeral `1`
 does not narrow numerals; format 11 still rejects Name numerals above u32 when
 emitting their binary representation. Native registry lookup uses the same key.
 
-Legacy versions 6–8 retain their display-name agreement path because retained
-SDKs and client artifacts use it. Retiring that path, including startup and target
-spelling normalization, requires a matched consumer migration; it is not implied
-by version 9 generation. Runtime ABI 4 versions the validation message carrying
-the structural/legacy identity mode. Rebuild the SDK JavaScript and Wasm together.
+JavaScript validates the key grammar and UTF-8 before it sends the contract to
+Wasm. The pinned Wasm decoder derives the canonical key from its decoded Lean
+`Name`; the contract succeeds only when those structural identities agree.
+These checks deliberately do not parse display aliases.
+
+Manifest 9 is the only supported schema. The current SDK contract is runtime
+ABI 4 with package format 11, so regenerate `.irpkg` members and descriptors
+with the manifest-9 generator and install the matching JavaScript and Wasm SDK
+artifacts together when the generator or runtime revision changes.
 
 The modes are `explicit`, `packageOnly`, `all`, `marked` and `markedModule`.
 `explicit`/`packageOnly` require nonempty `roots`; other modes require `[]`.
 `roots` and `resolvedRoots` contain unique normalized names. Compiled marked
 selection uses `markedModule` and requires `module`; live marked selection
-uses `marked` with `source`. Legacy `markedModules` is accepted only in
-pre-version-8 manifests. New generation uses the current spellings.
+uses `marked` with `source`. These are the only accepted target spellings.
 
 `effect` is one of `pure`, `runtime`, `io`, `dom` or `react`, preserving
 source-level classification for tooling. Binary export/host summaries carry

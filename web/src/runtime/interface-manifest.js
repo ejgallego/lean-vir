@@ -15,7 +15,6 @@ import { requireModuleIdentity } from "./module-name.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
 export const INTERFACE_MANIFEST_VERSION = 9;
-export const MIN_INTERFACE_MANIFEST_VERSION = 6;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",
   EXPLICIT_CONVERSION: "explicitConversion",
@@ -23,8 +22,8 @@ export const HOST_IMPORT_BOUNDARY = Object.freeze({
 });
 
 export const INTERFACE_MANIFEST_SHAPE_ERROR =
-  `embedded interface manifest must be { version: ${MIN_INTERFACE_MANIFEST_VERSION} through ` +
-  `${INTERFACE_MANIFEST_VERSION}, metadata: {...}, exports: [...] }`;
+  `embedded interface manifest must be { version: ${INTERFACE_MANIFEST_VERSION}, metadata: {...}, exports: [...] }; ` +
+  "regenerate packages with the matching SDK";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -73,8 +72,7 @@ export function validateInterfaceManifest(
   if (
     !isRecord(manifest) ||
     !Number.isInteger(manifest.version) ||
-    manifest.version < MIN_INTERFACE_MANIFEST_VERSION ||
-    manifest.version > INTERFACE_MANIFEST_VERSION ||
+    manifest.version !== INTERFACE_MANIFEST_VERSION ||
     !isRecord(manifest.metadata) ||
     !Array.isArray(manifest.exports)
   ) {
@@ -105,15 +103,16 @@ export function validateInterfaceManifest(
     manifest.version,
     packageFormatVersion,
   );
-  const exports = validateManifestExports(manifest.exports, manifest.version);
+  const exports = manifest.exports;
+  validateManifestExports(exports);
   const hostImports = manifest.hostImports ?? [];
-  validateManifestHostImports(hostImports, manifest.version);
+  validateManifestHostImports(hostImports);
   validatePackageSetSurface(
     manifest.metadata.packageSetMember,
     exports,
     hostImports,
   );
-  return { ...manifest, exports };
+  return manifest;
 }
 
 function validateManifestMetadata(
@@ -150,18 +149,16 @@ function validateManifestMetadata(
       `${label}.packageFormatVersion must match package header version ${packageFormatVersion}`,
     );
   }
-  validatePackageTargets(metadata.targets, `${label}.targets`, {
-    manifestVersion,
-  });
+  validatePackageTargets(metadata.targets, `${label}.targets`);
   validatePackageSetMember(metadata.packageSetMember, metadata.targets, label);
 }
 
-function validateManifestExports(exports, manifestVersion) {
+function validateManifestExports(exports) {
   const entries = new Set();
   const identities = new Set();
   const ids = new Set();
   const jsNames = new Set();
-  return exports.map((entry, index) => {
+  exports.forEach((entry, index) => {
     const label = `embedded interface manifest exports[${index}]`;
     if (!isRecord(entry)) {
       throw new Error(`${label} must be an object`);
@@ -171,13 +168,8 @@ function validateManifestExports(exports, manifestVersion) {
     requireOptionalString(entry.jsName, `${label}.jsName`);
     requireOptionalString(entry.source, `${label}.source`);
     requireInterfaceEffect(entry.effect, `${label}.effect`);
-    if (manifestVersion >= 7 && typeof entry.startup !== "boolean") {
+    if (typeof entry.startup !== "boolean") {
       throw new Error(`${label}.startup must be a boolean`);
-    }
-    if (manifestVersion < 7) {
-      if (entry.startup !== undefined && typeof entry.startup !== "boolean") {
-        throw new Error(`${label}.startup must be a boolean`);
-      }
     }
     requireUnique(entries, entry.entry, `${label}.entry`);
     if (entry.id !== undefined) requireUnique(ids, entry.id, `${label}.id`);
@@ -195,13 +187,8 @@ function validateManifestExports(exports, manifestVersion) {
       validateInterfaceRootType(arg.type, `${argLabel}.type`);
     });
     validateInterfaceRootType(entry.result, `${label}.result`);
-    if (manifestVersion >= 9) {
-      requireNameKey(entry.nameKey, `${label}.nameKey`);
-      requireUnique(identities, entry.nameKey, `${label}.nameKey`);
-    }
-    return manifestVersion < 7 && entry.startup === undefined
-      ? { ...entry, startup: false }
-      : entry;
+    requireNameKey(entry.nameKey, `${label}.nameKey`);
+    requireUnique(identities, entry.nameKey, `${label}.nameKey`);
   });
 }
 
@@ -248,7 +235,7 @@ function validatePackageSetSurface(member, exports, hostImports) {
   }
 }
 
-function validateManifestHostImports(hostImports, manifestVersion) {
+function validateManifestHostImports(hostImports) {
   const names = new Set();
   const identities = new Set();
   const symbols = new Set();
@@ -294,10 +281,8 @@ function validateManifestHostImports(hostImports, manifestVersion) {
       );
     }
     requireHostImportBoundary(entry.boundary, `${label}.boundary`);
-    if (manifestVersion >= 9) {
-      requireNameKey(entry.nameKey, `${label}.nameKey`);
-      requireUnique(identities, entry.nameKey, `${label}.nameKey`, "host import");
-    }
+    requireNameKey(entry.nameKey, `${label}.nameKey`);
+    requireUnique(identities, entry.nameKey, `${label}.nameKey`, "host import");
   });
 }
 

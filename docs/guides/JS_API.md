@@ -305,7 +305,9 @@ their existing reference-leased cleanup behavior.
   methods.
 - `vir.runStartupEntries()` invokes zero-argument exports whose manifest entry
   has `startup: true`, in manifest order. Successful hooks run once per loaded
-  package; a failed call can be retried without repeating earlier hooks.
+  package. A recoverable failed hook can be retried without repeating earlier
+  hooks; a fatal host failure or Wasm trap retires the runtime and requires a
+  fresh factory runtime.
 - `vir.interfaceManifest.exports[].startup` distinguishes `@[vir_startup]`
   hooks from ordinary `@[vir_export]` calls.
 - `vir.packageInfo.interfaceExports` reports the number of generated exports.
@@ -473,10 +475,12 @@ Names inside these structural expression and level values use a restricted
 text spelling: non-empty Lean identifier components separated by single dots.
 Unicode components accepted by the pinned Lean identifier predicates are
 supported, such as `café` and `αβ₁`; these predicates differ from JavaScript's
-Unicode identifier grammar. Numeric components (including
-large numerals), empty components, escaped components such as
-`A.«B.C»`, and other internal or non-identifier spellings are rejected at the
-JavaScript boundary instead of being normalized into a different `Lean.Name`.
+Unicode identifier grammar. JavaScript checks well-formed Unicode and rejects
+numeric, empty and escaped components such as `A.«B.C»`. The Wasm constructors
+and getters apply the pinned Lean identifier predicates to the remaining
+components. Unsupported spellings fail conversion instead of being normalized
+into a different `Lean.Name`; ordinary conversion failures leave the runtime
+usable.
 The empty string and `[anonymous]` are retained as explicit spellings for the
 anonymous name. Package and manifest names have their separate structural
 identity contract; this restriction applies only to the specialized Expr and
@@ -652,10 +656,16 @@ failures preserve the original JavaScript Error. The runtime remains reusable
 after those failures.
 
 A failed **pure** host import or an exception escaping Wasm execution makes the
-runtime unusable. Calls, callbacks, startup and package installation then reject;
-create a fresh runtime from the factory to recover. Catching a nested fatal
-callback in a host binding does not let the outer Lean call continue. Other
-runtime instances remain usable.
+runtime unusable. Synchronous calls, callbacks, startup and package installation
+then throw; asynchronous factory creation rejects. Create a fresh runtime from
+the factory to recover. Catching a nested fatal callback in a host binding does
+not let the outer Lean call continue. Other runtime instances remain usable.
+
+`runtime.failure` is a read-only `Error | null` diagnostic. It is `null` while
+the runtime is healthy or after a recoverable effect failure; after a fatal
+host/Wasm failure it retains the original error when available. Guarded runtime
+methods still throw after the failure, so inspect this property for diagnostics
+and create a fresh runtime for continued execution.
 
 `dispose()` remains idempotent after failure. It releases JavaScript-owned host
 resources and invalidates callbacks/handles without re-entering failed Wasm.

@@ -16,7 +16,6 @@ namespace lean::vir {
 struct package_call_runtime_summary {
     uint32_t arg_count;
     bool is_io;
-    bool needs_boxed_wasm32_boundary;
 };
 
 object * find_package_decl(object * name);
@@ -24,7 +23,6 @@ object * find_package_boxed_decl(object * name);
 object * find_package_init_name(object * name);
 uint32_t package_call_slot_for_export(uint32_t export_index);
 object * package_call_slot_name(uint32_t slot);
-bool package_call_slot_has_boxed_decl(uint32_t slot);
 bool package_call_summary(uint32_t slot, package_call_runtime_summary & out);
 char const * find_host_import_symbol(object * name);
 int32_t host_import_slot_for_symbol(char const * symbol);

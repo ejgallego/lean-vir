@@ -186,7 +186,7 @@ and export indices. Raw callers must establish those same preconditions for
 their inputs; they must not reset a package while calls or retained roots are
 live, or invoke lifecycle operations from an initializer.
 
-Since runtime ABI 3, begin/append/prepare/finish return `1` on success and `0` on
+Under runtime ABI 4, begin/append/prepare/finish return `1` on success and `0` on
 failure. `vir_package_decl_count` reports the count separately. A package set
 must contain at least one member, but a well-formed member or entire set may
 contain zero declarations. Query the root manifest after preparation and the
@@ -198,10 +198,13 @@ initializing, ready and failed. A failed append leaves previously staged members
 intact; failed index/export resolution during preparation requires abort or
 begin before appending again. Preparing before any member is appended leaves
 the transaction open.
-Initializer failure retires the interpreter and clears the package. Invalid or
-repeated transitions return failure without changing state, so a repeated finish
-neither reruns initializers nor unloads a ready package. Abort is idempotent and
-preserves the last diagnostic; begin clears it and starts a fresh transaction.
+An ordinary initializer failure retires the interpreter session and clears the
+staged package; the JS runtime remains usable for a fresh installation. A fatal
+host failure or Wasm trap retires the entire Wasm generation and cannot be
+recovered by retrying on that instance. Invalid or repeated transitions return
+failure without changing state, so a repeated finish neither reruns
+initializers nor unloads a ready package. Abort is idempotent and preserves the
+last diagnostic; begin clears it and starts a fresh transaction.
 The JS loader aborts on any failed transaction step. Package retirement also
 clears upstream initializer names and cached native-symbol lookups so a later
 installation cannot reuse their values or package-local host slots. Upstream
@@ -229,11 +232,10 @@ Repeated calls use `vir_call_resolved_objects(slot, argv, argc)`, without repars
 a display name.
 
 Manifest 9 uses canonical structural `nameKey` values for binary agreement and
-native registry lookup. Human-readable names remain aliases. Runtime ABI 4 adds
-an identity-mode byte to the transient package validation message; matching JS
-and Wasm must be installed together. Manifest 6–8 packages retain their legacy
-printer comparison. Their compatibility path is deliberate until supported
-consumers migrate; it is not used for new manifests or native lookup.
+native registry lookup. Human-readable names remain aliases. Runtime ABI 4
+requires matching JavaScript and Wasm artifacts, and its package contract uses
+the manifest-9 structural identity directly. The loader has no legacy
+display-name comparison path.
 
 The call requires a package-owned summary specifying argument count, effect
 handling and boxed wasm32 boundary requirements. It consumes owned argument
@@ -304,11 +306,12 @@ initializers include Lean's formatted IO error text in their diagnostics.
 
 The SDK transfers consuming call arguments before Wasm entry. Any exception
 escaping an exported Wasm function retires that instance: further calls,
-callbacks, startup and package replacement reject. A binding cannot swallow a
-nested fatal call and resume its outer Lean frame; transactional host resources
-roll back. The guarded export facade is runtime-owned and must not be replaced
-or bypassed with raw exports. Constructor failure before the facade exists is
-an instantiation failure; the factory never returns that instance.
+callbacks, startup and package installation fail synchronously. A binding
+cannot swallow a nested fatal call and resume its outer Lean frame; transactional
+host resources roll back. The guarded export facade is runtime-owned and must
+not be replaced or bypassed with raw exports. Constructor failure before the
+facade exists is an instantiation failure; the factory never returns that
+instance.
 
 Disposal after a fatal failure runs JavaScript cleanup and clears host roots,
 but does not call Wasm decrements, frees, closure releases or package abort.
