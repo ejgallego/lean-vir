@@ -8,8 +8,8 @@ unrelated responsibilities.
 
 ## Runtime Entry Points
 
-- `vir-runtime.js`: public package/SDK runtime facade, WASM instantiation, package loading
-  convenience helpers, and host import wiring.
+- `vir-runtime.js`: public package/SDK browser entry point selecting the default
+  host providers.
 - `vir-runtime-node.js`: public package/SDK Node wrapper that installs only
   environment-neutral JavaScript value and console bindings. Browser and React
   imports require an explicitly supplied external host.
@@ -25,10 +25,12 @@ unrelated responsibilities.
 
 ## Runtime Internals
 
+- `runtime/factory.js`: environment-neutral acquisition, WASM instantiation,
+  package input validation and host import wiring.
 - `runtime/call-timing.js`: opt-in synchronous runtime call phase
   attribution.
-- `runtime/vir-codec.js`: binary reader/writer and interface type descriptor
-  codec.
+- `runtime/vir-codec.js`: byte normalization, contract writer and live descriptor
+  accessors.
 - `runtime/callbacks.js`: private Lean closure roots associated with ordinary
   JavaScript functions, plus runtime-disposal helpers.
 - `runtime/cleanup.js`: shared cleanup error collection and deterministic
@@ -56,6 +58,8 @@ unrelated responsibilities.
   shared user-facing formatting.
 - `host-boundary.js`: exact-value externref roots and host-call rollback
   transactions.
+- `host/vir-common-host-bindings.js`: environment-neutral JavaScript value and
+  console providers, shared by the browser and Node entry points.
 - `host/vir-dom-host-bindings.js`: passive direct-value DOM provider helpers.
 - `host/vir-active-host-bindings.js`: explicit teardown for timers and frames.
   It does not represent passive JavaScript values.

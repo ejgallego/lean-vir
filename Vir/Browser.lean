@@ -6,7 +6,6 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.Common
 public import Vir.Js
 public import Vir.Browser.Generated
 

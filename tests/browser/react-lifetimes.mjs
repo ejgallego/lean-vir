@@ -20,13 +20,45 @@ import {
 
 const resultKey = "__leanVirReactRefLifetimeSmoke";
 const strictModeResultKey = "__leanVirReactStrictModeSmoke";
+const hoverLifecycleResultKey = "__leanVirInfoviewHoverLifecycleSmoke";
 const browserProbeBundles = new Map();
 
 export async function smokeBrowserReactLifetimes(cdp, artifactDirectory) {
   await smokeBrowserReactRefLifetime(cdp);
   await smokeBrowserReactStrictModeLifetime(cdp);
+  await smokeBrowserInfoviewHoverLifecycle(cdp);
   await smokeBrowserReactUseId(cdp, artifactDirectory);
   await smokeBrowserNativeInfoviewUpdates(cdp, artifactDirectory);
+}
+
+async function smokeBrowserInfoviewHoverLifecycle(cdp) {
+  const source = await bundledBrowserProbe(
+    "./hover-lifecycle-entry.js",
+    "production",
+  );
+  await evaluateBrowserProbe(
+    cdp,
+    source,
+    "lean-vir-infoview-hover-lifecycle-smoke.js",
+  );
+  const result = await evaluate(
+    cdp,
+    `globalThis[${JSON.stringify(hoverLifecycleResultKey)}]`,
+  );
+  if (result?.ok !== true) {
+    throw new Error(
+      `Infoview hover lifecycle browser probe failed: ${result?.error?.message ?? JSON.stringify(result)}`,
+    );
+  }
+  assert.deepEqual(result.value, {
+    activeBeforeDispose: 1,
+    activeAfterDispose: 0,
+    constructed: 1,
+    disconnected: 1,
+    added: 2,
+    removed: 2,
+    reentrantError: "host lifecycle cannot register active resources while disposing or disposed",
+  });
 }
 
 export async function smokeBrowserNativeInfoviewUpdates(

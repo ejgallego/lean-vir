@@ -9,7 +9,7 @@ import { DocumentPosition, EditorContext, InteractiveCode, TaggedText_stripTags,
 import { createBrowserHostBindings } from "../src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.js";
 import { createVirRuntime as createBundledVirRuntime } from "../src/vir-runtime.js";
-import { widgetErrorMessage as errorMessage } from "../src/vir-widget-errors.js";
+import { widgetErrorMessage as errorMessage } from "./vir-widget-errors.js";
 import { isEffectfulInterfaceEffect } from "../src/runtime/interface-effects.js";
 import { INTERFACE_TAG } from "../src/runtime/interface-tags.js";
 import { collectCleanupError } from "../src/runtime/cleanup.js";

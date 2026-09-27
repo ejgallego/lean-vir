@@ -4,6 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import {
+  collectCleanupError,
+  throwCollectedErrors,
+} from "../runtime/cleanup.js";
+import { registerHostCallRollback } from "../host-boundary.js";
+
 /**
  * Upstream infoview panel-widget bindings. The supplied functions are the
  * actual React hook and tagged-text utility from `@leanprover/infoview`.
@@ -14,23 +20,56 @@ export function createInfoviewPanelBindings({
   editorContext = null,
   positionToTdpp = null,
   interactiveCode = null,
+  lifecycle = null,
 } = {}) {
   return {
     "infoview.hover.modifier": (event, key) => event.getModifierState(key),
     "infoview.hover.rect": element => element.getBoundingClientRect(),
     "infoview.hover.observe": (reference, popup, callback) => {
+      lifecycle?.requireActive();
       const view = reference.ownerDocument.defaultView;
-      const observer = new view.ResizeObserver(() => callback(undefined));
+      let observer = new view.ResizeObserver(() => callback(undefined));
       const update = () => callback(undefined);
-      observer.observe(reference);
-      observer.observe(popup);
-      view.addEventListener("resize", update);
-      view.addEventListener("scroll", update, true);
-      return () => {
-        observer.disconnect();
-        view.removeEventListener("resize", update);
-        view.removeEventListener("scroll", update, true);
+      let resizeListenerInstalled = false;
+      let scrollListenerInstalled = false;
+      const cleanup = () => {
+        const errors = [];
+        lifecycle?.removeDisposable(cleanup);
+        const activeObserver = observer;
+        observer = null;
+        if (activeObserver !== null) {
+          collectCleanupError(errors, () => activeObserver.disconnect());
+        }
+        if (resizeListenerInstalled) {
+          resizeListenerInstalled = false;
+          collectCleanupError(errors, () =>
+            view.removeEventListener("resize", update),
+          );
+        }
+        if (scrollListenerInstalled) {
+          scrollListenerInstalled = false;
+          collectCleanupError(errors, () =>
+            view.removeEventListener("scroll", update, true),
+          );
+        }
+        throwCollectedErrors(errors, "infoview hover cleanup failed");
       };
+
+      try {
+        observer.observe(reference);
+        observer.observe(popup);
+        view.addEventListener("resize", update);
+        resizeListenerInstalled = true;
+        view.addEventListener("scroll", update, true);
+        scrollListenerInstalled = true;
+        lifecycle?.addDisposable(cleanup, cleanup);
+        registerHostCallRollback(cleanup);
+        return cleanup;
+      } catch (error) {
+        const errors = [error];
+        collectCleanupError(errors, cleanup);
+        throwCollectedErrors(errors, "infoview hover setup failed");
+      }
     },
     "infoview.interactiveCode": () => requireUpstream(interactiveCode, "InteractiveCode"),
     "infoview.editorContext": () => {

@@ -11,7 +11,6 @@ import {
   disposeHostBindings,
   ExternrefRoots,
 } from "../host-boundary.js";
-import { createBrowserHostBindings } from "../vir-host-bindings.js";
 import {
   collectCleanupError,
   throwCollectedErrors,
@@ -32,7 +31,7 @@ export const RUNTIME_INTRINSIC_HOST_TARGETS = Object.freeze({
 export class VirHostState {
   constructor({
     hostBindings = null,
-    defaultHostBindings = createBrowserHostBindings(),
+    defaultHostBindings = null,
     releaseHostBindings = null,
     releaseDefaultHostBindings = null,
   } = {}) {

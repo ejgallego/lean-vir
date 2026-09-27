@@ -23,10 +23,6 @@ import {
 } from "../../scripts/packages/irpkg-generator.mjs";
 import { createTestModuleProject } from "../support/module-project.mjs";
 import {
-  roundTripInterfaceTypeDescriptor,
-  sameInterfaceTypeDescriptor,
-} from "../../web/src/runtime/vir-codec.js";
-import {
   INTERFACE_MANIFEST_ARTIFACT,
   INTERFACE_MANIFEST_VERSION,
   validateInterfaceManifest,
@@ -82,36 +78,6 @@ export function jsNatResourceValue(value) {
     throw new Error("expected JsNat host resource");
   }
   return value;
-}
-
-export function assertManifestTypeDescriptorsRoundTrip(manifest) {
-  const entries = [
-    ...manifest.exports,
-    ...(manifest.hostImports ?? []).map((entry) => ({
-      ...entry,
-      entry: entry.name,
-    })),
-  ];
-  for (const entry of entries) {
-    for (const arg of entry.args) {
-      const decoded = roundTripInterfaceTypeDescriptor(
-        arg.type,
-        `${entry.entry} argument ${arg.name}`,
-      );
-      assert.ok(
-        sameInterfaceTypeDescriptor(arg.type, decoded),
-        `${entry.entry} argument ${arg.name} descriptor should round-trip`,
-      );
-    }
-    const decoded = roundTripInterfaceTypeDescriptor(
-      entry.result,
-      `${entry.entry} result`,
-    );
-    assert.ok(
-      sameInterfaceTypeDescriptor(entry.result, decoded),
-      `${entry.entry} result descriptor should round-trip`,
-    );
-  }
 }
 
 export function findTypeDescriptor(type, predicate, seen = new Set()) {

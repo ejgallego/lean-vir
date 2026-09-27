@@ -12,7 +12,6 @@ import {
 } from "../../scripts/packages/package-versions.mjs";
 import {
   assert,
-  assertManifestTypeDescriptorsRoundTrip,
   generateIrPackage,
   join,
   manifestEntry,
@@ -51,8 +50,6 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.ok(
     freshManifest.metadata.targets[0].resolvedRoots.includes("freshBump"),
   );
-  assertManifestTypeDescriptorsRoundTrip(freshManifest);
-
   const freshEntries = freshManifest.exports.map((entry) => entry.entry).sort();
   assert.deepEqual(freshEntries, [
     "freshAliasBump",

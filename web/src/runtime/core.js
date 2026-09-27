@@ -25,7 +25,6 @@ import {
 const textDecoder = new TextDecoder();
 const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
-const OBJECT_CALL_UNAVAILABLE = Symbol("object-call-unavailable");
 
 export class VirRuntime extends ObjectValueRuntime {
   constructor(
@@ -102,6 +101,7 @@ export class VirRuntime extends ObjectValueRuntime {
     return this.installIrPackageSetBytes(packageBytes, packageSet);
   }
 
+  // Internal installer for validated bytes from the factory or public loader.
   installIrPackageSetBytes(packageBytes, packageSet = null) {
     this.requireLiveRuntime();
     if (this.hasPackageState()) {
@@ -330,22 +330,11 @@ export class VirRuntime extends ObjectValueRuntime {
     }
 
     const cache = this.callCacheFor(entry);
-    const objectResult = this.tryObjectResolvedCall(entry, args, cache, timing);
-    if (objectResult !== OBJECT_CALL_UNAVAILABLE) {
-      return objectResult;
-    }
-    throw new Error(
-      `object ABI does not support interface entry ${entry.entry}`,
-    );
-  }
-
-  tryObjectResolvedCall(entry, args, cache, timing = null) {
     const plan = this.objectCallPlanFor(entry, cache);
-    if (plan === null) {
-      return OBJECT_CALL_UNAVAILABLE;
-    }
-    if (!this.hasObjectValueExports()) {
-      return OBJECT_CALL_UNAVAILABLE;
+    if (plan === null || !this.hasObjectValueExports()) {
+      throw new Error(
+        `object ABI does not support interface entry ${entry.entry}`,
+      );
     }
     const argObjs = [];
     try {
