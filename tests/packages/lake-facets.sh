@@ -577,6 +577,15 @@ test ! -e "$module_package"
 test ! -e "$module_dependency"
 test -f "${module_package%.irpkg}.report.md"
 
+# A different rejection must not republish the prior generation's report.
+printf '%s\n' 'def Smoke.NewRuntime.value : Nat := 1' > "$tmp/Smoke/NewRuntime.lean"
+if lake -d "$tmp" build +Smoke.NewRuntime:vir > "$tmp/rejected-after-failure.log" 2>&1; then
+  echo "non-module replacement after a failed generation unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -q 'requires a `module` header and compiled IR' "$tmp/rejected-after-failure.log"
+test ! -e "${module_package%.irpkg}.report.md"
+
 client_native_package="$tmp/.lake/build/vir/module-sets/Smoke/ClientNative.irpkg"
 client_native_report="$tmp/.lake/build/vir/module-sets/Smoke/ClientNative.report.md"
 write_client_native_manifest \
