@@ -188,6 +188,10 @@ module_facet virProgram (mod : Module) : System.FilePath := do
   let setupPath := virModuleOutput mod "programs" "setup.json"
   let clientNativeManifest? ← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST"
   generatorJob.bindM fun generator => inputsJob.mapM fun setup => do
+    -- A rejected non-module must not inherit an earlier generation diagnostic.
+    let diagnostic := output.addExtension "report.md"
+    checkResourceOutput diagnostic
+    removeFileIfExists diagnostic
     unless (setup.importArts.find? mod.name).any (·.ir?.isSome) do
       error s!"VIR package input `{mod.name}` requires a `module` header and compiled IR"
     addTrace (← computeTrace generator)
