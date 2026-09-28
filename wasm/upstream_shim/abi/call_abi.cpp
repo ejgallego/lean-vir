@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 #include "interpreter/interpreter_bridge.h"
 
 #include "package/decl_provider.h"
+#include "runtime/io_error.h"
 
 #include <stdint.h>
 
@@ -66,16 +67,10 @@ extern "C" lean::object * vir_call_resolved_objects(
         lean::vir::g_call_error = "call slot is not registered";
         return nullptr;
     }
-    bool has_boxed_decl = lean::vir::package_call_slot_has_boxed_decl(call_slot);
     lean::vir::package_call_runtime_summary summary{};
     if (!lean::vir::package_call_summary(call_slot, summary)) {
         lean::vir::cleanup_object_call_args(argc, argv);
         lean::vir::g_call_error = "object call requires a package-owned call summary";
-        return nullptr;
-    }
-    if (!has_boxed_decl && summary.needs_boxed_wasm32_boundary) {
-        lean::vir::cleanup_object_call_args(argc, argv);
-        lean::vir::g_call_error = "object call requires a boxed package declaration for this call summary";
         return nullptr;
     }
     if (argc != summary.arg_count) {
@@ -102,8 +97,13 @@ extern "C" lean::object * vir_call_resolved_objects(
     }
     if (summary.is_io) {
         if (!lean_io_result_is_ok(result)) {
+            std::string detail = lean::vir::io_result_error_message(result);
             lean_dec(result);
             lean::vir::g_call_error = "IO action failed";
+            if (!detail.empty()) {
+                lean::vir::g_call_error += ": ";
+                lean::vir::g_call_error += detail;
+            }
             return nullptr;
         }
         result = lean_io_result_take_value(result);

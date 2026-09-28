@@ -14,7 +14,7 @@ namespace Vir.FetchSdk
 
 def sdkVersion : String := "0.1.0"
 
-def sdkRuntimeAbiVersion : Nat := 2
+def sdkRuntimeAbiVersion : Nat := 4
 
 structure Options where
   out : FilePath := "web/public/vendor/lean-vir"

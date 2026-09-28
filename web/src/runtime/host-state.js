@@ -11,7 +11,6 @@ import {
   disposeHostBindings,
   ExternrefRoots,
 } from "../host-boundary.js";
-import { createBrowserHostBindings } from "../vir-host-bindings.js";
 import {
   collectCleanupError,
   throwCollectedErrors,
@@ -32,7 +31,7 @@ export const RUNTIME_INTRINSIC_HOST_TARGETS = Object.freeze({
 export class VirHostState {
   constructor({
     hostBindings = null,
-    defaultHostBindings = createBrowserHostBindings(),
+    defaultHostBindings = null,
     releaseHostBindings = null,
     releaseDefaultHostBindings = null,
   } = {}) {
@@ -155,6 +154,7 @@ export class VirHostState {
   }
 
   callObjectsImpl(slot, argvPtr, argc) {
+    if (this.runtime?.failure != null) throw this.runtime.failure;
     // A recorded exception belongs to the active JS call. Even if Lean catches
     // the IO error used for propagation, it must not dispatch further host work.
     if (this.callError !== null) throw this.callError;
@@ -211,6 +211,7 @@ export class VirHostState {
     const transaction = beginHostCallTransaction();
     try {
       const value = binding(...args);
+      if (this.runtime.failure != null) throw this.runtime.failure;
       if (
         !isGenericJsResourceDescriptor(entry.result) &&
         isPromiseLike(value)
@@ -223,6 +224,7 @@ export class VirHostState {
       const resultObject = explicitConversionTarget
         ? this.runtime.makeObjectValue(entry.result, value, resultLabel)
         : this.runtime.makeJsObjectValue(entry.result, value, resultLabel);
+      if (this.runtime.failure != null) throw this.runtime.failure;
       commitHostCallTransaction(transaction);
       return resultObject;
     } catch (error) {

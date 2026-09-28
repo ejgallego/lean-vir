@@ -232,7 +232,8 @@ termination operation:
 
 - timeouts and intervals;
 - animation frames;
-- React roots.
+- React roots;
+- Infoview hover observers and their viewport listeners.
 
 The shared `HostLifecycle` registers each active value together with its exact
 cleanup function. Runtime disposal invokes those functions without inspecting
@@ -248,6 +249,16 @@ caller explicitly supplies one. A factory-created runtime generation can
 therefore be disposed without invalidating another live generation.
 Preconstructed binding maps are reference-counted only so intentional sharing
 across generations remains safe.
+
+The Infoview hover provider registers its `ResizeObserver` and viewport
+listeners in this same lifecycle. Its returned cleanup removes that
+registration before disconnecting the observer and listeners, so normal Lean
+effect cleanup and hard lifecycle disposal are both idempotent. The lifecycle
+gate applies to this provider-owned activity only; generic DOM event listeners
+remain application-owned. When a preconstructed binding map is intentionally
+shared, its lifecycle remains active until the final binding-map lease is
+released, so an earlier runtime disposal does not close admission for the
+other owners.
 
 New lifecycle-managed resources are published transactionally. Before invoking a
 binding, the runtime opens a private transaction. An active resource created by

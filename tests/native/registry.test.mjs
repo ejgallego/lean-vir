@@ -16,18 +16,21 @@ import {
 test("native registry separates wrappers, constants, and compiler-owned entries", () => {
   const wrapper = {
     name: "Demo.run",
+    nameKey: "s44656d6f/s72756e/",
     symbol: "lean_demo_run",
     params: [{}],
     generateBoxedWrapper: false,
   };
   const constant = {
     name: "Demo.constant",
+    nameKey: "s44656d6f/s636f6e7374616e74/",
     symbol: "l_Demo_constant",
     params: [],
     generateBoxedWrapper: false,
   };
   const compilerOwned = {
     name: "Demo.compilerOwned",
+    nameKey: "s44656d6f/s636f6d70696c65724f776e6564/",
     symbol: "lean_demo_compiler_owned",
     params: [{}],
     generateBoxedWrapper: true,
@@ -35,14 +38,14 @@ test("native registry separates wrappers, constants, and compiler-owned entries"
 
   assert.deepEqual(nativeSymbolRegistryEntry(wrapper), {
     kind: "X",
-    leanName: "Demo.run",
+    nameKey: "s44656d6f/s72756e/",
     symbol: "lean_demo_run",
     wrapper: "lean_demo_run___boxed",
     dlsymSymbol: "lean_demo_run___boxed",
   });
   assert.deepEqual(nativeSymbolRegistryEntry(constant), {
     kind: "X_CONST",
-    leanName: "Demo.constant",
+    nameKey: "s44656d6f/s636f6e7374616e74/",
     symbol: "l_Demo_constant",
     wrapper: "l_Demo_constant",
     dlsymSymbol: "l_Demo_constant",

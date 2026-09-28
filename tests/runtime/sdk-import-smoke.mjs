@@ -53,7 +53,6 @@ try {
   const runtime = modules["vir-runtime.js"];
   const nodeRuntime = modules["vir-runtime-node.js"];
   const hostBindings = modules["vir-host-bindings.js"];
-  const codec = modules["runtime/vir-codec.js"];
   const interfaceManifest = modules["runtime/interface-manifest.js"];
   const interfaceTags = modules["runtime/interface-tags.js"];
   const packageTargets = modules["runtime/package-targets.js"];
@@ -70,7 +69,7 @@ try {
   );
   assert.equal(
     runtime.packageTargetModeLabel("markedModules"),
-    "marked declarations across imported modules",
+    null,
   );
   assert.equal(runtime.VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
   assert.equal(runtime.VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
@@ -80,23 +79,10 @@ try {
   );
   assert.equal(Object.hasOwn(runtime, "VirRuntime"), false);
   assert.equal(Object.hasOwn(runtime, "VIR_HOST_RESOLVE_BINDING"), false);
-  assert.equal(
-    Object.hasOwn(runtime, "roundTripInterfaceTypeDescriptor"),
-    false,
-  );
-  assert.equal(Object.hasOwn(runtime, "sameInterfaceTypeDescriptor"), false);
   assert.equal(nodeRuntime.debugWasmUrlFor, runtime.debugWasmUrlFor);
   assert.equal(typeof nodeRuntime.createVirRuntime, "function");
   assert.equal(Object.hasOwn(nodeRuntime, "VirRuntime"), false);
   assert.equal(Object.hasOwn(nodeRuntime, "VIR_HOST_RESOLVE_BINDING"), false);
-  assert.equal(
-    Object.hasOwn(nodeRuntime, "roundTripInterfaceTypeDescriptor"),
-    false,
-  );
-  assert.equal(
-    Object.hasOwn(nodeRuntime, "sameInterfaceTypeDescriptor"),
-    false,
-  );
   assert.equal(typeof hostBindings.createHostLifecycle, "function");
   assert.equal(
     Object.hasOwn(hostBindings, "createDOMTokenListHostBindings"),
@@ -106,8 +92,6 @@ try {
     Object.hasOwn(hostBindings, "createCSSStyleDeclarationHostBindings"),
     false,
   );
-  assert.equal(typeof codec.decodeTypeDescriptor, "function");
-  assert.equal(typeof codec.roundTripInterfaceTypeDescriptor, "function");
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
   assert.equal(
     packageTargets.formatPackageTarget({
@@ -123,26 +107,13 @@ try {
       mode: "markedModules",
       resolvedRoots: ["Example.value"],
     }),
-    "Example.lean [marked declarations across imported modules] roots: Example.value",
+    "Example.lean [unknown selection] roots: Example.value",
   );
-  assert.equal(typeof codec.sameInterfaceTypeDescriptor, "function");
   assert.equal(interfaceTags.INTERFACE_TAG.NAT, 0);
   assert.equal(
     interfaceTags.SUPPORTED_INTERFACE_TAGS.has(interfaceTags.INTERFACE_TAG.NAT),
     true,
   );
-  assert.equal(
-    interfaceTags.JSON_INPUT_INTERFACE_TAGS.has(
-      interfaceTags.INTERFACE_TAG.ARRAY,
-    ),
-    true,
-  );
-
-  const decoded = codec.roundTripInterfaceTypeDescriptor({
-    type: "Nat",
-    interfaceTag: interfaceTags.INTERFACE_TAG.NAT,
-  });
-  assert.deepEqual(decoded, { interfaceTag: interfaceTags.INTERFACE_TAG.NAT });
 } finally {
   await rm(isolatedDir, { recursive: true, force: true });
 }

@@ -23,7 +23,7 @@ export function encodePackageContract(manifest) {
   };
   writer.u32(manifest.exports.length);
   for (const entry of manifest.exports) {
-    string(entry.entry);
+    string(entry.nameKey);
     writer.u32(entry.args.length);
     writer.u8(entry.effect !== "pure" ? 1 : 0);
     writer.u8(
@@ -36,7 +36,7 @@ export function encodePackageContract(manifest) {
   const imports = manifest.hostImports ?? [];
   writer.u32(imports.length);
   for (const entry of imports) {
-    string(entry.name);
+    string(entry.nameKey);
     string(entry.target);
     string(entry.symbol);
     writer.u32(entry.arity);

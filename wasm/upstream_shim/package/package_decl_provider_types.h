@@ -48,7 +48,6 @@ struct decoded_ir_package {
     std::vector<init_global_entry> init_entries;
     std::vector<host_import_entry> host_imports;
     std::vector<export_call_summary_entry> export_summaries;
-    std::vector<uint32_t> call_summary_indices;
     std::string interface_manifest;
     uint32_t format_version = 0;
 

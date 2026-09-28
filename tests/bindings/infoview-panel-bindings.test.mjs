@@ -9,7 +9,130 @@ import test from "node:test";
 import { typeScriptDiagnostics } from "../support/typescript-probe.mjs";
 
 import { createInfoviewPanelBindings } from "../../web/src/host/vir-infoview-panel-bindings.js";
+import { createHostLifecycle } from "../../web/src/host/vir-active-host-bindings.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
+import { createBrowserHostBindings } from "../../web/src/vir-host-bindings.js";
+import { VirHostState } from "../../web/src/runtime/host-state.js";
+import { HOST_IMPORT_BOUNDARY } from "../../web/src/runtime/interface-manifest.js";
+import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+
+function hoverEnvironment({
+  failObserve = null,
+  failAdd = null,
+  failDisconnect = null,
+  failRemove = new Map(),
+} = {}) {
+  const observations = [];
+  const listeners = [];
+  const calls = [];
+  const view = {
+    ResizeObserver: class {
+      constructor(callback) {
+        this.callback = callback;
+        calls.push(["construct"]);
+      }
+
+      observe(element) {
+        calls.push(["observe", element]);
+        const failedElement = failObserve === "reference"
+          ? reference
+          : failObserve === "popup"
+            ? popup
+            : failObserve;
+        if (failedElement === element) throw new Error("observe failed");
+        observations.push(element);
+      }
+
+      disconnect() {
+        calls.push(["disconnect"]);
+        if (failDisconnect !== null) throw failDisconnect;
+        observations.length = 0;
+      }
+    },
+
+    addEventListener(type, listener, capture) {
+      calls.push(["add", type, listener, capture]);
+      if (failAdd === type) throw new Error(`${type} listener failed`);
+      if (failAdd?.type === type) throw failAdd.error;
+      listeners.push([type, listener, capture]);
+    },
+
+    removeEventListener(type, listener, capture) {
+      calls.push(["remove", type, listener, capture]);
+      const failure = failRemove.get(type);
+      if (failure !== undefined) throw failure;
+      const index = listeners.findIndex(entry =>
+        entry[0] === type && entry[1] === listener && entry[2] === capture,
+      );
+      assert.notEqual(index, -1, `missing ${type} listener`);
+      listeners.splice(index, 1);
+    },
+  };
+  const reference = { ownerDocument: { defaultView: view } };
+  const popup = {};
+  return {
+    reference,
+    popup,
+    view,
+    observations,
+    listeners,
+    calls,
+    state() {
+      return { observations: observations.length, listeners: listeners.length };
+    },
+  };
+}
+
+function assertAggregateWithErrors(error, expected) {
+  assert.equal(error instanceof AggregateError, true);
+  for (const failure of expected) assert.ok(error.errors.includes(failure));
+}
+
+function callHoverThroughHostState({ environment, loweringError, captured, lifecycle = null }) {
+  const bindings = createInfoviewPanelBindings({ lifecycle });
+  const resourceType = {
+    interfaceTag: INTERFACE_TAG.RESOURCE,
+    kind: "resource",
+    name: "Lean.Vir.Js",
+  };
+  const values = new Map([
+    [1, environment.reference],
+    [2, environment.popup],
+    [3, () => undefined],
+  ]);
+  const hostState = new VirHostState({
+    hostBindings: {
+      "infoview.hover.observe": bindings["infoview.hover.observe"],
+    },
+    defaultHostBindings: {},
+  });
+  hostState.attach({ memory: new WebAssembly.Memory({ initial: 1 }) });
+  hostState.attachRuntime({
+    liftJsObjectValue: (_type, pointer) => values.get(pointer),
+    makeJsObjectValue: (_type, value) => {
+      if (captured !== undefined) captured.value = value;
+      if (loweringError !== null) throw loweringError;
+      return value;
+    },
+  });
+  hostState.setManifest({
+    hostImports: [{
+      target: "infoview.hover.observe",
+      boundary: HOST_IMPORT_BOUNDARY.HOST_RESOURCE,
+      args: [
+        { name: "reference", type: resourceType },
+        { name: "popup", type: resourceType },
+        { name: "callback", type: resourceType },
+      ],
+      result: resourceType,
+    }],
+  });
+  const view = new DataView(hostState.exports.memory.buffer);
+  view.setUint32(4, 1, true);
+  view.setUint32(8, 2, true);
+  view.setUint32(12, 3, true);
+  return hostState.callObjectsImpl(0, 4, 3);
+}
 
 test("hover primitives preserve DOM values and disconnect geometry observers", () => {
   const bindings = createInfoviewPanelBindings();
@@ -50,6 +173,7 @@ test("hover primitives preserve DOM values and disconnect geometry observers", (
   listeners[0][1]();
   assert.equal(calls, 2);
   cleanup();
+  cleanup();
   assert.equal(disconnected, true);
   assert.deepEqual(listeners, []);
 
@@ -65,6 +189,187 @@ test("hover primitives preserve DOM values and disconnect geometry observers", (
     if (original) Object.defineProperty(globalThis, "document", original);
     else delete globalThis.document;
   }
+});
+
+test("hover activity follows the shared lifecycle and rejects setup during disposal", () => {
+  const lifecycle = createHostLifecycle();
+  const environment = hoverEnvironment();
+  const bindings = createBrowserHostBindings({ lifecycle });
+  const cleanup = bindings["infoview.hover.observe"](
+    environment.reference,
+    environment.popup,
+    () => undefined,
+  );
+  assert.deepEqual(lifecycle.debugResourceCounts(), { active: 1 });
+  cleanup();
+  assert.deepEqual(lifecycle.debugResourceCounts(), { active: 0 });
+  assert.deepEqual(environment.state(), { observations: 0, listeners: 0 });
+  lifecycle.dispose();
+
+  const disposalLifecycle = createHostLifecycle();
+  const disposalEnvironment = hoverEnvironment();
+  const disposalBindings = createBrowserHostBindings({
+    lifecycle: disposalLifecycle,
+  });
+  const disposalCleanup = disposalBindings["infoview.hover.observe"](
+    disposalEnvironment.reference,
+    disposalEnvironment.popup,
+    () => undefined,
+  );
+  assert.deepEqual(disposalLifecycle.debugResourceCounts(), { active: 1 });
+  let reentrantError = null;
+  const reentrantEnvironment = hoverEnvironment();
+  disposalLifecycle.addDisposable({}, () => {
+    try {
+      disposalBindings["infoview.hover.observe"](
+        reentrantEnvironment.reference,
+        reentrantEnvironment.popup,
+        () => undefined,
+      );
+    } catch (error) {
+      reentrantError = error;
+    }
+  });
+  disposalLifecycle.dispose();
+  assert.deepEqual(disposalEnvironment.state(), { observations: 0, listeners: 0 });
+  assert.deepEqual(disposalLifecycle.debugResourceCounts(), { active: 0 });
+  assert.match(
+    reentrantError?.message ?? "",
+    /host lifecycle cannot register active resources/,
+  );
+  assert.deepEqual(reentrantEnvironment.calls, []);
+  const callsAfterDispose = disposalEnvironment.calls.length;
+  disposalCleanup();
+  assert.equal(
+    disposalEnvironment.calls.length,
+    callsAfterDispose,
+    "lifecycle disposal leaves the returned cleanup idempotent",
+  );
+
+  const rejectedEnvironment = hoverEnvironment();
+  assert.throws(
+    () => disposalBindings["infoview.hover.observe"](
+      rejectedEnvironment.reference,
+      rejectedEnvironment.popup,
+      () => undefined,
+    ),
+    /host lifecycle cannot register active resources/,
+  );
+  assert.deepEqual(rejectedEnvironment.state(), { observations: 0, listeners: 0 });
+  assert.deepEqual(rejectedEnvironment.calls, []);
+});
+
+test("hover setup rolls back each partial observer and listener installation", () => {
+  const bindings = createInfoviewPanelBindings();
+  for (const [stage, options] of [
+    ["reference observation", { failObserve: "reference" }],
+    ["popup observation", { failObserve: "popup" }],
+    ["resize listener", { failAdd: "resize" }],
+    ["scroll listener", { failAdd: "scroll" }],
+  ]) {
+    const environment = hoverEnvironment(options);
+    assert.throws(
+      () => bindings["infoview.hover.observe"](
+        environment.reference,
+        environment.popup,
+        () => undefined,
+      ),
+      /failed/,
+    );
+    assert.deepEqual(environment.state(), { observations: 0, listeners: 0 }, stage);
+    assert.equal(
+      environment.calls.filter(([kind]) => kind === "disconnect").length,
+      1,
+      `${stage} disconnects the allocated observer`,
+    );
+  }
+});
+
+test("hover cleanup attempts independent releases and is idempotent after failures", () => {
+  const bindings = createInfoviewPanelBindings();
+  const disconnectFailure = new Error("disconnect failed");
+  const resizeFailure = new Error("resize removal failed");
+  const scrollFailure = new Error("scroll removal failed");
+  const environment = hoverEnvironment({
+    failDisconnect: disconnectFailure,
+    failRemove: new Map([
+      ["resize", resizeFailure],
+      ["scroll", scrollFailure],
+    ]),
+  });
+  const cleanup = bindings["infoview.hover.observe"](
+    environment.reference,
+    environment.popup,
+    () => undefined,
+  );
+  let firstFailure;
+  try {
+    cleanup();
+  } catch (error) {
+    firstFailure = error;
+  }
+  assert.ok(firstFailure);
+  assertAggregateWithErrors(firstFailure, [
+    disconnectFailure,
+    resizeFailure,
+    scrollFailure,
+  ]);
+  assert.deepEqual(
+    environment.calls.filter(([kind]) => kind === "remove").map(([, type]) => type),
+    ["resize", "scroll"],
+  );
+  const callsAfterFailure = environment.calls.length;
+  cleanup();
+  assert.equal(environment.calls.length, callsAfterFailure, "cleanup is idempotent after errors");
+});
+
+test("hover setup preserves its error together with independent cleanup errors", () => {
+  const bindings = createInfoviewPanelBindings();
+  const setupFailure = new Error("scroll listener setup failed");
+  const disconnectFailure = new Error("disconnect failed");
+  const resizeFailure = new Error("resize removal failed");
+  const environment = hoverEnvironment({
+    failAdd: { type: "scroll", error: setupFailure },
+    failDisconnect: disconnectFailure,
+    failRemove: new Map([["resize", resizeFailure]]),
+  });
+  let failure;
+  try {
+    bindings["infoview.hover.observe"](
+      environment.reference,
+      environment.popup,
+      () => undefined,
+    );
+  } catch (error) {
+    failure = error;
+  }
+  assert.ok(failure instanceof AggregateError);
+  assert.equal(failure.errors[0], setupFailure);
+  assert.ok(failure.errors[1] instanceof AggregateError);
+  assertAggregateWithErrors(failure.errors[1], [disconnectFailure, resizeFailure]);
+  assert.deepEqual(
+    environment.calls.filter(([kind]) => kind === "remove").map(([, type]) => type),
+    ["resize"],
+  );
+});
+
+test("host result lowering rolls back hover effects and later cleanup does not repeat releases", () => {
+  const environment = hoverEnvironment();
+  const lifecycle = createHostLifecycle();
+  const loweringFailure = new Error("returned cleanup lowering failed");
+  const captured = {};
+  assert.throws(() => callHoverThroughHostState({
+    environment,
+    loweringError: loweringFailure,
+    captured,
+    lifecycle,
+  }), error => error === loweringFailure);
+  assert.equal(typeof captured.value, "function");
+  assert.deepEqual(environment.state(), { observations: 0, listeners: 0 });
+  assert.deepEqual(lifecycle.debugResourceCounts(), { active: 0 });
+  const callsAfterRollback = environment.calls.length;
+  captured.value();
+  assert.equal(environment.calls.length, callsAfterRollback, "rollback cleanup is idempotent");
 });
 
 test("panel projections match the pinned upstream TypeScript shapes", () => {

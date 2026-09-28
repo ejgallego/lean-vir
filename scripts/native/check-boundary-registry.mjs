@@ -43,7 +43,7 @@ if (writeMode) {
 }
 
 const nativeRegistryEntries = new Map(
-  parseNativeSymbolRegistry(generatedRegistry).map((entry) => [entry.leanName, entry]),
+  parseNativeSymbolRegistry(generatedRegistry).map((entry) => [entry.nameKey, entry]),
 );
 const boxedWrappers = parseBoxedWrappers(nativeSymbols);
 const failures = [];
@@ -52,7 +52,7 @@ const expectedDlsymSymbols = new Set();
 const expectedWrappers = new Set();
 
 for (const entry of nativeExterns) {
-  const key = entry.name;
+  const key = entry.nameKey;
   const registryEntry = nativeRegistryEntries.get(key);
   if (entry.generateBoxedWrapper) {
     if (entry.params.length === 0) {
@@ -92,7 +92,7 @@ for (const entry of nativeExterns) {
 }
 
 for (const [key, entry] of nativeRegistryEntries.entries()) {
-  if (!nativeExterns.some((nativeExtern) => nativeExtern.name === key && !nativeExtern.generateBoxedWrapper)) {
+  if (!nativeExterns.some((nativeExtern) => nativeExtern.nameKey === key && !nativeExtern.generateBoxedWrapper)) {
     failures.push(`${key}: native registry has extra entry`);
   }
   if (!expectedDlsymSymbols.has(entry.dlsymSymbol)) {

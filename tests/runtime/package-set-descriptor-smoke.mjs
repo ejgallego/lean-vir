@@ -16,7 +16,7 @@ import {
 import {
   readIrPackageInfo,
   replaceIrPackageManifest,
-} from "../../web/src/runtime/ir-package.js";
+} from "../../scripts/packages/irpkg-format.mjs";
 import {
   packageTargetModeLabel,
   validatePackageTargets,
@@ -265,14 +265,13 @@ for (const origin of [
       resolvedRoots: ["Example.value"],
     };
     assert.doesNotThrow(() =>
-      validatePackageTargets([target], "targets", { manifestVersion: 8 }),
+      validatePackageTargets([target], "targets"),
     );
     assert.throws(
       () =>
         validatePackageTargets(
           [{ ...target, roots: explicitRoots ? [] : ["Example.value"] }],
           "targets",
-          { manifestVersion: 8 },
         ),
       explicitRoots ? /roots must be non-empty/ : /roots must be empty/,
     );
@@ -289,7 +288,6 @@ for (const origin of [
           },
         ],
         "targets",
-        { manifestVersion: 8 },
       ),
     origin.module
       ? /module requires mode markedModule/
@@ -302,23 +300,9 @@ const legacyTarget = {
   roots: [],
   resolvedRoots: [],
 };
-for (const manifestVersion of [6, 7]) {
-  assert.doesNotThrow(() =>
-    validatePackageTargets([legacyTarget], "targets", { manifestVersion }),
-  );
-  assert.throws(
-    () =>
-      validatePackageTargets(
-        [{ ...legacyTarget, source: undefined, module: "Example" }],
-        "targets",
-        { manifestVersion },
-      ),
-    /module requires mode markedModule/,
-  );
-}
 assert.throws(
   () =>
-    validatePackageTargets([legacyTarget], "targets", { manifestVersion: 8 }),
+    validatePackageTargets([legacyTarget], "targets"),
   /mode must be one of/,
 );
 
@@ -408,6 +392,26 @@ for (const inputKind of ["fetched", "bytes"]) {
     runtime.dispose();
   }
 }
+
+// One member validation plus the effective manifest returned by the backend.
+// Counting actual JSON parses catches duplicate decoding across those layers.
+const parse = JSON.parse;
+let manifestParses = 0;
+let countedRuntime;
+try {
+  JSON.parse = (text, ...args) => {
+    const value = parse(text, ...args);
+    if (value?.artifact === "lean-vir-ir-package") manifestParses++;
+    return value;
+  };
+  countedRuntime = await createVirRuntimeFactory({ wasmBytes }).createRuntime({
+    irPackageSet: [defaultPackageBytes],
+  });
+} finally {
+  JSON.parse = parse;
+  countedRuntime?.dispose();
+}
+assert.equal(manifestParses, 2);
 
 console.log("IR package-set descriptor smoke ok");
 

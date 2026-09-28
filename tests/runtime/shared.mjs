@@ -23,10 +23,6 @@ import {
 } from "../../scripts/packages/irpkg-generator.mjs";
 import { createTestModuleProject } from "../support/module-project.mjs";
 import {
-  roundTripInterfaceTypeDescriptor,
-  sameInterfaceTypeDescriptor,
-} from "../../web/src/runtime/vir-codec.js";
-import {
   INTERFACE_MANIFEST_ARTIFACT,
   INTERFACE_MANIFEST_VERSION,
   validateInterfaceManifest,
@@ -84,36 +80,6 @@ export function jsNatResourceValue(value) {
   return value;
 }
 
-export function assertManifestTypeDescriptorsRoundTrip(manifest) {
-  const entries = [
-    ...manifest.exports,
-    ...(manifest.hostImports ?? []).map((entry) => ({
-      ...entry,
-      entry: entry.name,
-    })),
-  ];
-  for (const entry of entries) {
-    for (const arg of entry.args) {
-      const decoded = roundTripInterfaceTypeDescriptor(
-        arg.type,
-        `${entry.entry} argument ${arg.name}`,
-      );
-      assert.ok(
-        sameInterfaceTypeDescriptor(arg.type, decoded),
-        `${entry.entry} argument ${arg.name} descriptor should round-trip`,
-      );
-    }
-    const decoded = roundTripInterfaceTypeDescriptor(
-      entry.result,
-      `${entry.entry} result`,
-    );
-    assert.ok(
-      sameInterfaceTypeDescriptor(entry.result, decoded),
-      `${entry.entry} result descriptor should round-trip`,
-    );
-  }
-}
-
 export function findTypeDescriptor(type, predicate, seen = new Set()) {
   if (type === null || typeof type !== "object") return null;
   if (seen.has(type)) return null;
@@ -148,6 +114,7 @@ const validManifestShape = {
       id: "ok",
       jsName: "ok",
       entry: "ok",
+      nameKey: "s6f6b/",
       source: "Ok.lean",
       args: [{ name: "arg1", type: { type: "Nat", interfaceTag: 0 } }],
       result: { type: "Nat", interfaceTag: 0 },
@@ -168,6 +135,7 @@ export function assertValidManifestShape() {
     {
       slot: 0,
       name: "Example.pureHost",
+      nameKey: "s4578616d706c65/s70757265486f7374/",
       source: "Example.lean",
       target: "test.pureHost",
       boundary: "hostResource",

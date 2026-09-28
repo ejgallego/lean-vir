@@ -40,8 +40,54 @@ globalThis.runVirGenerationGc = async (wasm, pkg) => {
     irPackageSet[0],
   );
   const react = await runReactChurn(createRuntime);
-  return { gc, lifecycle, shared, react };
+  const fatal = await runFatalRecovery(wasmModule, irPackageSet);
+  return { gc, lifecycle, shared, react, fatal };
 };
+
+async function runFatalRecovery(wasmModule, irPackageSet) {
+  let captured;
+  const factory = createVirRuntimeFactory({ wasmModule, hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      captured = callback;
+      return callback(input);
+    },
+    "test.recordNat": () => undefined,
+  } });
+  const bad = await factory.createRuntime({ irPackageSet });
+  const good = await factory.createRuntime({ irPackageSet });
+  let recovered;
+  try {
+    bad.call("HostInterop.callbackRoundTrip", 3);
+    const oldCallback = captured;
+    const state = bad.hostState;
+    const held = makeJsl(bad, "retained across trap");
+    let failure;
+    try { bad.exports.vir_obj_nat(0xfffffff0, 32); }
+    catch (error) { failure = error; }
+    check(failure instanceof WebAssembly.RuntimeError, "real browser Wasm trap");
+    check(bad.failure === failure, "browser runtime remembers original trap");
+    for (const action of [
+      () => oldCallback(4n),
+      () => readJsl(bad, held),
+      () => bad.loadIrPackageSetBytes(irPackageSet),
+    ]) {
+      let rejected = false;
+      try { action(); } catch (error) { rejected = /fresh runtime/.test(error.message); }
+      check(rejected, "trapped generation rejects callback, handle and installation");
+    }
+    bad.dispose(); bad.dispose();
+    check(state.resourceRoots.debugCounts().active === 0 &&
+      state.leanObjectHandleCells.size === 0 && bad.liveCallbacks.size === 0,
+      "browser disposal releases JavaScript roots after trap");
+    for (const runtime of [good, recovered = await factory.createRuntime({ irPackageSet })]) {
+      runtime.call("HostInterop.callbackRoundTrip", 3);
+      check(captured(4n) === 11n, "other and fresh generations execute after trap");
+    }
+    return { retired: true, recovered: true };
+  } finally {
+    bad.dispose(); good.dispose(); recovered?.dispose(); captured = null;
+  }
+}
 
 async function runReactChurn(createRuntime) {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;

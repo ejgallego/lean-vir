@@ -15,6 +15,8 @@ runtime through `web/src` entry points.
 - `vir-infoview-widget.js`: live infoview application that loads WASM, requests
   fresh `.irpkg` packages, and renders Lean-produced components in the existing
   Infoview React tree.
+- `vir-widget-errors.js`: presentation and serialization of Infoview widget
+  failures.
 - `pages/`: import-safe page configuration, parsing, rendering, and fixture
   metadata helpers.
 

@@ -146,6 +146,11 @@ See the [descriptor schema](../reference/IRPKG_FORMAT.md#package-set-descriptor)
 ordering, integrity and duplicate-identity rules. Browsers load neither
 `.olean` nor Lean's raw `.ir` files.
 
+The supported compatibility tuple is manifest 9, package format 11 and runtime
+ABI 4. Generate the package set and install the JavaScript/Wasm SDK from the
+same `lean_vir` revision. After changing that revision or the generator,
+regenerate the `.irpkg` members and descriptor and reinstall the matching SDK.
+
 An executable or renderer consuming this output should declare the facet as a
 build dependency:
 
@@ -228,10 +233,11 @@ vir.runStartupEntries();
 ```
 
 Startup hooks run in manifest order and are recorded only after success. A
-retry skips completed hooks and resumes at the failed hook. Each fresh runtime
-has its own startup state; create a new runtime when selecting another package
-generation, then dispose the previous runtime when its callbacks and resources
-should become invalid.
+recoverable retry skips completed hooks and resumes at the failed hook. A fatal
+host failure or Wasm trap retires the runtime; create a fresh runtime instead.
+Each fresh runtime has its own startup state. When selecting another package
+generation, create a new runtime and dispose the previous runtime when its
+callbacks and resources should become invalid.
 
 The [SlidesCanvas example](../../examples/SlidesCanvas.lean) creates its DOM and
 canvas and schedules animation frames entirely from Lean:
@@ -343,10 +349,16 @@ Deep links select a package and entry:
 dev.html?package=local-quickstart.irpkg&entry=Quickstart.total
 ```
 
-`entry` accepts a manifest `id`, `jsName` or Lean declaration name. The Pages
+`entry` accepts a manifest `entry`, `id`, or `jsName` alias from the
+[shared call namespace](JS_API.md#calls-and-manifest). The Pages
 build's `prepare:pages` step generates URL-loadable samples in one generator
 session; [HARNESS.md](../HARNESS.md) owns site build/check commands. Generated
 packages, reports and `web/dist/` remain ignored local outputs.
+
+After a fatal Wasm failure, the runner disables Run and offers **Reload
+runtime**. Reload creates a fresh instance while preserving the selected entry
+and inputs; it does not execute the entry again. Ordinary input errors and
+recoverable Lean IO errors leave Run available for a corrected attempt.
 
 The [JS API](JS_API.md#calls-and-manifest) defines caller values, while
 [host bindings](../reference/HOST_BINDINGS.md) defines the narrower Lean-to-JavaScript

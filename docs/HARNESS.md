@@ -111,6 +111,10 @@ semantics require the separate Chromium checks below.
 
 ### Native and host boundaries
 
+- Constructor providers: after `npm run build:demo`, run
+  `npm run test:constructor-providers`. This links the same Wasm objects used
+  by the probe and compares constructor metadata and reference counts with
+  the pinned native Lean library. Set `WASI_SDK_PATH` for a non-default SDK.
 - Native declarations: `npm run check:native-externs`. Add
   `npm run check:client-native-externs` for client manifest selection, wrapper
   imports or provider handoff. Pure registry tooling uses

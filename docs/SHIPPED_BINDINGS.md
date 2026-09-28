@@ -210,7 +210,7 @@ Unreviewed translations and unresolved canonical-policy failures remain author
 actions. Explicitly unsupported operations remain roadmap entries, while
 unselected upstream operations may remain visible without failing CI.
 
-The abrupt migration covers Browser, JavaScript core, React, Common, Infoview,
+The abrupt migration covers Browser, JavaScript core, React, Infoview,
 and ProofWidgets. Further slices should replace reviewed protocol operations
 with direct TypeScript lowering where an upstream declaration exists, without
 changing their host target or public faithful type unnecessarily.
@@ -228,7 +228,6 @@ Each Lean source group that owns shipped bindings has a companion
 `Vir/bindings.schema.json`:
 
 - `Vir/Browser.bindings.json`
-- `Vir/Common.bindings.json`
 - `Vir/Js.bindings.json`
 - `Vir/React.bindings.json`
 - `Vir/Infoview/Panel.bindings.json`

@@ -47,6 +47,8 @@ import {
 
 const textEncoder = new TextEncoder();
 const MAX_UINT64 = 0xffffffffffffffffn;
+// The pinned kernel stores index + 1 in a 20-bit loose-bound-variable range.
+const MAX_EXPR_BVAR_INDEX = 1048574n;
 // A JSL value is an ordinary JavaScript object. Its Lean root lives only in
 // this out-of-band cell, and ordinary JavaScript reachability controls when
 // that root is released.
@@ -560,22 +562,23 @@ export class ObjectValueRuntime {
       case "bvar":
         return this.makeObjectDecimal(
           "vir_obj_expr_bvar",
-          normalizeDecimal(expr.index, `${label}.index`, {
-            signed: false,
-          }),
+          normalizeBoundedUnsignedDecimal(
+            expr.index, `${label}.index`, MAX_EXPR_BVAR_INDEX,
+            "Lean.Expr.bvar (maximum index 1048574)",
+          ),
           label,
         );
       case "fvar":
         return this.makeObjectStringConstructor(
           "vir_obj_expr_fvar",
-          expr.name,
+          requireObjectName(expr.name, `${label}.name`),
           `${label}.name`,
           label,
         );
       case "mvar":
         return this.makeObjectStringConstructor(
           "vir_obj_expr_mvar",
-          expr.name,
+          requireObjectName(expr.name, `${label}.name`),
           `${label}.name`,
           label,
         );
@@ -597,7 +600,7 @@ export class ObjectValueRuntime {
         let levels = this.makeObjectLevelList(expr.levels, `${label}.levels`);
         try {
           return this.withWasmString(
-            requireString(expr.name, `${label}.name`),
+            requireObjectName(expr.name, `${label}.name`),
             `${label}.name`,
             (namePtr, nameLen) => {
               const obj = this.exports.vir_obj_expr_const(
@@ -723,14 +726,14 @@ export class ObjectValueRuntime {
       case "param":
         return this.makeObjectStringConstructor(
           "vir_obj_level_param",
-          level.name,
+          requireObjectName(level.name, `${label}.name`),
           `${label}.name`,
           label,
         );
       case "mvar":
         return this.makeObjectStringConstructor(
           "vir_obj_level_mvar",
-          level.name,
+          requireObjectName(level.name, `${label}.name`),
           `${label}.name`,
           label,
         );
@@ -831,12 +834,13 @@ export class ObjectValueRuntime {
     binderInfo,
     label,
   ) {
+    const checkedName = requireObjectName(name, `${label}.name`);
     let type = this.makeObjectExpr(typeValue, `${label}.type`);
     let body = 0;
     try {
       body = this.makeObjectExpr(bodyValue, `${label}.body`);
       return this.withWasmString(
-        requireString(name, `${label}.name`),
+        checkedName,
         `${label}.name`,
         (namePtr, nameLen) => {
           const obj = this.exports[constructorName](
@@ -861,6 +865,7 @@ export class ObjectValueRuntime {
   }
 
   makeObjectExprLet(expr, label) {
+    const checkedName = requireObjectName(expr.name, `${label}.name`);
     let type = this.makeObjectExpr(expr.type, `${label}.type`);
     let value = 0;
     let body = 0;
@@ -868,7 +873,7 @@ export class ObjectValueRuntime {
       value = this.makeObjectExpr(expr.value, `${label}.value`);
       body = this.makeObjectExpr(expr.body, `${label}.body`);
       return this.withWasmString(
-        requireString(expr.name, `${label}.name`),
+        checkedName,
         `${label}.name`,
         (namePtr, nameLen) => {
           const obj = this.exports.vir_obj_expr_let(
@@ -895,10 +900,14 @@ export class ObjectValueRuntime {
   }
 
   makeObjectExprProj(expr, label) {
+    const checkedTypeName = requireObjectName(
+      expr.typeName,
+      `${label}.typeName`,
+    );
     let structure = this.makeObjectExpr(expr.struct, `${label}.struct`);
     try {
       return this.withWasmString(
-        requireString(expr.typeName, `${label}.typeName`),
+        checkedTypeName,
         `${label}.typeName`,
         (typeNamePtr, typeNameLen) =>
           this.withWasmString(
@@ -1097,11 +1106,14 @@ export class ObjectValueRuntime {
       }
 
       try {
+        const argc = argObjs.length;
+        // Wasm consumes these references even when execution traps.
+        argObjs.length = 0;
         if (timing === null) {
           resultObj = this.exports.vir_call_resolved_objects(
             callSlot,
             argvPtr,
-            argObjs.length,
+            argc,
           );
         } else {
           this.hostState?.beginCallTiming(timing);
@@ -1110,7 +1122,7 @@ export class ObjectValueRuntime {
             resultObj = this.exports.vir_call_resolved_objects(
               callSlot,
               argvPtr,
-              argObjs.length,
+              argc,
             );
           } finally {
             try {
@@ -1125,17 +1137,15 @@ export class ObjectValueRuntime {
       }
 
       decodeStarted = timing?.beginPhase();
-      argObjs.length = 0;
       const hostError = this.hostState?.takeCallError();
       if (hostError) {
         throw hostError;
       }
-      const error = this.lastCallError();
-      if (error !== "") {
-        throw new Error(error);
-      }
       if (resultObj === 0) {
-        throw new Error(`object call failed: ${entry.entry}`);
+        // A caught reentrant call can leave its diagnostic behind even when
+        // this call succeeds. The ABI signals failure with a null result.
+        const error = this.lastCallError();
+        throw new Error(error || `object call failed: ${entry.entry}`);
       }
       return liftResult(resultObj);
     } finally {
@@ -1174,7 +1184,15 @@ export class ObjectValueRuntime {
   readObjectName(obj) {
     const data = this.exports.vir_obj_name_string(obj);
     const len = this.exports.vir_obj_name_string_size();
-    return this.readWasmString(data, len);
+    if (data === 0 || data === null) {
+      throw new Error(
+        "Lean.Name result contains unsupported numeric, escaped, empty, or non-identifier components",
+      );
+    }
+    return requireObjectName(
+      this.readWasmString(data, len),
+      "Lean.Name result",
+    );
   }
 
   readObjectScalar(obj, label) {
@@ -1831,4 +1849,34 @@ function requireString(value, label) {
     throw new Error(`${label} must be a string`);
   }
   return value;
+}
+
+function requireObjectName(value, label) {
+  const text = requireString(value, label);
+  // TextEncoder replaces lone surrogates; reject them before crossing the ABI.
+  if (/[\uD800-\uDFFF]/u.test(text)) {
+    throw new Error(`${label} must contain well-formed Unicode`);
+  }
+  // The empty spelling is retained for compatibility with the existing
+  // anonymous Name construction; Name.toString emits the explicit spelling.
+  if (text === "" || text === "[anonymous]") {
+    return text;
+  }
+  const components = text.split(".");
+  for (const component of components) {
+    if (component.length === 0) {
+      throw new Error(
+        `${label} must use non-empty dotted identifier components`,
+      );
+    }
+    if (/^[0-9]+$/.test(component)) {
+      throw new Error(`${label} cannot contain numeric Name components`);
+    }
+    if (component.includes("«") || component.includes("»")) {
+      throw new Error(`${label} cannot contain escaped Name components`);
+    }
+  }
+  // The Wasm constructor/getter uses the pinned Lean identifier predicates.
+  // Do not approximate that grammar with JavaScript's Unicode ID properties.
+  return text;
 }

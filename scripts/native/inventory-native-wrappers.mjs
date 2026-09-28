@@ -122,14 +122,20 @@ const [nativeExterns, nativeSymbols] = await Promise.all([
 
 const compilerGeneratedExterns = nativeExterns.filter((nativeExtern) => nativeExtern.generateBoxedWrapper);
 const registryEntries = parseNativeSymbolRegistry(generateNativeSymbolRegistry(nativeExterns));
+const nativeExternByKey = new Map(nativeExterns.map((nativeExtern) => [nativeExtern.nameKey, nativeExtern]));
 const entries = registryEntries.filter((entry) => entry.kind === "X").map(inventoryRegistryEntry);
 const constants = registryEntries.filter((entry) => entry.kind === "X_CONST").map(inventoryRegistryEntry);
 const wrappers = parseWrappers(nativeSymbols);
 const grouped = entriesByWrapper(entries);
 const inventory = [];
 
-function inventoryRegistryEntry({ leanName, symbol, wrapper }) {
-  return { leanName, symbol, wrapper };
+function inventoryRegistryEntry({ nameKey, symbol, wrapper }) {
+  return {
+    nameKey,
+    leanName: nativeExternByKey.get(nameKey)?.name ?? nameKey,
+    symbol,
+    wrapper,
+  };
 }
 
 for (const [wrapperName, groupEntries] of grouped.entries()) {
@@ -144,6 +150,7 @@ for (const nativeExtern of compilerGeneratedExterns) {
   inventory.push({
     wrapper: `${nativeExtern.name}._boxed`,
     entries: [{
+      nameKey: nativeExtern.nameKey,
       leanName: nativeExtern.name,
       symbol: nativeExtern.symbol,
       wrapper: `${nativeExtern.name}._boxed`,

@@ -58,18 +58,12 @@ static object * mk_refcount_body(
 
 object * mk_name_str(object * prefix, std::string const & part) {
     object * suffix = mk_lean_string(part);
-    object * result = lean_name_mk_string(prefix, suffix);
-    lean_dec(prefix);
-    lean_dec(suffix);
-    return result;
+    return lean_name_mk_string(prefix, suffix);
 }
 
 object * mk_name_num(object * prefix, size_t value) {
     object * suffix = mk_nat(value);
-    object * result = lean_name_mk_numeral(prefix, suffix);
-    lean_dec(prefix);
-    lean_dec(suffix);
-    return result;
+    return lean_name_mk_numeral(prefix, suffix);
 }
 
 object * mk_array(std::vector<object *> const & fields) {

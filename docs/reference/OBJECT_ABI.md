@@ -107,11 +107,11 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_level_succ`          | Build `Lean.Level.succ`.                                                                          | Consumes the child level on success; returns an owned level object.                                                 |
 | `vir_obj_level_max`           | Build `Lean.Level.max`.                                                                           | Consumes both level arguments on success; returns an owned level object.                                            |
 | `vir_obj_level_imax`          | Build `Lean.Level.imax`.                                                                          | Consumes both level arguments on success; returns an owned level object.                                            |
-| `vir_obj_level_param`         | Build `Lean.Level.param` from a dotted name.                                                      | Returns an owned level object.                                                                                      |
-| `vir_obj_level_mvar`          | Build `Lean.Level.mvar` from a dotted name.                                                       | Returns an owned level object.                                                                                      |
+| `vir_obj_level_param`         | Build `Lean.Level.param` from a restricted dotted name.                                            | Returns an owned level object; numeric, escaped, empty and non-identifier components are rejected.                 |
+| `vir_obj_level_mvar`          | Build `Lean.Level.mvar` from a restricted dotted name.                                             | Returns an owned level object; numeric, escaped, empty and non-identifier components are rejected.                 |
 | `vir_obj_literal_nat`         | Build a `Lean.Literal.natVal`.                                                                    | Returns an owned literal object.                                                                                    |
 | `vir_obj_literal_string`      | Build a `Lean.Literal.strVal`.                                                                    | Returns an owned literal object.                                                                                    |
-| `vir_obj_expr_bvar`           | Build `Lean.Expr.bvar`.                                                                           | Returns an owned expression object.                                                                                 |
+| `vir_obj_expr_bvar`           | Build `Lean.Expr.bvar` with index `0..1048574`.                                                    | Returns an owned expression object; returns `0` outside the cached loose-variable range.                            |
 | `vir_obj_expr_fvar`           | Build `Lean.Expr.fvar`.                                                                           | Returns an owned expression object.                                                                                 |
 | `vir_obj_expr_mvar`           | Build `Lean.Expr.mvar`.                                                                           | Returns an owned expression object.                                                                                 |
 | `vir_obj_expr_sort`           | Build `Lean.Expr.sort`.                                                                           | Consumes the level on success; returns an owned expression object.                                                  |
@@ -123,7 +123,7 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_expr_lit`            | Build `Lean.Expr.lit`.                                                                            | Consumes the literal on success; returns an owned expression object.                                                |
 | `vir_obj_expr_proj`           | Build `Lean.Expr.proj`.                                                                           | Consumes the structure expression on success; returns an owned expression object.                                   |
 | `vir_obj_expr_scalar_u8`      | Inspect packed `Lean.Expr` scalar metadata such as binder info.                                   | No object ownership.                                                                                                |
-| `vir_obj_name_string`         | Inspect a Lean `Name` object as dotted text.                                                      | Returns a borrowed pointer into shim-owned string scratch storage.                                                  |
+| `vir_obj_name_string`         | Inspect a Lean `Name` object as restricted dotted text.                                            | Returns a borrowed pointer into shim-owned string scratch storage; returns `0` for unsupported structural components.              |
 | `vir_obj_name_string_size`    | Return the byte length of `vir_obj_name_string`.                                                  | No object ownership.                                                                                                |
 | `vir_obj_resource`            | Represent an exact JavaScript `externref` value as a Lean object.                                 | Returns an owned Lean external object whose finalizer releases its externref-table slot.                            |
 | `vir_obj_resource_externref`  | Recover the exact JavaScript value from a Lean resource object.                                   | No ownership change; JavaScript identity is preserved.                                                              |
@@ -191,12 +191,17 @@ Longer-lived Lean values need an explicit Lean root. Closures and JSL values
 already follow that pattern through private state associated with ordinary
 JavaScript functions and objects.
 
+If a pure host failure or other exception escapes an exported Wasm function,
+the generation is abandoned. Recoverable effectful host errors do not retire it. The call has already consumed its argument objects; JavaScript
+cleanup must not attempt to re-enter the failed instance to release or inspect
+them. Disposal releases JavaScript-owned resources, while the abandoned Wasm
+objects are reclaimed with the instance. Create a fresh runtime for subsequent
+object calls.
+
 ## Call path
 
-The runtime value path uses owned Lean objects. Primitive lane helpers are
-still useful for the hottest exact scalar signatures because they avoid object
-allocation, but the JavaScript-facing runtime no longer has a value byte
-fallback.
+The runtime value path uses owned Lean objects, including immediate scalar
+objects. There is no separate primitive call lane or value-byte fallback.
 `VirRuntime.call` lowers and lifts the
 [supported manifest value types](../guides/JS_API.md#calls-and-manifest).
 Constructors may mix object fields, raw `USize` slots and packed scalar fields,

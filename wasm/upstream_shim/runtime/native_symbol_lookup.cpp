@@ -13,6 +13,7 @@ Author: Emilio J. Gallego Arias
 #include <string>
 
 #include "runtime/object.h"
+#include "runtime/name_identity.h"
 #include "util/name.h"
 
 // Generated from Vir/GeneratePackage/NativeExterns.lean nativeExterns.
@@ -35,7 +36,8 @@ VIR_ALL_NATIVE_SYMBOLS(VIR_DECLARE_NATIVE_BOXED, VIR_DECLARE_NATIVE_CONST)
 namespace {
 
 struct NativeSymbol {
-    char const * lean_name;
+    // Generated registry entries carry Vir.nameKey, never a display rendering.
+    char const * name_key;
     char const * stem;
     char const * dlsym_name;
     void * address;
@@ -56,9 +58,9 @@ static char const * known_symbol_stem(lean::name const & n) {
     if (char const * symbol = lean::vir::find_host_import_symbol(n.raw())) {
         return symbol;
     }
-    std::string dotted = n.to_string();
+    std::string key = lean::vir::name_key(n);
     for (NativeSymbol const & entry : g_native_symbols) {
-        if (dotted == entry.lean_name) {
+        if (key == entry.name_key) {
             return entry.stem;
         }
     }

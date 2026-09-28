@@ -20,7 +20,6 @@ const PACKAGE_TARGET_MODE_LABEL = Object.freeze({
   [PACKAGE_TARGET_MODE.ALL]: "public definitions",
   [PACKAGE_TARGET_MODE.MARKED]: "marked declarations",
   [PACKAGE_TARGET_MODE.MARKED_MODULE]: "marked module",
-  markedModules: "marked declarations across imported modules",
 });
 
 export function packageTargetModeLabel(mode) {
@@ -30,11 +29,7 @@ export function packageTargetModeLabel(mode) {
     : null;
 }
 
-export function validatePackageTargets(
-  targets,
-  label,
-  { manifestVersion = null } = {},
-) {
+export function validatePackageTargets(targets, label) {
   if (targets === undefined) return;
   if (!Array.isArray(targets)) {
     throw new Error(`${label} must be an array`);
@@ -48,14 +43,7 @@ export function validatePackageTargets(
     ) {
       throw new Error(`${targetLabel} must be an object`);
     }
-    const legacyMarkedModule =
-      manifestVersion !== null &&
-      manifestVersion < 8 &&
-      target.mode === "markedModules";
-    if (
-      !Object.values(PACKAGE_TARGET_MODE).includes(target.mode) &&
-      !legacyMarkedModule
-    ) {
+    if (!Object.values(PACKAGE_TARGET_MODE).includes(target.mode)) {
       throw new Error(
         `${targetLabel}.mode must be one of ${Object.values(PACKAGE_TARGET_MODE).join(", ")}`,
       );
@@ -73,10 +61,7 @@ export function validatePackageTargets(
     if (target.mode === PACKAGE_TARGET_MODE.MARKED_MODULE && !hasModule) {
       throw new Error(`${targetLabel}.mode markedModule requires a module`);
     }
-    if (
-      hasModule &&
-      (target.mode === PACKAGE_TARGET_MODE.MARKED || legacyMarkedModule)
-    ) {
+    if (hasModule && target.mode === PACKAGE_TARGET_MODE.MARKED) {
       throw new Error(
         `${targetLabel}.module requires mode markedModule for marked selection`,
       );

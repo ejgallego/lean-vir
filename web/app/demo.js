@@ -42,8 +42,11 @@ const fixtureFilterButtons = document.querySelectorAll("[data-fixture-filter]");
 const fixtureRunVisibleButton = document.querySelector("#fixture-run-visible");
 const fixtureRunStatus = document.querySelector("#fixture-run-status");
 const fixtureRunSelectedButton = document.querySelector("#fixture-run-selected");
+const fixtureReloadRuntimeButton = document.querySelector("#fixture-reload-runtime");
 const fixtureSelectedResult = document.querySelector("#fixture-selected-result");
 const fixtureSourceControls = document.querySelector(".fixture-source-controls");
+const petActionButtons = document.querySelectorAll(".action-grid button");
+const petReinitializeButton = document.querySelector("#pet-reinitialize-runtime");
 const fixtureInputPanel = document.querySelector("#fixture-input-panel");
 const fixtureInputLabel = document.querySelector("#fixture-input-label");
 const fixtureInput = document.querySelector("#fixture-input");
@@ -57,7 +60,15 @@ const fixtureResultFailures = new Map();
 const fixtureInputs = createFixtureInputDefaults();
 const packageBytesPromises = new Map();
 const runtimePromises = new Map();
+const failedRuntimePackages = new Set();
+const retiredRuntimes = new WeakSet();
 let hostRuntime = null;
+let pageReady = false;
+let recoveryPackageFile = null;
+let recoveryLoading = false;
+let fixtureBatchRunning = false;
+let fatalGeneration = 0;
+let petMountPending = false;
 let currentFixtureFilter = "all";
 let selectedFixtureId = null;
 
@@ -68,23 +79,76 @@ function packageBytes(packageFile) {
   return packageBytesPromises.get(packageFile);
 }
 
+function startRuntimeForPackage(packageFile) {
+  const pending = packageBytes(packageFile)
+    .then((bytes) => runtimeFactory.createRuntime({ irPackageSet: [bytes] }))
+    .catch((error) => {
+      if (runtimePromises.get(packageFile) === pending) {
+        runtimePromises.delete(packageFile);
+      }
+      throw error;
+    });
+  runtimePromises.set(packageFile, pending);
+  return pending;
+}
+
 function runtimeForPackage(packageFile) {
-  if (!runtimePromises.has(packageFile)) {
-    runtimePromises.set(
-      packageFile,
-      packageBytes(packageFile).then((bytes) =>
-        runtimeFactory.createRuntime({ irPackageSet: [bytes] })),
+  if (failedRuntimePackages.has(packageFile)) {
+    return Promise.reject(
+      new Error(`Runtime for ${packageFile} failed; reload it before running again`),
     );
   }
-  return runtimePromises.get(packageFile);
+  return runtimePromises.get(packageFile) ?? startRuntimeForPackage(packageFile);
+}
+
+function disposeRuntime(runtime) {
+  try {
+    runtime.dispose();
+  } catch (error) {
+    console.error("failed to dispose retired runtime", error);
+  }
+}
+
+function retireRuntime(packageFile, runtime) {
+  if (runtime?.failure == null) return false;
+  if (retiredRuntimes.has(runtime)) return true;
+  retiredRuntimes.add(runtime);
+  fatalGeneration += 1;
+  failedRuntimePackages.delete(packageFile);
+  failedRuntimePackages.add(packageFile);
+  recoveryPackageFile = packageFile;
+  runtimePromises.delete(packageFile);
+  disposeRuntime(runtime);
+  updateFixtureRunControls();
+  updatePetControls();
+  return true;
 }
 
 function setReady() {
-  setReadyState(statusEl, "Ready", true);
+  if (failedRuntimePackages.size === 0) {
+    setReadyState(statusEl, "Ready", true);
+  }
+  updatePetControls();
 }
 
-function setTrap(error) {
-  setReadyState(statusEl, "Trap", false);
+function updatePetControls() {
+  const ready =
+    pageReady &&
+    !recoveryLoading &&
+    !petMountPending &&
+    hostRuntime !== null &&
+    hostRuntime.failure === null;
+  for (const button of petActionButtons) button.disabled = !ready;
+  petReinitializeButton.hidden = !petMountPending;
+  petReinitializeButton.disabled =
+    !pageReady ||
+    recoveryLoading ||
+    hostRuntime === null ||
+    hostRuntime.failure !== null;
+}
+
+function setRunError(error, fatal = false) {
+  setReadyState(statusEl, fatal ? "Trap" : "Failed", false);
   console.error(error);
 }
 
@@ -94,7 +158,10 @@ function mountPet(runtime) {
     setReady();
   } catch (error) {
     petMoodDisplay.textContent = "error";
-    setTrap(error);
+    const fatal = retireRuntime(hostPackageFile, runtime);
+    petMountPending = true;
+    setRunError(error, fatal);
+    updatePetControls();
   }
 }
 
@@ -221,9 +288,24 @@ function visibleFixtures() {
 }
 
 function updateFixtureRunControls() {
-  const enabled = hostRuntime !== null;
-  fixtureRunVisibleButton.disabled = !enabled;
-  fixtureRunSelectedButton.disabled = !enabled || selectedFixtureId === null;
+  const selected = fixtures.find((fixture) => fixture.id === selectedFixtureId);
+  const blockedVisible = visibleFixtures().some((fixture) =>
+    failedRuntimePackages.has(fixture.packageFile ?? defaultPackageFile),
+  );
+  fixtureRunVisibleButton.disabled =
+    !pageReady || recoveryLoading || fixtureBatchRunning || blockedVisible;
+  fixtureRunSelectedButton.disabled =
+    !pageReady ||
+    recoveryLoading ||
+    fixtureBatchRunning ||
+    selected === undefined ||
+    failedRuntimePackages.has(selected.packageFile ?? defaultPackageFile);
+  fixtureReloadRuntimeButton.hidden = recoveryPackageFile === null;
+  fixtureReloadRuntimeButton.disabled =
+    !pageReady || recoveryLoading || fixtureBatchRunning || recoveryPackageFile === null;
+  fixtureReloadRuntimeButton.textContent = recoveryPackageFile === null
+    ? "Reload failed runtime"
+    : `Reload ${recoveryPackageFile}`;
 }
 
 function setFixtureResult(fixture, value, failed = false) {
@@ -284,12 +366,16 @@ function evaluateFixture(runtime, fixture) {
   return runtime.call(fixture.entry);
 }
 
-async function runFixture(fixture) {
-  if (hostRuntime === null) return null;
+async function runFixture(fixture, fromBatch = false) {
+  if (!pageReady || recoveryLoading || (fixtureBatchRunning && !fromBatch)) return null;
+  const packageFile = fixture.packageFile ?? defaultPackageFile;
+  if (failedRuntimePackages.has(packageFile)) return null;
   fixtureRunStatus.textContent = `Running ${fixture.id}`;
   setFixtureResult(fixture, "running");
+  let fixtureRuntime = null;
   try {
-    const fixtureRuntime = await runtimeForPackage(fixture.packageFile ?? defaultPackageFile);
+    fixtureRuntime = await runtimeForPackage(packageFile);
+    if (fixtureRuntime.failure !== null) throw fixtureRuntime.failure;
     const result = evaluateFixture(fixtureRuntime, fixture);
     setFixtureResult(fixture, result);
     fixtureRunStatus.textContent = `${fixture.id}: ${result}`;
@@ -298,28 +384,69 @@ async function runFixture(fixture) {
   } catch (error) {
     setFixtureResult(fixture, "error", true);
     fixtureRunStatus.textContent = `${fixture.id}: error`;
-    setTrap(error);
+    const fatal = retireRuntime(packageFile, fixtureRuntime);
+    setRunError(error, fatal);
+    updateFixtureRunControls();
     return null;
   }
 }
 
 async function runVisibleFixtures() {
-  if (hostRuntime === null) return;
+  if (!pageReady || recoveryLoading || fixtureBatchRunning) return;
   const selected = visibleFixtures();
   let passed = 0;
   let failed = 0;
-  fixtureRunVisibleButton.disabled = true;
+  const startingFatalGeneration = fatalGeneration;
+  fixtureBatchRunning = true;
+  updateFixtureRunControls();
   for (const fixture of selected) {
-    const result = await runFixture(fixture);
+    const result = await runFixture(fixture, true);
     if (result === null) {
       failed++;
     } else {
       passed++;
     }
     await new Promise((resolve) => requestAnimationFrame(resolve));
+    if (fatalGeneration !== startingFatalGeneration) break;
   }
   fixtureRunStatus.textContent = `${passed} passed${failed === 0 ? "" : `, ${failed} failed`}`;
-  fixtureRunVisibleButton.disabled = false;
+  fixtureBatchRunning = false;
+  updateFixtureRunControls();
+}
+
+async function reloadFailedRuntime() {
+  const packageFile = recoveryPackageFile;
+  if (
+    packageFile === null ||
+    !failedRuntimePackages.has(packageFile) ||
+    recoveryLoading
+  ) return;
+  recoveryLoading = true;
+  updateFixtureRunControls();
+  updatePetControls();
+  fixtureRunStatus.textContent = `Loading fresh ${packageFile}`;
+  try {
+    runtimePromises.delete(packageFile);
+    const freshRuntime = await startRuntimeForPackage(packageFile);
+    failedRuntimePackages.delete(packageFile);
+    recoveryPackageFile = [...failedRuntimePackages].at(-1) ?? null;
+    if (packageFile === hostPackageFile) {
+      hostRuntime = freshRuntime;
+      petMountPending = true;
+    }
+    if (!failedRuntimePackages.has(packageFile)) {
+      fixtureRunStatus.textContent =
+        `Fresh ${packageFile} runtime ready. Run an entry explicitly to continue.`;
+      if (recoveryPackageFile === null) setReady();
+    }
+  } catch (error) {
+    fixtureRunStatus.textContent = `${packageFile}: reload failed`;
+    setRunError(error);
+  } finally {
+    recoveryLoading = false;
+    updateFixtureRunControls();
+    updatePetControls();
+  }
 }
 
 for (const button of fixtureFilterButtons) {
@@ -332,12 +459,32 @@ fixtureInput.addEventListener("input", () => {
   }
 });
 fixtureRunVisibleButton.addEventListener("click", () => runVisibleFixtures());
+fixtureReloadRuntimeButton.addEventListener("click", () => {
+  void reloadFailedRuntime();
+});
+petReinitializeButton.addEventListener("click", () => {
+  if (hostRuntime === null || hostRuntime.failure !== null || recoveryLoading) return;
+  petMountPending = false;
+  mountPet(hostRuntime);
+  updatePetControls();
+});
 fixtureRunSelectedButton.addEventListener("click", () => {
   const fixture = fixtures.find((candidate) => candidate.id === selectedFixtureId);
   if (fixture) {
     runFixture(fixture);
   }
 });
+function observeHostRuntimeFailure() {
+  if (hostRuntime?.failure != null) {
+    const error = hostRuntime.failure;
+    retireRuntime(hostPackageFile, hostRuntime);
+    setRunError(error, true);
+    fixtureRunStatus.textContent = `${hostPackageFile}: runtime trapped`;
+  }
+}
+
+window.addEventListener("error", observeHostRuntimeFailure);
+window.addEventListener("unhandledrejection", observeHostRuntimeFailure);
 renderFixtureSummary();
 renderFixtureList();
 selectFixture(fixtures[0]);
@@ -358,12 +505,15 @@ try {
   declCount.textContent = String(totalDeclCount);
   layoutGuard.textContent = pointerBytes === 4 ? "pass" : "fail";
   fixtureRunStatus.textContent = "Ready";
+  pageReady = true;
   updateFixtureRunControls();
+  updatePetControls();
   setReady();
 
   mountPet(hostRuntime);
 } catch (error) {
   hostRuntime = null;
+  pageReady = false;
   setReadyState(statusEl, "Failed", false);
   fixtureRunStatus.textContent = "Unavailable";
   updateFixtureRunControls();

@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
+import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import { spawnSync } from "node:child_process";
 import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -78,7 +79,7 @@ try {
   );
   assert.match(
     await readFile(registryPath, "utf8"),
-    /ClientNativeFixture\.increment.*vir_client_native_increment/,
+    /s436c69656e744e617469766546697874757265\/s696e6372656d656e74\/.*vir_client_native_increment/,
   );
   assert.equal(
     (await readFile(sourcesPath, "utf8")).trim(),
@@ -86,7 +87,12 @@ try {
   );
   assert.equal(
     (await readFile(symbolsPath, "utf8")).trim(),
-    "ClientNativeFixture.increment\tvir_client_native_increment",
+    [
+      "ClientNativeFixture.increment\tvir_client_native_increment",
+      "ClientNativeFixture.«quoted.dot»\tvir_client_native_quoted_dot",
+      "ClientNativeFixture.«1»\tvir_client_native_quoted_numeral",
+      "ClientNativeFixture.café\tvir_client_native_cafe",
+    ].join("\n"),
   );
 
   // Exercise both selections against the same compiled module, without
@@ -118,14 +124,38 @@ try {
     const { manifest } = await readIrPackageFile(packagePath);
     assert.equal(manifest.metadata.targets[0].mode, "markedModule");
     assert.equal(manifest.metadata.targets[0].module, "ClientNativeFixture");
-    assert.deepEqual(manifest.exports.map((entry) => entry.entry), [
+    assert.deepEqual(manifest.exports.map((entry) => entry.entry).sort(), [
+      "ClientNativeFixture.exportedCafe",
       "ClientNativeFixture.exportedIncrement",
+      "ClientNativeFixture.exportedQuotedDot",
+      "ClientNativeFixture.exportedQuotedNumeral",
     ]);
+    // A client-enabled Wasm artifact makes native lookup an executable check.
+    // Exotic C providers deliberately differ from their Lean fallback bodies.
+    if (process.env.VIR_CLIENT_NATIVE_WASM) {
+      const factory = createVirRuntimeFactory({ wasmBytes: await readFile(process.env.VIR_CLIENT_NATIVE_WASM) });
+      const runtime = await factory.createRuntime({ irPackageSet: [await readFile(packagePath)] });
+      try {
+        for (const [name, increment] of [["Increment", 1], ["QuotedDot", 10], ["QuotedNumeral", 20], ["Cafe", 30]]) {
+          const label = `${native ? "native" : "fallback"} ${name}`;
+          let value;
+          assert.doesNotThrow(() => { value = runtime.call(`ClientNativeFixture.exported${name}`, 1); }, label);
+          assert.equal(value, 1 + increment + (native && increment !== 1 ? 100 : 0), label);
+        }
+      } finally { runtime.dispose(); }
+    }
     const report = await readFile(reportPath, "utf8");
-    const nativeBoundary = /`ClientNativeFixture\.increment` -> `vir_client_native_increment`/;
-    const referenceBody = /Lean reference body for `ClientNativeFixture\.increment`/;
-    assert.match(report, native ? nativeBoundary : referenceBody);
-    assert.doesNotMatch(report, native ? referenceBody : nativeBoundary);
+    for (const [name, symbol] of [
+      ["increment", "vir_client_native_increment"],
+      ["«quoted.dot»", "vir_client_native_quoted_dot"],
+      ["«1»", "vir_client_native_quoted_numeral"],
+      ["café", "vir_client_native_cafe"],
+    ]) {
+      const nativeBoundary = new RegExp(`\`ClientNativeFixture\.${name}\` -> \`${symbol}\``);
+      const referenceBody = new RegExp(`Lean reference body for \`ClientNativeFixture\.${name}\``);
+      assert.match(report, native ? nativeBoundary : referenceBody);
+      assert.doesNotMatch(report, native ? referenceBody : nativeBoundary);
+    }
   }
 
   await copyFile(
