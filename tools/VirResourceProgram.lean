@@ -185,6 +185,10 @@ def usage : String :=
 end Vir.ResourceProgram
 
 unsafe def main (args : List String) : IO Unit := do
+  -- Match the Lake pre-cache guard for direct producer calls as well. Do not
+  -- silently clear a profile that the shared generator would otherwise read.
+  if (← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST").isSome then
+    throw <| IO.userError "VIR_RESOURCE_NATIVE_PROFILE_UNSUPPORTED: unset VIR_NATIVE_EXTERN_MANIFEST; resource programs require the locked runtime profile"
   match args with
   | ["plan", recipe, compatibility, root] =>
     Vir.ResourceProgram.plan recipe compatibility root

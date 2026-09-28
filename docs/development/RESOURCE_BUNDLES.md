@@ -220,6 +220,13 @@ and full compiled artifact groups, including private implementation traces.
 Setup maps remain producer-local. No Node, nested Lake or npm is used in this
 application preparation path. Every build validates/repairs staging from the
 actual returned artifact, including cache hits, while retaining semantic traces.
+The private `fetchVirCompiledSetup` helper is shared with `:vir`: one implementation
+owns full artifact acquisition, implementation traces and resolved-map identity.
+Caller-specific cycle checks and output/cache contracts stay outside it.
+Resource facets and direct program-tool calls reject `VIR_NATIVE_EXTERN_MANIFEST`
+(including an empty value) before using cached outputs: custom providers are not
+part of the locked resource-runtime contract. The lower-level `:vir` workflow
+continues to support its explicitly traced native profile.
 Before Lake touches the program output, setup, trace or hash file, the facet
 rejects symlink ancestors and nonregular leaves. Native checks alone would be too
 late: Lake can remove outputs or write trace/hash files before invoking the tool.
