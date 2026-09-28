@@ -5,12 +5,10 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntimeFactory } from "./vir-runtime.js";
-import {
-  IR_PACKAGE_VERSION,
-  validateIrPackageSetMembers,
-} from "./runtime/ir-package.js";
+import { validateIrPackageSetMembers } from "./runtime/ir-package.js";
 import { sha256Hex, validateEnvelope } from "./resources/descriptor.js";
 import { resolveProgramExports } from "./resources/program-exports.js";
+import { assertResourceCompatibility } from "./resources/compatibility.js";
 
 const manifestLimit = 4 * 1024 * 1024 + 1024;
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -199,13 +197,7 @@ export async function createProgram(options) {
     ) {
       throw new Error("incompatible runtime and program resource bundles");
     }
-    if (
-      compatibility.jsApiVersion !== 1 ||
-      compatibility.runtimeAbi !== "2" ||
-      compatibility.irFormatVersion !== IR_PACKAGE_VERSION
-    ) {
-      throw new Error("unsupported resource runtime compatibility");
-    }
+    assertResourceCompatibility(compatibility);
     if (engine.descriptor.logicalId === program.descriptor.logicalId) {
       throw new Error(
         "runtime and program resource logical identities conflict",
@@ -264,6 +256,11 @@ export async function createProgram(options) {
     );
     let disposed = false;
     return Object.freeze({
+      get status() {
+        return disposed
+          ? "disposed"
+          : runtime.failure === null ? "active" : "failed";
+      },
       call(role, ...args) {
         if (disposed) throw new Error("program has been disposed");
         const entry = exports.get(role);

@@ -20,7 +20,8 @@ import {
   IR_PACKAGE_SET_VERSION,
 } from "../../web/src/vir-runtime.js";
 import { IR_PACKAGE_MAGIC, IR_PACKAGE_SECTION } from "./irpkg-format.mjs";
-import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION } from "./package-versions.mjs";
+import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION, RESOURCE_JS_API_VERSION } from "./package-versions.mjs";
+import { assertResourceCompatibility } from "../../web/src/resources/compatibility.js";
 
 const args = process.argv.slice(2);
 if (args.some(arg => arg !== "--write")) {
@@ -169,10 +170,29 @@ assertEqual(
   "SDK fetcher version mismatch",
 );
 assertEqual(
-  leanNatConstant(sdkFetcherSource, "sdkRuntimeAbiVersion"),
+  leanNatConstant(packageFormat, "currentRuntimeAbiVersion"),
   RUNTIME_ABI_VERSION,
-  "SDK fetcher runtime ABI version mismatch",
+  "runtime ABI version mismatch",
 );
+assertEqual(
+  leanNatConstant(packageFormat, "currentResourceJsApiVersion"),
+  RESOURCE_JS_API_VERSION,
+  "resource JS API version mismatch",
+);
+assertResourceCompatibility(JSON.parse(await readRepoText("vir-resources/compatibility.json")));
+if (!/abi != Vir\.GeneratePackage\.currentRuntimeAbiVersion/.test(sdkFetcherSource)) {
+  throw new Error("SDK fetcher must use the shared runtime ABI version");
+}
+const resourceBuildSource = await readRepoText("Vir/Resources/Build.lean");
+for (const [field, expression] of [
+  ["runtimeAbi", "toString Vir.GeneratePackage.currentRuntimeAbiVersion"],
+  ["jsApiVersion", "Vir.GeneratePackage.currentResourceJsApiVersion"],
+  ["irFormatVersion", "Vir.GeneratePackage.currentPackageFormatVersion"],
+]) {
+  if (!resourceBuildSource.includes(`${field} := ${expression}`)) {
+    throw new Error(`resource producer must derive ${field} from shared contract`);
+  }
+}
 assertEqual(
   leanStringConstant(lakefileSource, "virSdkVersion"),
   packageJson.version,

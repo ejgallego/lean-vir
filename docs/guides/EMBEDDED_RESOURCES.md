@@ -127,6 +127,13 @@ and dispose it there. Separate `createProgram` calls have separate Lean runtime
 state, even when they use the same resource files. `interfaceId` remains
 client-owned protocol metadata, not a runtime proof of argument/result types.
 
+`program.status` is read-only: `"active"`, `"failed"`, or `"disposed"`. An
+ordinary Lean IO error or invalid role does not retire the program. An escaping
+Wasm failure does: later calls reject, and recovery requires an explicit new
+`createProgram` call. Never automatically replay an effectful call after failure.
+Disposal is idempotent, releases the facade's runtime references, and takes
+precedence over failed status. Other program instances remain independent.
+
 The [resource contract](../development/RESOURCE_BUNDLES.md) describes integrity,
 publication and loader rules; the [acceptance checklist](../development/RESOURCE_ACCEPTANCE.md)
 distinguishes tested behavior from remaining release gates.

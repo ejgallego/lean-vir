@@ -10,6 +10,7 @@ import Vir.Resources
 import Vir.Resources.Pack
 import Vir.Resources.Sha256
 import Vir.Resources.Bytes
+import Vir.GeneratePackage.PackageFormat
 public meta import Vir.Resources
 public meta import Vir.Resources.Pack
 public meta import Vir.Resources.Sha256
@@ -69,7 +70,11 @@ private def withDescriptor (bundle : Bundle) (descriptor : Descriptor) : Bundle 
 -- Native acquisition must instead check the actual pinned compiler identity.
 private def nativeRuntime : Bundle :=
   withDescriptor runtime { runtime.descriptor with
-    compatibility := { compatibility with leanBuildId := Lean.githash, runtimeAbi := "2" } }
+    compatibility := {
+      leanBuildId := Lean.githash
+      runtimeAbi := toString Vir.GeneratePackage.currentRuntimeAbiVersion
+      jsApiVersion := Vir.GeneratePackage.currentResourceJsApiVersion
+      irFormatVersion := Vir.GeneratePackage.currentPackageFormatVersion } }
 
 private def rawPack (descriptor : String) (payload : ByteArray := ByteArray.empty) : ByteArray := Id.run do
   let mut out : ByteArray := ⟨#[86, 73, 82, 82, 69, 83, 0, 1]⟩

@@ -12,6 +12,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
+import { assertResourceCompatibility } from "../../web/src/resources/compatibility.js";
 import {
   descriptorContentId,
   encodeDescriptor,
@@ -28,6 +29,7 @@ const output = resolve(out);
 const profile = JSON.parse(
   await readFile(join(root, "vir-resources/compatibility.json")),
 );
+assertResourceCompatibility(profile);
 const identity = JSON.parse(await readFile(identityPath));
 if (
   identity.leanSource?.commit !== profile.leanBuildId ||

@@ -16,6 +16,11 @@ def currentPackageFormatVersion : Nat := 11
 
 def currentInterfaceManifestVersion : Nat := 9
 
+/-- Native SDK and resource producers share these runtime contract versions. -/
+def currentRuntimeAbiVersion : Nat := 4
+
+def currentResourceJsApiVersion : Nat := 1
+
 def packageSetFormat : String := "lean-vir-ir-package-set"
 
 def currentPackageSetVersion : Nat := 2

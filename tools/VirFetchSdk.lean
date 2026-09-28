@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import Lean
 import Vir.NativePayload
+import Vir.GeneratePackage.PackageFormat
 
 open Lean
 open System
@@ -13,8 +14,6 @@ open System
 namespace Vir.FetchSdk
 
 def sdkVersion : String := "0.1.0"
-
-def sdkRuntimeAbiVersion : Nat := 4
 
 structure Options where
   out : FilePath := "web/public/vendor/lean-vir"
@@ -244,7 +243,7 @@ def verifyInstalledSdk
   if version != expectVersion then
     throw <| IO.userError s!"SDK version mismatch: expected {expectVersion}, got {version}"
   let abi ← jsonField manifest "runtimeAbiVersion" Json.getNat?
-  if abi != sdkRuntimeAbiVersion then
+  if abi != Vir.GeneratePackage.currentRuntimeAbiVersion then
     throw <| IO.userError s!"unsupported SDK runtime ABI version: {abi}"
   let actualCommit ← jsonField manifest "gitCommit" Json.getStr?
   if actualCommit.isEmpty then

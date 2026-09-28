@@ -12,3 +12,7 @@ public import fixtures.FormatPretty
 @[vir_export]
 public def Vir.Resources.Test.prettyScore : Nat :=
   Vir.Fixtures.FormatPretty.formatPrettyScore
+
+@[vir_export]
+public def Vir.Resources.Test.leanError : IO Unit :=
+  throw (IO.userError "resource recoverable error")

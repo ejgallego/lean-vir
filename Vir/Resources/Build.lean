@@ -11,6 +11,7 @@ public import Lean.Data.Json.Basic
 public import Vir.Resources.Types
 public import Vir.NativePayload
 import Vir.Resources.Pack
+import Vir.GeneratePackage.PackageFormat
 
 /-! Native-only support for bounded resource preparation.
 
@@ -123,9 +124,9 @@ def validMetadata (value : String) : Bool :=
 
 def currentCompatibility : Compatibility := {
   leanBuildId := Lean.githash
-  runtimeAbi := "2"
-  jsApiVersion := 1
-  irFormatVersion := 11
+  runtimeAbi := toString Vir.GeneratePackage.currentRuntimeAbiVersion
+  jsApiVersion := Vir.GeneratePackage.currentResourceJsApiVersion
+  irFormatVersion := Vir.GeneratePackage.currentPackageFormatVersion
 }
 
 def compatibility (path : FilePath) : IO Compatibility := do
@@ -143,7 +144,7 @@ def compatibility (path : FilePath) : IO Compatibility := do
       c.jsApiVersion == currentCompatibility.jsApiVersion &&
       c.irFormatVersion == currentCompatibility.irFormatVersion do
     fail "UNSUPPORTED_COMPATIBILITY"
-      s!"expected runtime ABI 2, JS API 1, IR format 11, got {repr c}"
+      s!"expected {repr currentCompatibility}, got {repr c}"
   return c
 
 def checkedSupport (root : FilePath) (source : String) : IO FilePath := do

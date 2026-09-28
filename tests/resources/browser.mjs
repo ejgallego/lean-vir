@@ -23,6 +23,7 @@ import {
 import {
   PACKAGE_FORMAT_VERSION,
   RUNTIME_ABI_VERSION,
+  RESOURCE_JS_API_VERSION,
 } from "../../scripts/packages/package-versions.mjs";
 import {
   launchChromium,
@@ -86,7 +87,7 @@ assert.equal(buildIdentity.leanSource.dirty, false);
 const compatibility = {
   leanBuildId,
   runtimeAbi: String(RUNTIME_ABI_VERSION),
-  jsApiVersion: 1,
+  jsApiVersion: RESOURCE_JS_API_VERSION,
   irFormatVersion: PACKAGE_FORMAT_VERSION,
 };
 const inventory = new Map();
@@ -161,6 +162,11 @@ const program = await bundle(
       role: "score",
       declaration: "Vir.Resources.Test.prettyScore",
       interfaceId: "vir-test-score-v1",
+    },
+    {
+      role: "leanError",
+      declaration: "Vir.Resources.Test.leanError",
+      interfaceId: "vir-test-error-v1",
     },
   ],
 );
@@ -272,6 +278,60 @@ try {
     }, null, 2));
   });
   outcomes.push("retention: live control, 300 scalar calls, 12 released instances PASS");
+  // Route one normal facade call into an actual Wasm out-of-bounds access.
+  // The existing runtime guard, not the facade, must record/retire that failure.
+  const status = await evaluate(cdp, `(async () => {
+    const original = WebAssembly.Instance;
+    let trapNext = false, boundaryCalls = 0;
+    WebAssembly.Instance = new Proxy(original, {construct(target, args) {
+      const instance = Reflect.construct(target, args);
+      return {exports: {...instance.exports, vir_call_resolved_objects(...args) {
+        boundaryCalls++;
+        if (trapNext) { trapNext = false; return instance.exports.vir_obj_nat(0xfffffff0, 32); }
+        return instance.exports.vir_call_resolved_objects(...args);
+      }}};
+    }});
+    let program, peer, fresh;
+    try {
+      program = await openResourceProgram(); peer = await openResourceProgram();
+      const initial = program.status;
+      let ioError = false;
+      try { program.call('leanError'); } catch (e) { ioError = /resource recoverable error/.test(e.message); }
+      const afterIo = program.status;
+      const afterIoValue = program.call('score');
+      let invalidRole = false;
+      try { program.call('missing'); } catch { invalidRole = true; }
+      const afterInvalidRole = program.status;
+      const immutable = !Reflect.set(program, 'status', 'disposed') && program.status === 'active';
+      trapNext = true;
+      let failure;
+      try { program.call('score'); } catch (error) { failure = error; }
+      const failed = program.status;
+      const callsAtFailure = boundaryCalls;
+      let retired = false;
+      try { program.call('score'); } catch (error) { retired = error.cause === failure; }
+      const noReplay = boundaryCalls === callsAtFailure;
+      const peerState = peer.status, peerValue = peer.call('score');
+      program.dispose(); program.dispose();
+      const disposed = program.status;
+      fresh = await openResourceProgram();
+      return {initial, ioError, afterIo, afterIoValue, invalidRole, afterInvalidRole,
+        immutable, realTrap: failure instanceof WebAssembly.RuntimeError, failed,
+        retired, noReplay, peerState, peerValue, disposed,
+        freshState: fresh.status, freshValue: fresh.call('score')};
+    } finally {
+      program?.dispose(); peer?.dispose(); fresh?.dispose();
+      WebAssembly.Instance = original;
+    }
+  })()`);
+  assert.deepEqual(status, {
+    initial: "active", ioError: true, afterIo: "active", afterIoValue: "6093",
+    invalidRole: true, afterInvalidRole: "active", immutable: true,
+    realTrap: true, failed: "failed", retired: true, noReplay: true,
+    peerState: "active", peerValue: "6093", disposed: "disposed",
+    freshState: "active", freshValue: "6093",
+  });
+  outcomes.push("status: recoverable IO, real Wasm trap, no replay, independent recovery, disposal PASS");
   const jsonItem = (value) => ({
     bytes: Buffer.from(JSON.stringify(value)),
     mediaType: "application/json",
