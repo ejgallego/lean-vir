@@ -58,8 +58,8 @@ checks. The downstream Slides tests belong to Slides and are not run by VIR CI.
 | T20 Site relocation | Covered | Actual Slides program executes at root and nested URL prefixes. |
 | T21 Real PrettyM | Covered on historical 4.35 demo | Downstream browser/native shared 21-case semantic corpus; no automatic 4.34 Slides adoption claim. |
 | T22 Format edges | Covered | Shared corpus includes Unicode, tags, groups and alignment/width cases. |
-| T23 Invalid requests | Partial | Shared browser error cases and 13 additional native bounds cases; the full generated bounds set is not yet replayed in Wasm. |
-| T24 Calls/disposal | Partial | Independent runtimes, sequential disposal/remount and deferred client mount races pass; retained-memory measurements remain. |
+| T23 Invalid requests | Covered on historical 4.35 demo | Slides test-only a5b42f8 / VIR4d00dbf replays the same 13 generated native bounds cases in Wasm at root/nested URLs, including exact escaped 1 MiB output and one byte over. Successful calls after each expected error check recovery. No 4.34 Slides adoption claim. |
+| T24 Calls/disposal | Partial | Independent runtimes, sequential disposal/remount and deferred client mount races pass. The 4.34 resource browser gate measures 300 scalar calls and collection of 13 disposed Wasm memories, including one with its facade still held; dynamic PrettyM/callback retention is not inferred. See below. |
 | T25 Paths/collisions | Covered | Portable path, case/prefix collision, integrity and link/hardlink tests; seven real-facet aliases preserve sentinels before rejection, including Lake trace/hash writes and warm-cache paths. Slides reserves publisher namespaces. |
 | T26 Shared producer | Covered | Two distinct intermediary packages, each with two carriers, share one producer/runtime in a cold build. Publication contains one runtime plus four programs; client-specific edits preserve peer program bytes. |
 | T27 Build cycles | Covered | Program importing its owning carrier rejected before compiled jobs wait. |
@@ -85,6 +85,24 @@ edit. It separately exercises enabled-cache warm reuse and cache-only generation
 This prevents changing content-addressed paths from hiding a missing semantic
 dependency trace. Output safety tests use only campaign-owned sentinels and restore
 moved paths even when a negative case fails.
+
+### Browser retention evidence
+
+`test:resources:browser` records `retention.json` beside its package/runtime
+identities. It observes actual Wasm memories through weak references and forces
+Chromium GC between protocol turns. A live-instance control must remain reachable;
+all observed memories must become collectable after disposal, including while a
+disposed program facade is still held. Twelve additional create/call/dispose cycles test that this
+does not only work for the first instance. The harness keeps raw JS heap and Wasm
+capacity measurements, without a timing claim or a noisy heap-size threshold.
+
+The scalar Format score is not the client PrettyM JSON wrapper, and does not
+exercise callback roots. Its 300-call measurement must not be described as a
+dynamic PrettyM allocation test. Disposal detaches the facade from its runtime
+even if cleanup throws; repeated disposal remains harmless and later calls
+reject. This changes neither the underlying runtime's ownership policy nor its
+ABI. Collection is observed after explicit GC, not promised to occur immediately
+on disposal, and linear memory capacity need not shrink while an instance lives.
 
 ## Before promoting the workflow
 

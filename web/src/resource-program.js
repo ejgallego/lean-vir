@@ -274,7 +274,14 @@ export async function createProgram(options) {
       dispose() {
         if (disposed) return;
         disposed = true;
-        runtime.dispose();
+        try {
+          runtime.dispose();
+        } finally {
+          // A retained closed facade must not keep the Wasm heap reachable,
+          // including when runtime cleanup reports an error.
+          runtime = null;
+          exports.clear();
+        }
       },
     });
   } catch (error) {
