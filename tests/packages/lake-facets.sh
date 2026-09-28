@@ -12,7 +12,15 @@ repo="$(pwd -P)"
 node tests/packages/infoview-bundle-downstream.mjs
 sdk_version="$(node -p 'require("./package.json").version')"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/lean-vir-lake-facets.XXXXXX")"
-trap 'rm -rf "$tmp"' EXIT
+cleanup() {
+  local status=$?
+  if [ "$status" -eq 0 ]; then
+    rm -rf "$tmp"
+  else
+    echo "Lake facet failure evidence retained at $tmp" >&2
+  fi
+}
+trap cleanup EXIT
 
 write_sdk_manifest() {
   local sdk_dir="$1"
@@ -438,6 +446,12 @@ fi
 test "$(cat "$tmp/existing-sdk/marker.txt")" = 'keep-existing-sdk'
 grep -q 'SDK version mismatch' "$tmp/version-sdk.stderr"
 
+lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk.tar.gz" --out "$tmp/existing-sdk" \
+    > "$tmp/good-sdk.stdout" 2> "$tmp/good-sdk.stderr"
+test ! -e "$tmp/existing-sdk/marker.txt"
+cmp "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js" "$tmp/existing-sdk/js/vir-runtime.js"
+test -f "$tmp/existing-sdk/lean-vir-artifact.json"
+
 lake -d "$tmp" build Smoke.InterfaceClassifier
 lake -d "$tmp" build Smoke.PackagePipeline
 lake -d "$tmp" build +Smoke.Runtime:vir
@@ -560,6 +574,8 @@ if lake -d "$tmp" build +Smoke.NewRuntime:vir \
 fi
 test ! -e "$module_descriptor"
 test ! -e "$module_package"
+test ! -e "$module_dependency"
+test -f "${module_package%.irpkg}.report.md"
 
 client_native_package="$tmp/.lake/build/vir/module-sets/Smoke/ClientNative.irpkg"
 client_native_report="$tmp/.lake/build/vir/module-sets/Smoke/ClientNative.report.md"

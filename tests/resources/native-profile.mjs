@@ -58,7 +58,7 @@ export function checkNativeProfileRejection({
   const retained = [
     stage,
     output,
-    `${output}.setup.json`,
+    join(client, "build with spaces/vir/programs/Client/Program.virprogram"),
     `${output}.trace`,
     `${output}.hash`,
   ].filter(existsSync);
@@ -87,7 +87,10 @@ export function checkNativeProfileRejection({
           "build",
           recipe,
           compatibility,
-          `${output}.setup.json`,
+          join(
+            client,
+            "build with spaces/vir/programs/Client/Program.virprogram",
+          ),
           client,
           join(dir, "unexpected.virres"),
         ],

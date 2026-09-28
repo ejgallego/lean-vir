@@ -44,7 +44,10 @@ const descriptorPath = path.join(
   consumer,
   ".lake/build/vir/module-sets/CacheFixture/Root.irpkg-set.json",
 );
-const setupPath = descriptorPath.replace(/[.]irpkg-set[.]json$/, ".setup.json");
+const setupPath = path.join(
+  consumer,
+  ".lake/build/vir/programs/CacheFixture/Root.setup.json",
+);
 let succeeded = false;
 
 try {
@@ -288,7 +291,8 @@ function runBuild(label, restore) {
       LAKE_RESTORE_ARTIFACTS: restore ? "true" : "false",
     },
   });
-  const log = `${result.stdout ?? ""}\n${result.stderr ?? ""}` +
+  const log =
+    `${result.stdout ?? ""}\n${result.stderr ?? ""}` +
     (result.error ? `\n${result.error.stack ?? result.error}\n` : "");
   writeFileSync(path.join(logs, `${label}.log`), log);
   assert.ifError(result.error);
@@ -479,11 +483,13 @@ function assertPackageContract(summary) {
   );
   for (const member of summary.members) {
     assert.equal(
-      member.descriptorSha256, member.actualSha256,
+      member.descriptorSha256,
+      member.actualSha256,
       `${member.module}: descriptor sha256 mismatch`,
     );
     assert.equal(
-      member.descriptorByteLength, member.actualByteLength,
+      member.descriptorByteLength,
+      member.actualByteLength,
       `${member.module}: descriptor byteLength mismatch`,
     );
     assert.deepEqual(member.owner, {
@@ -506,13 +512,15 @@ function assertRejectsStaleDescriptorIntegrity() {
   const original = readFileSync(descriptorPath);
   try {
     for (const [field, value] of [
-      ["sha256", "0".repeat(64)], ["byteLength", 0],
+      ["sha256", "0".repeat(64)],
+      ["byteLength", 0],
     ]) {
       const descriptor = JSON.parse(original);
       descriptor.packages[1][field] = value;
       writeFileSync(descriptorPath, JSON.stringify(descriptor));
       assert.throws(
-        () => packageSummary(), new RegExp(`descriptor ${field} mismatch`),
+        () => packageSummary(),
+        new RegExp(`descriptor ${field} mismatch`),
       );
     }
   } finally {
@@ -543,7 +551,8 @@ function sha256(bytes) {
 
 async function assertRuntimeResult(label, expected) {
   if (!options.wasm) return;
-  const { createVirRuntime } = await import("../../web/src/vir-runtime-node.js");
+  const { createVirRuntime } =
+    await import("../../web/src/vir-runtime-node.js");
   const descriptor = JSON.parse(readFileSync(descriptorPath, "utf8"));
   const irPackageSet = descriptor.packages.map(({ path: memberPath }) =>
     readFileSync(path.join(path.dirname(descriptorPath), memberPath)),

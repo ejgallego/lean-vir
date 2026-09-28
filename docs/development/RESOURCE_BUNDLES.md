@@ -186,11 +186,13 @@ The owning package supplies `vir-resources/ClientResources.json`:
   "schemaVersion": 1,
   "logicalId": "client-fixture/greeting",
   "module": "Client.Program",
-  "exports": [{
-    "role": "greet",
-    "declaration": "Client.Program.greet",
-    "interfaceId": "vir-fixture-greet-v1"
-  }],
+  "exports": [
+    {
+      "role": "greet",
+      "declaration": "Client.Program.greet",
+      "interfaceId": "vir-fixture-greet-v1"
+    }
+  ],
   "supportFiles": []
 }
 ```
@@ -220,9 +222,13 @@ and full compiled artifact groups, including private implementation traces.
 Setup maps remain producer-local. No Node, nested Lake or npm is used in this
 application preparation path. Every build validates/repairs staging from the
 actual returned artifact, including cache hits, while retaining semantic traces.
-The private `fetchVirCompiledSetup` helper is shared with `:vir`: one implementation
-owns full artifact acquisition, implementation traces and resolved-map identity.
-Caller-specific cycle checks and output/cache contracts stay outside it.
+The internal `virProgram` facet is shared with `:vir`: one cached result owns full
+artifact acquisition, implementation/location traces, analysis and emission.
+`Vir.Resources.Program` verifies its canonical package-set inventory and reads
+the actual root interface manifest. The resource adapter checks requested exports
+against that result before adding recipe roles/support files. Role/support edits
+therefore do not regenerate IR, and requesting both adapters reuses generation.
+Carrier-cycle checks still run before requesting the shared program job.
 Resource facets and direct program-tool calls reject `VIR_NATIVE_EXTERN_MANIFEST`
 (including an empty value) before using cached outputs: custom providers are not
 part of the locked resource-runtime contract. The lower-level `:vir` workflow
@@ -234,8 +240,11 @@ These checks assume trusted single-writer directories, not hostile concurrent
 replacement. Setup replacement also preserves existing hardlink aliases.
 
 Runtime planning and staging use the lightweight `vir_resource_pack` tool.
-They share bounded native file/JSON operations with program production, but do
-not depend on the generator or acquire program inputs. Neither runtime selection
+`Vir.NativePayload` provides bounded reads, digest checks and verified publication
+for both this path and the SDK installer. Domain validators and source selection
+remain separate: an SDK release/commit is not a resource content ID, and SDK
+authentication does not enter locked resource acquisition. These tools do not
+depend on the generator or acquire program inputs. Neither runtime selection
 nor compatible JavaScript-only runtime changes are program recipe inputs.
 
 Native rendering consumes compiled bytes only; moving the executable or removing

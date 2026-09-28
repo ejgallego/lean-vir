@@ -138,7 +138,7 @@ writeFileSync(
     .replace("import Client", "import Client\nimport Peer")
     .replace(
       "  let bundles ← IO.ofExcept <| Client.resources.bundles.mapError reprStr",
-      "  unless Client.resources.runtime.contentId == Peer.resources.runtime.contentId do\n    throw <| IO.userError \"intermediaries selected different runtimes\"\n  let resources : Vir.Resources.ResourceSet := { runtime := Client.resources.runtime, programs := Client.resources.programs ++ Peer.resources.programs }\n  let bundles ← IO.ofExcept <| resources.bundles.mapError reprStr",
+      '  unless Client.resources.runtime.contentId == Peer.resources.runtime.contentId do\n    throw <| IO.userError "intermediaries selected different runtimes"\n  let resources : Vir.Resources.ResourceSet := { runtime := Client.resources.runtime, programs := Client.resources.programs ++ Peer.resources.programs }\n  let bundles ← IO.ofExcept <| resources.bundles.mapError reprStr',
     ),
 );
 const lock = JSON.parse(
@@ -256,7 +256,26 @@ const signature = (path) => {
   const s = statSync(path, { bigint: true });
   return [s.ino, s.mtimeNs, s.size];
 };
-build("cold-shared");
+const cold = build("cold-shared");
+assert.equal(
+  (cold.match(/trace: .*vir_program build /g) ?? []).length,
+  2,
+  "two roots must generate exactly twice despite four resource carriers",
+);
+const canonical = join(
+  client,
+  "build with spaces/vir/programs/Client/Program.virprogram",
+);
+const canonicalIdentity = () =>
+  JSON.parse(readFileSync(`${canonical}.trace`)).outputs;
+const canonicalSignature = signature(canonical);
+const mixed = runLake("mixed-adapters", client, [
+  "build",
+  "+Client.Program:vir",
+  "ClientResources:virResourcePack",
+]);
+assert.doesNotMatch(mixed, /Built.*Client\.Program:virProgram/);
+assert.deepEqual(signature(canonical), canonicalSignature);
 const packs = stages.map((p) => readFileSync(p));
 const signatures = stages.map(signature);
 const warm = build("warm-shared");
@@ -280,7 +299,7 @@ const conventionalEnv = { ...env, LAKE_ARTIFACT_CACHE: "false" };
 build("conventional-inputs", conventionalEnv);
 const setupPath = join(
   client,
-  "build with spaces/vir/resources/programs/ClientResources.virres.setup.json",
+  "build with spaces/vir/programs/Client/Program.setup.json",
 );
 const setupBefore = readFileSync(setupPath);
 const beforeSetup = JSON.parse(setupBefore);
@@ -291,8 +310,16 @@ const publicPaths = ["Helper", "Program"].map((name) =>
   join(client, "build with spaces/lib/lean/Client", `${name}.olean`),
 );
 const publicBytes = publicPaths.map((path) => readFileSync(path));
+const canonicalBefore = readFileSync(canonical);
 writeFileSync(helper, helperSource.replace('"Hello, "', '"Welcome, "'));
 build("private-transitive-edit", conventionalEnv);
+assert.notDeepEqual(readFileSync(canonical), canonicalBefore);
+runLake(
+  "private-edit-loose-adapter",
+  client,
+  ["build", "+Client.Program:vir"],
+  conventionalEnv,
+);
 assert.deepEqual(
   readFileSync(setupPath),
   setupBefore,
@@ -305,7 +332,10 @@ assert.deepEqual(
 assert.notDeepEqual(readFileSync(stages[1]), packs[1]);
 assert.notDeepEqual(readFileSync(stages[2]), packs[2]);
 assert.deepEqual(signature(stages[0]), signatures[0]);
-assert.deepEqual(stages.slice(3).map((path) => readFileSync(path)), packs.slice(3));
+assert.deepEqual(
+  stages.slice(3).map((path) => readFileSync(path)),
+  packs.slice(3),
+);
 writeFileSync(helper, helperSource);
 build("private-transitive-restored", conventionalEnv);
 assert.deepEqual(
@@ -322,6 +352,10 @@ const support = {
   mediaType: "text/plain",
 };
 writeFileSync(supportSource, "first\n");
+// Normalize back to cache-backed acquisition once, then keep the canonical
+// result completely stable across changes that belong only to the adapter.
+build("support-baseline");
+const supportProgramSignature = canonicalIdentity();
 let previous = packs[1];
 for (const [label, entry, contents] of [
   ["support-added", support, "first\n"],
@@ -339,9 +373,17 @@ for (const [label, entry, contents] of [
   assert.notDeepEqual(current, previous);
   previous = current;
   assert.deepEqual(readFileSync(stages[2]), packs[2]);
-  assert.deepEqual(stages.slice(3).map((path) => readFileSync(path)), packs.slice(3));
+  assert.deepEqual(
+    stages.slice(3).map((path) => readFileSync(path)),
+    packs.slice(3),
+  );
   assert.deepEqual(signature(stages[0]), signatures[0]);
   assert.doesNotMatch(log, /Built.*Client\.(?:Program|Helper)(?:\s|:)/);
+  assert.deepEqual(
+    canonicalIdentity(),
+    supportProgramSignature,
+    `${label} must not regenerate the compiled program`,
+  );
 }
 writeFileSync(recipePath, JSON.stringify(recipe));
 build("support-removed");
@@ -466,14 +508,9 @@ assert.deepEqual(
   [],
   "only the changed carrier may recompile",
 );
-const setup = JSON.parse(
-  readFileSync(join(facetDir, "ClientResources.virres.setup.json")),
-);
-for (const path of setup.importArts["Client.Program"].flat())
-  assert.ok(
-    path.startsWith(cache + "/"),
-    `not an authoritative cache path: ${path}`,
-  );
+// Recipe-only repacking consumes the shared program artifact, not another
+// generator invocation or a conventional-path compiled-input reconstruction.
+assert.ok(existsSync(join(cache, "artifacts")));
 
 // Keep only module artifacts in this campaign's Lake cache. A normal leaf
 // execution must rebuild native tools/objects and still use the cached Lean
@@ -486,7 +523,11 @@ let movedNative = 0;
 let movedObjects = 0;
 let movedExecutables = 0;
 for (const name of readdirSync(artifacts)) {
-  if (/\.(?:olean(?:\.server|\.private)?|ir(?:\.sig)?|ilean|c|bc|ltar)$/.test(name))
+  if (
+    /\.(?:olean(?:\.server|\.private)?|ir(?:\.sig)?|ilean|c|bc|ltar)$/.test(
+      name,
+    )
+  )
     continue;
   if (/\.o$/.test(name)) movedObjects++;
   if (!name.includes(".")) movedExecutables++;
@@ -494,8 +535,14 @@ for (const name of readdirSync(artifacts)) {
   movedNative++;
 }
 assert.ok(movedNative > 0, "expected native artifacts in the initial cache");
-assert.ok(movedObjects > 0, "expected native object artifacts in the initial cache");
-assert.ok(movedExecutables > 0, "expected executable artifacts in the initial cache");
+assert.ok(
+  movedObjects > 0,
+  "expected native object artifacts in the initial cache",
+);
+assert.ok(
+  movedExecutables > 0,
+  "expected executable artifacts in the initial cache",
+);
 for (const [name, path] of [
   ["producer", join(producer, ".lake/build")],
   ["client", join(client, "build with spaces")],
@@ -507,14 +554,17 @@ for (const [name, path] of [
 for (const path of stages.slice(1))
   renameSync(path, `${path}.lean-only-retained`);
 const leanOnly = build("lean-only-cache");
-assert.deepEqual(stages.map((path) => readFileSync(path)), leanOnlyPacks);
+assert.deepEqual(
+  stages.map((path) => readFileSync(path)),
+  leanOnlyPacks,
+);
 assert.match(leanOnly, /Built.*(?:vir_resource_pack|vir_resource_program)/);
 for (const name of ["vir_resource_pack", "vir_resource_program"])
   assert.ok(existsSync(join(producer, ".lake/build/bin", name)), name);
 assert.ok(existsSync(join(leaf, ".lake/build/bin/generate-site")));
 for (const path of [
-  join(client, "build with spaces/vir/resources/programs/ClientResources.virres.setup.json"),
-  join(peer, "build with spaces/vir/resources/programs/PeerResources.virres.setup.json"),
+  join(client, "build with spaces/vir/programs/Client/Program.setup.json"),
+  join(peer, "build with spaces/vir/programs/Peer/Program.setup.json"),
 ]) {
   const setup = JSON.parse(readFileSync(path));
   for (const imports of Object.values(setup.importArts))

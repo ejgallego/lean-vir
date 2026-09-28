@@ -5,13 +5,14 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Lean
-import Vir.GeneratePackage
+import Vir.LeanName
+import Vir.Resources.Program
 import Vir.Resources.Build
 import Vir.Resources.Pack
 import Vir.Resources.Sha256
 
 /-! Native, bounded producer for one independently registered marked module.
-Lake resolves and traces the compiled module setup before invoking `build`.
+Lake supplies the shared, verified compiled program result to `build`.
 There is no source compilation or artifact-path guessing in this tool. -/
 
 namespace Vir.ResourceProgram
@@ -106,22 +107,12 @@ private def plan (recipePath compatibilityPath root : FilePath) : IO Unit := do
     ("module", toJson moduleName),
     ("supportFiles", Json.arr supportFiles)])
 
-private def packageMembers (descriptorPath : FilePath) : IO (Array String) := do
-  let json ← Build.readJson descriptorPath maxDescriptorBytes
-  let members ← fromExcept "INVALID_PACKAGE_SET" do
-    let packages ← (← json.getObjVal? "packages").getArr?
-    if packages.isEmpty || packages.size > maxFiles then throw "invalid package count"
-    packages.mapM fun member => member.getObjValAs? String "path"
-  for path in members do
-    unless validPath path do fail "INVALID_PACKAGE_PATH" path
-  return members
-
 private def addFile (files : Array File) (infos : Array FileInfo)
     (path mediaType : String) (bytes : ByteArray) : Array File × Array FileInfo :=
   (files.push { path, bytes }, infos.push {
     path, mediaType, byteLength := bytes.size, sha256 := sha256 bytes })
 
-private unsafe def build (recipePath compatibilityPath setupPath root outputPath : FilePath) : IO Unit := do
+private def build (recipePath compatibilityPath programPath root outputPath : FilePath) : IO Unit := do
   let recipe ← readRecipe recipePath
   let compat ← Build.compatibility compatibilityPath
   Build.checkDirectory root
@@ -133,58 +124,39 @@ private unsafe def build (recipePath compatibilityPath setupPath root outputPath
     let bytes ← Build.readInput path (maxPayloadBytes - supportTotal) "PAYLOAD_LIMIT"
     supportTotal := supportTotal + bytes.size
     supports := supports.push (support, bytes)
-  let setup ← ModuleSetup.load setupPath
-  unless setup.name == moduleName do
-    fail "SETUP_MODULE_MISMATCH" s!"expected {moduleName}, got {setup.name}"
-  IO.FS.withTempDir fun temporary => do
-    let packagePath := temporary / "program.irpkg"
-    let setPath := temporary / "program.irpkg-set.json"
-    let shardDir := temporary / "parts"
-    let reportPath := temporary / "report.md"
-    IO.FS.createDir shardDir
-    let required ← recipe.exports.mapM fun item =>
-      fromExcept "INVALID_EXPORT" (Vir.parseDottedName item.declaration)
-    let result ← Vir.GeneratePackage.runModuleSet
-      #[{ origin := .module moduleName, mode := .marked }] moduleName
-      packagePath setPath shardDir "program.irpkg" "parts" reportPath
-      setup.importArts required (some sha256)
-    unless result == 0 do fail "PROGRAM_GENERATION_FAILED" s!"see diagnostics for {moduleName}"
-    let members ← packageMembers setPath
-    let mut files : Array File := #[]
-    let mut infos : Array FileInfo := #[]
-    let setBytes ← Build.readInput setPath maxDescriptorBytes "DESCRIPTOR_LIMIT"
-    (files, infos) := addFile files infos "program.irpkg-set.json" "application/json" setBytes
-    let mut total := setBytes.size + supportTotal
-    if total > maxPayloadBytes then fail "PAYLOAD_LIMIT" "package set and support files exceed limit"
-    for member in members do
-      let path := temporary / member
-      let bytes ← Build.readInput path (maxPayloadBytes - total) "PAYLOAD_LIMIT"
-      total := total + bytes.size
-      (files, infos) := addFile files infos member "application/vnd.lean-vir.ir-package" bytes
-    for (support, bytes) in supports do
-      (files, infos) := addFile files infos support.path support.mediaType bytes
-    let descriptor : Descriptor := {
-      schemaVersion := 1
-      logicalId := recipe.logicalId
-      kind := .program
-      compatibility := compat
-      files := infos
-      fileEntries := #[{ role := "programSet", path := "program.irpkg-set.json" }]
-      exports := recipe.exports }
-    let bundle : Bundle := { contentId := descriptor.contentId, descriptor, files }
-    let packed ← match Pack.encode bundle with
-      | .ok value => pure value
-      | .error e => fail e.code (reprStr e)
-    Build.atomicInstall outputPath packed
-    IO.println bundle.contentId
+  let program ← Program.read programPath moduleName.toString
+  unless program.bundle.descriptor.compatibility == compat do
+    fail "PROGRAM_COMPATIBILITY_MISMATCH" moduleName.toString
+  for requested in recipe.exports do
+    unless program.exports.contains requested.declaration do
+      fail "MISSING_PROGRAM_EXPORT"
+        s!"required VIR interface export `{requested.declaration}` is absent from marked module `{moduleName}`"
+  let mut files := program.bundle.files.filter (·.path != "report.md")
+  let mut infos := program.bundle.descriptor.files.filter (·.path != "report.md")
+  for (support, bytes) in supports do
+    (files, infos) := addFile files infos support.path support.mediaType bytes
+  let descriptor : Descriptor := {
+    schemaVersion := 1
+    logicalId := recipe.logicalId
+    kind := .program
+    compatibility := compat
+    files := infos
+    fileEntries := #[{ role := "programSet", path := "program.irpkg-set.json" }]
+    exports := recipe.exports }
+  let bundle : Bundle := { contentId := descriptor.contentId, descriptor, files }
+  let packed ← match Pack.encode bundle with
+    | .ok value => pure value
+    | .error e => fail e.code (reprStr e)
+  Build.atomicInstall outputPath packed
+  IO.println bundle.contentId
 
 def usage : String :=
   "usage: vir_resource_program plan RECIPE COMPAT OWNERROOT\n" ++
-  "       vir_resource_program build RECIPE COMPAT SETUP OWNERROOT OUT"
+  "       vir_resource_program build RECIPE COMPAT PROGRAM OWNERROOT OUT"
 
 end Vir.ResourceProgram
 
-unsafe def main (args : List String) : IO Unit := do
+def main (args : List String) : IO Unit := do
   -- Match the Lake pre-cache guard for direct producer calls as well. Do not
   -- silently clear a profile that the shared generator would otherwise read.
   if (← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST").isSome then
