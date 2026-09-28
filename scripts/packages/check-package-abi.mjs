@@ -173,16 +173,9 @@ assertEqual(
   packageJson.version,
   "Lake SDK facet version mismatch",
 );
-assertEqual(
-  leanStringConstant(lakefileSource, "virPackageSetFormat"),
-  IR_PACKAGE_SET_FORMAT,
-  "Lake package-set descriptor format mismatch",
-);
-assertEqual(
-  leanNatConstant(lakefileSource, "virPackageSetVersion"),
-  IR_PACKAGE_SET_VERSION,
-  "Lake package-set descriptor version mismatch",
-);
+// Both Lake adapters now consume the shared native program result. Its format
+// authority is PackageFormat.lean, checked against the runtime above; Lake no
+// longer owns a second descriptor codec or duplicate format/version constants.
 
 const emitSource = await readRepoText("Vir/GeneratePackage/Emit.lean");
 const manifestEncodeSource = await readRepoText("Vir/GeneratePackage/Manifest/Encode.lean");
