@@ -17,6 +17,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { checkFacetOutputSafety } from "./output-safety.mjs";
+import { checkNativeProfileRejection } from "./native-profile.mjs";
 import {
   encodeDescriptor,
   descriptorContentId,
@@ -264,6 +265,9 @@ assert.doesNotMatch(warm, /Built.*(?:Client|Peer|Main|Runtime)/);
 assert.equal(readdirSync(join(evidence, "site")).length, 5);
 assert.notDeepEqual(packs[1], packs[3]);
 assert.notDeepEqual(packs[2], packs[4]);
+checkNativeProfileRejection({ client, producer, env, evidence });
+build("native-profile-unset");
+assert.deepEqual(stages.map(signature), signatures);
 checkFacetOutputSafety({ client, env, evidence });
 
 // Full implementation traces must invalidate the new facet even when public

@@ -245,20 +245,33 @@ private def virPackageSetComplete
     index := index + 1
   return (← virSha256Files? memberPaths) == some expectedHashes
 
-private def buildVirPackageSetFacet
-    (mod : Module) : FetchM (Job System.FilePath) := do
-  let generatorJob ← vir_irpkg.fetch
+/- One compiled-input boundary for loose package sets and embedded resources.
+Callers resolve/check the import graph first (resource carriers must stay out of
+it). This job carries implementation contents as well as their resolved paths;
+serializing its result must not replace that semantic dependency trace. -/
+private def fetchVirCompiledSetup
+    (mod : Module) (imports : Array Module) : FetchM (Job Lean.ModuleSetup) := do
   -- Lean 4.33's importAllArts facet returns exportInfo.arts, not allArts,
   -- despite using allArtsTrace. Extract both explicitly so private artifact
   -- groups reach the generator as well as participating in invalidation.
-  let moduleJob ← mod.exportInfo.fetch
-  let importsJob ← mod.transImports.fetch
-  let importArtsJob ← importsJob.bindM fun imports => do
-    let jobs ← imports.mapM fun imported => do
-      (← imported.exportInfo.fetch).mapM fun info => do
-        addTrace info.allArtsTrace
-        return (imported.name, info.allArts)
-    return Job.collectArray jobs "VIR imported module IR"
+  let jobs ← (imports.push mod).mapM fun input => do
+    (← input.exportInfo.fetch).mapM fun info => do
+      addTrace info.allArtsTrace
+      return (input.name, info.allArts)
+  (Job.collectArray jobs "VIR compiled inputs").mapM fun artifacts => do
+    let importArts := artifacts.foldl (init := ({} : Lean.NameMap Lean.ImportArtifacts))
+      fun arts (name, paths) => arts.insert name paths
+    let setup : Lean.ModuleSetup := { name := mod.name, importArts }
+    addLeanTrace
+    -- Cache relocation can change paths without changing implementation bytes.
+    addPureTrace (Lean.toJson setup).compress "VIR resolved input locations"
+    return setup
+
+private def buildVirPackageSetFacet
+    (mod : Module) : FetchM (Job System.FilePath) := do
+  let generatorJob ← vir_irpkg.fetch
+  let inputsJob ← (← mod.transImports.fetch).bindM fun imports =>
+    fetchVirCompiledSetup mod imports
   let packagePath := virModuleOutput mod "module-sets" "irpkg"
   let reportPath := virModuleOutput mod "module-sets" "report.md"
   let descriptorPath := virModuleOutput mod "module-sets" "irpkg-set.json"
@@ -269,58 +282,49 @@ private def buildVirPackageSetFacet
   let shardRelativeDir := shardDir.fileName.getD shardDir.toString
   let clientNativeManifest? ← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST"
   generatorJob.bindM fun generator =>
-    moduleJob.bindM fun artifacts =>
-      importArtsJob.mapM fun imports => do
-        unless artifacts.allArts.ir?.isSome do
-          -- Rejection must also invalidate an older successful source package.
-          removeFileIfExists descriptorPath
-          removeFileIfExists packagePath
-          removeFileIfExists reportPath
-          removeDirAllIfExists shardDir
-          error s!"VIR package input `{moduleName}` requires a `module` header and compiled IR"
-        addLeanTrace
-        addTrace artifacts.allArtsTrace
-        addTrace (← computeTrace generator)
-        addPureTrace moduleName "VIR module"
-        addPureTrace (clientNativeManifest?.getD "<unset>") "VIR client-native extern manifest"
-        if let some manifest := clientNativeManifest? then
-          unless manifest.isEmpty do
-            addTrace (← computeTrace (System.FilePath.mk manifest))
-        let packageSetComplete ← virPackageSetComplete descriptorPath moduleName
-          rootRelativePath shardRelativeDir
-        if (← descriptorPath.pathExists) &&
-            (!(← reportPath.pathExists) || !packageSetComplete) then
-          IO.FS.removeFile descriptorPath
-        buildFileUnlessUpToDate' descriptorPath do
-          removeFileIfExists descriptorPath
-          removeFileIfExists packagePath
-          removeDirAllIfExists shardDir
-          createParentDirs packagePath
-          createParentDirs reportPath
-          createParentDirs descriptorPath
-          IO.FS.createDirAll shardDir
-          -- Keep Lake's resolved paths, including private data and full IR.
-          -- Cache-only builds need not restore conventional .lake/build files.
-          let importArts := imports.foldl (init := ({} : Lean.NameMap Lean.ImportArtifacts))
-            fun arts (name, paths) => arts.insert name paths
-          let setup : Lean.ModuleSetup := {
-            name := mod.name
-            importArts := importArts.insert mod.name artifacts.allArts
-          }
-          IO.FS.writeFile setupPath (Lean.toJson setup).compress
-          proc {
-            cmd := generator.toString
-            args := #[
-              packagePath.toString,
-              reportPath.toString,
-              "--setup", setupPath.toString
-            ] ++ #[
-              "--module-set-output", descriptorPath.toString, shardDir.toString, moduleName,
-              rootRelativePath, shardRelativeDir
-            ] ++ #["--target-marked-module", moduleName]
-            env := ← getAugmentedEnv
-          }
-        return descriptorPath
+    inputsJob.mapM fun setup => do
+      unless (setup.importArts.find? mod.name).any (·.ir?.isSome) do
+        -- Rejection must also invalidate an older successful source package.
+        removeFileIfExists descriptorPath
+        removeFileIfExists packagePath
+        removeFileIfExists reportPath
+        removeDirAllIfExists shardDir
+        error s!"VIR package input `{moduleName}` requires a `module` header and compiled IR"
+      addTrace (← computeTrace generator)
+      addPureTrace moduleName "VIR module"
+      addPureTrace (clientNativeManifest?.getD "<unset>") "VIR client-native extern manifest"
+      if let some manifest := clientNativeManifest? then
+        unless manifest.isEmpty do
+          addTrace (← computeTrace (System.FilePath.mk manifest))
+      let packageSetComplete ← virPackageSetComplete descriptorPath moduleName
+        rootRelativePath shardRelativeDir
+      if (← descriptorPath.pathExists) &&
+          (!(← reportPath.pathExists) || !packageSetComplete) then
+        IO.FS.removeFile descriptorPath
+      buildFileUnlessUpToDate' descriptorPath do
+        removeFileIfExists descriptorPath
+        removeFileIfExists packagePath
+        removeDirAllIfExists shardDir
+        createParentDirs packagePath
+        createParentDirs reportPath
+        createParentDirs descriptorPath
+        IO.FS.createDirAll shardDir
+        -- Keep Lake's resolved paths, including private data and full IR.
+        -- Cache-only builds need not restore conventional .lake/build files.
+        IO.FS.writeFile setupPath (Lean.toJson setup).compress
+        proc {
+          cmd := generator.toString
+          args := #[
+            packagePath.toString,
+            reportPath.toString,
+            "--setup", setupPath.toString
+          ] ++ #[
+            "--module-set-output", descriptorPath.toString, shardDir.toString, moduleName,
+            rootRelativePath, shardRelativeDir
+          ] ++ #["--target-marked-module", moduleName]
+          env := ← getAugmentedEnv
+        }
+      return descriptorPath
 
 /--
 Build a composable VIR package set from the module's `@[vir_export]` and
@@ -450,6 +454,10 @@ private def checkResourceOutput (path : System.FilePath) : IO Unit := do
 /-- Resolve only independent program inputs; never fetch the carrier's modules
 or extra dependencies while producing the prerequisite for that carrier. -/
 library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
+  -- Enforce this before any cache lookup. Resource runtime capabilities come
+  -- from the locked bundle, not an ambient custom native-provider selection.
+  if (← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST").isSome then
+    error "VIR_RESOURCE_NATIVE_PROFILE_UNSUPPORTED: unset VIR_NATIVE_EXTERN_MANIFEST; resource programs require the locked runtime profile"
   let stem ← IO.ofExcept (resourceLibraryStem lib)
   let recipe ← inputTextFile (lib.pkg.dir / "vir-resources" / s!"{stem}.json")
   let profile ← virResourceCompatibility.fetch
@@ -474,27 +482,14 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
           error s!"VIR resource cycle: `{moduleName}` imports carrier module `{imported.name}` in `{lib.name}`"
       -- Source-only transImports was checked before requesting compilation, so
       -- the common carrier/program cycle produces a diagnostic, not a job wait.
-      let modules := imports.push mod
-      let artifacts ← modules.mapM fun input => do
-        (← input.exportInfo.fetch).mapM fun info => do
-          addTrace info.allArtsTrace
-          return (input.name, info.allArts)
-      let artifacts := Job.collectArray artifacts "VIR resource compiled inputs"
+      let inputs ← fetchVirCompiledSetup mod imports
       let support ← supportPaths.mapM fun path => inputBinFile (lib.pkg.dir / System.FilePath.mk path)
       let support := Job.collectArray support "VIR resource support files"
-      artifacts.bindM fun artifacts => support.mapM fun _ => do
-        let arts := artifacts.foldl (init := ({} : Lean.NameMap Lean.ImportArtifacts))
-          fun map (name, paths) => map.insert name paths
-        let some rootArts := arts.find? mod.name
-          | error "missing VIR root artifacts"
-        unless rootArts.ir?.isSome do
+      inputs.bindM fun setup => support.mapM fun _ => do
+        unless (setup.importArts.find? mod.name).any (·.ir?.isSome) do
           error s!"VIR resource program `{moduleName}` requires a module header and compiled IR"
-        addLeanTrace
         addPureTrace "virResourcePack/v1" "VIR resource producer contract"
-        -- Path maps can change on cache relocation without changing content.
-        let setup : Lean.ModuleSetup := { name := mod.name, importArts := arts }
         let setupText := (Lean.toJson setup).compress
-        addPureTrace setupText "VIR resolved input locations"
         let output := lib.pkg.buildDir / "vir/resources/programs" / s!"{stem}.virres"
         let setupPath := output.addExtension "setup.json"
         for path in #[output, setupPath, output.addExtension "trace", output.addExtension "hash"] do

@@ -60,6 +60,12 @@ semantics require the separate Chromium checks below.
 
 ### Package and fixture work
 
+- Embedded resource acquisition/tracing: `npm run test:resources:cache` includes
+  cold/warm rejection of empty, missing and valid ambient native-manifest settings,
+  direct native producer rejection, output preservation and unset recovery. It
+  also exercises cache-only artifacts, private implementation changes and stage
+  repair. Its default synthetic runtime tests build integrity,
+  not Wasm execution; supply an exact runtime pack for the real-pack campaign.
 - Interface head reduction and its rejection boundaries: `npm run test:interface`
   checks the classifier and export attributes locally and through a compiled
   module import, without Wasm or npm dependencies.

@@ -9,6 +9,9 @@ The current runtime lock is available-only: a maintainer must first supply its
 exact verified pack. A missing pack fails clearly; it never triggers a Wasm build.
 Anonymous cold installation is not yet supported. Use the pinned Lean toolchain
 and the matching runtime; do not substitute another release's Wasm.
+Unset `VIR_NATIVE_EXTERN_MANIFEST` when building resources: ambient custom native
+profiles are rejected, even on cache hits. Custom-profile packaging remains a
+separate lower-level `:vir` workflow with a matching runtime requirement.
 
 The [build-workflow guide](BUILD_WORKFLOWS.md#how-resource-preparation-builds-its-inputs)
 explains the facet dependencies, cache behavior, and boundary with `:vir` / `:virSdk`.

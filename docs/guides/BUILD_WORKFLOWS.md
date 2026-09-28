@@ -111,16 +111,39 @@ uses `curl`; packing runtime distributions is a separate maintainer operation.
 
 | Boundary | Package facet | Resource facet |
 | --- | --- | --- |
-| Compiled acquisition | Root/import `exportInfo.allArts`, setup map, implementation traces | The same policy, separately orchestrated, plus carrier-cycle checks |
+| Compiled acquisition | Shared `fetchVirCompiledSetup`: full artifacts, implementation/location traces and setup map | The same helper, after carrier-cycle checks |
 | Package generation | `vir_irpkg` CLI → `runModuleSet` | Native resource producer → the same `runModuleSet` |
 | Result | Loose package-set descriptor, root/shards and report | One portable pack containing the package set, roles and support files |
 | Cache/publication | File build rule plus package-set completeness checks | Lake artifact rule plus verified source-relative stage repair |
 | Runtime | Independent `:virSdk` installs an SDK directory | Independent `virRuntimePack` supplies a compiled runtime carrier |
 
-There is genuine duplication in acquisition/setup orchestration, but not a second
-IR interpreter or closure algorithm. Sharing a small internal acquisition helper
-is preferable to forcing the resource producer through the loose-output facet:
-that would add an intermediate publication/cache contract merely to reuse logic.
+Both facets now share one private acquisition/setup helper and the same generation
+core. They still invoke generation independently: requesting both for one root
+can emit its inner package set twice. The next possible consolidation is a shared
+cached program result beneath two output adapters, not routing resource production
+through loose-file publication. It requires one explicit key for selection, native
+profile, compiler/generator identity and emission format, plus a common integrity
+check. Do not cache a root-specific selected shard as a canonical whole module.
+
+That shared program result could let a role/support-file edit rewrap a resource
+without rerunning IR analysis, and let requests for both facets reuse emission.
+Those are proposed benefits, not behavior implemented by this first pass.
+Before consolidating emission:
+
+- Define a canonical inner package layout independent of the consumer's output
+  directory; preserve existing loose-output paths through its adapter.
+- Keep recipe roles/support bytes outside the inner program cache key, but still
+  validate required exports against cached results before advertising a bundle.
+- Preserve the lower-level custom-native profile and the resource locked-profile
+  restriction; only identical program semantics may share a cached result.
+- Use one package-set integrity check without importing unbuilt VIR code into
+  the lakefile. Test both adapters requesting the same program, warm reuse,
+  private-body invalidation and repair of damaged members.
+
+The general CLI's explicit/unmarked/multiple-target selections still need their
+own request representation. Live snapshots carry authoritative editor environments
+instead of an acquisition request. Consolidation should share analysis/encoding,
+not force either input contract through the marked compiled-module facet.
 
 SDK installation and resource acquisition also overlap in downloading and checking
 bytes, but have different identities and distribution contracts. Sharing transport
@@ -132,11 +155,11 @@ paths. Their migration and shared acquisition are tracked in
 [#205](https://github.com/ejgallego/lean-vir/issues/205); the resource tests do not
 establish cache-only support for those callers.
 
-The resource producer currently inherits `VIR_NATIVE_EXTERN_MANIFEST` without
-declaring it in its Lake trace. Warm and forced builds can therefore disagree;
-do not treat custom native-profile resource builds as qualified. The resource
-contract must either reject that ambient setting or trace an explicitly supported
-profile and require matching runtime capabilities before merge.
+Resource builds reject `VIR_NATIVE_EXTERN_MANIFEST` before cache lookup, including
+empty values; direct native producer calls reject it too. Their runtime is the
+locked bundle, not an ambient provider profile. The lower-level `:vir` path retains
+its traced custom-profile support. Supporting custom resource runtimes later needs
+an explicit matched capability/profile contract, not merely passing this variable.
 
 ## Replaced workflows
 
