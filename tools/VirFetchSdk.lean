@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Lean
-import Vir.Hash
+import Vir.NativePayload
 
 open Lean
 open System
@@ -226,8 +226,8 @@ def verifySdkFiles (sdkDir : FilePath) (manifest : Json) : IO Unit := do
     let relPath ← jsonField file "path" Json.getStr?
     let expected ← jsonField file "sha256" Json.getStr?
     return (relPath, expected)
-  let hashes ← Vir.sha256Files (entries.map fun (relPath, _) => sdkDir / FilePath.mk relPath)
-  for ((relPath, expected), actual) in entries.zip hashes do
+  for (relPath, expected) in entries do
+    let actual ← Vir.NativePayload.sha256File (sdkDir / FilePath.mk relPath)
     if actual != expected then
       throw <| IO.userError s!"checksum mismatch for {relPath}: expected {expected}, got {actual}"
 
@@ -259,24 +259,15 @@ def installArchive
     (outDir : FilePath)
     (expectVersion : String)
     (expectCommit? : Option String) : IO Unit := do
-  let stamp ← IO.monoMsNow
-  let tmpRoot := FilePath.mk s!"/tmp/lean-vir-sdk-fetch-{stamp}"
-  let unpackDir := tmpRoot / "unpack"
-  let sdkDir := unpackDir / "lean-vir-sdk"
-  try
+  IO.FS.createDirAll (outDir.parent.getD ".")
+  Vir.NativePayload.withSiblingDirectory outDir fun tmpRoot => do
+    let unpackDir := tmpRoot / "unpack"
+    let sdkDir := unpackDir / "lean-vir-sdk"
     IO.FS.createDirAll unpackDir
     discard <| run "tar" #["-xzf", archive.toString, "-C", unpackDir.toString]
-    verifyInstalledSdk sdkDir expectVersion expectCommit?
-    if ← outDir.pathExists then
-      IO.FS.removeDirAll outDir
-    if let some parent := outDir.parent then
-      IO.FS.createDirAll parent
-    discard <| run "mv" #[sdkDir.toString, outDir.toString]
-  finally
-    try
-      IO.FS.removeDirAll tmpRoot
-    catch _ =>
-      pure ()
+    let verified ← Vir.NativePayload.verifyDirectory sdkDir fun sdkDir =>
+      verifyInstalledSdk sdkDir expectVersion expectCommit?
+    Vir.NativePayload.promote outDir verified
 
 def fetchArchive (url : String) (dest : FilePath) : IO Unit :=
   fetchUrl url dest

@@ -19,17 +19,19 @@ import {
 } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { encodeDescriptor } from "../../web/src/resources/descriptor.js";
 
 // Run after building both native resource tools and the BrowserProgram :vir fixture.
 const repo = resolve(fileURLToPath(new URL("../../", import.meta.url)));
 const tool = join(repo, ".lake/build/bin/vir_resource_program");
 const packTool = join(repo, ".lake/build/bin/vir_resource_pack");
-const setup = join(
+const programTool = join(repo, ".lake/build/bin/vir_program");
+const program = join(
   repo,
-  ".lake/build/vir/module-sets/tests/resources/BrowserProgram.setup.json",
+  ".lake/build/vir/programs/tests/resources/BrowserProgram.virprogram",
 );
 const compat = join(repo, "vir-resources/compatibility.json");
-assert.ok(existsSync(tool) && existsSync(setup));
+assert.ok(existsSync(tool) && existsSync(program));
 const evidence = mkdtempSync(join(repo, "build/resource-program-"));
 const recipePath = join(evidence, "recipe.json");
 const runtimeLockPath = join(evidence, "runtime-lock.json");
@@ -64,7 +66,12 @@ const runtimeLock = {
 const writeRuntimeLock = (value) =>
   writeFileSync(runtimeLockPath, JSON.stringify(value));
 function run(label, args, error) {
-  const command = ["runtime-plan", "stage"].includes(args[0]) ? packTool : tool;
+  const command =
+    args[0] === "verify"
+      ? programTool
+      : ["runtime-plan", "stage"].includes(args[0])
+        ? packTool
+        : tool;
   const result = spawnSync("lake", ["env", command, ...args], {
     cwd: repo,
     encoding: "utf8",
@@ -83,7 +90,7 @@ const plan = () => run("plan", ["plan", recipePath, compat, repo]);
 const build = (label, error) => {
   const stdout = run(
     label,
-    ["build", recipePath, compat, setup, repo, packPath],
+    ["build", recipePath, compat, program, repo, packPath],
     error,
   );
   return stdout.split("\n").at(-1);
@@ -298,6 +305,89 @@ run(
   /INCOMPATIBLE/,
 );
 assert.deepEqual(readFileSync(packPath), first);
+
+// Valid outer transport must not conceal an invalid inner package-set contract.
+const canonical = readFileSync(program);
+const canonicalLength = canonical.readUInt32LE(8);
+const canonicalDescriptor = JSON.parse(
+  canonical.subarray(12, 12 + canonicalLength),
+);
+let canonicalOffset = 12 + canonicalLength;
+const canonicalFiles = new Map(
+  canonicalDescriptor.files.map((file) => {
+    const bytes = canonical.subarray(
+      canonicalOffset,
+      canonicalOffset + file.byteLength,
+    );
+    canonicalOffset += file.byteLength;
+    return [file.path, bytes];
+  }),
+);
+function writeCanonical(label, mutate) {
+  const descriptor = structuredClone(canonicalDescriptor);
+  const files = new Map(canonicalFiles);
+  mutate(descriptor, files);
+  descriptor.files = descriptor.files.map((file) => ({
+    ...file,
+    byteLength: files.get(file.path).length,
+    sha256: hash(files.get(file.path)),
+  }));
+  const json = Buffer.from(encodeDescriptor(descriptor));
+  const size = Buffer.alloc(4);
+  size.writeUInt32LE(json.length);
+  const path = join(evidence, `${label}.virprogram`);
+  writeFileSync(
+    path,
+    Buffer.concat([
+      canonical.subarray(0, 8),
+      size,
+      json,
+      ...descriptor.files.map((file) => files.get(file.path)),
+    ]),
+  );
+  return path;
+}
+run("canonical-verified", ["verify", program, recipe.module]);
+for (const [label, mutate] of [
+  [
+    "wrong-root",
+    (d) => {
+      d.logicalId = "vir-compiled/Other.Root";
+    },
+  ],
+  [
+    "missing-report",
+    (d) => {
+      d.files = d.files.filter((f) => f.path !== "report.md");
+    },
+  ],
+  [
+    "wrong-member-hash",
+    (_d, files) => {
+      const set = JSON.parse(files.get("program.irpkg-set.json"));
+      set.packages[0].sha256 = "0".repeat(64);
+      files.set("program.irpkg-set.json", Buffer.from(JSON.stringify(set)));
+    },
+  ],
+  [
+    "wrong-member-role",
+    (_d, files) => {
+      const set = JSON.parse(files.get("program.irpkg-set.json"));
+      set.packages[0].role = "root";
+      files.set("program.irpkg-set.json", Buffer.from(JSON.stringify(set)));
+    },
+  ],
+]) {
+  const candidate = writeCanonical(label, mutate);
+  run(label, ["verify", candidate, recipe.module], /INVALID_COMPILED_PROGRAM/);
+}
+const truncated = join(evidence, "truncated.virprogram");
+writeFileSync(truncated, canonical.subarray(0, canonical.length - 1));
+run(
+  "canonical-truncated",
+  ["verify", truncated, recipe.module],
+  /TRUNCATED|LENGTH|PACK_/,
+);
 
 console.log(
   `program packing: compiled export, complete members, deterministic bytes, strict inputs and safe staging passed (${firstId})`,

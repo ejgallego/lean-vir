@@ -161,9 +161,9 @@ The facet tracks Lake's transitive import artifacts, so imported implementation
 changes regenerate the set even when the root's public interface and `.olean`
 stay unchanged. The selected `VIR_NATIVE_EXTERN_MANIFEST` path and contents are
 also inputs. A missing root, report or listed shard, or a member whose length
-or SHA-256 differs from the descriptor, invalidates the cached target. Size
-checks use filesystem metadata; one portable Node crypto invocation hashes all
-members.
+or SHA-256 differs from the descriptor, is repaired from the shared compiled
+program result. Verification and hashing run in the native Lean tool; this path
+does not require Node.
 
 Compiled inputs use Lake's resolved artifact paths, including cache-only hits
 with no conventional `.olean` or `.ir` files restored under `.lake/build`.
@@ -172,11 +172,20 @@ setup file; later owning-module loads use the same mapping. No cache restoration
 setting is required. The setup file is build-local input metadata, not part of
 the published package set; output locations and descriptor ownership are unchanged.
 
-The descriptor is one Lake target. Invalidating it regenerates every reached
-member; unchanged members are not independently cached. Before generation the
-facet removes the previous descriptor, root and root-specific shard directory.
+The marked program is one cached Lake result, shared with `virResourcePack`.
+Its key includes full implementation/location traces, compiler/producer identity,
+root selection and native profile. A program edit regenerates every reached
+member; unchanged members are not independently cached. The loose-file adapter
+preserves the existing output names and installs the descriptor last. Repairing
+loose outputs does not rerun IR analysis. This is build-directory publication,
+not a transactional deployment mechanism for concurrent readers.
 Non-module inputs fail explicitly and invalidate stale outputs, including when
 replacing a previously successful module; there is no source fallback.
+
+The internal result reuses the validated resource-pack container and its bounded
+inventory (4096 files, 512 MiB of payload). It is not a public resource recipe:
+roles/support files and runtime acquisition do not affect its identity. Reports
+and setup maps remain build-local and are not embedded in public resources.
 
 Module identities and ordinal shard names avoid checkout-local paths in the
 package set. Manifests omit wall-clock timestamps, so identical

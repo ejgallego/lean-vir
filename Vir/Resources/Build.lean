@@ -9,8 +9,8 @@ module
 import Lean
 public import Lean.Data.Json.Basic
 public import Vir.Resources.Types
+public import Vir.NativePayload
 import Vir.Resources.Pack
-import Vir.Resources.Sha256
 
 /-! Native-only support for bounded resource preparation.
 
@@ -38,43 +38,13 @@ private def fromResource (value : Except ResourceError α) : IO α :=
 
 def packLimit : Nat := maxPayloadBytes + maxDescriptorBytes + 12
 
-def metadata? (path : FilePath) : IO (Option IO.FS.Metadata) := do
-  try return some (← path.symlinkMetadata)
-  catch e => match e with
-    | .noFileOrDirectory .. => return none
-    | _ => throw e
-
-/-! Refuse link traversal in producer-managed paths. This guards accidental
-aliases, not concurrent hostile replacement of ancestor directories. -/
-partial def checkParents (path : FilePath) : IO Unit := do
-  if let some parent := path.parent then
-    if parent != path then checkParents parent
-  if let some m ← metadata? path then
-    unless m.type == .dir do fail "UNSAFE_RESOURCE_DIRECTORY" path.toString
-
-def checkDirectory (path : FilePath) : IO Unit := do
-  checkParents path
-  let some m ← metadata? path | fail "MISSING_RESOURCE_DIRECTORY" path.toString
-  unless m.type == .dir do fail "UNSAFE_RESOURCE_DIRECTORY" path.toString
-
-def checkFile (path : FilePath) : IO Unit := do
-  checkParents (path.parent.getD ".")
-  if let some m ← metadata? path then
-    unless m.type == .file do fail "UNSAFE_RESOURCE_FILE" path.toString
-
-/-! Bound the read itself, not just a racy size observation before
-`readBinFile`. The path must be a regular file with no symlink ancestors. -/
-def readInput (path : FilePath) (limit : Nat) (limitCode : String) : IO ByteArray := do
-  checkFile path
-  let some m ← metadata? path | fail "MISSING_RESOURCE_FILE" path.toString
-  if m.byteSize.toNat > limit then fail limitCode path.toString
-  let handle ← IO.FS.Handle.mk path .read
-  let mut bytes := ByteArray.empty
-  repeat
-    let chunk ← handle.read (min 65536 (limit + 1 - bytes.size)).toUSize
-    if chunk.isEmpty then return bytes
-    bytes := bytes ++ chunk
-    if bytes.size > limit then fail limitCode path.toString
+def metadata? (path : FilePath) : IO (Option IO.FS.Metadata) :=
+  Vir.NativePayload.metadata? path
+def checkParents (path : FilePath) : IO Unit := Vir.NativePayload.checkParents path
+def checkDirectory (path : FilePath) : IO Unit := Vir.NativePayload.checkDirectory path
+def checkFile (path : FilePath) : IO Unit := Vir.NativePayload.checkFile path
+def readInput (path : FilePath) (limit : Nat) (limitCode : String) : IO ByteArray :=
+  Vir.NativePayload.readInput path limit limitCode
 
 /-! The ordinary Lean JSON parser collapses duplicate keys. Scan only JSON
 object keys before parsing so recipes and compatibility files reject them. -/
@@ -133,11 +103,14 @@ private def jsonPreflight (bytes : ByteArray) : Except String Unit := do
     i := i + 1
   unless depth == 0 && stack.isEmpty do throw "unbalanced JSON nesting"
 
+def parseJson (bytes : ByteArray) : Except String Json := do
+  jsonPreflight bytes
+  let some source := String.fromUTF8? bytes | throw "invalid UTF-8"
+  Json.parse source
+
 def readJson (path : FilePath) (limit : Nat) : IO Json := do
   let bytes ← readInput path limit "JSON_LIMIT"
-  fromExcept "INVALID_JSON" (do
-    jsonPreflight bytes
-    Json.parse (String.fromUTF8! bytes))
+  fromExcept "INVALID_JSON" (parseJson bytes)
 
 def exactKeys (json : Json) (keys : Array String) : Except String Unit := do
   let obj ← json.getObj?
@@ -147,6 +120,13 @@ def exactKeys (json : Json) (keys : Array String) : Except String Unit := do
 
 def validMetadata (value : String) : Bool :=
   !value.isEmpty && value.utf8ByteSize ≤ maxMetadataBytes
+
+def currentCompatibility : Compatibility := {
+  leanBuildId := Lean.githash
+  runtimeAbi := "2"
+  jsApiVersion := 1
+  irFormatVersion := 11
+}
 
 def compatibility (path : FilePath) : IO Compatibility := do
   let json ← readJson path maxMetadataBytes
@@ -159,7 +139,9 @@ def compatibility (path : FilePath) : IO Compatibility := do
       irFormatVersion := ← json.getObjValAs? Nat "irFormatVersion" }
   unless c.leanBuildId == Lean.githash do
     fail "LEAN_BUILD_MISMATCH" s!"expected {Lean.githash}, got {c.leanBuildId}"
-  unless c.runtimeAbi == "2" && c.jsApiVersion == 1 && c.irFormatVersion == 11 do
+  unless c.runtimeAbi == currentCompatibility.runtimeAbi &&
+      c.jsApiVersion == currentCompatibility.jsApiVersion &&
+      c.irFormatVersion == currentCompatibility.irFormatVersion do
     fail "UNSUPPORTED_COMPATIBILITY"
       s!"expected runtime ABI 2, JS API 1, IR format 11, got {repr c}"
   return c
@@ -173,38 +155,10 @@ def checkedSupport (root : FilePath) (source : String) : IO FilePath := do
 
 /-! Write through a fresh sibling and rename. Never truncate or write through a
 possibly hardlinked destination; identical bytes are a deliberate no-op. -/
-def withSibling (destination : FilePath) (f : FilePath → IO α) : IO α := do
-  checkFile destination
-  let parent := destination.parent.getD "."
-  IO.FS.createDirAll parent
-  checkParents parent
-  let mut directory? := none
-  for _ in [:8] do
-    let nonce := sha256 (← IO.getRandomBytes 32)
-    let directory := parent / s!".vir-resource-{nonce}"
-    try
-      IO.FS.createDir directory
-      directory? := some directory
-      break
-    catch e => match e with
-      | .alreadyExists .. => pure ()
-      | _ => throw e
-  let some directory := directory? | fail "TEMPORARY_PATH_COLLISION" parent.toString
-  let temporary := directory / "payload"
-  try f temporary
-  finally
-    if (← metadata? temporary).isSome then IO.FS.removeFile temporary
-    IO.FS.removeDir directory
-
-def atomicInstall (destination : FilePath) (bytes : ByteArray) : IO Unit := do
-  checkFile destination
-  if let some metadata ← metadata? destination then
-    if metadata.byteSize.toNat == bytes.size then
-      if (← readInput destination bytes.size "PACK_LIMIT") == bytes then return
-  withSibling destination fun temporary => do
-    IO.FS.writeBinFile temporary bytes
-    checkFile destination
-    IO.FS.rename temporary destination
+def withSibling (destination : FilePath) (f : FilePath → IO α) : IO α :=
+  Vir.NativePayload.withSibling destination f
+def atomicInstall (destination : FilePath) (bytes : ByteArray) : IO Unit :=
+  Vir.NativePayload.atomicInstall destination bytes
 
 def verifyIdentity (expected : String) (profile : Compatibility) (bundle : Bundle) : IO Unit := do
   unless bundle.contentId == expected do
@@ -221,9 +175,14 @@ def verify (expected : String) (profile : Compatibility) (bytes : ByteArray) : I
   | .ok bundle => verifyIdentity expected profile bundle
   | .error e => fail e.code (reprStr e)
 
+def verifyPayload (expected : String) (profile : Compatibility) (bytes : ByteArray)
+    : IO Vir.NativePayload.VerifiedPayload :=
+  Vir.NativePayload.verifyBytes bytes fun bytes => verify expected profile bytes
+
 /-! A corrupt cache is a rejected candidate, never a new expected identity.
 Path/permission errors remain errors rather than triggering network fallback. -/
-def candidate (expected : String) (profile : Compatibility) (path : FilePath) : IO (Option ByteArray) := do
+def candidate (expected : String) (profile : Compatibility) (path : FilePath)
+    : IO (Option Vir.NativePayload.VerifiedPayload) := do
   checkFile path
   unless (← metadata? path).isSome do return none
   let m ← path.metadata
@@ -233,8 +192,9 @@ def candidate (expected : String) (profile : Compatibility) (path : FilePath) : 
   | .error _ => return none
   | .ok bundle =>
     if bundle.contentId != expected then return none
-    verifyIdentity expected profile bundle
-    return some bytes
+    let verified ← Vir.NativePayload.verifyBytes bytes fun _ =>
+      verifyIdentity expected profile bundle
+    return some verified
 
 def runtimePlan (compatibilityPath lockPath root : FilePath) : IO Unit := do
   let _ ← compatibility compatibilityPath

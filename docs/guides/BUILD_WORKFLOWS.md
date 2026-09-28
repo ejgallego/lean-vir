@@ -7,15 +7,15 @@ Embedded resources are still a draft integration; see their
 
 ## Choose an entry point
 
-| Audience | Entry point | Contract |
-| --- | --- | --- |
-| Lean library user | `lake build Vir` | Core Lean library, without browser-runtime production. |
-| Native application author | Ordinary application build / generator command | With the draft resource integration, consume the client library's `ResourceSet` and publish its bytes. No producer-path discovery. |
-| Client-library author | `CarrierLibrary:virResourcePack` as a library `needs` dependency | Prepare one registered browser program, named export roles, and support files for a compiled carrier. |
-| Custom browser host / package producer | `+Module:vir` and `:virSdk` | Build a marked program package set and independently acquire the matching SDK. The host owns loading and startup. |
-| Editor-widget author | `VirInfoview` and widget/RPC APIs | Package the retained live module environment, including unsaved code. Not a disk rebuild. |
-| Advanced producer / developer | `vir_irpkg`, `generate:irpkg`, `generate:package`, `prepare:irpkg` | Explicit compiled-module selection and repository package tooling. Not the application-author API. |
-| VIR contributor / runtime maintainer | `build:demo`, `build:sdk-artifact`, `build:site` | Produce Wasm, SDK archives, or the repository site. Requires the contributor toolchain. |
+| Audience                               | Entry point                                                        | Contract                                                                                                                           |
+| -------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Lean library user                      | `lake build Vir`                                                   | Core Lean library, without browser-runtime production.                                                                             |
+| Native application author              | Ordinary application build / generator command                     | With the draft resource integration, consume the client library's `ResourceSet` and publish its bytes. No producer-path discovery. |
+| Client-library author                  | `CarrierLibrary:virResourcePack` as a library `needs` dependency   | Prepare one registered browser program, named export roles, and support files for a compiled carrier.                              |
+| Custom browser host / package producer | `+Module:vir` and `:virSdk`                                        | Build a marked program package set and independently acquire the matching SDK. The host owns loading and startup.                  |
+| Editor-widget author                   | `VirInfoview` and widget/RPC APIs                                  | Package the retained live module environment, including unsaved code. Not a disk rebuild.                                          |
+| Advanced producer / developer          | `vir_irpkg`, `generate:irpkg`, `generate:package`, `prepare:irpkg` | Explicit compiled-module selection and repository package tooling. Not the application-author API.                                 |
+| VIR contributor / runtime maintainer   | `build:demo`, `build:sdk-artifact`, `build:site`                   | Produce Wasm, SDK archives, or the repository site. Requires the contributor toolchain.                                            |
 
 The [resource guide](EMBEDDED_RESOURCES.md) owns client setup;
 [Packages](PACKAGES.md) owns the lower-level package/SDK commands;
@@ -59,7 +59,7 @@ in [lakefile.lean](../../lakefile.lean), not commands the application must run.
 2. **Check the graph.** Resolve the root with Lake's `findModule?`; unregistered
    modules fail. Fetch `transImports` and reject direct or transitive imports of
    the carrier library before requesting compiled program artifacts.
-3. **Acquire compiled inputs.** Fetch `exportInfo` for the root and every transitive
+3. **Fetch the shared program.** The internal `virProgram` facet fetches `exportInfo` for the root and every transitive
    import. Consume `allArts`, including private data and interpretation IR, and
    add `allArtsTrace`. Lake owns compilation/cache retrieval and returns the real
    artifact locations; the producer does not reconstruct conventional paths.
@@ -68,13 +68,13 @@ in [lakefile.lean](../../lakefile.lean), not commands the application must run.
    tool and compatibility dependencies; the facet adds Lean identity, a producer
    contract marker, and the serialized resolved-path map. Paths matter for
    relocation; implementation traces matter when paths stay unchanged.
-5. **Build or restore the program pack.** `buildArtifactUnlessUpToDate` owns the
-   `.virres` artifact. On a miss, write a private `ModuleSetup` transport and invoke
-   `vir_resource_program build`. That native tool calls the shared
-   `Vir.GeneratePackage.runModuleSet` directly, using marked selection and the
-   recipe's required exports. It collects only the executable closure, emits the
-   package set in temporary storage, adds roles/support files, validates and packs
-   it, then installs the output. It does not launch `vir_irpkg` or recompile sources.
+5. **Build or restore two separate results.** The shared program facet uses
+   `buildArtifactUnlessUpToDate` for a canonical, recipe-independent program.
+   On a miss, `vir_program` consumes the resolved setup and calls
+   `Vir.GeneratePackage.runModuleSet` once. The resource adapter consumes that
+   verified result, checks its actual interface exports against the recipe, adds
+   roles/support files, and caches the outer `.virres` pack. It does not launch
+   another generator or recompile sources. The diagnostic report stays internal.
 6. **Stage even on a hit.** Use the artifact path returned by Lake, which may be in
    its cache rather than the conventional output directory. Validate and repair
    `.vir-generated/<Library>.virres` in the owning package. Preserve the semantic
@@ -105,50 +105,47 @@ allowed. A miss fails. There is no implicit SDK installation, npm invocation,
 GitHub authentication, WASI installation, or local runtime build. HTTPS acquisition
 uses `curl`; packing runtime distributions is a separate maintainer operation.
 
-## Shared core versus overlapping orchestration
+## Shared core, separate public contracts
 
 `virResourcePack` **does not fetch `+Module:vir`, `:virSdk`, or `:virInputs`**.
+Both program adapters depend on the internal `virProgram` facet instead.
 
-| Boundary | Package facet | Resource facet |
-| --- | --- | --- |
-| Compiled acquisition | Shared `fetchVirCompiledSetup`: full artifacts, implementation/location traces and setup map | The same helper, after carrier-cycle checks |
-| Package generation | `vir_irpkg` CLI → `runModuleSet` | Native resource producer → the same `runModuleSet` |
-| Result | Loose package-set descriptor, root/shards and report | One portable pack containing the package set, roles and support files |
-| Cache/publication | File build rule plus package-set completeness checks | Lake artifact rule plus verified source-relative stage repair |
-| Runtime | Independent `:virSdk` installs an SDK directory | Independent `virRuntimePack` supplies a compiled runtime carrier |
+| Boundary             | Package facet                                                                     | Resource facet                                                        |
+| -------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Compiled acquisition | Shared `virProgram`: full artifacts, implementation/location traces and setup map | The same job, after carrier-cycle checks                              |
+| Package generation   | Shared cached marked-root program via `vir_program` → `runModuleSet`              | The same cached result; no independent IR generation                  |
+| Result               | Loose package-set descriptor, root/shards and report                              | One portable pack containing the package set, roles and support files |
+| Cache/publication    | File build rule plus package-set completeness checks                              | Lake artifact rule plus verified source-relative stage repair         |
+| Runtime              | Independent `:virSdk` installs an SDK directory                                   | Independent `virRuntimePack` supplies a compiled runtime carrier      |
 
-Both facets now share one private acquisition/setup helper and the same generation
-core. They still invoke generation independently: requesting both for one root
-can emit its inner package set twice. The next possible consolidation is a shared
-cached program result beneath two output adapters, not routing resource production
-through loose-file publication. It requires one explicit key for selection, native
-profile, compiler/generator identity and emission format, plus a common integrity
-check. Do not cache a root-specific selected shard as a canonical whole module.
+The inner cache key includes full implementation traces and resolved paths,
+Lean/producer identity, marked-root selection and the native profile. Roles,
+support files and runtime locks stay outside that key. It is a selected program,
+not a canonical representation of every declaration in each imported module.
+The existing pack codec supplies the internal container and its size limits;
+there is no new public archive format or setup schema.
 
-That shared program result could let a role/support-file edit rewrap a resource
-without rerunning IR analysis, and let requests for both facets reuse emission.
-Those are proposed benefits, not behavior implemented by this first pass.
-Before consolidating emission:
+The loose adapter installs member bytes unchanged under existing paths, rewrites
+only descriptor paths, and installs the descriptor last. The resource adapter
+keeps the canonical member layout and validates required exports from the actual
+embedded root manifest on cache hits as well as misses. Damaged loose files can
+be repaired without regeneration. A malformed internal cached result fails
+closed; it is not silently substituted with a conventional-path program.
 
-- Define a canonical inner package layout independent of the consumer's output
-  directory; preserve existing loose-output paths through its adapter.
-- Keep recipe roles/support bytes outside the inner program cache key, but still
-  validate required exports against cached results before advertising a bundle.
-- Preserve the lower-level custom-native profile and the resource locked-profile
-  restriction; only identical program semantics may share a cached result.
-- Use one package-set integrity check without importing unbuilt VIR code into
-  the lakefile. Test both adapters requesting the same program, warm reuse,
-  private-body invalidation and repair of damaged members.
+`+Module:virProgram` and `vir_program` are implementation plumbing, not additional
+application workflows. Applications continue to choose between portable resources
+and explicitly published loose package sets.
 
 The general CLI's explicit/unmarked/multiple-target selections still need their
 own request representation. Live snapshots carry authoritative editor environments
 instead of an acquisition request. Consolidation should share analysis/encoding,
 not force either input contract through the marked compiled-module facet.
 
-SDK installation and resource acquisition also overlap in downloading and checking
-bytes, but have different identities and distribution contracts. Sharing transport
-must not import the SDK's release/Actions selection into the content-locked
-resource path or add an automatic runtime-build fallback.
+`Vir.NativePayload` shares bounded reads, digest verification and verified
+publication between SDK installation and resource acquisition. Domain validators
+and selection remain separate: an SDK release/commit is not a resource content ID.
+SDK authentication does not enter locked acquisition, and neither adapter adds
+an automatic runtime-build fallback.
 
 Repository npm producers still use conventional search-path resolution in some
 paths. Their migration and shared acquisition are tracked in

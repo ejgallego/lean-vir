@@ -50,35 +50,24 @@ private def acquire (compatibilityPath : FilePath) (expected source : String)
   -- Check both destinations before doing any acquisition or committing a cache.
   Build.checkFile cache
   Build.checkFile stage
-  let bytes ← match ← Build.candidate expected profile cache with
-    | some bytes => pure bytes
+  let payload ← match ← Build.candidate expected profile cache with
+    | some payload => pure payload
     | none => match ← Build.candidate expected profile stage with
-      | some bytes => pure bytes
+      | some payload => pure payload
       | none =>
         if source == "-" || (offline && source.startsWith "https://") then
           fail "RESOURCE_OFFLINE_MISS" s!"required bundle {expected}; cache {cache}"
         let bytes ← if source.startsWith "https://" then
           Build.withSibling cache fun temporary => do
-            let result ← IO.Process.output {
-              cmd := "curl"
-              -- -q ignores per-user curl config (including credentials). Only
-              -- HTTPS redirects are permitted; no gh/token/Node/source-build path.
-              args := #["-q", "--fail", "--silent", "--show-error", "--location",
-                "--proto", "=https", "--proto-redir", "=https",
-                "--connect-timeout", "20", "--max-time", "120",
-                "--max-filesize", toString Build.packLimit, "--output", temporary.toString,
-                "--url", source] }
-            unless result.exitCode == 0 do
-              fail "RESOURCE_DOWNLOAD_FAILED" s!"bundle {expected}: {result.stderr.trimAscii}"
+            Vir.NativePayload.fetchAnonymousHttps source temporary Build.packLimit
             Build.readInput temporary Build.packLimit "PACK_LIMIT"
         else
           if (source.splitOn "://").length > 1 then
             fail "UNSUPPORTED_RESOURCE_TRANSPORT" source
           Build.readInput source Build.packLimit "PACK_LIMIT"
-        Build.verify expected profile bytes
-        pure bytes
-  Build.atomicInstall cache bytes
-  Build.atomicInstall stage bytes
+        Build.verifyPayload expected profile bytes
+  Vir.NativePayload.promote cache payload
+  Vir.NativePayload.promote stage payload
 
 private def runtimePlan (compatibilityPath lockPath root : FilePath) : IO Unit :=
   Build.runtimePlan compatibilityPath lockPath root
