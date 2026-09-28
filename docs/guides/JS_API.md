@@ -297,8 +297,10 @@ their existing reference-leased cleanup behavior.
 - `vir.packageMetadata` is `vir.interfaceManifest.metadata`, including the
   package format version, Lean toolchain, source targets, and resolved roots.
   Wall-clock generation time is intentionally confined to diagnostic reports.
-- `vir.call(name, ...args)` accepts a manifest `id`, `jsName`, or Lean
-  declaration name.
+- `vir.call(name, ...args)` accepts a manifest `entry`, `id`, or `jsName`.
+  These share one alias namespace: multiple
+  spellings may identify the same export, but a spelling cannot identify two
+  different exports. Ambiguous manifests are rejected before initialization.
 - `vir.callTimed(name, ...args)` performs the same call and returns
   `{ value, timings }` for opt-in phase attribution.
 - `vir.exportsByName.<jsName>(...args)` exposes valid generated JS names as

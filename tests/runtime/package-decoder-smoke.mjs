@@ -20,11 +20,8 @@ const factory = createVirRuntimeFactory({ wasmBytes });
 const renamedExportManifest = structuredClone(
   readIrPackageInfo(defaultPackageBytes).manifest,
 );
-if (renamedExportManifest.version >= 9) {
-  renamedExportManifest.exports[0].nameKey = "s526576696577/s52656e616d65644578706f7274/";
-} else {
-  renamedExportManifest.exports[0].entry = "Review.RenamedExport";
-}
+renamedExportManifest.exports[0].nameKey =
+  "s526576696577/s52656e616d65644578706f7274/";
 await assert.rejects(
   () =>
     factory.createRuntime({

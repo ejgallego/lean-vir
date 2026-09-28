@@ -154,10 +154,8 @@ function validateManifestMetadata(
 }
 
 function validateManifestExports(exports) {
-  const entries = new Set();
+  const aliases = new Map();
   const identities = new Set();
-  const ids = new Set();
-  const jsNames = new Set();
   exports.forEach((entry, index) => {
     const label = `embedded interface manifest exports[${index}]`;
     if (!isRecord(entry)) {
@@ -171,10 +169,19 @@ function validateManifestExports(exports) {
     if (typeof entry.startup !== "boolean") {
       throw new Error(`${label}.startup must be a boolean`);
     }
-    requireUnique(entries, entry.entry, `${label}.entry`);
-    if (entry.id !== undefined) requireUnique(ids, entry.id, `${label}.id`);
-    if (entry.jsName !== undefined)
-      requireUnique(jsNames, entry.jsName, `${label}.jsName`);
+    // call(name) shares one namespace across all three spellings. Repeating a
+    // spelling for the same export is fine; selecting two exports is ambiguous.
+    for (const field of ["entry", "id", "jsName"]) {
+      const alias = entry[field];
+      if (alias === undefined || alias === "") continue;
+      const previous = aliases.get(alias);
+      if (previous !== undefined && previous !== index) {
+        throw new Error(
+          `${label}.${field} duplicates another interface export alias ${JSON.stringify(alias)} (exports[${previous}])`,
+        );
+      }
+      aliases.set(alias, index);
+    }
     if (!Array.isArray(entry.args)) {
       throw new Error(`${label}.args must be an array`);
     }

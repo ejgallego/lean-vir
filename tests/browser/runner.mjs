@@ -35,6 +35,13 @@ import {
 } from "./page-suites.mjs";
 import { smokeBrowserReactLifetimes } from "./react-lifetimes.mjs";
 import { smokeReactTamagotchi } from "./react-tamagotchi.mjs";
+import {
+  smokeDemoRuntimeRecovery,
+  smokeDemoPetRecovery,
+  smokeFormatRuntimeRecovery,
+  smokeRunnerFatalRecovery,
+  smokeRunnerRecoverableHostError,
+} from "./runtime-recovery.mjs";
 import { packageFiles } from "../../scripts/packages/browser-package-config.mjs";
 
 await assertDistReady();
@@ -62,6 +69,11 @@ try {
   await smokeBrowserCallbacks(cdp, server.origin);
   await smokeBrowserCallbackCleanup(cdp, server.origin);
   await smokeAtomicPackageLoads(cdp, server.origin);
+  await smokeRunnerFatalRecovery(cdp, server.origin);
+  await smokeRunnerRecoverableHostError(cdp, server.origin);
+  await smokeDemoRuntimeRecovery(cdp, server.origin);
+  await smokeDemoPetRecovery(cdp, server.origin);
+  await smokeFormatRuntimeRecovery(cdp, server.origin);
 
   const runnerCases = await Promise.all(
     browserRunnerCaseSpecs.map(({ packageFile, entryName, expected }) =>

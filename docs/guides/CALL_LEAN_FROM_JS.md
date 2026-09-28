@@ -112,8 +112,9 @@ console.log(classified); // { kind: "inr", value: "5" }
 console.log(validated); // { kind: "ok", value: "Hello, Lean" }
 ```
 
-`vir.call(name, ...args)` accepts the Lean declaration name, manifest `id`, or
-generated JavaScript name.
+`vir.call(name, ...args)` accepts a manifest `entry`, `id`, or `jsName` alias.
+The producer uses the Lean declaration name for `entry`. All aliases share
+[one unambiguous namespace](JS_API.md#calls-and-manifest).
 
 For diagnostic phase attribution, `vir.callTimed(name, ...args)` performs the
 same synchronous call and returns `{ value, timings }`. See

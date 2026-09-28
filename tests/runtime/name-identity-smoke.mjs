@@ -75,22 +75,50 @@ try {
       assert.equal(runtime.call("café", 10), "13");
     } finally { runtime.dispose(); }
   });
+  await test("cross-field aliases reject before initialization and same-export aliases agree", async () => {
+    const aliases = structuredClone(info.manifest);
+    Object.assign(aliases.exports.find(entry => entry.entry === "café"), {
+      entry: "sharedName", id: "sharedName", jsName: "sharedName",
+    });
+    Object.assign(aliases.exports.find(entry => entry.entry === "αβ₁"), {
+      entry: "otherName_", id: "otherName_", jsName: "otherName_",
+    });
+    const validPackage = replaceIrPackageManifest(bytes, aliases);
+    aliases.exports.find(entry => entry.entry === "otherName_").jsName = "sharedName";
+    // Bypass writer validation so the runtime receives checksum-valid bytes.
+    const ambiguousPackage = rewriteSameLengthManifest(validPackage, aliases);
+    const runtime = await factory.createRuntime();
+    const original = runtime.exports;
+    let begins = 0;
+    let finishes = 0;
+    runtime.exports = { ...original,
+      vir_begin_ir_package_set() { begins++; return original.vir_begin_ir_package_set(); },
+      vir_finish_ir_package_set() { finishes++; return original.vir_finish_ir_package_set(); },
+    };
+    try {
+      assert.throws(() => runtime.loadIrPackageSetBytes([ambiguousPackage]), /duplicates another interface export alias "sharedName"/);
+      assert.equal(begins, 0);
+      assert.equal(finishes, 0);
+      assert.equal(runtime.packageDeclCount(), 0);
+      assert.equal(runtime.interfaceManifest, null);
+      assert.equal(runtime.failure, null);
+      runtime.loadIrPackageSetBytes([validPackage]);
+      assert.equal(begins, 1);
+      assert.equal(finishes, 1);
+      assert.equal(runtime.call("sharedName", 10), "13");
+      assert.equal(runtime.exportsByName.sharedName(10), "13");
+      assert.equal(runtime.call("otherName_", 10), "14");
+      assert.equal(runtime.exportsByName.otherName_(10), "14");
+    } finally { runtime.dispose(); }
+  });
   await test("old manifests reject before initialization and permit a current-package retry", async () => {
     const canonical = replaceIrPackageManifest(bytes, info.manifest);
-    const section = readIrPackageInfo(canonical).package.sections.find(
-      value => value.kind === IR_PACKAGE_SECTION.INTERFACE_MANIFEST,
-    );
     for (const version of [6, 7, 8]) {
       const legacy = structuredClone(info.manifest);
       legacy.version = legacy.metadata.manifestVersion = version;
       // Bypass the writer's current-schema validation. Changing only the two
       // version digits preserves section offsets and isolates version admission.
-      const manifestBytes = new TextEncoder().encode(JSON.stringify(legacy));
-      assert.equal(manifestBytes.byteLength, section.byteLength - 12);
-      const oldPackage = canonical.slice();
-      oldPackage.set(manifestBytes, section.offset + 12);
-      new DataView(oldPackage.buffer, oldPackage.byteOffset, oldPackage.byteLength)
-        .setBigUint64(section.offset, irPackageManifestChecksum(manifestBytes), true);
+      const oldPackage = rewriteSameLengthManifest(canonical, legacy);
       const runtime = await factory.createRuntime();
       let finishes = 0;
       const original = runtime.exports;
@@ -119,3 +147,16 @@ try {
     assert.match(`${result.stderr}\n${result.stdout}`, /package format stores this field as u32, but got 4294967296/);
   });
 } finally { await rm(directory, { recursive: true, force: true }); }
+
+function rewriteSameLengthManifest(bytes, manifest) {
+  const section = readIrPackageInfo(bytes).package.sections.find(
+    value => value.kind === IR_PACKAGE_SECTION.INTERFACE_MANIFEST,
+  );
+  assert.ok(section, "fixture must contain an interface manifest");
+  const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest));
+  assert.equal(manifestBytes.byteLength, section.byteLength - 12);
+  const output = Uint8Array.from(bytes);
+  output.set(manifestBytes, section.offset + 12);
+  new DataView(output.buffer).setBigUint64(section.offset, irPackageManifestChecksum(manifestBytes), true);
+  return output;
+}

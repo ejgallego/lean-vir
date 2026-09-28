@@ -559,9 +559,6 @@ link_flags=(
 )
 
 exports=(
-  -Wl,--export=lean_eval_const
-  -Wl,--export=lean_run_init
-  -Wl,--export=lean_run_mod_init_core
   -Wl,--export=vir_upstream_target_pointer_bytes
   -Wl,--export=vir_alloc_bytes
   -Wl,--export=vir_free_bytes
@@ -906,45 +903,9 @@ report_start=$SECONDS
     done < "$wasi_imports"
   fi
   echo
-  echo "## Demo Policy"
+  echo "## Shim Roles and Policy"
   echo
-  echo "- Keep \`src/library/ir_interpreter.cpp\` unmodified."
-  echo "- Provide real Lean IR declaration objects through \`lean_ir_find_env_decl\`."
-  echo "- Stub only runtime/library pieces that the current demo paths do not execute."
-  echo "- Keep general native symbol lookup unsupported; register only demo externs explicitly."
-  echo
-  echo "## Current Shim Scope"
-  echo
-  echo "\`wasm/upstream_shim/interpreter/persistent_ir_interpreter.cpp\` compiles the"
-  echo "untouched pinned interpreter with a package-scoped session."
-  echo "\`wasm/upstream_shim/interpreter/interpreter_bridge.cpp\` supplies interpreter"
-  echo "initialization and declaration lookup hooks. \`abi/call_abi.cpp\`"
-  echo "supplies the package call surface. \`abi/closure_abi.cpp\` supplies Lean"
-  echo "closure roots and callback calls. \`package/host_import_trampolines.cpp\` supplies the"
-  echo "package-scoped JavaScript host-import trampoline grid."
-  echo "\`package/package_decl_provider.cpp\` owns direct package-call summaries,"
-  echo "including arity, IO, and boxed-boundary requirements. \`runtime/name_utils.cpp\` contains restricted"
-  echo "dotted-name conversion. \`abi/object_abi.cpp\` supplies generic owned"
-  echo "Lean object helpers, \`abi/object_expr_abi.cpp\` supplies specialized Level/Expr"
-  echo "helpers, and \`abi/resource_abi.cpp\` supplies JavaScript resource helpers used"
-  echo "by the runtime object-call path."
-  echo "\`wasm/upstream_shim/runtime/native_symbols.cpp\` supplies shim-specific native"
-  echo "extern wrappers. \`$generated_native_wrappers\` supplies standard boxed adapters"
-  echo "emitted by Lean's compiler. Pinned stage0 sources supply selected Lean-defined raw"
-  echo "exports. These inputs are prelinked with audited, bundle-local duplicate handling."
-  echo "\`runtime/native_symbol_lookup.cpp\` supplies the registries,"
-  echo "include, restricted \`dlsym\` lookup, symbol-stem lookup, and C++ exception"
-  echo "stubs. \`runtime/runtime_environment_stubs.cpp\`, \`package/package_init_bridge.cpp\`,"
-  echo "\`runtime/runtime_value_stubs.cpp\`, and \`runtime/io_stubs.cpp\` contain the remaining"
-  echo "host/platform providers, including ST references and constrained environment behavior."
-  echo "\`package/package_loader_abi.cpp\` supplies the package-load"
-  echo "WASM exports. \`package/package_section_directory.cpp\` reads the v11"
-  echo "package section directory. \`package/package_ir_decoder.cpp\` decodes"
-  echo "the \`build/generated/*.irpkg\` packages emitted from typed"
-  echo "\`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`; \`package/package_ir_builders.cpp\`"
-  echo "materializes the decoded IR as Lean objects. \`package/package_decl_provider.cpp\` owns the loaded package state and"
-  echo "declaration lookup facade. The browser demos run through the real upstream"
-  echo "interpreter."
+  echo "See the [canonical shim responsibility and policy inventory](../../wasm/upstream_shim/README.md) for current source roles, boundaries, and constraints."
 } > "$report"
 report_seconds=$((SECONDS - report_start))
 

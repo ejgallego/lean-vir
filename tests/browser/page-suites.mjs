@@ -730,7 +730,8 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     })(),
   })`);
   assert.equal(combined.selectedColor, "combined");
-  assert.ok(combined.overlapLeaves > 0);
+  // The retained and unsupported-call frontiers may be disjoint (for example,
+  // after replacing handwritten providers with pinned generated constructors).
   assert.ok(combined.note.includes(`${combined.overlapLeaves} leaf functions currently have both signals`));
   assert.ok(combined.note.includes("separate boundaries"));
   assert.ok(combined.overlap > 0);
@@ -743,15 +744,17 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.equal(combined.legendMax, "both");
   assert.ok(combined.hash.includes("color=combined"));
 
-  await clickSelector(cdp, "#top-children button");
-  const overlapDetail = await evaluate(cdp, `({
-    title: document.querySelector("#selection-details h2")?.textContent,
-    surfaceEntry: document.querySelector("#selection-details .detail-actions a")?.textContent,
-    surfaceHref: document.querySelector("#selection-details .detail-actions a")?.getAttribute("href"),
-  })`);
-  assert.ok(combined.top.includes(overlapDetail.title));
-  assert.ok(overlapDetail.surfaceEntry);
-  assert.ok(overlapDetail.surfaceHref.includes("../surface/#declaration="));
+  if (combined.overlapLeaves > 0) {
+    await clickSelector(cdp, "#top-children button");
+    const overlapDetail = await evaluate(cdp, `({
+      title: document.querySelector("#selection-details h2")?.textContent,
+      surfaceEntry: document.querySelector("#selection-details .detail-actions a")?.textContent,
+      surfaceHref: document.querySelector("#selection-details .detail-actions a")?.getAttribute("href"),
+    })`);
+    assert.ok(combined.top.includes(overlapDetail.title));
+    assert.ok(overlapDetail.surfaceEntry);
+    assert.ok(overlapDetail.surfaceHref.includes("../surface/#declaration="));
+  }
 
   await clickSelector(cdp, "#breadcrumbs button:first-child");
   assert.equal(await evaluate(cdp, "document.querySelector('#map-depth')?.value"), "7");

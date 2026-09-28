@@ -96,7 +96,12 @@ Author: Emilio J. Gallego Arias
               <select id="dev-entry-select"></select>
             </label>
             <div id="dev-input-fields" class="dev-input-fields"></div>
-            <button id="dev-run-entry" type="button" disabled>Run</button>
+            <div class="dev-eval-actions">
+              <button id="dev-run-entry" type="button" disabled>Run</button>
+              <button id="dev-reload-runtime" type="button" hidden disabled>
+                Reload runtime
+              </button>
+            </div>
             <output id="dev-result">...</output>
           </div>
         </section>

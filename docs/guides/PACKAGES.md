@@ -335,10 +335,16 @@ Deep links select a package and entry:
 dev.html?package=local-quickstart.irpkg&entry=Quickstart.total
 ```
 
-`entry` accepts a manifest `id`, `jsName` or Lean declaration name. The Pages
+`entry` accepts a manifest `entry`, `id`, or `jsName` alias from the
+[shared call namespace](JS_API.md#calls-and-manifest). The Pages
 build's `prepare:pages` step generates URL-loadable samples in one generator
 session; [HARNESS.md](../HARNESS.md) owns site build/check commands. Generated
 packages, reports and `web/dist/` remain ignored local outputs.
+
+After a fatal Wasm failure, the runner disables Run and offers **Reload
+runtime**. Reload creates a fresh instance while preserving the selected entry
+and inputs; it does not execute the entry again. Ordinary input errors and
+recoverable Lean IO errors leave Run available for a corrected attempt.
 
 The [JS API](JS_API.md#calls-and-manifest) defines caller values, while
 [host bindings](../reference/HOST_BINDINGS.md) defines the narrower Lean-to-JavaScript

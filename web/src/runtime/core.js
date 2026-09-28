@@ -658,7 +658,8 @@ function freezeManifestTree(manifest) {
 }
 
 function registerManifestEntryKey(map, key, entry) {
-  if (typeof key === "string" && key !== "" && map[key] === undefined) {
+  // Manifest validation guarantees that every nonempty alias has one owner.
+  if (typeof key === "string" && key !== "") {
     map[key] = entry;
   }
 }
