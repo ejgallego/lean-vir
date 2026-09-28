@@ -1,7 +1,7 @@
 # Harness
 
 This guide covers maintainer setup, generated artifacts, check selection and CI.
-Start with the [quickstart](../README.md) to use VIR, the
+Start with the [workflow overview](../README.md) to use VIR, the
 [developer guide](DEVELOPER_GUIDE.md) to change its implementation, or
 [tests/README.md](../tests/README.md) to add a test.
 

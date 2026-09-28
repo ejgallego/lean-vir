@@ -1,10 +1,12 @@
 # Documentation
 
-Start with the [quickstart](../README.md) to use VIR, or the
+Start with the [overview](../README.md) to choose a workflow, or the
 [developer guide](DEVELOPER_GUIDE.md) to change its implementation.
 
 ## Guides: use VIR
 
+- [Build workflows](guides/BUILD_WORKFLOWS.md): supported entry points by audience,
+  the draft resource workflow, and retained lower-level tools.
 - [Embedded resources (draft)](guides/EMBEDDED_RESOURCES.md): prepare portable
   browser programs in a client library and publish them from a native application.
 - [Packages](guides/PACKAGES.md): register modules, select exports, build/load packages

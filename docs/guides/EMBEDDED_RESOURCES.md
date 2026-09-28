@@ -10,6 +10,9 @@ exact verified pack. A missing pack fails clearly; it never triggers a Wasm buil
 Anonymous cold installation is not yet supported. Use the pinned Lean toolchain
 and the matching runtime; do not substitute another release's Wasm.
 
+The [build-workflow guide](BUILD_WORKFLOWS.md#how-resource-preparation-builds-its-inputs)
+explains the facet dependencies, cache behavior, and boundary with `:vir` / `:virSdk`.
+
 ## Client-library setup
 
 Keep browser code separate from the native renderer and resource carrier.
