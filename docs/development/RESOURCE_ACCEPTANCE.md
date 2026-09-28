@@ -59,7 +59,7 @@ checks. The downstream Slides tests belong to Slides and are not run by VIR CI.
 | T21 Real PrettyM | Covered on historical 4.35 demo | Downstream browser/native shared 21-case semantic corpus; no automatic 4.34 Slides adoption claim. |
 | T22 Format edges | Covered | Shared corpus includes Unicode, tags, groups and alignment/width cases. |
 | T23 Invalid requests | Covered on historical 4.35 demo | Slides test-only a5b42f8 / VIR4d00dbf replays the same 13 generated native bounds cases in Wasm at root/nested URLs, including exact escaped 1 MiB output and one byte over. Successful calls after each expected error check recovery. No 4.34 Slides adoption claim. |
-| T24 Calls/disposal | Partial | Independent runtimes, sequential disposal/remount and deferred client mount races pass. The 4.34 resource browser gate measures 300 scalar calls and collection of 13 disposed Wasm memories, including one with its facade still held; dynamic PrettyM/callback retention is not inferred. See below. |
+| T24 Calls/disposal | Partial | Independent runtimes, sequential disposal/remount and deferred client mount races pass. The documented mount example is tested for both completion orders, pending unmount, stale/current rejection and cleanup failure. The resource browser gate measures 300 scalar calls and collection of 14 disposed Wasm memories, including retained facades after normal and throwing cleanup; dynamic PrettyM/callback retention is not inferred. See below. |
 | T25 Paths/collisions | Covered | Portable path, case/prefix collision, integrity and link/hardlink tests; seven real-facet aliases preserve sentinels before rejection, including Lake trace/hash writes and warm-cache paths. Slides reserves publisher namespaces. |
 | T26 Shared producer | Covered | Two distinct intermediary packages, each with two carriers, share one producer/runtime in a cold build. Publication contains one runtime plus four programs; client-specific edits preserve peer program bytes. |
 | T27 Build cycles | Covered | Program importing its owning carrier rejected before compiled jobs wait. |
@@ -95,6 +95,11 @@ all observed memories must become collectable after disposal, including while a
 disposed program facade is still held. Twelve additional create/call/dispose cycles test that this
 does not only work for the first instance. The harness keeps raw JS heap and Wasm
 capacity measurements, without a timing claim or a noisy heap-size threshold.
+
+A final real instance exercises a test-only synchronous host-cleanup fault and
+checks collection while its disposed facade remains held. The fault is injected
+at callback-set cleanup, not by changing Wasm bytes or adding a public test API.
+This checks error-path detachment, not callback-heavy application retention.
 
 The scalar Format score is not the client PrettyM JSON wrapper, and does not
 exercise callback roots. Its 300-call measurement must not be described as a

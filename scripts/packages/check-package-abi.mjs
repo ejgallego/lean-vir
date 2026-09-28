@@ -180,19 +180,8 @@ assertEqual(
   "resource JS API version mismatch",
 );
 assertResourceCompatibility(JSON.parse(await readRepoText("vir-resources/compatibility.json")));
-if (!/abi != Vir\.GeneratePackage\.currentRuntimeAbiVersion/.test(sdkFetcherSource)) {
-  throw new Error("SDK fetcher must use the shared runtime ABI version");
-}
-const resourceBuildSource = await readRepoText("Vir/Resources/Build.lean");
-for (const [field, expression] of [
-  ["runtimeAbi", "toString Vir.GeneratePackage.currentRuntimeAbiVersion"],
-  ["jsApiVersion", "Vir.GeneratePackage.currentResourceJsApiVersion"],
-  ["irFormatVersion", "Vir.GeneratePackage.currentPackageFormatVersion"],
-]) {
-  if (!resourceBuildSource.includes(`${field} := ${expression}`)) {
-    throw new Error(`resource producer must derive ${field} from shared contract`);
-  }
-}
+// Producer behavior is exercised by resources/acquisition.mjs and the SDK
+// acceptance/rejection cases in packages/lake-facets.sh, not source spelling.
 assertEqual(
   leanStringConstant(lakefileSource, "virSdkVersion"),
   packageJson.version,

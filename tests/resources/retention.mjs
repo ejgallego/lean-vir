@@ -75,6 +75,32 @@ export async function measureResourceRetention(cdp, record) {
       assert.equal(released.created, 1 + 4 * (batch + 1));
       assert.equal(released.live, 0, "released programs must be collectable");
     }
+    await evaluate(cdp, `(async () => {
+      resourceRetention.held.push(await openResourceProgram());
+    })()`);
+    const cleanup = await evaluate(cdp, `(() => {
+      const program = resourceRetention.held[0];
+      const original = Array.from;
+      const fault = new Error('injected host cleanup failure');
+      let injected = false, caught = false;
+      // Synchronous test-only fault at runtime callback-set cleanup. No Wasm
+      // bytes or public API are changed; restore the builtin before returning.
+      Array.from = function(value, ...args) {
+        if (!injected && value instanceof Set) { injected = true; throw fault; }
+        return original.call(this, value, ...args);
+      };
+      const contains = error => error === fault ||
+        (error instanceof AggregateError && error.errors.some(contains));
+      try { program.dispose(); } catch (error) { caught = contains(error); }
+      finally { Array.from = original; }
+      program.dispose();
+      let rejected = false;
+      try { program.call('score'); } catch { rejected = true; }
+      return {injected, caught, rejected, status: program.status};
+    })()`);
+    assert.deepEqual(cleanup, { injected: true, caught: true, rejected: true, status: "disposed" });
+    assert.equal((await sample("throwing-cleanup-facade-held")).live, 0,
+      "throwing cleanup must not retain the runtime through a held facade");
     return observations;
   } finally {
     await evaluate(cdp, `(() => {

@@ -117,7 +117,23 @@ assert.ok(!existsSync(cache) && !existsSync(stage));
 
 // Matching content identity is not sufficient: enforce every compatibility field
 // before touching either destination, including already-cached/staged candidates.
-for (const [field, value] of [["runtimeAbi", "3"], ["jsApiVersion", 2], ["irFormatVersion", 12]]) {
+const profile = JSON.parse(readFileSync(compat));
+assert.deepEqual(JSON.parse(originalJson).compatibility, profile,
+  "native producer must emit the selected compatibility values");
+for (const field of ["runtimeAbi", "jsApiVersion", "irFormatVersion"]) {
+  const value = typeof profile[field] === "string" ? `${profile[field]}-wrong` : profile[field] + 1;
+  assert.notEqual(value, profile[field]);
+  // Reject an unsupported requested profile even if matching cached bytes exist.
+  const wrongProfile = join(evidence, `profile-${field}.json`);
+  writeFileSync(wrongProfile, JSON.stringify({ ...profile, [field]: value }));
+  const profileCache = join(evidence, `profile-${field}-cache`);
+  const profileStage = join(evidence, `profile-${field}-stage`);
+  writeFileSync(profileCache, bytes);
+  writeFileSync(profileStage, bytes);
+  run(tool, ["acquire", wrongProfile, expected, source, profileCache, profileStage],
+    `unsupported-profile-${field}`, { error: /UNSUPPORTED_COMPATIBILITY/ });
+  assert.deepEqual(readFileSync(profileCache), bytes);
+  assert.deepEqual(readFileSync(profileStage), bytes);
   const descriptor = JSON.parse(originalJson);
   descriptor.compatibility[field] = value;
   const changedJson = Buffer.from(encodeDescriptor(descriptor));

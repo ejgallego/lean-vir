@@ -105,6 +105,12 @@ vir_resource_pack acquire COMPAT CONTENT_ID SOURCE CACHE STAGE [--offline]
 vir_resource_pack pack DESCRIPTOR ROOT OUT
 ```
 
+`pack` materializes the descriptor: it checks member integrity and the native
+tool's Lean build identity, but does not qualify the described runtime or enforce
+the full supported ABI profile. Runtime production uses `pack-runtime.mjs`;
+`acquire` and staging enforce the selected supported compatibility profile.
+A structurally valid pack is not, by itself, executable-runtime qualification.
+
 The producer supplies a pinned bundle identity. `SOURCE` is a local complete pack,
 an anonymous HTTPS URL, or `-` for already-available bytes only. Cache and staging
 are checked against that identity and the complete compatibility profile before installation;
@@ -288,8 +294,8 @@ root exports and bound to exact installed entries, not `id`/`jsName` aliases.
 Dependency-only exports do not become callable roles. No PrettyM protocol or
 Slides policy is built into this API.
 
-Each `createProgram` creates an independent runtime instance. `dispose` is
-idempotent; later calls fail. No startup markers are invoked. The existing call
+Each `createProgram` creates an independent runtime instance. No startup markers
+are invoked. The existing call
 API's value representation is preserved (for example, Nat results are decimal
 strings); this facade does not introduce a second marshaller. `interfaceId` is
 client-owned protocol metadata, not a runtime proof of a function's semantics.
@@ -307,6 +313,24 @@ serves the same files at root and nested URLs. A marked Lean wrapper delegates t
 the existing real Format fixture; expected result is 6093. This exercises a real
 multi-member set and interpreter, not the separate Slides corpus or default
 runtime acquisition. Diagnostic identities and full packs are retained locally.
+
+### Browser lifecycle
+
+`program.status` is read-only: `"active"`, `"failed"`, or `"disposed"`.
+Ordinary Lean IO errors and invalid roles do not retire the program. An escaping
+Wasm failure does: later calls reject. **Failed is not disposed**: dispose the
+failed instance before explicitly creating a replacement, and never automatically
+replay its last effectful call. Other program instances remain independent.
+
+`dispose()` is idempotent, detaches the facade's runtime references even if cleanup
+throws, and leaves status `"disposed"`. Later calls reject and repeated disposal
+does not repeat cleanup. Report cleanup errors, but do not keep the old instance
+as the current program or attempt to revive it. Collection may occur later.
+
+Pending creation has no public cancellation operation. The host owns mount
+ordering: both a new mount and unmount invalidate older pending results. Stale
+successful instances must be disposed; stale failures must not replace the
+current view. See the [tested single-component example](../guides/EMBEDDED_RESOURCES.md#overlapping-loads).
 
 ## Validation and remaining work
 

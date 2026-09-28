@@ -11,6 +11,7 @@ cd "$(dirname "$0")/../.."
 repo="$(pwd -P)"
 node tests/packages/infoview-bundle-downstream.mjs
 sdk_version="$(node -p 'require("./package.json").version')"
+sdk_abi="$(node --input-type=module -e 'import {RUNTIME_ABI_VERSION} from "./scripts/packages/package-versions.mjs"; console.log(RUNTIME_ABI_VERSION)')"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/lean-vir-lake-facets.XXXXXX")"
 cleanup() {
   local status=$?
@@ -26,7 +27,7 @@ write_sdk_manifest() {
   local sdk_dir="$1"
   local commit="$2"
   local hash="$3"
-  local abi="${4:-4}"
+  local abi="${4:-$sdk_abi}"
   printf '%s\n' 'export const companion = true;' > "$sdk_dir/js/sdk-helper.js"
   local helper_hash
   helper_hash="$(sha256sum "$sdk_dir/js/sdk-helper.js" | cut -d' ' -f1)"
@@ -428,15 +429,17 @@ grep -q 'checksum mismatch for js/sdk-helper.js:' "$tmp/bad-sdk.stderr"
 
 mkdir -p "$tmp/sdk-old-abi/lean-vir-sdk/js"
 cp "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js" "$tmp/sdk-old-abi/lean-vir-sdk/js/vir-runtime.js"
-write_sdk_manifest "$tmp/sdk-old-abi/lean-vir-sdk" "lake-facet-smoke" "$sdk_hash" 3
-tar -czf "$tmp/lean-vir-sdk-old-abi.tar.gz" -C "$tmp/sdk-old-abi" lean-vir-sdk
-if lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk-old-abi.tar.gz" --out "$tmp/existing-sdk" \
-    > "$tmp/old-abi-sdk.stdout" 2> "$tmp/old-abi-sdk.stderr"; then
-  echo "SDK archive with the obsolete runtime ABI unexpectedly installed" >&2
-  exit 1
-fi
-test "$(cat "$tmp/existing-sdk/marker.txt")" = 'keep-existing-sdk'
-grep -q 'unsupported SDK runtime ABI version: 3' "$tmp/old-abi-sdk.stderr"
+for wrong_sdk_abi in "$((sdk_abi - 1))" "$((sdk_abi + 1))"; do
+  write_sdk_manifest "$tmp/sdk-old-abi/lean-vir-sdk" "lake-facet-smoke" "$sdk_hash" "$wrong_sdk_abi"
+  tar -czf "$tmp/lean-vir-sdk-old-abi.tar.gz" -C "$tmp/sdk-old-abi" lean-vir-sdk
+  if lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk-old-abi.tar.gz" --out "$tmp/existing-sdk" \
+      > "$tmp/abi-$wrong_sdk_abi.stdout" 2> "$tmp/abi-$wrong_sdk_abi.stderr"; then
+    echo "SDK archive with an unsupported runtime ABI unexpectedly installed" >&2
+    exit 1
+  fi
+  test "$(cat "$tmp/existing-sdk/marker.txt")" = 'keep-existing-sdk'
+  grep -q "unsupported SDK runtime ABI version: $wrong_sdk_abi" "$tmp/abi-$wrong_sdk_abi.stderr"
+done
 
 if lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk.tar.gz" --expect-version 9.9.9 \
     --out "$tmp/existing-sdk" > "$tmp/version-sdk.stdout" 2> "$tmp/version-sdk.stderr"; then

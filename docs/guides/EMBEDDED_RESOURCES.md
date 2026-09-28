@@ -127,12 +127,64 @@ and dispose it there. Separate `createProgram` calls have separate Lean runtime
 state, even when they use the same resource files. `interfaceId` remains
 client-owned protocol metadata, not a runtime proof of argument/result types.
 
-`program.status` is read-only: `"active"`, `"failed"`, or `"disposed"`. An
-ordinary Lean IO error or invalid role does not retire the program. An escaping
-Wasm failure does: later calls reject, and recovery requires an explicit new
-`createProgram` call. Never automatically replay an effectful call after failure.
-Disposal is idempotent, releases the facade's runtime references, and takes
-precedence over failed status. Other program instances remain independent.
+See the [browser lifecycle contract](../development/RESOURCE_BUNDLES.md#browser-lifecycle)
+for `program.status`, failure and disposal. A failed instance still needs disposal;
+do not automatically replay its last call on a replacement.
+
+### Overlapping loads
+
+A component can unmount or request another program while `createProgram` is
+pending. Each mount **and** unmount must invalidate older work. Dispose a stale
+successful result; do not let a stale rejection update the current view. Keep
+this policy in the host, not in the runtime or a shared singleton.
+
+Here is a single-component example. `setStatus` is a synchronous, non-throwing
+view update; it should also clear stale displayed results when loading/disposed.
+Event handlers use only `current`, never a candidate captured by an older mount.
+
+<!-- resource-mount-example -->
+```js
+let generation = 0;
+let current = null;
+
+function unmount() {
+  ++generation;
+  const previous = current;
+  current = null;
+  try {
+    previous?.dispose();
+  } finally {
+    setStatus("Disposed");
+  }
+}
+
+async function mount() {
+  unmount();
+  const mine = generation;
+  setStatus("Loading");
+  let candidate;
+  try {
+    candidate = await createProgram({ runtimeManifestUrl, programManifestUrl });
+  } catch (error) {
+    if (mine === generation) setStatus("Failed");
+    throw error;
+  }
+  if (mine !== generation) {
+    candidate.dispose();
+    return;
+  }
+  current = candidate;
+  setStatus("Ready");
+}
+```
+<!-- /resource-mount-example -->
+
+Observe every `mount()` promise, for example `mount().catch(reportError)` where
+`reportError` logs diagnostics rather than changing this component's view. The
+generation check already owns view updates. Unmount invalidates pending work
+even when disposal throws; report that error too. It does not cancel acquisition:
+late successful results are disposed when they arrive. Separate components have
+separate generations and program ownership.
 
 The [resource contract](../development/RESOURCE_BUNDLES.md) describes integrity,
 publication and loader rules; the [acceptance checklist](../development/RESOURCE_ACCEPTANCE.md)
