@@ -1,10 +1,15 @@
 # Packages
 
-VIR packages selected Lean declarations for its browser runtime. Downstream
-projects use Lake's module `:vir` facet to build a package set and its package
-`:virSdk` facet to install the matching JavaScript/Wasm SDK. The repository's
+This guide covers the supported lower-level workflow for custom browser hosts
+and package producers. Lake's module `:vir` facet builds a package set and its
+package `:virSdk` facet installs the matching JavaScript/Wasm SDK. The repository's
 npm commands build focused, single-member packages for local development.
 This is a browser-program workflow, not a general Lean-to-Wasm compiler.
+
+Native applications publishing client-library resources should instead evaluate
+the [draft embedded-resource workflow](EMBEDDED_RESOURCES.md), with its stated
+runtime-distribution limits. It does not require applications to run these
+package commands. [Build workflows](BUILD_WORKFLOWS.md) separates the audiences.
 
 For application calls, follow [Call Lean from JavaScript](CALL_LEAN_FROM_JS.md).
 [Generator internals](../reference/GENERATE_PACKAGE.md) owns compiled/live input selection;
