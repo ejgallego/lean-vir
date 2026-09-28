@@ -50,9 +50,14 @@ export async function measureResourceRetention(cdp, record) {
       await sample(`100-score-calls-${batch + 1}`);
     }
     await evaluate(cdp, `resourceRetention.held[0].dispose()`);
-    // Keeping a disposed facade is a separate ownership policy. Report it,
-    // rather than mistaking a retained facade for unowned leaking memory.
-    await sample("disposed-facade-held");
+    assert.equal((await sample("disposed-facade-held")).live, 0,
+      "a disposed facade must release its runtime even while the facade is held");
+    const disposed = await evaluate(cdp, `(() => {
+      resourceRetention.held[0].dispose();
+      try { resourceRetention.held[0].call('score'); return false; }
+      catch (error) { return /disposed/.test(error.message); }
+    })()`);
+    assert.equal(disposed, true, "released facade keeps disposal semantics");
     await evaluate(cdp, `resourceRetention.held.length = 0`);
     assert.equal((await sample("disposed-facade-released")).live, 0);
     for (let batch = 0; batch < 3; batch++) {
