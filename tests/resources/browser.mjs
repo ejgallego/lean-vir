@@ -14,6 +14,7 @@ import { createServer } from "node:http";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
+import { measureResourceRetention } from "./retention.mjs";
 import {
   descriptorContentId,
   encodeDescriptor,
@@ -261,6 +262,16 @@ try {
       `${prefix}: role call, independent instance, disposal, remount PASS`,
     );
   }
+  const browserVersion = await cdp.send("Browser.getVersion");
+  await measureResourceRetention(cdp, async (observations) => {
+    await writeFile(join(output, "retention.json"), JSON.stringify({
+      browserVersion,
+      scope: "4.34 resource instances; scalar Format score, not dynamic PrettyM or callbacks",
+      method: "WeakRef memories after explicit CDP GC; heap/capacity are observations, not leak thresholds",
+      observations,
+    }, null, 2));
+  });
+  outcomes.push("retention: live control, 300 scalar calls, 12 released instances PASS");
   const jsonItem = (value) => ({
     bytes: Buffer.from(JSON.stringify(value)),
     mediaType: "application/json",
