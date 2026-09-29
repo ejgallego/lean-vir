@@ -124,6 +124,8 @@ callback that traps is reported even when application code catches the exception
 or handles a rejected Promise. The shell shows the failure, unmounts the component,
 and disposes the failed runtime. A local React error boundary contains errors from
 its now-invalid Lean cleanup callbacks while keeping the original failure visible.
+An aggregate is contained only when every member is an expected retirement
+error; mixed aggregates propagate intact to the upstream boundary.
 It does not call the component factory or replay the failed action. Reload the
 Infoview panel or change the widget code to create a fresh runtime.
 

@@ -252,13 +252,13 @@ class FatalRuntimeBoundary extends React.Component {
     // React may batch several cleanup errors into one render. Check every
     // reported error, including ones replaced in the rendered error state.
     if (this.props.failure === null ||
-        !errorContainsFailure(error, this.props.failure)) throw error;
+        !isExpectedRetirementError(error, this.props.failure)) throw error;
   }
 
   render() {
     if (this.state.error !== null) {
       if (this.props.failure === null ||
-          !errorContainsFailure(this.state.error, this.props.failure)) {
+          !isExpectedRetirementError(this.state.error, this.props.failure)) {
         throw this.state.error;
       }
       return null;
@@ -271,20 +271,32 @@ function stopInfoviewEvent(event) {
   event.stopPropagation();
 }
 
-function errorContainsFailure(error, failure) {
-  const pending = [error];
-  const seen = new Set();
-  while (pending.length > 0) {
-    const value = pending.pop();
-    if (value === failure) return true;
-    if (value === null || (typeof value !== "object" && typeof value !== "function") || seen.has(value)) {
-      continue;
-    }
-    seen.add(value);
-    if (value.cause !== undefined) pending.push(value.cause);
-    if (value instanceof AggregateError) pending.push(...value.errors);
+// Suppression requires every failure to be attributable to this retirement.
+// A mixed aggregate must reach the upstream boundary intact.
+function isExpectedRetirementError(error, failure, ancestors = new Set()) {
+  if (error === failure) return true;
+  if (error === null || (typeof error !== "object" && typeof error !== "function") || ancestors.has(error)) {
+    return false;
   }
-  return false;
+  ancestors.add(error);
+  try {
+    const expected = value => isExpectedRetirementError(value, failure, ancestors);
+    const cause = error.cause;
+    if (error instanceof AggregateError) {
+      const errors = error.errors;
+      if (!Array.isArray(errors) || errors.length === 0) return false;
+      for (let index = 0; index < errors.length; index++) {
+        if (!expected(errors[index])) return false;
+      }
+      return cause === undefined || expected(cause);
+    }
+    return expected(cause);
+  } catch {
+    // Uninspectable errors cannot establish that suppression is appropriate.
+    return false;
+  } finally {
+    ancestors.delete(error);
+  }
 }
 
 export function validateWidgetComponentEntry(runtime, entryName) {

@@ -28,6 +28,7 @@ const transport = {
 };
 const failures = [];
 const boundaryErrors = [];
+const boundaryErrorValues = [];
 const consoleMessages = [];
 const unexpectedConsole = [];
 const expectedConsole = [];
@@ -65,6 +66,7 @@ class ShellErrorBoundary extends React.Component {
 
   componentDidCatch(error) {
     boundaryErrors.push(String(error));
+    boundaryErrorValues.push(error);
   }
 
   render() {
@@ -270,6 +272,17 @@ const harness = (globalThis.__shellTest = {
       if (state.trapOnCallback && args[0] === prefix + "createComponent") {
         return function TrapOnClickComponent(props) {
           React.useEffect(() => () => {
+            if (state.aggregateCleanup) {
+              const expected = new Error("retired cleanup", { cause: runtime.failure });
+              const unrelated = new Error("independent cleanup sentinel");
+              const members = ["expected-first", "overridden-every"].includes(state.aggregateCleanup) ? [expected, unrelated]
+                : state.aggregateCleanup === "unrelated-first" ? [unrelated, expected]
+                : state.aggregateCleanup === "nested" ? [expected, new AggregateError([expected, unrelated])]
+                : [expected, new AggregateError([expected, expected])];
+              state.cleanupAggregate = new AggregateError(members, "aggregate cleanup sentinel");
+              if (state.aggregateCleanup === "overridden-every") state.cleanupAggregate.errors.every = () => true;
+              throw state.cleanupAggregate;
+            }
             if (state.throwIndependentCleanup) throw new Error("independent cleanup sentinel");
           }, []);
           return React.createElement(
@@ -743,8 +756,10 @@ async function failedCandidates() {
   await setupFailure.unmount();
 }
 
-async function mountedRuntimeTrap({ throwIndependentCleanup = false } = {}) {
-  runtimeFault = { trapOnCallback: true, throwIndependentCleanup };
+async function mountedRuntimeTrap({ throwIndependentCleanup = false, aggregateCleanup = null } = {}) {
+  runtimeFault = { trapOnCallback: true, throwIndependentCleanup, aggregateCleanup };
+  const propagateCleanup = throwIndependentCleanup ||
+    (aggregateCleanup !== null && aggregateCleanup !== "expected-only");
   const shell = await mountShell();
   await shell.ready();
   const failed = states.at(-1);
@@ -754,6 +769,7 @@ async function mountedRuntimeTrap({ throwIndependentCleanup = false } = {}) {
   check(button !== null, "mounted fatal callback control is present");
   allowConsoleDiagnostic("VirRuntime failed during Wasm execution", 1);
   if (throwIndependentCleanup) allowConsoleDiagnostic("independent cleanup sentinel", 2);
+  if (aggregateCleanup) allowConsoleDiagnostic("aggregate cleanup sentinel", propagateCleanup ? 2 : 1);
   const globalReports = [];
   const recordGlobalReport = (event) => {
     globalReports.push(event.error ?? event.reason);
@@ -762,10 +778,12 @@ async function mountedRuntimeTrap({ throwIndependentCleanup = false } = {}) {
   globalThis.addEventListener("unhandledrejection", recordGlobalReport);
   try {
     await React.act(async () => button.click());
-    if (throwIndependentCleanup) {
+    if (propagateCleanup) {
       await until(() => shell.container.querySelector("[data-shell-error-boundary]"),
         "unrelated fatal-unmount cleanup errors still reach the upstream boundary");
-      check(shell.container.textContent.includes("independent cleanup sentinel"),
+      if (aggregateCleanup) check(boundaryErrorValues.includes(failed.cleanupAggregate),
+        "mixed cleanup aggregate reaches the upstream boundary unchanged");
+      check(shell.container.textContent.includes(aggregateCleanup ? "aggregate cleanup sentinel" : "independent cleanup sentinel"),
         "fatal runtime handling must not hide unrelated cleanup errors");
       check(failed.disposed === 1, "fatal disposal still completes when other cleanup fails");
       await shell.unmount();
@@ -1443,6 +1461,9 @@ globalThis.runShellLifetime = async (
     await failedCandidates();
     await mountedRuntimeTrap();
     await mountedRuntimeTrap({ throwIndependentCleanup: true });
+    for (const aggregateCleanup of ["expected-first", "unrelated-first", "nested", "overridden-every", "expected-only"]) {
+      await mountedRuntimeTrap({ aggregateCleanup });
+    }
     await failedRefresh();
     await failedAcquisitionNewContext();
     await failedConnectionDoesNotReconnectItself();

@@ -32,7 +32,7 @@ try {
     ].map(x => prefix + x),
   ]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
-  const failure = new Error("original host error");
+  let failure = new Error("original host error");
   let hostCalls = 0;
   let shouldThrow = true;
   let catchNested = false;
@@ -111,6 +111,38 @@ try {
       /IO callback failed:.*Lean IO callback failure/,
       "closure IO errors should retain the Lean IO.Error text",
     );
+    // Exercise the complete dispatcher, including transactional cleanup. The
+    // proxy's diagnostic inspection tries to perform a real nested Lean/host effect.
+    const inspections = [];
+    const nestedFailures = [];
+    let nestedSuccesses = 0;
+    const thrownProxy = new Proxy({}, {
+      getPrototypeOf() {
+        inspections.push(runtime.hostState.callError !== null);
+        shouldThrow = false;
+        try {
+          runtime.call(prefix + "failThenWork", counter);
+          nestedSuccesses++;
+        } catch (error) { nestedFailures.push(error === runtime.hostState.callError); }
+        return Object.prototype;
+      },
+    });
+    failure = thrownProxy;
+    for (const method of ["call", "callTimed"]) {
+      inspections.length = 0;
+      nestedFailures.length = 0;
+      shouldThrow = true;
+      assert.throws(() => runtime[method](prefix + "failThenWork", counter),
+        error => error.cause === thrownProxy);
+      assert.ok(inspections.length > 0, "the owning boundary inspects the proxy");
+      assert.ok(inspections.every(Boolean), "inspection must follow host-error quarantine");
+      assert.equal(nestedSuccesses, 0, "diagnostic inspection cannot complete a nested Lean call");
+      assert.equal(nestedFailures.length, inspections.length);
+      assert.ok(nestedFailures.every(Boolean), "nested calls reject with the active quarantine error");
+      assert.equal(hostCalls, 0, "diagnostic inspection cannot perform host effects");
+      assert.equal(runtime.call(prefix + "readCounter", counter), "0");
+      assert.equal(runtime.failure, null, "an effectful exception without Wasm unwind stays recoverable");
+    }
     shouldThrow = false;
     runtime.call(prefix + "failThenWork", counter);
     assert.equal(runtime.call(prefix + "readCounter", counter), "1");

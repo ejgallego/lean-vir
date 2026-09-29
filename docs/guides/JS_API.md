@@ -658,6 +658,8 @@ Ordinary Lean IO errors in an installed package report their message and leave
 the runtime reusable. Unexpected JavaScript host exceptions abort the owning
 JavaScript invocation: the original `Error` is preserved, and other thrown
 values are wrapped with their raw value as `cause`, without coercing objects.
+Cleanup aggregation preserves raw thrown values without inspecting them; the
+owning error boundary normalizes only after committing quarantine or retirement.
 Effectful host imports transport the exception as an IO error, but this is not
 Lean-side recovery: even if Lean catches it, further host work in that invocation
 is blocked. A later pure import has no error carrier and traps, retiring the

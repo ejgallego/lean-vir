@@ -8,7 +8,7 @@ export function collectCleanupError(errors, cleanup) {
   try {
     return { ok: true, value: cleanup() };
   } catch (error) {
-    errors.push(asError(error));
+    errors.push(error);
     return { ok: false, value: undefined };
   }
 }
@@ -20,7 +20,9 @@ export function throwCollectedErrors(errors, message) {
 }
 
 export function throwWithCleanup(error, cleanup, message) {
-  const errors = [asError(error)];
+  // Cleanup preserves raw failures. Only an owning boundary may inspect them,
+  // after committing its quarantine or retirement state.
+  const errors = [error];
   collectCleanupError(errors, cleanup);
   throwCollectedErrors(errors, message);
 }
