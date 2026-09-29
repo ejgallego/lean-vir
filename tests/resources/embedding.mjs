@@ -52,7 +52,7 @@ def main : IO Unit := do
 `);
 run(join(root, ".lake/build/bin/vir_resource_tests"), ["pack", join(project, "pack.virres")], "prepare");
 run("lake", ["build", "check"], "compile");
-const expected = "59bea0c0be16a07242d4f516971f465532b7c5b9d31e8bf90e8bda39b1c54866";
+const expected = "31aa0de3db1b738af032d0a1c98074426f9b0cad7657d79035c62284d87c2d8e";
 const executable = join(project, "compiled output/bin/check");
 assert.equal(run(executable, [], "native").trim(), expected);
 renameSync(join(project, "pack.virres"), join(project, "pack.retained"));

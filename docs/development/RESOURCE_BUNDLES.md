@@ -25,11 +25,39 @@ or inspect Lean package declarations. The program producer and browser
 loader also verify the complete package-set closure and actual exports;
 passing structural bundle validation alone is not executable-program acceptance.
 
-`ResourceSet.validate` requires exact compiler/ABI/JS/IR compatibility and rejects
+`ResourceSet.validate` requires equal Lean revision and VIR compatibility version and rejects
 conflicting contents under one logical identity. `ResourceSet.bundles` validates
 first and returns one copy of each repeated identical logical/content identity.
 Program compatibility does not include a runtime content hash, so compatible
 runtime JavaScript repackaging need not change program bytes.
+
+### Compatibility versus content identity
+
+The public resource compatibility record has exactly two fields:
+
+```json
+{"leanRevision":"293d5d0c0c3f3dded4688b3ccd6a33939ac5102b","virVersion":1}
+```
+
+`leanRevision` is `Lean.githash` (also `lean --githash`): the compiler's reported
+Lean source commit. It is not a hash of the compiler executable, build flags or
+installed libraries. Qualification of the actual runtime bytes remains necessary.
+
+`virVersion` is one combined contract for the client-facing JavaScript API,
+runtime ABI and accepted program formats. It is independent of the runtime ABI
+number. Version 1 currently covers ABI 4, interface manifest 9, IR binary format
+11 and the `createProgram` / `call` / `status` / `dispose` resource API. Internal
+format versions remain in their headers and validators; applications do not
+select them independently. Advance `virVersion` when any constituent contract
+breaks; compatible fixes/repackaging retain it. Both native and JS constants are
+checked together by `check:package-abi`.
+
+The pair says whether program and runtime bundles are compatible. The separate
+content ID selects exact descriptor and payload bytes. Two runtime bundles can
+share the pair but have different content IDs, without requiring program rebuilds.
+This draft replaces the earlier four-field record; old or mixed records reject
+and must be regenerated. There are no legacy field aliases. Descriptor/pack
+framing stays v1; canonical descriptor identity changes with the new fields.
 
 All resource hashing is pure Lean, without Node, subprocesses or FFI. The SHA-256
 implementation follows [FIPS 180-4](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf)
@@ -106,7 +134,7 @@ vir_resource_pack pack DESCRIPTOR ROOT OUT
 ```
 
 `pack` materializes the descriptor: it checks member integrity and the native
-tool's Lean build identity, but does not qualify the described runtime or enforce
+tool's reported Lean revision, but does not qualify the described runtime or enforce
 the full supported ABI profile. Runtime production uses `pack-runtime.mjs`;
 `acquire` and staging enforce the selected supported compatibility profile.
 A structurally valid pack is not, by itself, executable-runtime qualification.
@@ -115,7 +143,7 @@ The producer supplies a pinned bundle identity. `SOURCE` is a local complete pac
 an anonymous HTTPS URL, or `-` for already-available bytes only. Cache and staging
 are checked against that identity and the complete compatibility profile before installation;
 a transport override cannot change either. The content identity also binds all
-ABI compatibility fields. Source-distributed packs need no external host tool;
+compatibility fields. Source-distributed packs need no external host tool;
 HTTPS uses `curl`, with user curl configuration disabled, HTTPS-only redirects,
 size/time limits, and no GitHub authentication or source-build fallback.
 
@@ -163,7 +191,7 @@ must not import that carrier.
 
 The runtime selection is `vir-resources/runtime.json` in VIR. It selects one
 content ID and acquisition source; `vir-resources/compatibility.json` independently
-defines the exact compiler/ABI/JS/IR profile shared by program production. The
+defines the Lean revision / VIR version pair shared by program production. The
 current lock deliberately uses `source: "-"`: a maintainer must seed the verified
 pack cache until a durable distribution is published. Missing bytes produce an
 acquisition error, never an implicit Wasm build. This is not yet the anonymous

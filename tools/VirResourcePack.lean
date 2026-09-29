@@ -28,9 +28,9 @@ private def pack (descriptorPath root destination : FilePath) : IO Unit := do
   let descriptor ← match Pack.decodeDescriptor descriptorBytes with
     | .ok value => pure value
     | .error e => fail e.code (reprStr e)
-  unless descriptor.compatibility.leanBuildId == Lean.githash do
+  unless descriptor.compatibility.leanRevision == Lean.githash do
     fail "LEAN_BUILD_MISMATCH"
-      s!"expected {Lean.githash}, got {descriptor.compatibility.leanBuildId}"
+      s!"expected {Lean.githash}, got {descriptor.compatibility.leanRevision}"
   let mut files := #[]
   for info in descriptor.files do
     let path := root / info.path

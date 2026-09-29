@@ -8,24 +8,47 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { assertResourceCompatibility } from "../../web/src/resources/compatibility.js";
-import { PACKAGE_VERSIONS } from "../../scripts/packages/package-versions.mjs";
+import { VIR_COMPATIBILITY_VERSION } from "../../web/src/runtime/versions.js";
 
 const profile = JSON.parse(
   readFileSync(new URL("../../vir-resources/compatibility.json", import.meta.url)),
 );
-test("producer profile agrees with the browser and SDK contract", () => {
+test("producer profile agrees with the browser resource contract", () => {
   assertResourceCompatibility(profile);
-  assert.equal(profile.runtimeAbi, String(PACKAGE_VERSIONS.runtimeAbiVersion));
-  assert.equal(profile.irFormatVersion, PACKAGE_VERSIONS.packageFormatVersion);
+  assert.equal(profile.virVersion, VIR_COMPATIBILITY_VERSION);
 });
-for (const field of ["runtimeAbi", "jsApiVersion", "irFormatVersion"]) {
-  test(`${field} rejects drift, a missing field and a wrong type`, () => {
-    for (const value of ["wrong", undefined, null, Number(profile[field]) + 1]) {
-      assert.notEqual(value, profile[field]);
-      assert.throws(
-        () => assertResourceCompatibility({ ...profile, [field]: value }),
-        /unsupported resource runtime compatibility/,
-      );
-    }
-  });
-}
+test("virVersion rejects drift, a missing field and a wrong type", () => {
+  for (const value of ["wrong", undefined, null, profile.virVersion + 1]) {
+    assert.notEqual(value, profile.virVersion);
+    assert.throws(
+      () => assertResourceCompatibility({ ...profile, virVersion: value }),
+      /unsupported resource runtime compatibility/,
+    );
+  }
+});
+test("Lean revision must be present and nonempty", () => {
+  for (const leanRevision of ["", undefined, null, 434]) {
+    assert.throws(
+      () => assertResourceCompatibility({ ...profile, leanRevision }),
+      /unsupported resource runtime compatibility/,
+    );
+  }
+});
+test("rejects obsolete and mixed resource compatibility records", () => {
+  const obsolete = {
+    leanBuildId: profile.leanRevision,
+    runtimeAbi: "4",
+    jsApiVersion: 1,
+    irFormatVersion: 11,
+  };
+  for (const candidate of [
+    obsolete,
+    { ...profile, runtimeAbi: "4" },
+    { ...profile, ...obsolete },
+  ]) {
+    assert.throws(
+      () => assertResourceCompatibility(candidate),
+      /unsupported resource runtime compatibility/,
+    );
+  }
+});

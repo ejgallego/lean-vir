@@ -21,10 +21,8 @@ private def magic : ByteArray := ⟨#[86, 73, 82, 82, 69, 83, 0, 1]⟩
 
 private def parseCompatibility (j : Json) : Except String Compatibility := do
   return {
-    leanBuildId := ← j.getObjValAs? String "leanBuildId"
-    runtimeAbi := ← j.getObjValAs? String "runtimeAbi"
-    jsApiVersion := ← j.getObjValAs? Nat "jsApiVersion"
-    irFormatVersion := ← j.getObjValAs? Nat "irFormatVersion" }
+    leanRevision := ← j.getObjValAs? String "leanRevision"
+    virVersion := ← j.getObjValAs? Nat "virVersion" }
 
 private def parseFileInfo (j : Json) : Except String FileInfo := do
   return {

@@ -32,7 +32,7 @@ const profile = JSON.parse(
 assertResourceCompatibility(profile);
 const identity = JSON.parse(await readFile(identityPath));
 if (
-  identity.leanSource?.commit !== profile.leanBuildId ||
+  identity.leanSource?.commit !== profile.leanRevision ||
   identity.leanSource?.dirty !== false
 )
   throw new Error(

@@ -237,10 +237,8 @@ export async function createProgram(options) {
       },
     );
     for (const manifest of manifests) {
-      if (
-        manifest.metadata.leanGithash !== compatibility.leanBuildId ||
-        manifest.metadata.packageFormatVersion !== compatibility.irFormatVersion
-      ) {
+      // IR and interface format versions were checked by the package validator.
+      if (manifest.metadata.leanGithash !== compatibility.leanRevision) {
         throw new Error(
           "program compiled identity does not match resource compatibility",
         );

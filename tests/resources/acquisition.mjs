@@ -100,11 +100,11 @@ acquire("reject-insecure-transport", "http://invalid.example/pack",
   { error: /UNSUPPORTED_RESOURCE_TRANSPORT/ });
 assert.ok(!existsSync(cache) && !existsSync(stage));
 
-// A transport replacement cannot change either selected content or compiler.
+// A transport replacement cannot change either selected content or Lean revision.
 const descriptorSize = bytes.readUInt32LE(8);
 const originalJson = bytes.subarray(12, 12 + descriptorSize).toString("utf8");
 const json = Buffer.from(originalJson.replace(
-  /"leanBuildId":"[^"]+"/, '"leanBuildId":"wrong-compiler"'));
+  /"leanRevision":"[^"]+"/, '"leanRevision":"wrong-revision"'));
 const header = Buffer.from(bytes.subarray(0, 12));
 header.writeUInt32LE(json.length, 8);
 const other = join(evidence, "other-compiler");
@@ -115,13 +115,23 @@ run(tool, ["acquire", compat, otherId, other, cache, stage], "reject-compiler",
   { error: /LEAN_BUILD_MISMATCH/ });
 assert.ok(!existsSync(cache) && !existsSync(stage));
 
-// Matching content identity is not sufficient: enforce every compatibility field
+// Matching content identity is not sufficient: enforce the resource compatibility
 // before touching either destination, including already-cached/staged candidates.
 const profile = JSON.parse(readFileSync(compat));
 assert.deepEqual(JSON.parse(originalJson).compatibility, profile,
   "native producer must emit the selected compatibility values");
-for (const field of ["runtimeAbi", "jsApiVersion", "irFormatVersion"]) {
-  const value = typeof profile[field] === "string" ? `${profile[field]}-wrong` : profile[field] + 1;
+for (const [label, value] of Object.entries({
+  obsolete: { leanBuildId: profile.leanRevision, runtimeAbi: "4", jsApiVersion: 1, irFormatVersion: 11 },
+  mixed: { ...profile, runtimeAbi: "4" },
+})) {
+  const path = join(evidence, `${label}-profile.json`);
+  writeFileSync(path, JSON.stringify(value));
+  run(tool, ["acquire", path, expected, source, cache, stage],
+    `reject-${label}-profile`, { error: /INVALID_COMPATIBILITY/ });
+  assert.ok(!existsSync(cache) && !existsSync(stage));
+}
+for (const field of ["virVersion"]) {
+  const value = profile[field] + 1;
   assert.notEqual(value, profile[field]);
   // Reject an unsupported requested profile even if matching cached bytes exist.
   const wrongProfile = join(evidence, `profile-${field}.json`);

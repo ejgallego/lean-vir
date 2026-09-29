@@ -17,7 +17,7 @@ const emptySha256 =
 const abcSha256 =
   "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
 const identity =
-  "59bea0c0be16a07242d4f516971f465532b7c5b9d31e8bf90e8bda39b1c54866";
+  "31aa0de3db1b738af032d0a1c98074426f9b0cad7657d79035c62284d87c2d8e";
 
 function runtime(overrides = {}) {
   return {
@@ -25,10 +25,8 @@ function runtime(overrides = {}) {
     logicalId: "test/λ😀\n\u0001",
     kind: "runtime",
     compatibility: {
-      leanBuildId: "470d5ce1400764999581fd26d5d72b00d990b0f4",
-      runtimeAbi: "test-abi",
-      jsApiVersion: 1,
-      irFormatVersion: 11,
+      leanRevision: "470d5ce1400764999581fd26d5d72b00d990b0f4",
+      virVersion: 1,
     },
     files: [
       {
@@ -166,6 +164,25 @@ test("rejects representative v1 schema, metadata, path, and role failures", () =
   const cases = [
     [runtime({ extra: true }), "INVALID_DESCRIPTOR"],
     [runtime({ schemaVersion: 0 }), "SCHEMA_VERSION"],
+    [
+      runtime({
+        compatibility: {
+          leanBuildId: "470d5ce1400764999581fd26d5d72b00d990b0f4",
+          runtimeAbi: "test-abi",
+          jsApiVersion: 1,
+          irFormatVersion: 11,
+        },
+      }),
+      "INVALID_COMPATIBILITY",
+    ],
+    [
+      runtime({ compatibility: { ...runtime().compatibility, runtimeAbi: "test-abi" } }),
+      "INVALID_COMPATIBILITY",
+    ],
+    [
+      runtime({ compatibility: { ...runtime().compatibility, virVersion: 0 } }),
+      "INVALID_VERSION",
+    ],
     [runtime({ logicalId: "\ud800" }), "INVALID_METADATA"],
     [
       runtime({

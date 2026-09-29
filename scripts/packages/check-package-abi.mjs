@@ -20,7 +20,7 @@ import {
   IR_PACKAGE_SET_VERSION,
 } from "../../web/src/vir-runtime.js";
 import { IR_PACKAGE_MAGIC, IR_PACKAGE_SECTION } from "./irpkg-format.mjs";
-import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION, RESOURCE_JS_API_VERSION } from "./package-versions.mjs";
+import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION, VIR_COMPATIBILITY_VERSION } from "./package-versions.mjs";
 import { assertResourceCompatibility } from "../../web/src/resources/compatibility.js";
 
 const args = process.argv.slice(2);
@@ -175,9 +175,9 @@ assertEqual(
   "runtime ABI version mismatch",
 );
 assertEqual(
-  leanNatConstant(packageFormat, "currentResourceJsApiVersion"),
-  RESOURCE_JS_API_VERSION,
-  "resource JS API version mismatch",
+  leanNatConstant(packageFormat, "currentVirCompatibilityVersion"),
+  VIR_COMPATIBILITY_VERSION,
+  "VIR resource compatibility version mismatch",
 );
 assertResourceCompatibility(JSON.parse(await readRepoText("vir-resources/compatibility.json")));
 // Producer behavior is exercised by resources/acquisition.mjs and the SDK

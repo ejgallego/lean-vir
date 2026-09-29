@@ -11,7 +11,9 @@ import { INTERFACE_MANIFEST_VERSION } from "./interface-manifest.js";
 export { INTERFACE_MANIFEST_VERSION };
 export const PACKAGE_FORMAT_VERSION = IR_PACKAGE_VERSION;
 export const RUNTIME_ABI_VERSION = 4;
-export const RESOURCE_JS_API_VERSION = 1;
+// Combined resource contract; advance for breaking client API, runtime ABI or
+// accepted program-format changes. This is not the runtime ABI number.
+export const VIR_COMPATIBILITY_VERSION = 1;
 
 export const PACKAGE_VERSIONS = Object.freeze({
   packageFormatVersion: PACKAGE_FORMAT_VERSION,

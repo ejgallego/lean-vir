@@ -42,7 +42,7 @@ const encoded = run(["descriptor"]).replace(/\n$/, "");
 const descriptor = JSON.parse(encoded);
 assert.equal(encoded, canonical(descriptor));
 assert.equal(digest(`vir-resource-bundle-v1\n${encoded}`),
-  "59bea0c0be16a07242d4f516971f465532b7c5b9d31e8bf90e8bda39b1c54866");
+  "31aa0de3db1b738af032d0a1c98074426f9b0cad7657d79035c62284d87c2d8e");
 
 const scratch = mkdtempSync(join(tmpdir(), "vir-resource-core-"));
 let passed = false;

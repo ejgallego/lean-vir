@@ -237,7 +237,8 @@ const runtimeOnly = runLake("runtime-only", producer, [
 ]);
 assert.doesNotMatch(
   runtimeOnly,
-  /Built.*(?:GeneratePackage|ResourceProgram|vir_resource_program)/,
+  // Shared version constants are not the package generator or its analysis cone.
+  /Built.*(?:GeneratePackage(?!\.PackageFormat\b)|ResourceProgram|vir_resource_program)/,
 );
 assert.equal(
   existsSync(join(producer, ".lake/build/bin/vir_resource_program")),

@@ -292,10 +292,10 @@ const descriptorText = first
   .subarray(12, 12 + descriptorLength)
   .toString("utf8");
 const changedText = descriptorText.replace(
-  `"runtimeAbi":${JSON.stringify(descriptor.compatibility.runtimeAbi)}`,
-  `"runtimeAbi":${JSON.stringify("0".repeat(descriptor.compatibility.runtimeAbi.length))}`,
+  `"virVersion":${descriptor.compatibility.virVersion}`,
+  `"virVersion":2`,
 );
-assert.notEqual(changedText, descriptorText, "compatibility negative must change the actual ABI");
+assert.notEqual(changedText, descriptorText, "compatibility negative must change virVersion");
 assert.equal(changedText.length, descriptorText.length);
 Buffer.from(changedText).copy(altered, 12);
 const incompatiblePath = join(evidence, "incompatible.virres");

@@ -9,6 +9,10 @@ The current runtime lock is available-only: a maintainer must first supply its
 exact verified pack. A missing pack fails clearly; it never triggers a Wasm build.
 Anonymous cold installation is not yet supported. Use the pinned Lean toolchain
 and the matching runtime; do not substitute another release's Wasm.
+Compatibility is one Lean source revision plus one VIR compatibility version;
+the lock's content ID selects the exact runtime bundle. Client libraries inherit
+this profile from VIR rather than independently choosing ABI or package-format
+versions. See [the compatibility contract](../development/RESOURCE_BUNDLES.md#compatibility-versus-content-identity).
 Unset `VIR_NATIVE_EXTERN_MANIFEST` when building resources: ambient custom native
 profiles are rejected, even on cache hits. Custom-profile packaging remains a
 separate lower-level `:vir` workflow with a matching runtime requirement.

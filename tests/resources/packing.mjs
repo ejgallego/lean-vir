@@ -230,7 +230,7 @@ invoke(
 writeDescriptor(descriptorBytes);
 altered({
   ...descriptor,
-  compatibility: { ...compatibility, leanBuildId: "wrong-compiler" },
+  compatibility: { ...compatibility, leanRevision: "wrong-revision" },
 });
 invoke(
   "wrong-compiler",

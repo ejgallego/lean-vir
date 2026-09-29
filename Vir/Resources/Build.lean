@@ -123,26 +123,20 @@ def validMetadata (value : String) : Bool :=
   !value.isEmpty && value.utf8ByteSize ≤ maxMetadataBytes
 
 def currentCompatibility : Compatibility := {
-  leanBuildId := Lean.githash
-  runtimeAbi := toString Vir.GeneratePackage.currentRuntimeAbiVersion
-  jsApiVersion := Vir.GeneratePackage.currentResourceJsApiVersion
-  irFormatVersion := Vir.GeneratePackage.currentPackageFormatVersion
+  leanRevision := Lean.githash
+  virVersion := Vir.GeneratePackage.currentVirCompatibilityVersion
 }
 
 def compatibility (path : FilePath) : IO Compatibility := do
   let json ← readJson path maxMetadataBytes
   let c ← fromExcept "INVALID_COMPATIBILITY" do
-    exactKeys json #["leanBuildId", "runtimeAbi", "jsApiVersion", "irFormatVersion"]
+    exactKeys json #["leanRevision", "virVersion"]
     return {
-      leanBuildId := ← json.getObjValAs? String "leanBuildId"
-      runtimeAbi := ← json.getObjValAs? String "runtimeAbi"
-      jsApiVersion := ← json.getObjValAs? Nat "jsApiVersion"
-      irFormatVersion := ← json.getObjValAs? Nat "irFormatVersion" }
-  unless c.leanBuildId == Lean.githash do
-    fail "LEAN_BUILD_MISMATCH" s!"expected {Lean.githash}, got {c.leanBuildId}"
-  unless c.runtimeAbi == currentCompatibility.runtimeAbi &&
-      c.jsApiVersion == currentCompatibility.jsApiVersion &&
-      c.irFormatVersion == currentCompatibility.irFormatVersion do
+      leanRevision := ← json.getObjValAs? String "leanRevision"
+      virVersion := ← json.getObjValAs? Nat "virVersion" }
+  unless c.leanRevision == Lean.githash do
+    fail "LEAN_BUILD_MISMATCH" s!"expected {Lean.githash}, got {c.leanRevision}"
+  unless c.virVersion == currentCompatibility.virVersion do
     fail "UNSUPPORTED_COMPATIBILITY"
       s!"expected {repr currentCompatibility}, got {repr c}"
   return c
@@ -164,9 +158,9 @@ def atomicInstall (destination : FilePath) (bytes : ByteArray) : IO Unit :=
 def verifyIdentity (expected : String) (profile : Compatibility) (bundle : Bundle) : IO Unit := do
   unless bundle.contentId == expected do
     fail "CONTENT_ID_MISMATCH" s!"expected {expected}, got {bundle.contentId}"
-  unless bundle.descriptor.compatibility.leanBuildId == Lean.githash do
+  unless bundle.descriptor.compatibility.leanRevision == Lean.githash do
     fail "LEAN_BUILD_MISMATCH"
-      s!"expected {Lean.githash}, got {bundle.descriptor.compatibility.leanBuildId}"
+      s!"expected {Lean.githash}, got {bundle.descriptor.compatibility.leanRevision}"
   unless bundle.descriptor.compatibility == profile do
     fail "INCOMPATIBLE"
       s!"bundle {bundle.descriptor.logicalId} has {repr bundle.descriptor.compatibility}; expected {repr profile}"

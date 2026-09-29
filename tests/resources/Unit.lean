@@ -33,10 +33,8 @@ private def failure (code : String) (value : Except ResourceError α) : IO Unit 
 
 -- Fixed cross-language identity vector, independent of the executing compiler.
 private def compatibility : Compatibility := {
-  leanBuildId := "470d5ce1400764999581fd26d5d72b00d990b0f4"
-  runtimeAbi := "test-abi"
-  jsApiVersion := 1
-  irFormatVersion := 11 }
+  leanRevision := "470d5ce1400764999581fd26d5d72b00d990b0f4"
+  virVersion := 1 }
 
 -- Synthetic integrity fixtures, not executable runtime/program acceptance.
 private def runtime : Bundle := Id.run do
@@ -71,10 +69,8 @@ private def withDescriptor (bundle : Bundle) (descriptor : Descriptor) : Bundle 
 private def nativeRuntime : Bundle :=
   withDescriptor runtime { runtime.descriptor with
     compatibility := {
-      leanBuildId := Lean.githash
-      runtimeAbi := toString Vir.GeneratePackage.currentRuntimeAbiVersion
-      jsApiVersion := Vir.GeneratePackage.currentResourceJsApiVersion
-      irFormatVersion := Vir.GeneratePackage.currentPackageFormatVersion } }
+      leanRevision := Lean.githash
+      virVersion := Vir.GeneratePackage.currentVirCompatibilityVersion } }
 
 private def rawPack (descriptor : String) (payload : ByteArray := ByteArray.empty) : ByteArray := Id.run do
   let mut out : ByteArray := ⟨#[86, 73, 82, 82, 69, 83, 0, 1]⟩
@@ -103,7 +99,7 @@ private def unitTests : IO Unit := do
   let r := runtime
   let d := r.descriptor
   let _ ← success "runtime validation" r.validate
-  check "Unicode canonical identity" (r.contentId == "59bea0c0be16a07242d4f516971f465532b7c5b9d31e8bf90e8bda39b1c54866")
+  check "Unicode canonical identity" (r.contentId == "31aa0de3db1b738af032d0a1c98074426f9b0cad7657d79035c62284d87c2d8e")
   let reordered := { r with
     descriptor := { d with files := d.files.reverse, fileEntries := d.fileEntries.reverse }
     files := r.files.reverse }
@@ -115,7 +111,7 @@ private def unitTests : IO Unit := do
   check "pure payload access" ((r.file? "runtime.js").map (·.bytes) == some "abc".toUTF8)
   failure "SCHEMA_VERSION" (withDescriptor r { d with schemaVersion := 2 }).validate
   failure "INVALID_VERSION" (withDescriptor r { d with
-    compatibility := { compatibility with jsApiVersion := 9007199254740992 } }).validate
+    compatibility := { compatibility with virVersion := 9007199254740992 } }).validate
   failure "PAYLOAD_LIMIT" (withDescriptor r { d with
     files := d.files.set! 0 { d.files[0]! with byteLength := maxPayloadBytes + 1 } }).validate
   failure "MISSING_ROLE" (withDescriptor r { d with fileEntries := #[] }).validate
@@ -138,7 +134,7 @@ private def unitTests : IO Unit := do
   let bundles ← success "set normalization" set.bundles
   check "one copy per identity" (bundles.size == 2)
   let incompatible := withDescriptor program { program.descriptor with
-    compatibility := { compatibility with leanBuildId := "other" } }
+    compatibility := { compatibility with leanRevision := "other" } }
   failure "INCOMPATIBLE" { set with programs := #[incompatible] }.validate
   let conflict := withDescriptor program { program.descriptor with exports := #[] }
   failure "LOGICAL_ID_CONFLICT" { set with programs := #[program, conflict] }.validate
@@ -156,11 +152,14 @@ private def unitTests : IO Unit := do
   failure "HASH_MISMATCH" (Pack.decode (encoded.set! (encoded.size - 1) 100))
   let json := String.fromUTF8! (encodeDescriptor d)
   for bad in #[json ++ "\n", json.replace "\"schemaVersion\":1" "\"schemaVersion\":1,\"unknown\":0",
-      json.replace "\"runtimeAbi\":\"test-abi\"" "\"runtimeAbi\":\"test-abi\",\"unknown\":0",
+      json.replace "\"virVersion\":1" "\"virVersion\":1,\"runtimeAbi\":\"4\"",
       json.replace "\"schemaVersion\":1" "\"schemaVersion\":1,\"schemaVersion\":1"] do
     failure "NONCANONICAL_DESCRIPTOR" (Pack.decode (rawPack bad "abc".toUTF8))
   failure "DESCRIPTOR_JSON" (Pack.decode (rawPack
     (json.replace "\"schemaVersion\":1" "\"schemaVersion\":1.0") "abc".toUTF8))
+  failure "DESCRIPTOR_JSON" (Pack.decode (rawPack
+    (json.replace "\"virVersion\":1" "\"runtimeAbi\":\"4\",\"jsApiVersion\":1,\"irFormatVersion\":11"
+      |>.replace "leanRevision" "leanBuildId") "abc".toUTF8))
   failure "DESCRIPTOR_LIMIT" (Pack.decode (rawPack (String.ofList (List.replicate 17 '['))))
   failure "DESCRIPTOR_LIMIT" (Pack.decode (rawPack
     (json.replace "\"schemaVersion\":1" "\"schemaVersion\":10000000000000000")))

@@ -21,10 +21,8 @@ import {
   validateDescriptor,
 } from "../../web/src/resources/descriptor.js";
 import {
-  PACKAGE_FORMAT_VERSION,
-  RUNTIME_ABI_VERSION,
-  RESOURCE_JS_API_VERSION,
-} from "../../scripts/packages/package-versions.mjs";
+  VIR_COMPATIBILITY_VERSION,
+} from "../../web/src/runtime/versions.js";
 import {
   launchChromium,
   openChromiumPage,
@@ -78,17 +76,15 @@ const wasm = await readFile(join(root, "web/public/vir-upstream.wasm"));
 const buildIdentity = JSON.parse(
   await readFile(join(root, "build/upstream-probe/wasm-build-identity.json")),
 );
-const leanBuildId = execFileSync("lean", ["--githash"], {
+const leanRevision = execFileSync("lean", ["--githash"], {
   cwd: root,
   encoding: "utf8",
 }).trim();
-assert.equal(buildIdentity.leanSource.commit, leanBuildId);
+assert.equal(buildIdentity.leanSource.commit, leanRevision);
 assert.equal(buildIdentity.leanSource.dirty, false);
 const compatibility = {
-  leanBuildId,
-  runtimeAbi: String(RUNTIME_ABI_VERSION),
-  jsApiVersion: RESOURCE_JS_API_VERSION,
-  irFormatVersion: PACKAGE_FORMAT_VERSION,
+  leanRevision,
+  virVersion: VIR_COMPATIBILITY_VERSION,
 };
 const inventory = new Map();
 async function bundle(kind, entries, fileEntries, exports) {
@@ -179,7 +175,7 @@ await writeFile(
   join(output, "identities.json"),
   JSON.stringify(
     {
-      leanBuildId,
+      leanRevision,
       wasmSha256: digest(wasm),
       runtime: runtime.contentId,
       program: program.contentId,
@@ -378,7 +374,7 @@ try {
     /CONTENT_ID_MISMATCH/,
   );
   const incompatible = await changed(
-    (d) => (d.compatibility.runtimeAbi = "wrong"),
+    (d) => (d.compatibility.virVersion = 2),
   );
   await rejected(
     "compatibility",

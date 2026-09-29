@@ -25,10 +25,8 @@ const descriptorKeys = [
   "exports",
 ];
 const compatibilityKeys = [
-  "leanBuildId",
-  "runtimeAbi",
-  "jsApiVersion",
-  "irFormatVersion",
+  "leanRevision",
+  "virVersion",
 ];
 const fileKeys = ["path", "mediaType", "byteLength", "sha256"];
 const entryKeys = ["role", "path"];
@@ -58,10 +56,8 @@ function prepareDescriptor(value) {
   );
   requireExactKeys(compatibility, compatibilityKeys, "INVALID_COMPATIBILITY");
   const normalizedCompatibility = {
-    leanBuildId: metadata(compatibility.leanBuildId, "INVALID_METADATA"),
-    runtimeAbi: metadata(compatibility.runtimeAbi, "INVALID_METADATA"),
-    jsApiVersion: version(compatibility.jsApiVersion),
-    irFormatVersion: version(compatibility.irFormatVersion),
+    leanRevision: metadata(compatibility.leanRevision, "INVALID_METADATA"),
+    virVersion: version(compatibility.virVersion),
   };
 
   const files = requireArray(descriptor.files, "INVALID_FILES");
@@ -315,7 +311,7 @@ function compareUtf8(left, right) {
 }
 
 function encodeCanonical(descriptor) {
-  const compatibility = `{\"irFormatVersion\":${descriptor.compatibility.irFormatVersion},\"jsApiVersion\":${descriptor.compatibility.jsApiVersion},\"leanBuildId\":${quote(descriptor.compatibility.leanBuildId)},\"runtimeAbi\":${quote(descriptor.compatibility.runtimeAbi)}}`;
+  const compatibility = `{\"leanRevision\":${quote(descriptor.compatibility.leanRevision)},\"virVersion\":${descriptor.compatibility.virVersion}}`;
   const exports = descriptor.exports
     .map(
       (entry) =>

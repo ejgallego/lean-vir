@@ -39,10 +39,8 @@ private def objectJson (fields : List (String × String)) : String :=
   "{" ++ String.intercalate "," (fields.map fun (key, value) => quote key ++ ":" ++ value) ++ "}"
 
 private def compatibilityJson (c : Compatibility) : String := objectJson [
-  ("irFormatVersion", toString c.irFormatVersion),
-  ("jsApiVersion", toString c.jsApiVersion),
-  ("leanBuildId", quote c.leanBuildId),
-  ("runtimeAbi", quote c.runtimeAbi)]
+  ("leanRevision", quote c.leanRevision),
+  ("virVersion", toString c.virVersion)]
 
 /-- Complete canonical descriptor. Fixed ASCII object keys are written in sorted order;
 Unicode values are preserved without normalization. Call `validateDescriptor` on input. -/
@@ -124,12 +122,9 @@ def validateDescriptor (d : Descriptor) : Except ResourceError Unit := do
       code := "SCHEMA_VERSION", logicalId := id, expected := some "1",
       actual := some (toString d.schemaVersion) }
   metadata id "logicalId" id
-  metadata id "leanBuildId" d.compatibility.leanBuildId
-  metadata id "runtimeAbi" d.compatibility.runtimeAbi
-  for (field, value) in [("jsApiVersion", d.compatibility.jsApiVersion),
-      ("irFormatVersion", d.compatibility.irFormatVersion)] do
-    unless 0 < value && value ≤ 9007199254740991 do
-      throw { code := "INVALID_VERSION", logicalId := id, path := some field }
+  metadata id "leanRevision" d.compatibility.leanRevision
+  unless 0 < d.compatibility.virVersion && d.compatibility.virVersion ≤ 9007199254740991 do
+    throw { code := "INVALID_VERSION", logicalId := id, path := some "virVersion" }
   paths id (d.files.map (·.path))
   let mut total := 0
   for f in d.files do

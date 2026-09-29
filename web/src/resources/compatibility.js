@@ -4,21 +4,18 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import {
-  PACKAGE_FORMAT_VERSION,
-  RUNTIME_ABI_VERSION,
-  RESOURCE_JS_API_VERSION,
-} from "../runtime/versions.js";
+import { VIR_COMPATIBILITY_VERSION } from "../runtime/versions.js";
 
 // Compiler identity is checked separately against the actual program/build.
 export function assertResourceCompatibility(profile) {
   if (
-    profile.runtimeAbi !== String(RUNTIME_ABI_VERSION) ||
-    profile.jsApiVersion !== RESOURCE_JS_API_VERSION ||
-    profile.irFormatVersion !== PACKAGE_FORMAT_VERSION
+    !profile ||
+    Object.keys(profile).sort().join(",") !== "leanRevision,virVersion" ||
+    typeof profile.leanRevision !== "string" || !profile.leanRevision.length ||
+    profile.virVersion !== VIR_COMPATIBILITY_VERSION
   ) {
     throw new Error(
-      `unsupported resource runtime compatibility: expected ABI ${RUNTIME_ABI_VERSION}, JS API ${RESOURCE_JS_API_VERSION}, IR format ${PACKAGE_FORMAT_VERSION}`,
+      `unsupported resource runtime compatibility: expected leanRevision and VIR version ${VIR_COMPATIBILITY_VERSION}`,
     );
   }
 }

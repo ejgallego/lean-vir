@@ -22,10 +22,10 @@ inductive BundleKind where
 
 /-- Exact compatibility, deliberately independent of a runtime bundle's content identity. -/
 structure Compatibility where
-  leanBuildId : String
-  runtimeAbi : String
-  jsApiVersion : Nat
-  irFormatVersion : Nat
+  /-- Lean source revision reported by `Lean.githash`, not a compiler-binary hash. -/
+  leanRevision : String
+  /-- Combined VIR client/runtime/program compatibility contract. -/
+  virVersion : Nat
   deriving BEq, Repr, Inhabited
 
 structure File where
