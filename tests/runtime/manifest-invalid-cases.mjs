@@ -798,16 +798,6 @@ export const invalidManifestCases = [
       /arity does not match erased arguments, value arguments, and effect \(2\)/,
   },
   {
-    name: "duplicate host import name",
-    mutate: (manifest) => {
-      manifest.hostImports = [
-        hostImport(),
-        hostImport({ slot: 1, symbol: "vir_host_import_1" }),
-      ];
-    },
-    pattern: /hostImports\[1\]\.name duplicates another host import/,
-  },
-  {
     name: "duplicate host import symbol",
     mutate: (manifest) => {
       manifest.hostImports = [
@@ -815,6 +805,6 @@ export const invalidManifestCases = [
         hostImport({ slot: 1, name: "Example.otherHost" }),
       ];
     },
-    pattern: /hostImports\[1\]\.symbol duplicates another host import/,
+    pattern: /hostImports\[1\]\.symbol alias "vir_host_import_0" belongs to more than one host import/,
   },
 ];

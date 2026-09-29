@@ -11,6 +11,7 @@ Author: Emilio J. Gallego Arias
 #include "package_decl_provider_types.h"
 #include "runtime/name_identity.h"
 #include "runtime/io_error.h"
+#include "runtime/native_symbol_lookup.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -18,6 +19,7 @@ Author: Emilio J. Gallego Arias
 #include <memory>
 #include <string>
 #include <utility>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -27,7 +29,9 @@ Author: Emilio J. Gallego Arias
 namespace lean::vir {
 namespace {
 
-enum class package_phase { idle, appending, prepared, initializing, ready, failed };
+using host_symbol_index = std::unordered_map<std::string, uint32_t>;
+
+enum class package_phase { idle, appending, prepared, initializing, ready, failed, retired };
 
 struct package_state {
     // Reuse the decoder's owned records and cleanup for the aggregate package.
@@ -36,6 +40,9 @@ struct package_state {
     std::unique_ptr<name_hash_map<uint32_t>> boxed_decl_index;
     // One declaration index per public export; slots are 1-based indices here.
     std::vector<uint32_t> call_decl_indices;
+    // dlsym accepts both each host symbol and its boxed spelling. Keep this
+    // index in the package state so validation and lookup share one authority.
+    std::unique_ptr<host_symbol_index> host_import_slots_by_symbol;
     package_phase phase = package_phase::idle;
     size_t member_count = 0;
     std::string last_error;
@@ -48,6 +55,7 @@ struct package_state {
         decl_index.reset();
         boxed_decl_index.reset();
         call_decl_indices.clear();
+        host_import_slots_by_symbol.reset();
         records.clear();
         member_count = 0;
         phase = package_phase::idle;
@@ -173,7 +181,31 @@ static bool validate_named_entries(
     return true;
 }
 
-static bool validate_decoded_package(decoded_ir_package const & decoded) {
+static bool register_host_import_symbol_alias(
+    host_symbol_index const & accepted_slots,
+    host_symbol_index & staged_slots,
+    std::string const & alias,
+    uint32_t slot) {
+    if (is_registered_native_symbol(alias.c_str())) {
+        g_package.last_error = "JavaScript host import symbol alias `" + alias +
+            "` conflicts with the native symbol registry";
+        return false;
+    }
+    auto accepted = accepted_slots.find(alias);
+    auto staged = staged_slots.find(alias);
+    if ((accepted != accepted_slots.end() && accepted->second != slot) ||
+        (staged != staged_slots.end() && staged->second != slot)) {
+        g_package.last_error = "ambiguous JavaScript host import symbol alias `" + alias +
+            "` belongs to more than one host import";
+        return false;
+    }
+    staged_slots.emplace(alias, slot);
+    return true;
+}
+
+static bool validate_decoded_package(
+    decoded_ir_package const & decoded,
+    host_symbol_index & staged_host_import_slots) {
     if (g_package.member_count != 0 && decoded.format_version != g_package.records.format_version) {
         g_package.last_error =
             "IR package set mixes format versions " + std::to_string(g_package.records.format_version) +
@@ -189,13 +221,14 @@ static bool validate_decoded_package(decoded_ir_package const & decoded) {
         return false;
     }
 
-    std::unordered_set<std::string> symbols;
-    for (host_import_entry const & entry : g_package.records.host_imports) {
-        symbols.insert(entry.symbol);
-    }
-    for (host_import_entry const & entry : decoded.host_imports) {
-        if (!symbols.insert(entry.symbol).second) {
-            g_package.last_error = "duplicate JavaScript host import symbol `" + entry.symbol + "`";
+    for (size_t i = 0; i < decoded.host_imports.size(); ++i) {
+        host_import_entry const & entry = decoded.host_imports[i];
+        uint32_t slot = static_cast<uint32_t>(g_package.records.host_imports.size() + i);
+        if (!register_host_import_symbol_alias(
+                *g_package.host_import_slots_by_symbol, staged_host_import_slots, entry.symbol, slot) ||
+            !register_host_import_symbol_alias(
+                *g_package.host_import_slots_by_symbol, staged_host_import_slots,
+                entry.symbol + "___boxed", slot)) {
             return false;
         }
     }
@@ -204,7 +237,6 @@ static bool validate_decoded_package(decoded_ir_package const & decoded) {
 
 template <typename T>
 static void append_owned_entries(std::vector<T> & target, std::vector<T> & source) {
-    target.reserve(target.size() + source.size());
     for (T & entry : source) {
         target.push_back(std::move(entry));
     }
@@ -212,7 +244,8 @@ static void append_owned_entries(std::vector<T> & target, std::vector<T> & sourc
 }
 
 static bool append_decoded_package(decoded_ir_package & decoded) {
-    if (!validate_decoded_package(decoded)) {
+    host_symbol_index staged_host_import_slots;
+    if (!validate_decoded_package(decoded, staged_host_import_slots)) {
         return false;
     }
 
@@ -220,6 +253,7 @@ static bool append_decoded_package(decoded_ir_package & decoded) {
     append_owned_entries(g_package.records.init_entries, decoded.init_entries);
     append_owned_entries(g_package.records.host_imports, decoded.host_imports);
     append_owned_entries(g_package.records.export_summaries, decoded.export_summaries);
+    g_package.host_import_slots_by_symbol->merge(staged_host_import_slots);
     g_package.records.interface_manifest = std::move(decoded.interface_manifest);
     ++g_package.member_count;
     g_package.records.format_version = decoded.format_version;
@@ -306,6 +340,9 @@ static export_call_summary_entry const * package_call_summary_entry(uint32_t slo
 } // namespace
 
 void clear_loaded_package() {
+    // A failed initializer can publish closures/handles and persistent globals.
+    // Keep their generation intact until the entire Wasm instance is discarded.
+    if (g_package.phase == package_phase::retired) return;
     if (g_package.phase == package_phase::initializing) {
         g_package.last_error = "IR package set is initializing";
         return;
@@ -314,12 +351,19 @@ void clear_loaded_package() {
 }
 
 bool begin_package_set() {
+    if (g_package.phase == package_phase::retired) {
+        g_package.last_error = "IR package initialization failed; create a fresh runtime";
+        return false;
+    }
     if (g_package.phase == package_phase::initializing) {
         g_package.last_error = "IR package set is initializing";
         return false;
     }
     g_package.last_error.clear();
     g_package.clear();
+    // This WASI boundary does not rely on global C++ constructors. Hash maps
+    // need their constructor (not just zeroed storage) for max_load_factor.
+    g_package.host_import_slots_by_symbol = std::make_unique<host_symbol_index>();
     g_package.phase = package_phase::appending;
     return true;
 }
@@ -358,7 +402,7 @@ bool finish_package_set() {
     }
     g_package.phase = package_phase::initializing;
     if (!run_package_initializers_state()) {
-        g_package.clear();
+        g_package.phase = package_phase::retired;
         return false;
     }
     g_package.phase = package_phase::ready;
@@ -491,16 +535,13 @@ char const * find_host_import_symbol(object * n) {
 }
 
 int32_t host_import_slot_for_symbol(char const * symbol) {
-    if (symbol == nullptr) {
+    if (symbol == nullptr || !g_package.host_import_slots_by_symbol) {
         return -1;
     }
-    for (size_t i = 0; i < g_package.records.host_imports.size(); i++) {
-        std::string boxed = g_package.records.host_imports[i].symbol + "___boxed";
-        if (g_package.records.host_imports[i].symbol == symbol || boxed == symbol) {
-            return static_cast<int32_t>(i);
-        }
-    }
-    return -1;
+    auto found = g_package.host_import_slots_by_symbol->find(symbol);
+    return found == g_package.host_import_slots_by_symbol->end()
+        ? -1
+        : static_cast<int32_t>(found->second);
 }
 
 uint32_t host_import_arity(uint32_t slot) {

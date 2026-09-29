@@ -9,7 +9,7 @@ import { validateIrPackageSetMembers } from "./ir-package.js";
 import { encodePackageContract } from "./package-contract.js";
 import { releaseCallbackRoots } from "./callbacks.js";
 import { RuntimeCallTiming } from "./call-timing.js";
-import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
+import { asError, collectCleanupError, throwCollectedErrors } from "./cleanup.js";
 import { ObjectValueRuntime } from "./object-values.js";
 import {
   asBytes,
@@ -21,6 +21,7 @@ import {
   objectResultSupported,
 } from "./object-abi.js";
 
+const runtimeBoundaries = new WeakMap();
 const textDecoder = new TextDecoder();
 const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
@@ -35,8 +36,9 @@ export class VirRuntime extends ObjectValueRuntime {
     } = {},
   ) {
     super();
-    this.wasmBoundary = guardWasmExports(exports, hostState);
-    this.exports = this.wasmBoundary.exports;
+    const boundary = guardWasmExports(exports, hostState);
+    runtimeBoundaries.set(this, boundary);
+    this.exports = boundary.exports;
     this.module = module;
     this.hostState = hostState;
     this.packageInfo = packageInfo;
@@ -128,6 +130,7 @@ export class VirRuntime extends ObjectValueRuntime {
     }
 
     let transactionOpen = true;
+    let initializationStarted = false;
     try {
       let byteLength = 0;
       for (let index = 0; index < packageBytes.length; index += 1) {
@@ -155,6 +158,7 @@ export class VirRuntime extends ObjectValueRuntime {
       const interfaceManifest = this.readPackageManifest();
       this.hostState?.setManifest(interfaceManifest);
 
+      initializationStarted = true;
       const finished = this.exports.vir_finish_ir_package_set();
       const hostError = this.hostState?.takeCallError();
       if (hostError) throw hostError;
@@ -173,8 +177,11 @@ export class VirRuntime extends ObjectValueRuntime {
         packageSet,
       });
     } catch (error) {
+      // Initializers can publish persistent values and opaque handles. Once
+      // execution starts, failure cannot be rolled back into an empty instance.
+      if (initializationStarted) runtimeBoundaries.get(this).fail(error);
       const errors = [error];
-      if (transactionOpen) {
+      if (transactionOpen && !initializationStarted) {
         collectCleanupError(errors, () =>
           this.exports.vir_abort_ir_package_set(),
         );
@@ -283,6 +290,7 @@ export class VirRuntime extends ObjectValueRuntime {
   }
 
   call(name, ...args) {
+    this.requireLiveRuntime();
     const entry = this.findManifestEntry(name);
     if (entry === null) {
       throw new Error(`interface entry not found: ${name}`);
@@ -291,6 +299,7 @@ export class VirRuntime extends ObjectValueRuntime {
   }
 
   callTimed(name, ...args) {
+    this.requireLiveRuntime();
     const timing = new RuntimeCallTiming();
     const entry = this.findManifestEntry(name);
     if (entry === null) {
@@ -494,7 +503,12 @@ export class VirRuntime extends ObjectValueRuntime {
   }
 
   get failure() {
-    return this.wasmBoundary?.failure ?? null;
+    return runtimeBoundaries.get(this)?.failure ?? null;
+  }
+
+  onFailure(listener) {
+    if (typeof listener !== "function") throw new TypeError("failure listener must be a function");
+    return runtimeBoundaries.get(this).subscribe(listener);
   }
 
   trackCallback(callback) {
@@ -630,7 +644,41 @@ const abandonedCleanupExports = new Set([
 ]);
 
 function guardWasmExports(exports, hostState) {
-  const boundary = { failure: null, exports: Object.create(null) };
+  const listeners = new Set();
+  const schedule = (subscription) => {
+    if (subscription.pending) return;
+    subscription.pending = true;
+    queueMicrotask(() => {
+      if (!listeners.delete(subscription)) return;
+      try {
+        subscription.listener(boundary.failure);
+      } catch (error) {
+        // Notifications cannot replace the original failure or escape as an
+        // unhandled microtask exception. Applications own listener diagnostics.
+        try { console.error("VIR failure listener threw", error); } catch {}
+      }
+    });
+  };
+  const boundary = {
+    failure: null,
+    exports: Object.create(null),
+    fail(error) {
+      if (boundary.failure !== null) return boundary.failure;
+      // Commit abandonment before touching the thrown value or host diagnostics.
+      boundary.failure = new Error("Wasm invocation failed", { cause: error });
+      let cause = error;
+      try { cause = hostState?.takeCallError() ?? error; } catch {}
+      boundary.failure = asError(cause, "Wasm invocation failed");
+      for (const subscription of listeners) schedule(subscription);
+      return boundary.failure;
+    },
+    subscribe(listener) {
+      const subscription = { listener, pending: false };
+      listeners.add(subscription);
+      if (boundary.failure !== null) schedule(subscription);
+      return () => { listeners.delete(subscription); };
+    },
+  };
   for (const [name, value] of Object.entries(exports)) {
     boundary.exports[name] = typeof value !== "function" ? value : (...args) => {
       if (boundary.failure !== null) {
@@ -644,9 +692,7 @@ function guardWasmExports(exports, hostState) {
         if (boundary.failure !== null) throw boundary.failure;
         return result;
       } catch (error) {
-        boundary.failure ??= hostState?.takeCallError() ??
-          (error instanceof Error ? error : new Error(String(error)));
-        throw boundary.failure;
+        throw boundary.fail(error);
       }
     };
   }

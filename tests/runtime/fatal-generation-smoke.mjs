@@ -55,10 +55,11 @@ end Fatal`,
   directory.setUint32(entryOffset + 4, bytes.length, true);
   directory.setUint32(entryOffset + 8, contents.length, true);
   const wasmBytes = await readFile(process.argv[2] ?? new URL("../../web/public/vir-upstream.wasm", import.meta.url));
-  const failure = new Error("fatal original host error");
+  let failure = new Error("fatal original host error");
+  let pureCalls = 0;
   let fail = true, effects = 0, caughtNested = false, releases = 0, rollbacks = 0;
   const factory = createVirRuntimeFactory({ wasmBytes, hostBindings: {
-    "fatal.pure": value => { if (fail) throw failure; return value; },
+    "fatal.pure": value => { pureCalls++; if (fail) throw failure; return value; },
     "fatal.io": value => { if (fail) throw failure; return value; },
     "fatal.init": () => { throw failure; },
     "fatal.record": () => { effects++; },
@@ -96,6 +97,29 @@ end Fatal`,
     assert.equal(caughtNested, true);
     assert.equal(rollbacks, 1, "a binding cannot commit resources after catching a nested fatal call");
     assert.equal(releases, 4);
+  });
+  await test("hostile thrown values cannot reopen a real Lean/Wasm generation", async () => {
+    const originalFailure = failure;
+    const nonStringifiable = { [Symbol.toPrimitive]() { throw this; } };
+    let proxy;
+    proxy = new Proxy({}, { getPrototypeOf() { throw proxy; }, get() { throw proxy; } });
+    try {
+      for (const thrown of [nonStringifiable, proxy]) {
+        failure = thrown;
+        const runtime = await fresh();
+        const callsBefore = pureCalls;
+        try {
+          let caught;
+          try { runtime.call("Fatal.pureCall", {}); }
+          catch (error) { caught = error; }
+          assert.ok(caught instanceof Error);
+          assert.equal(runtime.failure, caught);
+          assert.equal(caught.cause, thrown);
+          assert.throws(() => runtime.call("Fatal.pureCall", {}), /fresh runtime/);
+          assert.equal(pureCalls, callsBefore + 1);
+        } finally { runtime.dispose(); }
+      }
+    } finally { failure = originalFailure; }
   });
   await test("ordinary IO failure remains reusable and other instances stay usable", async () => {
     const good = await fresh();

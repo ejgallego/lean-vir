@@ -119,12 +119,13 @@ even when the fingerprint matches the earlier valid program. Escaped continuatio
 still retain their original runtime and execute their cleanup guards. There is no
 periodic retry or Retry button.
 
-If a mounted component callback causes a globally reported error and its runtime
-records a fatal Wasm failure, the shell shows that failure, unmounts the component,
-and disposes the failed runtime. A local React error boundary contains errors
-from its now-invalid Lean cleanup callbacks while keeping the original failure
-visible. It does not call the component factory or replay the failed action. Reload the Infoview panel or change the widget code to create a
-fresh runtime.
+The shell subscribes to the runtime's first-failure notification. A mounted
+callback that traps is reported even when application code catches the exception
+or handles a rejected Promise. The shell shows the failure, unmounts the component,
+and disposes the failed runtime. A local React error boundary contains errors from
+its now-invalid Lean cleanup callbacks while keeping the original failure visible.
+It does not call the component factory or replay the failed action. Reload the
+Infoview panel or change the widget code to create a fresh runtime.
 
 Fingerprint generation performs package analysis once per elaboration of the
 widget command. This can increase definition/build time and compiled module size;

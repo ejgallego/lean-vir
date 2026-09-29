@@ -159,7 +159,7 @@ function WidgetLoader({ widgetProps: props, rpcSession }) {
         ),
       });
     };
-    const stopObservingFailure = observeRuntimeFailure(loaded, onFailure);
+    const stopObservingFailure = loaded.service.runtime.onFailure(onFailure);
     loaded.stopObservingFailure = stopObservingFailure;
     return stopObservingFailure;
   }, [loaded, configurationKey]);
@@ -252,13 +252,13 @@ class FatalRuntimeBoundary extends React.Component {
     // React may batch several cleanup errors into one render. Check every
     // reported error, including ones replaced in the rendered error state.
     if (this.props.failure === null ||
-        !eventReportsFailure({ error }, this.props.failure)) throw error;
+        !errorContainsFailure(error, this.props.failure)) throw error;
   }
 
   render() {
     if (this.state.error !== null) {
       if (this.props.failure === null ||
-          !eventReportsFailure({ error: this.state.error }, this.props.failure)) {
+          !errorContainsFailure(this.state.error, this.props.failure)) {
         throw this.state.error;
       }
       return null;
@@ -271,28 +271,8 @@ function stopInfoviewEvent(event) {
   event.stopPropagation();
 }
 
-function observeRuntimeFailure(loaded, onFailure) {
-  const runtime = loaded.service.runtime;
-  let active = true;
-  const stop = () => {
-    if (!active) return;
-    active = false;
-    globalThis.removeEventListener("error", observe);
-    globalThis.removeEventListener("unhandledrejection", observe);
-  };
-  const observe = (event) => {
-    const failure = runtime.failure;
-    if (!active || failure === null || !eventReportsFailure(event, failure)) return;
-    stop();
-    onFailure(failure);
-  };
-  globalThis.addEventListener("error", observe);
-  globalThis.addEventListener("unhandledrejection", observe);
-  return stop;
-}
-
-function eventReportsFailure(event, failure) {
-  const pending = [event?.error, event?.reason];
+function errorContainsFailure(error, failure) {
+  const pending = [error];
   const seen = new Set();
   while (pending.length > 0) {
     const value = pending.pop();

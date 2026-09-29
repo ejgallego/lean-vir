@@ -106,6 +106,11 @@ export const runtimeTests = Object.freeze(
       group: "lean",
     },
     {
+      id: "initializer-retirement",
+      file: "initializer-retirement-smoke.mjs",
+      group: "lean",
+    },
+    {
       id: "interpreter-constant-cache",
       file: "interpreter-constant-cache-smoke.mjs",
       group: "lean",

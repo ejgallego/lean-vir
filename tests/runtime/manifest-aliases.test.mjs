@@ -22,6 +22,23 @@ function manifest() {
   };
 }
 
+function hostImport(slot, symbol) {
+  return {
+    slot,
+    name: `Example.host${slot}`,
+    nameKey: slot === 0 ? "s4578616d706c65/s686f737430/" : "s4578616d706c65/s686f737431/",
+    source: "Example.lean",
+    target: `test.host${slot}`,
+    boundary: "hostResource",
+    symbol,
+    arity: 2,
+    erasedPrefixArgs: 0,
+    args: [{ name: "value", type: { type: "Nat", interfaceTag: 0 } }],
+    result: { type: "Nat", interfaceTag: 0 },
+    effect: "runtime",
+  };
+}
+
 for (const first of ["entry", "id", "jsName"]) {
   for (const second of ["entry", "id", "jsName"]) {
     test(`export aliases cannot collide across ${first} and ${second}`, () => {
@@ -50,4 +67,23 @@ test("absent and empty optional aliases do not reserve callable names", () => {
     entry.jsName = "";
   }
   assert.equal(validateInterfaceManifest(value), value);
+});
+
+test("host import symbols and their boxed spellings share one native namespace", () => {
+  for (const symbols of [
+    ["collision", "collision___boxed"],
+    ["collision___boxed", "collision"],
+  ]) {
+    const value = manifest();
+    value.hostImports = symbols.map((symbol, slot) => hostImport(slot, symbol));
+    assert.throws(
+      () => validateInterfaceManifest(value),
+      /symbol alias "collision___boxed" belongs to more than one host import/,
+    );
+  }
+
+  const distinct = manifest();
+  distinct.hostImports = [hostImport(0, "native_first"), hostImport(1, "native_second")];
+  for (const entry of distinct.hostImports) entry.name = "same display name";
+  assert.equal(validateInterfaceManifest(distinct), distinct);
 });

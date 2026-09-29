@@ -243,9 +243,8 @@ function validatePackageSetSurface(member, exports, hostImports) {
 }
 
 function validateManifestHostImports(hostImports) {
-  const names = new Set();
   const identities = new Set();
-  const symbols = new Set();
+  const symbolAliases = new Map();
   hostImports.forEach((entry, index) => {
     const label = `embedded interface manifest hostImports[${index}]`;
     if (!isRecord(entry)) {
@@ -258,8 +257,15 @@ function validateManifestHostImports(hostImports) {
     for (const field of ["name", "source", "target", "symbol"]) {
       requireString(entry[field], `${label}.${field}`);
     }
-    requireUnique(names, entry.name, `${label}.name`, "host import");
-    requireUnique(symbols, entry.symbol, `${label}.symbol`, "host import");
+    for (const alias of [entry.symbol, `${entry.symbol}___boxed`]) {
+      const previous = symbolAliases.get(alias);
+      if (previous !== undefined && previous !== index) {
+        throw new Error(
+          `${label}.symbol alias ${JSON.stringify(alias)} belongs to more than one host import (hostImports[${previous}])`,
+        );
+      }
+      symbolAliases.set(alias, index);
+    }
     requireNonNegativeInteger(entry.arity, `${label}.arity`);
     requireNonNegativeInteger(
       entry.erasedPrefixArgs,

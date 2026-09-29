@@ -654,9 +654,15 @@ the resulting bytes or descriptor URL through `irPackageSet`, as described in
 
 ## Errors and recovery
 
-Ordinary Lean IO failures report their message, and synchronous effectful host
-failures preserve the original JavaScript Error. The runtime remains reusable
-after those failures.
+Ordinary Lean IO errors in an installed package report their message and leave
+the runtime reusable. Unexpected JavaScript host exceptions abort the owning
+JavaScript invocation: the original `Error` is preserved, and other thrown
+values are wrapped with their raw value as `cause`, without coercing objects.
+Effectful host imports transport the exception as an IO error, but this is not
+Lean-side recovery: even if Lean catches it, further host work in that invocation
+is blocked. A later pure import has no error carrier and traps, retiring the
+instance. A later JavaScript call may proceed if no exceptional Wasm unwind
+occurred. Expected host-domain failures should use explicit result values.
 
 A failed **pure** host import or an exception escaping Wasm execution makes the
 runtime unusable. Synchronous calls, callbacks, startup and package installation
@@ -668,7 +674,23 @@ not let the outer Lean call continue. Other runtime instances remain usable.
 the runtime is healthy or after a recoverable effect failure; after a fatal
 host/Wasm failure it retains the original error when available. Guarded runtime
 methods still throw after the failure, so inspect this property for diagnostics
-and create a fresh runtime for continued execution.
+and create a fresh runtime for continued execution. Failure state is private and
+cannot be reset through a public boundary object.
+
+`runtime.onFailure(listener)` returns an idempotent unsubscribe function. The
+listener receives the first failure once, in a microtask after the active call
+stack. Subscribing to an already failed runtime also schedules notification;
+unsubscribing before delivery cancels it. Listener exceptions are reported to
+`console.error` and cannot replace the original failure. Unsubscribe when an
+integration releases its runtime. Notification reports retirement even when the
+caller catches the exception locally; it does not perform recovery.
+
+Package initialization has a stricter lifetime boundary. Decode, preparation
+and manifest failures before initializers run may be retried on an empty
+runtime. Any failure after initialization begins requires a fresh instance,
+including ordinary Lean IO errors: initialization can publish persistent values
+and opaque handles before failing. The factory can reuse its compiled Wasm
+module while creating a fresh instance.
 
 `dispose()` remains idempotent after failure. It releases JavaScript-owned host
 resources and invalidates callbacks/handles without re-entering failed Wasm.

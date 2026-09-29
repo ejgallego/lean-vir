@@ -156,7 +156,7 @@ public initialize Lifecycle.value : Nat ← do
     } finally { runtime.dispose(); }
   });
 
-  await test("initializer failure clears prepared state and permits a fresh installation", async () => {
+  await test("initializer failure retires the instance and recovery uses a fresh installation", async () => {
     const section = info.package.sections.find(section => section.kind === SECTION.INIT_GLOBALS);
     const original = bytes.subarray(section.offset, section.offset + section.byteLength);
     const count = new DataView(original.buffer, original.byteOffset).getUint32(0, true);
@@ -166,16 +166,32 @@ public initialize Lifecycle.value : Nat ← do
       ...encodeName("Lifecycle.hostValue"), ...encodeName("Lifecycle.readA"),
       ...encodeName("Lifecycle.failed"), ...encodeName("Lifecycle.failure"),
     ]));
+    // The native primitive also refuses to reopen the failed initializer's
+    // generation, independently of the JavaScript installer's failure latch.
+    const raw = await factory.createRuntime();
+    try {
+      raw.hostState.setManifest(info.manifest);
+      assert.equal(raw.exports.vir_begin_ir_package_set(), 1);
+      assert.equal(withBytes(raw, failing, (ptr, len) => raw.exports.vir_append_ir_package(ptr, len)), 1);
+      assert.equal(raw.exports.vir_prepare_ir_package_set(), 1);
+      assert.equal(raw.exports.vir_finish_ir_package_set(), 0);
+      assert.match(raw.lastPackageError(), /lifecycle failure/);
+      raw.exports.vir_abort_ir_package_set();
+      assert.equal(raw.exports.vir_begin_ir_package_set(), 0);
+      assert.match(raw.lastPackageError(), /create a fresh runtime/);
+    } finally { raw.dispose(); }
+    hostCalls.length = 0;
     const runtime = await factory.createRuntime();
     try {
       assert.throws(() => runtime.loadIrPackageSetBytes([failing]),
         /initializer failed for `Lifecycle.failed` via `Lifecycle.failure`:.*lifecycle failure/);
-      assert.equal(runtime.packageDeclCount(), 0);
-      assert.equal(runtime.exports.vir_package_interface_manifest_size(), 0);
+      assert.ok(runtime.failure instanceof Error);
+      assert.throws(() => runtime.packageDeclCount(), /fresh runtime/);
+      assert.throws(() => runtime.loadIrPackageSetBytes([bytes]), /fresh runtime/);
       assert.equal(runtime.packageInfo, null);
       assert.equal(runtime.interfaceManifest, null);
-      // The failed initializer populated native lookup with a package-local host
-      // trampoline. Retry with the same names at different slots to expose reuse.
+      // Recover through a new instance with different host slots: no interpreter
+      // or initialized globals from the failed generation can be reused.
       const retryManifest = structuredClone(info.manifest);
       assert.equal(retryManifest.hostImports.length, 2);
       retryManifest.hostImports.reverse().forEach((entry, slot) => { entry.slot = slot; });
@@ -185,14 +201,16 @@ public initialize Lifecycle.value : Nat ← do
       ]);
       const retry = replaceIrPackageManifest(replaceSection(bytes, SECTION.HOST_IMPORTS,
         Uint8Array.from([...u32(2), ...hostRecords])), retryManifest);
-      runtime.loadIrPackageSetBytes([retry]);
-      assert.equal(runtime.call("Lifecycle.answer"), "1");
-      assert.equal(runtime.call("Lifecycle.read"), "1");
-      assert.deepEqual(hostCalls, ["A"], "the failed initializer must have called host A");
-      hostCalls.length = 0;
-      runtime.call("Lifecycle.readA");
-      runtime.call("Lifecycle.readB");
-      assert.deepEqual(hostCalls, ["A", "B"], "retry must resolve the new host slots");
+      const recovered = await factory.createRuntime({ irPackageSet: [retry] });
+      try {
+        assert.equal(recovered.call("Lifecycle.answer"), "1");
+        assert.equal(recovered.call("Lifecycle.read"), "1");
+        assert.deepEqual(hostCalls, ["A"], "the failed initializer must have called host A");
+        hostCalls.length = 0;
+        recovered.call("Lifecycle.readA");
+        recovered.call("Lifecycle.readB");
+        assert.deepEqual(hostCalls, ["A", "B"], "fresh runtime must resolve the new host slots");
+      } finally { recovered.dispose(); }
     } finally { runtime.dispose(); }
   });
 } finally {

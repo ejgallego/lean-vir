@@ -65,10 +65,13 @@ reentry while both disposing flags are set; rejecting all disposal-time calls
 skips the cleanup. Restrictions on new retained activity need to preserve that
 path. A fatal host failure or Wasm trap retires that generation: disposal still
 releases JavaScript-owned resources without re-entering Wasm, and recovery uses
-a fresh factory runtime. A recoverable initializer failure is a different
-transaction: it clears the failed interpreter session and staged package state
-so the same runtime can install a fresh package, while arbitrary external
-effects performed before the failure remain outside rollback.
+a fresh factory runtime. Failure after initializer execution begins also retires
+the instance: persistent values, opaque handles and external effects cannot be
+rolled back. Decode, preparation and manifest rejection before initialization
+remain retryable on an empty instance. Ordinary IO failures in an installed
+healthy generation remain recoverable. The runtime reports its first retirement
+through `onFailure`; applications own recovery and do not infer liveness from
+global browser exception reporting.
 
 The invariant is **one runtime object, one package generation**. It removes
 `replaceIrPackageSetBytes`, `replacePackageState`, `adoptRuntimeState`, the

@@ -283,8 +283,10 @@ const harness = (globalThis.__shellTest = {
                   runtime.exports.vir_obj_tag(0xfffffff0);
                 } catch (error) {
                   state.trapFailure = runtime.failure;
-                  allowConsoleDiagnostic(state.trapFailure.message, 1);
-                  throw error;
+                  state.trapCaught = true;
+                  Promise.reject(error).catch((reason) => {
+                    state.handledRejection = reason;
+                  });
                 }
               },
             }, "Trigger fatal runtime failure"),
@@ -752,54 +754,82 @@ async function mountedRuntimeTrap({ throwIndependentCleanup = false } = {}) {
   check(button !== null, "mounted fatal callback control is present");
   allowConsoleDiagnostic("VirRuntime failed during Wasm execution", 1);
   if (throwIndependentCleanup) allowConsoleDiagnostic("independent cleanup sentinel", 2);
-  await React.act(async () => button.click());
-  if (throwIndependentCleanup) {
-    await until(() => shell.container.querySelector("[data-shell-error-boundary]"),
-      "unrelated fatal-unmount cleanup errors still reach the upstream boundary");
-    check(shell.container.textContent.includes("independent cleanup sentinel"),
-      "fatal runtime handling must not hide unrelated cleanup errors");
-    check(failed.disposed === 1, "fatal disposal still completes when other cleanup fails");
+  const globalReports = [];
+  const recordGlobalReport = (event) => {
+    globalReports.push(event.error ?? event.reason);
+  };
+  globalThis.addEventListener("error", recordGlobalReport);
+  globalThis.addEventListener("unhandledrejection", recordGlobalReport);
+  try {
+    await React.act(async () => button.click());
+    if (throwIndependentCleanup) {
+      await until(() => shell.container.querySelector("[data-shell-error-boundary]"),
+        "unrelated fatal-unmount cleanup errors still reach the upstream boundary");
+      check(shell.container.textContent.includes("independent cleanup sentinel"),
+        "fatal runtime handling must not hide unrelated cleanup errors");
+      check(failed.disposed === 1, "fatal disposal still completes when other cleanup fails");
+      await shell.unmount();
+      return;
+    }
+    await until(
+      () => failed.disposed === 1 &&
+        shell.container.querySelector('[data-vir-infoview-state="error"]'),
+      "fatal callback retires its published runtime",
+    );
+    const failureStatus = shell.container.querySelector(".vir-infoview-widget-status");
+    check(
+      failed.trapFailure instanceof WebAssembly.RuntimeError &&
+        failed.trapCaught === true &&
+        failed.handledRejection === failed.trapFailure &&
+        failureStatus.textContent.includes(failed.trapFailure.message) &&
+        failureStatus.textContent.includes("Reload the Infoview panel") &&
+        harness.loadedRef.current === null &&
+        !globalReports.some((error) => errorContains(error, failed.trapFailure)),
+      "a caught trap and handled rejection notify and retire without global errors",
+    );
+
+    const previousRpc = harness.rpc;
+    harness.rpc = { call: (...args) => previousRpc.call(...args) };
+    await shell.update({ setupHint: "same source after fatal failure" });
+    await tick();
+    check(
+      transport.builds === buildsBeforeFailure &&
+        states.length === stateCountBeforeFailure &&
+        failed.factoryCalls === 1,
+      "ordinary RPC context updates neither reacquire nor replay a fatal widget",
+    );
+
+    await shell.update({ irPackage: packageDescription("source-after-fatal") });
+    await until(
+      () => states.length === stateCountBeforeFailure + 1 &&
+        shell.container.querySelector('[data-vir-infoview-state="ready"]'),
+      "an explicit new widget fingerprint installs a fresh runtime",
+    );
+    const recovered = states.at(-1);
+    check(
+      recovered !== failed && recovered.factoryCalls === 1 &&
+        transport.builds === buildsBeforeFailure + 1,
+      "changed widget code obtains a fresh factory result exactly once",
+    );
     await shell.unmount();
-    return;
+  } finally {
+    globalThis.removeEventListener("error", recordGlobalReport);
+    globalThis.removeEventListener("unhandledrejection", recordGlobalReport);
   }
-  await until(
-    () => failed.disposed === 1 &&
-      shell.container.querySelector('[data-vir-infoview-state="error"]'),
-    "fatal callback retires its published runtime",
-  );
-  const failureStatus = shell.container.querySelector(".vir-infoview-widget-status");
-  check(
-    failed.trapFailure instanceof WebAssembly.RuntimeError &&
-      failureStatus.textContent.includes(failed.trapFailure.message) &&
-      failureStatus.textContent.includes("Reload the Infoview panel") &&
-      harness.loadedRef.current === null,
-    "fatal callback is surfaced, unmounted, and detached",
-  );
+}
 
-  const previousRpc = harness.rpc;
-  harness.rpc = { call: (...args) => previousRpc.call(...args) };
-  await shell.update({ setupHint: "same source after fatal failure" });
-  await tick();
-  check(
-    transport.builds === buildsBeforeFailure &&
-      states.length === stateCountBeforeFailure &&
-      failed.factoryCalls === 1,
-    "ordinary RPC context updates neither reacquire nor replay a fatal widget",
-  );
-
-  await shell.update({ irPackage: packageDescription("source-after-fatal") });
-  await until(
-    () => states.length === stateCountBeforeFailure + 1 &&
-      shell.container.querySelector('[data-vir-infoview-state="ready"]'),
-    "an explicit new widget fingerprint installs a fresh runtime",
-  );
-  const recovered = states.at(-1);
-  check(
-    recovered !== failed && recovered.factoryCalls === 1 &&
-      transport.builds === buildsBeforeFailure + 1,
-    "changed widget code obtains a fresh factory result exactly once",
-  );
-  await shell.unmount();
+function errorContains(error, target) {
+  const pending = [error];
+  const seen = new Set();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (current === target) return true;
+    if (current === null || typeof current !== "object" || seen.has(current)) continue;
+    seen.add(current);
+    if (current.cause !== undefined) pending.push(current.cause);
+    if (current instanceof AggregateError) pending.push(...current.errors);
+  }
+  return false;
 }
 
 function effectCount(state, event) {
