@@ -309,7 +309,8 @@ their existing reference-leased cleanup behavior.
   has `startup: true`, in manifest order. Successful hooks run once per loaded
   package. A recoverable failed hook can be retried without repeating earlier
   hooks; a fatal host failure or Wasm trap retires the runtime and requires a
-  fresh factory runtime.
+  fresh factory runtime. Synchronous reentry from a host callback leaves the
+  active startup traversal in charge; it does not invoke hooks recursively.
 - `vir.interfaceManifest.exports[].startup` distinguishes `@[vir_startup]`
   hooks from ordinary `@[vir_export]` calls.
 - `vir.packageInfo.interfaceExports` reports the number of generated exports.

@@ -46,6 +46,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
     this.completedStartupEntries = new Set();
+    this.runningStartupEntries = false;
     this.disposed = false;
     this.disposing = false;
     this.liveCallbacks = new Set();
@@ -306,11 +307,19 @@ export class VirRuntime extends ObjectValueRuntime {
         "cannot run VIR startup hooks before loading an IR package",
       );
     }
-    for (const entry of this.interfaceManifest.exports) {
-      if (entry.startup && !this.completedStartupEntries.has(entry.entry)) {
-        this.callEntry(entry, []);
-        this.completedStartupEntries.add(entry.entry);
+    // Host bindings can synchronously reenter this method. Let the outer
+    // traversal finish each hook before proceeding to the next one.
+    if (this.runningStartupEntries) return;
+    this.runningStartupEntries = true;
+    try {
+      for (const entry of this.interfaceManifest.exports) {
+        if (entry.startup && !this.completedStartupEntries.has(entry.entry)) {
+          this.callEntry(entry, []);
+          this.completedStartupEntries.add(entry.entry);
+        }
       }
+    } finally {
+      this.runningStartupEntries = false;
     }
   }
 

@@ -267,6 +267,30 @@ const harness = (globalThis.__shellTest = {
           throw new Error("render sentinel");
         };
       }
+      if (state.trapOnCallback && args[0] === prefix + "createComponent") {
+        return function TrapOnClickComponent(props) {
+          React.useEffect(() => () => {
+            if (state.throwIndependentCleanup) throw new Error("independent cleanup sentinel");
+          }, []);
+          return React.createElement(
+            React.Fragment,
+            null,
+            React.createElement(value, props),
+            React.createElement("button", {
+              id: "trap-mounted-runtime",
+              onClick() {
+                try {
+                  runtime.exports.vir_obj_tag(0xfffffff0);
+                } catch (error) {
+                  state.trapFailure = runtime.failure;
+                  allowConsoleDiagnostic(state.trapFailure.message, 1);
+                  throw error;
+                }
+              },
+            }, "Trigger fatal runtime failure"),
+          );
+        };
+      }
       return state.invalidComponent && args[0] === prefix + "createComponent"
         ? null
         : value;
@@ -372,6 +396,8 @@ function checkContinuation(state, kind, stale) {
 async function normalUnmount() {
   const shell = await mountShell();
   await shell.ready();
+  check(transport.assetCalls === 1,
+    "runtime acquisition performs one direct Wasm asset read without stat metadata");
   const state = states.at(-1);
   check(
     state.contexts.includes(inheritedContextValue),
@@ -713,6 +739,67 @@ async function failedCandidates() {
   );
   check(states.at(-1).disposed === 1, "invalid setup hard-disposes candidate");
   await setupFailure.unmount();
+}
+
+async function mountedRuntimeTrap({ throwIndependentCleanup = false } = {}) {
+  runtimeFault = { trapOnCallback: true, throwIndependentCleanup };
+  const shell = await mountShell();
+  await shell.ready();
+  const failed = states.at(-1);
+  const buildsBeforeFailure = transport.builds;
+  const stateCountBeforeFailure = states.length;
+  const button = shell.container.querySelector("#trap-mounted-runtime");
+  check(button !== null, "mounted fatal callback control is present");
+  allowConsoleDiagnostic("VirRuntime failed during Wasm execution", 1);
+  if (throwIndependentCleanup) allowConsoleDiagnostic("independent cleanup sentinel", 2);
+  await React.act(async () => button.click());
+  if (throwIndependentCleanup) {
+    await until(() => shell.container.querySelector("[data-shell-error-boundary]"),
+      "unrelated fatal-unmount cleanup errors still reach the upstream boundary");
+    check(shell.container.textContent.includes("independent cleanup sentinel"),
+      "fatal runtime handling must not hide unrelated cleanup errors");
+    check(failed.disposed === 1, "fatal disposal still completes when other cleanup fails");
+    await shell.unmount();
+    return;
+  }
+  await until(
+    () => failed.disposed === 1 &&
+      shell.container.querySelector('[data-vir-infoview-state="error"]'),
+    "fatal callback retires its published runtime",
+  );
+  const failureStatus = shell.container.querySelector(".vir-infoview-widget-status");
+  check(
+    failed.trapFailure instanceof WebAssembly.RuntimeError &&
+      failureStatus.textContent.includes(failed.trapFailure.message) &&
+      failureStatus.textContent.includes("Reload the Infoview panel") &&
+      harness.loadedRef.current === null,
+    "fatal callback is surfaced, unmounted, and detached",
+  );
+
+  const previousRpc = harness.rpc;
+  harness.rpc = { call: (...args) => previousRpc.call(...args) };
+  await shell.update({ setupHint: "same source after fatal failure" });
+  await tick();
+  check(
+    transport.builds === buildsBeforeFailure &&
+      states.length === stateCountBeforeFailure &&
+      failed.factoryCalls === 1,
+    "ordinary RPC context updates neither reacquire nor replay a fatal widget",
+  );
+
+  await shell.update({ irPackage: packageDescription("source-after-fatal") });
+  await until(
+    () => states.length === stateCountBeforeFailure + 1 &&
+      shell.container.querySelector('[data-vir-infoview-state="ready"]'),
+    "an explicit new widget fingerprint installs a fresh runtime",
+  );
+  const recovered = states.at(-1);
+  check(
+    recovered !== failed && recovered.factoryCalls === 1 &&
+      transport.builds === buildsBeforeFailure + 1,
+    "changed widget code obtains a fresh factory result exactly once",
+  );
+  await shell.unmount();
 }
 
 function effectCount(state, event) {
@@ -1199,17 +1286,10 @@ function installMockRpc(wasmBase64, packageBase64, manifestPackageBase64) {
           dataBase64: transport.packageBase64,
         };
       }
-      check(
-        method.endsWith("statAsset") || method.endsWith("readAsset"),
-        "only mocked shell transport methods expected",
-      );
+      check(method.endsWith("readAsset"), "only mocked shell transport methods expected");
       transport.assetCalls++;
       return {
         path: params.path,
-        mime: "application/wasm",
-        byteSize: String(atob(wasmBase64).length),
-        modified: "1",
-        revision: "wasm-1",
         dataBase64: wasmBase64,
       };
     },
@@ -1331,6 +1411,8 @@ globalThis.runShellLifetime = async (
     await explicitShutdown();
     await normalUnmountFailure();
     await failedCandidates();
+    await mountedRuntimeTrap();
+    await mountedRuntimeTrap({ throwIndependentCleanup: true });
     await failedRefresh();
     await failedAcquisitionNewContext();
     await failedConnectionDoesNotReconnectItself();
