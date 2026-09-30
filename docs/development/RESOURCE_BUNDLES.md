@@ -330,6 +330,32 @@ root exports and bound to exact installed entries, not `id`/`jsName` aliases.
 Dependency-only exports do not become callable roles. No PrettyM protocol or
 Slides policy is built into this API.
 
+Two optional creation fields are supported, with no compatibility aliases:
+
+```ts
+expectedExports?: Readonly<Record<string, {
+  declaration: string;
+  interfaceId: string;
+  signature: { args: readonly InterfaceType[]; result: InterfaceType; effect: InterfaceEffect };
+}>>;
+signal?: AbortSignal;
+```
+
+`InterfaceType` and `InterfaceEffect` mean the existing manifest representations,
+not a new wire format. Complete expectations are validated and privately copied
+before asynchronous work. Each required role must occur once, with its exact
+declaration and ID. Additional roles are allowed. The ordered argument types,
+result and effect must match the validated actual root callable before runtime
+instantiation/Lean initialization. Constructor/field order, recursive references
+and representation/layout facts matter; JSON key order, argument display names
+and diagnostic extensions do not. Exact declaration binding never uses aliases.
+
+Metadata mismatch can reject before payload acquisition; actual ABI comparison
+requires verified package bytes. Every mismatch rejects in `program-validation`
+with zero runtime creations. The consumer owns a separately reviewed reference,
+not one inferred from the just-loaded program. This establishes interface/artifact
+agreement, not proof of executable behavior. Omission preserves two-URL callers.
+
 Each `createProgram` creates an independent runtime instance. No startup markers
 are invoked. The existing call
 API's value representation is preserved (for example, Nat results are decimal
@@ -363,10 +389,33 @@ throws, and leaves status `"disposed"`. Later calls reject and repeated disposal
 does not repeat cleanup. Report cleanup errors, but do not keep the old instance
 as the current program or attempt to revive it. Collection may occur later.
 
-Pending creation has no public cancellation operation. The host owns mount
-ordering: both a new mount and unmount invalidate older pending results. Stale
-successful instances must be disposed; stale failures must not replace the
-current view. See the [tested single-component example](../guides/EMBEDDED_RESOURCES.md#overlapping-loads).
+An optional caller-owned `signal` owns **pending creation only**. Preabort starts
+no I/O or allocation. Pending abort cancels this attempt's fetches and prevents
+successful handoff; a non-preemptible creation must settle, then its late instance
+is disposed at most once. The final abort check and listener removal have no
+intervening await. Timers/listeners detach on every exit. Attempts remain
+independent; abort after handoff neither disposes the program nor interrupts calls.
+
+Creation errors have a bounded `phase`, safe `context` and original `cause`:
+`runtime-manifest`, `program-manifest`, `resource-fetch`, `integrity`,
+`compatibility`, `program-validation` or `runtime-creation`. Primary messages
+do not stringify arbitrary causes, raw payloads or URLs. Caller cancellation is
+named `AbortError`, with the original signal reason as cause (no `DOMException`
+instance promise). Acquisition timeout is named `TimeoutError`; it is not caller
+cancellation or a formatting budget. Primary classification is fixed before
+cleanup and cannot be overwritten by a later abort.
+
+If owned-instance cleanup also fails, an own read-only `cleanupError` retains
+the untouched thrown value, even `undefined`/`null`. Inspect property presence,
+and report this secondary failure even when suppressing stale cancellation.
+Ownership detaches before cleanup; it is not retried. Explicit resolved disposal
+continues to propagate ordinary cleanup errors. Creation error wrapping does not
+change calls, recoverable IO, fatal state or quarantine.
+
+The host still owns mount ordering: both a new mount and unmount invalidate
+older pending results. Stale successful instances must be disposed; stale failures
+must not replace the current view. See the
+[tested single-component example](../guides/EMBEDDED_RESOURCES.md#overlapping-loads).
 
 ## Validation and remaining work
 

@@ -370,6 +370,69 @@ function validateInterfaceRootType(type, label) {
   validateNoDanglingRecursiveSelf(type, label);
 }
 
+// A comparison key for the existing callable ABI, not a second type grammar.
+// Keep validation here beside the format authority. Parameter display names and
+// diagnostic extensions are not ABI identity; ordered fields/layouts are.
+export function interfaceSignatureKey({ args, result, effect }) {
+  if (!Array.isArray(args)) throw new TypeError("signature.args must be an array");
+  requireInterfaceEffect(effect, "signature.effect");
+  for (const arg of args) validateInterfaceRootType(arg, "signature argument");
+  validateInterfaceRootType(result, "signature.result");
+  return JSON.stringify([args.map(interfaceTypeShape), interfaceTypeShape(result), effect]);
+}
+
+function interfaceTypeShape(type) {
+  const counts = owner => [owner.objectFieldCount, owner.usizeFieldCount, owner.scalarByteSize];
+  const layout = value => [value.kind, value.index ?? null, value.offset ?? null, value.size ?? null];
+  const header = ctor => [ctor.name, ctor.jsName, ctor.tag];
+  const fields = owner => owner.fields.map(field => [field.name,
+    interfaceTypeShape(field.type), layout(field.layout), field.subobject === true]);
+  const base = [type.type, type.interfaceTag];
+  switch (type.interfaceTag) {
+    case INTERFACE_TAG.SIMPLE_ENUM:
+      return [...base, type.kind, type.constructors.map(header)];
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
+      return [...base, interfaceTypeShape(type.element)];
+    case INTERFACE_TAG.PROD:
+      return [...base, interfaceTypeShape(type.fst), interfaceTypeShape(type.snd)];
+    case INTERFACE_TAG.STRUCTURE:
+      return [...base, type.kind, type.name, counts(type), type.trivialFieldIndex ?? null, fields(type)];
+    case INTERFACE_TAG.TAGGED_UNION:
+      return [...base, type.kind, type.name, type.constructors.map(ctor =>
+        [header(ctor), counts(ctor), layout(ctor.layout), interfaceTypeShape(ctor.type)])];
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
+      return [...base, type.kind, type.name, type.constructors.map(ctor =>
+        [header(ctor), counts(ctor), fields(ctor)])];
+    case INTERFACE_TAG.RECURSIVE_SELF:
+    case INTERFACE_TAG.RESOURCE:
+      return [...base, type.kind, type.name];
+    case INTERFACE_TAG.FUNCTION:
+      return [...base, type.kind, type.effect,
+        type.args.map(arg => interfaceTypeShape(arg.type)), interfaceTypeShape(type.result)];
+    case INTERFACE_TAG.LEAN_OBJECT:
+      return [...base, type.kind];
+    case INTERFACE_TAG.NAT:
+    case INTERFACE_TAG.INT:
+    case INTERFACE_TAG.BOOL:
+    case INTERFACE_TAG.STRING:
+    case INTERFACE_TAG.UINT8:
+    case INTERFACE_TAG.UINT16:
+    case INTERFACE_TAG.UINT32:
+    case INTERFACE_TAG.UINT64:
+    case INTERFACE_TAG.USIZE:
+    case INTERFACE_TAG.BYTE_ARRAY:
+    case INTERFACE_TAG.FLOAT:
+    case INTERFACE_TAG.FLOAT32:
+    case INTERFACE_TAG.EXPR:
+    case INTERFACE_TAG.UNIT:
+      return base;
+    default:
+      throw new Error("signature comparison does not support this interface tag");
+  }
+}
+
 function validateSimpleEnumType(type, label) {
   if (type.kind !== "simpleEnum") {
     throw new Error(`${label}.kind must be simpleEnum`);

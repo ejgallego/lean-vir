@@ -131,6 +131,55 @@ and dispose it there. Separate `createProgram` calls have separate Lean runtime
 state, even when they use the same resource files. `interfaceId` remains
 client-owned protocol metadata, not a runtime proof of argument/result types.
 
+A client can require its independently reviewed callable contract at creation:
+
+```js
+const pending = new AbortController();
+const program = await createProgram({
+  runtimeManifestUrl,
+  programManifestUrl,
+  signal: pending.signal,
+  expectedExports: {
+    greet: {
+      declaration: "Client.Program.greet",
+      interfaceId: "vir-fixture-greet-v1",
+      signature: {
+        args: [{ type: "String", interfaceTag: 3 }],
+        result: { type: "String", interfaceTag: 3 },
+        effect: "pure",
+      },
+    },
+  },
+});
+```
+
+This example matches the greeting fixture, not Slides' formatter. For compound
+types, retain the existing complete interface representation from separately
+reviewed compiler output alongside the client's typed adapter. Do not construct
+the expectation from the program being loaded. IDs and exact ABI agreement do
+not prove semantics; native/browser oracle tests remain necessary.
+
+`signal` cancels only pending creation. After success, the program belongs to its
+explicit `dispose()` lifecycle; a later abort neither disposes it nor interrupts
+calls. Hosts must still dispose stale successful results. A cancellation is named
+`AbortError`; inspect an own `cleanupError` even when ignoring stale cancellation:
+
+```js
+try {
+  const candidate = await createProgram(options);
+  // Hand off to the host's existing generation/disposal guard.
+  acceptCandidate(candidate);
+} catch (error) {
+  if (Object.hasOwn(error, "cleanupError")) reportCleanup(error.cleanupError);
+  if (error.name !== "AbortError") throw error;
+}
+```
+
+Here `options` includes the caller's pending signal, `acceptCandidate` retains the
+current candidate or disposes a stale one, and `reportCleanup` is the host's
+diagnostic handler. Property presence matters: cleanup can throw
+`undefined` or `null`. This handling does not replace explicit program disposal.
+
 See the [browser lifecycle contract](../development/RESOURCE_BUNDLES.md#browser-lifecycle)
 for `program.status`, failure and disposal. A failed instance still needs disposal;
 do not automatically replay its last call on a replacement.

@@ -6,8 +6,16 @@ Author: Emilio J. Gallego Arias
 
 import { createVirRuntimeFactory } from "./vir-runtime.js";
 import { validateIrPackageSetMembers } from "./runtime/ir-package.js";
-import { requireSha256, sha256Hex, validateEnvelope } from "./resources/descriptor.js";
-import { resolveProgramExports } from "./resources/program-exports.js";
+import {
+  requireSha256,
+  sha256Hex,
+  validateEnvelope,
+} from "./resources/descriptor.js";
+import {
+  resolveProgramExports,
+  snapshotExpectedExports,
+  checkExpectedExportMetadata,
+} from "./resources/program-exports.js";
 import { assertResourceCompatibility } from "./resources/compatibility.js";
 
 const manifestLimit = 4 * 1024 * 1024 + 1024;
@@ -114,15 +122,39 @@ async function fetchBounded(url, limit, signal, mediaType = null) {
   return bytes;
 }
 
-async function fetchBundle(url, kind, signal) {
-  const envelope = await validateEnvelope(
+function creationError(phase, cause, context = {}, name = "Error") {
+  const error = new Error(`program creation failed during ${phase}`, { cause });
+  error.name = name;
+  error.phase = phase;
+  error.context = Object.freeze({ ...context });
+  return error;
+}
+
+async function fetchManifest(url, kind, signal, perform) {
+  const value = await perform(`${kind}-manifest`, async () =>
     parseJson(
       await fetchBounded(url, manifestLimit, signal, "application/json"),
       "resource envelope",
     ),
   );
-  if (envelope.descriptor.kind !== kind)
-    throw new Error(`expected ${kind} resource bundle`);
+  const envelope = await perform("integrity", () => validateEnvelope(value), {
+    bundle: kind,
+  });
+  await perform(`${kind}-manifest`, () => {
+    if (envelope.descriptor.kind !== kind)
+      throw new Error("incorrect resource bundle kind");
+  });
+  const roleUrl = (role) => {
+    const entry = envelope.descriptor.fileEntries.find(
+      (item) => item.role === role,
+    );
+    if (!entry) throw new Error(`missing resource file role ${role}`);
+    return new URL(entry.path, url);
+  };
+  return { ...envelope, roleUrl };
+}
+
+async function fetchPayloads(envelope, url, signal, perform) {
   const files = new Map();
   // A small bounded worker pool: do not start thousands of requests at once.
   let next = 0;
@@ -136,13 +168,26 @@ async function fetchBundle(url, kind, signal) {
           : info.mediaType === "text/javascript"
             ? "text/javascript"
             : null;
-      const bytes = await fetchBounded(fileUrl, info.byteLength, signal, mime);
-      if (
-        bytes.length !== info.byteLength ||
-        (await sha256Hex(bytes)) !== info.sha256
-      ) {
-        throw new Error(`resource integrity mismatch: ${info.path}`);
-      }
+      const context = {
+        bundle: envelope.descriptor.kind,
+        path: info.path.slice(0, 256),
+      };
+      const bytes = await perform(
+        "resource-fetch",
+        () => fetchBounded(fileUrl, info.byteLength, signal, mime),
+        context,
+      );
+      await perform(
+        "integrity",
+        async () => {
+          if (
+            bytes.length !== info.byteLength ||
+            (await sha256Hex(bytes)) !== info.sha256
+          )
+            throw new Error("resource integrity mismatch");
+        },
+        context,
+      );
       files.set(fileUrl.href, bytes);
     }
   };
@@ -152,14 +197,7 @@ async function fetchBundle(url, kind, signal) {
       worker,
     ),
   );
-  const roleUrl = (role) => {
-    const entry = envelope.descriptor.fileEntries.find(
-      (item) => item.role === role,
-    );
-    if (!entry) throw new Error(`missing resource file role ${role}`);
-    return new URL(entry.path, url);
-  };
-  return { ...envelope, files, roleUrl };
+  return { ...envelope, files };
 }
 
 /**
@@ -170,45 +208,132 @@ async function fetchBundle(url, kind, signal) {
 export async function createProgram(options) {
   if (
     !options ||
-    Object.keys(options).sort().join(",") !==
-      "programManifestUrl,runtimeManifestUrl"
+    typeof options !== "object" ||
+    !Object.hasOwn(options, "runtimeManifestUrl") ||
+    !Object.hasOwn(options, "programManifestUrl") ||
+    Reflect.ownKeys(options).some(
+      (key) =>
+        ![
+          "runtimeManifestUrl",
+          "programManifestUrl",
+          "expectedExports",
+          "signal",
+        ].includes(key),
+    )
   ) {
     throw new TypeError(
-      "createProgram expects runtimeManifestUrl and programManifestUrl",
+      "createProgram expects runtimeManifestUrl, programManifestUrl and optional expectedExports/signal",
     );
   }
-  const runtimeUrl = requireManifestUrl(options.runtimeManifestUrl);
-  const programUrl = requireManifestUrl(options.programManifestUrl);
-  requireSha256();
+  const signal = options.signal;
+  if (signal !== undefined && !(signal instanceof AbortSignal))
+    throw new TypeError("signal must be an AbortSignal");
+  let expected;
+  try {
+    expected = snapshotExpectedExports(options.expectedExports);
+  } catch (cause) {
+    throw creationError("program-validation", cause);
+  }
+  let runtimeUrl, programUrl;
+  try {
+    runtimeUrl = requireManifestUrl(options.runtimeManifestUrl);
+  } catch (cause) {
+    throw creationError("runtime-manifest", cause);
+  }
+  try {
+    programUrl = requireManifestUrl(options.programManifestUrl);
+  } catch (cause) {
+    throw creationError("program-manifest", cause);
+  }
+  if (signal?.aborted)
+    throw creationError("runtime-manifest", signal.reason, {}, "AbortError");
+  try {
+    requireSha256();
+  } catch (cause) {
+    throw creationError("runtime-creation", cause);
+  }
   const controller = new AbortController();
+  let primary = null;
+  let phase = "runtime-manifest";
+  const stop = (error) => {
+    if (primary === null) {
+      primary = error;
+      controller.abort(error);
+    }
+    return primary;
+  };
+  const checkStopped = () => {
+    if (primary !== null) throw primary;
+  };
+  const abort = () =>
+    stop(creationError(phase, signal.reason, {}, "AbortError"));
+  signal?.addEventListener("abort", abort, { once: true });
   const timeout = setTimeout(
-    () => controller.abort(new Error("resource acquisition timeout")),
+    () =>
+      stop(
+        creationError(
+          phase,
+          new Error("resource acquisition timeout"),
+          {},
+          "TimeoutError",
+        ),
+      ),
     120000,
   );
+  let detached = false;
+  const detach = () => {
+    if (detached) return;
+    detached = true;
+    clearTimeout(timeout);
+    signal?.removeEventListener("abort", abort);
+  };
+  const perform = async (nextPhase, action, context = {}) => {
+    phase = nextPhase;
+    try {
+      checkStopped();
+      const value = await action();
+      checkStopped();
+      return value;
+    } catch (cause) {
+      throw stop(primary ?? creationError(nextPhase, cause, context));
+    }
+  };
   let runtime = null;
   try {
+    // Admit descriptors before payload acquisition. ABI shape checks still need
+    // verified package bytes, and all checks precede runtime instantiation.
+    const [runtimeManifest, programManifest] = await Promise.all([
+      fetchManifest(runtimeUrl, "runtime", controller.signal, perform),
+      fetchManifest(programUrl, "program", controller.signal, perform),
+    ]);
+    await perform("program-validation", () =>
+      checkExpectedExportMetadata(expected, programManifest.descriptor.exports),
+    );
+    await perform("compatibility", () => {
+      if (
+        JSON.stringify(runtimeManifest.descriptor.compatibility) !==
+        JSON.stringify(programManifest.descriptor.compatibility)
+      )
+        throw new Error("incompatible runtime and program resource bundles");
+      assertResourceCompatibility(runtimeManifest.descriptor.compatibility);
+      if (
+        runtimeManifest.descriptor.logicalId ===
+        programManifest.descriptor.logicalId
+      )
+        throw new Error(
+          "runtime and program resource logical identities conflict",
+        );
+      if (runtimeManifest.roleUrl("runtimeModule").href !== import.meta.url)
+        throw new Error(
+          "runtimeModule role does not identify the executing resource module",
+        );
+    });
     const [engine, program] = await Promise.all([
-      fetchBundle(runtimeUrl, "runtime", controller.signal),
-      fetchBundle(programUrl, "program", controller.signal),
+      fetchPayloads(runtimeManifest, runtimeUrl, controller.signal, perform),
+      fetchPayloads(programManifest, programUrl, controller.signal, perform),
     ]);
     const compatibility = engine.descriptor.compatibility;
-    if (
-      JSON.stringify(compatibility) !==
-      JSON.stringify(program.descriptor.compatibility)
-    ) {
-      throw new Error("incompatible runtime and program resource bundles");
-    }
-    assertResourceCompatibility(compatibility);
-    if (engine.descriptor.logicalId === program.descriptor.logicalId) {
-      throw new Error(
-        "runtime and program resource logical identities conflict",
-      );
-    }
-    if (engine.roleUrl("runtimeModule").href !== import.meta.url) {
-      throw new Error(
-        "runtimeModule role does not identify the executing resource module",
-      );
-    }
+    phase = "program-validation";
     const wasmUrl = engine.roleUrl("wasm");
     const wasmInfo = engine.descriptor.files.find(
       (info) => new URL(info.path, runtimeUrl).href === wasmUrl.href,
@@ -230,7 +355,9 @@ export async function createProgram(options) {
     });
     // Preflight duplicate keys and JSON depth before the existing descriptor parser.
     parseJson(await verifiedBytes(setUrl), "program package-set");
-    const packageSet = await factory.fetchIrPackageSet(setUrl);
+    const packageSet = await perform("program-validation", () =>
+      factory.fetchIrPackageSet(setUrl),
+    );
     const { manifests } = validateIrPackageSetMembers(
       packageSet.members.map((m) => m.bytes),
       {
@@ -245,20 +372,33 @@ export async function createProgram(options) {
         );
       }
     }
-    resolveProgramExports(program.descriptor.exports, manifests.at(-1).exports);
-    runtime = await factory.createRuntime({ irPackageSet: packageSet });
+    resolveProgramExports(
+      program.descriptor.exports,
+      manifests.at(-1).exports,
+      expected,
+    );
+    // Assign before the post-await abort check so a late owned instance cannot
+    // escape cleanup. Creation itself may be non-preemptible.
+    await perform("runtime-creation", async () => {
+      runtime = await factory.createRuntime({ irPackageSet: packageSet });
+    });
     // Use the installed entries (including their runtime call-index cache), not
     // structurally equivalent entries parsed during the preflight above.
     const exports = resolveProgramExports(
       program.descriptor.exports,
       runtime.interfaceManifest.exports,
+      expected,
     );
+    checkStopped();
+    detach(); // Final check and ownership handoff have no intervening await.
     let disposed = false;
     return Object.freeze({
       get status() {
         return disposed
           ? "disposed"
-          : runtime.failure === null ? "active" : "failed";
+          : runtime.failure === null
+            ? "active"
+            : "failed";
       },
       call(role, ...args) {
         if (disposed) throw new Error("program has been disposed");
@@ -281,19 +421,21 @@ export async function createProgram(options) {
       },
     });
   } catch (error) {
-    controller.abort(error);
-    if (runtime !== null) {
+    const failure = stop(primary ?? creationError(phase, error));
+    const owned = runtime;
+    runtime = null; // Detach before invoking arbitrary cleanup, even on throw.
+    if (owned !== null) {
       try {
-        runtime.dispose();
+        owned.dispose();
       } catch (cleanupError) {
-        throw new AggregateError(
-          [error, cleanupError],
-          "program creation and cleanup failed",
-        );
+        Object.defineProperty(failure, "cleanupError", {
+          value: cleanupError,
+          enumerable: true,
+        });
       }
     }
-    throw error;
+    throw failure;
   } finally {
-    clearTimeout(timeout);
+    detach();
   }
 }

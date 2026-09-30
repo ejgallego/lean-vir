@@ -243,7 +243,13 @@ try {
       const {createProgram} = await import('./runtime/runtime.js');
       const options = {runtimeManifestUrl: new URL('runtime/bundle.json', location.href),
         programManifestUrl: new URL('program/bundle.json', location.href)};
-      const first = await createProgram(options);
+      const controller = new AbortController();
+      const checkedOptions = {...options, signal: controller.signal, expectedExports: {
+        score: {declaration: 'Vir.Resources.Test.prettyScore', interfaceId: 'vir-test-score-v1',
+          signature: {args: [], result: {type: 'Nat', interfaceTag: 0}, effect: 'pure'}}
+      }};
+      const first = await createProgram(checkedOptions);
+      controller.abort(); // A handed-off instance belongs to the facade, not this signal.
       const second = await createProgram(options);
       const values = [first.call('score'), second.call('score')];
       let unknown = false; try {first.call('missing')} catch(e) {unknown = /unknown.*role/.test(e.message)};
@@ -251,7 +257,7 @@ try {
       let disposed = false; try {first.call('score')} catch(e) {disposed = /disposed/.test(e.message)};
       values.push(second.call('score')); second.dispose();
       const remounted = await createProgram(options); values.push(remounted.call('score')); remounted.dispose();
-      globalThis.openResourceProgram = () => createProgram(options);
+      globalThis.openResourceProgram = (extra = {}) => createProgram({...options, ...extra});
       return {values, unknown, disposed};
     })()`,
     );
@@ -274,6 +280,32 @@ try {
     }, null, 2));
   });
   outcomes.push("retention: live control, 300 scalar calls, 12 released instances PASS");
+  const cancelledCreation = await evaluate(cdp, `(async () => {
+    const original = WebAssembly.Instance, controller = new AbortController();
+    const memories = []; let cancelNext = true, handedOff = false, name, cause;
+    WebAssembly.Instance = new Proxy(original, {construct(target, args) {
+      const instance = Reflect.construct(target, args);
+      memories.push(new WeakRef(instance.exports.memory));
+      if (cancelNext) { cancelNext = false; controller.abort('cancel actual creation'); }
+      return instance;
+    }});
+    try {
+      try { const program = await openResourceProgram({signal: controller.signal}); handedOff = true; program.dispose(); }
+      catch (error) { name = error.name; cause = error.cause; }
+      const fresh = await openResourceProgram();
+      let value; try { value = fresh.call('score'); } finally { fresh.dispose(); }
+      globalThis.cancelledCreationMemories = memories;
+      return {handedOff, name, cause, created: memories.length, value};
+    } finally { WebAssembly.Instance = original; }
+  })()`);
+  assert.deepEqual(cancelledCreation, {handedOff: false, name: "AbortError", cause: "cancel actual creation", created: 2, value: "6093"});
+  await cdp.send("HeapProfiler.enable");
+  await cdp.send("HeapProfiler.collectGarbage");
+  assert.equal(await evaluate(cdp, "cancelledCreationMemories.filter(ref => ref.deref()).length"), 0,
+    "cancelled real-Wasm creation and fresh disposed peer release their memories");
+  await evaluate(cdp, "delete globalThis.cancelledCreationMemories");
+  await cdp.send("HeapProfiler.disable");
+  outcomes.push("abort during actual Wasm creation: no handoff, memory released, independent recovery PASS");
   // Route one normal facade call into an actual Wasm out-of-bounds access.
   // The existing runtime guard, not the facade, must record/retire that failure.
   const status = await evaluate(cdp, `(async () => {
@@ -341,23 +373,24 @@ try {
     }});
   })()`,
   );
-  async function rejected(name, change, expected) {
+  async function rejected(name, change, expected, phase) {
     override = change;
     const result = await evaluate(
       cdp,
       `(async () => {
       try {const p = await openResourceProgram(); p.dispose(); return 'unexpected success'}
-      catch(e) {return e.message}
+      catch(e) {return {message: e.message, cause: e.cause?.message, phase: e.phase}}
     })()`,
     );
     override = null;
-    assert.match(result, expected, name);
+    assert.match(result.cause, expected, name);
+    assert.equal(result.phase, phase, name);
     assert.equal(
       await evaluate(cdp, "resourceInstances"),
       0,
       `${name}: reject before Lean instantiation`,
     );
-    outcomes.push(`${name}: PASS (${result})`);
+    outcomes.push(`${name}: PASS (${result.phase})`);
   }
   const unavailableCrypto = await evaluate(cdp, `(async () => {
     const originalCrypto = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
@@ -367,13 +400,14 @@ try {
     try {
       Object.defineProperty(globalThis, 'crypto', {value: {}, configurable: true});
       try { await openResourceProgram(); return {unexpected: true, requests}; }
-      catch (error) { return {message: error.message, requests}; }
+      catch (error) { return {message: error.cause?.message, phase: error.phase, requests}; }
     } finally {
       Object.defineProperty(globalThis, 'crypto', originalCrypto);
       globalThis.fetch = originalFetch;
     }
   })()`);
   assert.match(unavailableCrypto.message, /WebCrypto SHA-256.*secure context/);
+  assert.equal(unavailableCrypto.phase, "runtime-creation");
   assert.equal(unavailableCrypto.requests, 0, "capability rejection before acquisition");
   assert.equal(await evaluate(cdp, "resourceInstances"), 0);
   outcomes.push("unavailable WebCrypto: reject before requests/instantiation PASS");
@@ -390,6 +424,7 @@ try {
         ? jsonItem({ ...program, contentId: "0".repeat(64) })
         : null,
     /CONTENT_ID_MISMATCH/,
+    "integrity",
   );
   const incompatible = await changed(
     (d) => (d.compatibility.virVersion = 2),
@@ -398,6 +433,7 @@ try {
     "compatibility",
     (path) => (path === "program/bundle.json" ? incompatible : null),
     /incompatible/,
+    "compatibility",
   );
   const missingExport = await changed(
     (d) => (d.exports[0].declaration = "Missing.export"),
@@ -406,6 +442,7 @@ try {
     "actual export",
     (path) => (path === "program/bundle.json" ? missingExport : null),
     /missing program export/,
+    "program-validation",
   );
   await rejected(
     "Wasm integrity",
@@ -414,6 +451,7 @@ try {
         ? { ...inventory.get(path), bytes: Buffer.alloc(wasm.length) }
         : null,
     /integrity mismatch/,
+    "integrity",
   );
   await rejected(
     "Wasm MIME",
@@ -422,6 +460,7 @@ try {
         ? { ...inventory.get(path), mediaType: "text/html" }
         : null,
     /Content-Type/,
+    "resource-fetch",
   );
   await rejected(
     "duplicate envelope key",
@@ -435,6 +474,7 @@ try {
           }
         : null,
     /duplicate JSON key/,
+    "program-manifest",
   );
   const missingMember = await changed(
     (d) => (d.files = d.files.filter((f) => f.path !== "root.irpkg")),
@@ -443,6 +483,7 @@ try {
     "undeclared member",
     (path) => (path === "program/bundle.json" ? missingMember : null),
     /outside verified inventory/,
+    "program-validation",
   );
   await rejected(
     "nested JSON",
@@ -454,6 +495,7 @@ try {
           }
         : null,
     /nesting limit/,
+    "program-manifest",
   );
   await rejected(
     "redirect",
@@ -467,8 +509,23 @@ try {
           }
         : null,
     /fetch/i,
+    "program-manifest",
   );
   assert.equal(requests.includes("/elsewhere"), false);
+  const strict = await evaluate(cdp, `(async () => {
+    const expectation = {score: {declaration: 'Vir.Resources.Test.prettyScore',
+      interfaceId: 'vir-test-score-v1', signature: {args: [], result: {type: 'String', interfaceTag: 3}, effect: 'pure'}}};
+    let phase;
+    try { await openResourceProgram({expectedExports: expectation}); }
+    catch (error) { phase = error.phase; }
+    const controller = new AbortController(); controller.abort('preabort');
+    let abort;
+    try { await openResourceProgram({signal: controller.signal}); }
+    catch (error) { abort = {name: error.name, cause: error.cause}; }
+    return {phase, abort, instances: resourceInstances};
+  })()`);
+  assert.deepEqual(strict, {phase: "program-validation", abort: {name: "AbortError", cause: "preabort"}, instances: 0});
+  outcomes.push("strict actual-ABI mismatch and preabort: zero Wasm creations PASS");
   await writeFile(
     join(output, "acceptance.json"),
     JSON.stringify({ outcomes, requests }, null, 2),
