@@ -19,6 +19,8 @@ const runtimeFactory = createVirRuntimeFactory({
   wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}`,
 });
 let runtimePromise = null;
+let pageUnloading = false;
+let sortRequestId = 0;
 
 function parseValues(text) {
   const parts = parseDelimitedNumberText(text);
@@ -35,30 +37,78 @@ function parseValues(text) {
 }
 
 function loadRuntime() {
-  runtimePromise ??= fetchBytes(`${import.meta.env.BASE_URL}${defaultPackageFile}`)
-    .then((bytes) => runtimeFactory.createRuntime({ irPackageSet: [bytes] }));
+  if (pageUnloading) {
+    return Promise.reject(new Error("the page is unloading"));
+  }
+  if (runtimePromise === null) {
+    const pending = fetchBytes(`${import.meta.env.BASE_URL}${defaultPackageFile}`)
+      .then((bytes) => {
+        if (pageUnloading) throw new Error("the page is unloading");
+        return runtimeFactory.createRuntime({ irPackageSet: [bytes] });
+      });
+    runtimePromise = pending;
+    pending.catch(() => {
+      if (runtimePromise === pending) runtimePromise = null;
+    });
+  }
   return runtimePromise;
+}
+
+function disposeRuntime(runtime) {
+  try {
+    runtime.dispose();
+  } catch (error) {
+    console.error("failed to dispose landing-page runtime", error);
+  }
 }
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const requestId = ++sortRequestId;
   button.disabled = true;
   result.dataset.failed = "false";
   result.textContent = "Loading Lean VIR…";
+  let runtime = null;
+  let pendingRuntime = null;
   try {
     const values = parseValues(input.value);
-    const runtime = await loadRuntime();
+    pendingRuntime = loadRuntime();
+    runtime = await pendingRuntime;
+    if (pageUnloading || requestId !== sortRequestId || runtimePromise !== pendingRuntime) {
+      return;
+    }
     const sorted = runtime.call("SortDemo.sortArray", values);
     result.textContent = `[${sorted.join(", ")}]`;
     status.innerHTML = `<code>SortDemo.sortArray</code> ran in Lean VIR`;
   } catch (error) {
+    if (runtime !== null && runtime.failure !== null) {
+      if (runtimePromise === pendingRuntime) runtimePromise = null;
+      disposeRuntime(runtime);
+    }
+    if (pageUnloading || requestId !== sortRequestId) return;
     result.dataset.failed = "true";
     result.textContent = error instanceof Error ? error.message : String(error);
   } finally {
-    button.disabled = false;
+    if (requestId === sortRequestId) button.disabled = false;
   }
 });
 
-window.addEventListener("beforeunload", async () => {
-  (await runtimePromise)?.dispose();
+window.addEventListener("pagehide", () => {
+  pageUnloading = true;
+  sortRequestId += 1;
+  const pending = runtimePromise;
+  runtimePromise = null;
+  void pending?.then(disposeRuntime, () => {});
+});
+
+window.addEventListener("pageshow", (event) => {
+  if (!event.persisted) return;
+  pageUnloading = false;
+  if (button.disabled) {
+    button.disabled = false;
+    if (result.textContent === "Loading Lean VIR…") {
+      result.dataset.failed = "true";
+      result.textContent = "Sort paused while leaving the page; press Sort to try again.";
+    }
+  }
 });

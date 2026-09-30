@@ -47,6 +47,7 @@ export const runtimeTests = Object.freeze(
       group: "pure",
     },
     { id: "startup-hooks", file: "startup-runtime-smoke.mjs", group: "pure" },
+    { id: "startup-reentry", file: "startup-reentry-smoke.mjs", group: "lean" },
     {
       id: "callback-lifecycle",
       file: "callback-lifecycle-smoke.mjs",
@@ -102,6 +103,11 @@ export const runtimeTests = Object.freeze(
     {
       id: "package-lifecycle",
       file: "package-lifecycle-smoke.mjs",
+      group: "lean",
+    },
+    {
+      id: "initializer-retirement",
+      file: "initializer-retirement-smoke.mjs",
       group: "lean",
     },
     {

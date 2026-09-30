@@ -14,6 +14,7 @@ Author: Emilio J. Gallego Arias
 
 #include "runtime/object.h"
 #include "runtime/name_identity.h"
+#include "runtime/native_symbol_lookup.h"
 #include "util/name.h"
 
 // Generated from Vir/GeneratePackage/NativeExterns.lean nativeExterns.
@@ -67,18 +68,25 @@ static char const * known_symbol_stem(lean::name const & n) {
     return nullptr;
 }
 
+static NativeSymbol const * find_native_symbol(char const * symbol) {
+    for (NativeSymbol const & entry : g_native_symbols) {
+        if (strcmp(symbol, entry.dlsym_name) == 0) return &entry;
+    }
+    return nullptr;
+}
+
 } // namespace
 
 #undef VIR_ALL_NATIVE_SYMBOLS
 #undef VIR_COMPILER_NATIVE_SYMBOLS
 #undef VIR_NATIVE_SYMBOLS
 
+bool lean::vir::is_registered_native_symbol(char const * symbol) {
+    return find_native_symbol(symbol) != nullptr;
+}
+
 extern "C" void * dlsym(void *, char const * sym) {
-    for (NativeSymbol const & entry : g_native_symbols) {
-        if (strcmp(sym, entry.dlsym_name) == 0) {
-            return entry.address;
-        }
-    }
+    if (auto entry = find_native_symbol(sym)) return entry->address;
     if (void * host_import = lean::vir::host_import_trampoline(sym)) {
         return host_import;
     }

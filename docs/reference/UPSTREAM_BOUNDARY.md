@@ -169,8 +169,8 @@ The package-set transaction inside the fresh instance is:
    once for a successful set. Generated descriptors order members dependency-first,
    with each member retaining its owning initializer metadata.
 
-The JS loader aborts staged state on decode, prepare, manifest or initializer
-failure.
+The JS loader aborts staged state on decode, preparation or manifest failure
+before initialization. Failure after initialization begins retires the instance.
 Manifest checksums detect corruption but do not prove agreement with binary call
 tables; the contract comparison is separately required. Runtime ABI 4 rejects
 Wasm without `vir_validate_package_contract`, rather than skipping validation.
@@ -194,23 +194,24 @@ final count after successful finish. Returned string pointers are borrowed and
 must be copied before another loader operation can invalidate them.
 
 The provider has one state owner and phases idle, appending, prepared,
-initializing, ready and failed. A failed append leaves previously staged members
-intact; failed index/export resolution during preparation requires abort or
-begin before appending again. Preparing before any member is appended leaves
-the transaction open.
-An ordinary initializer failure retires the interpreter session and clears the
-staged package; the JS runtime remains usable for a fresh installation. A fatal
-host failure or Wasm trap retires the entire Wasm generation and cannot be
-recovered by retrying on that instance. Invalid or repeated transitions return
-failure without changing state, so a repeated finish neither reruns
-initializers nor unloads a ready package. Abort is idempotent and preserves the
-last diagnostic; begin clears it and starts a fresh transaction.
-The JS loader aborts on any failed transaction step. Package retirement also
-clears upstream initializer names and cached native-symbol lookups so a later
-installation cannot reuse their values or package-local host slots. Upstream
-marks initialized values persistent; this cleanup removes names
-but does not reclaim their storage. Ordinary call errors retain initialized
-globals.
+initializing, ready, failed and retired. A failed append leaves previously
+staged members intact; failed index/export resolution during preparation
+requires abort or begin before appending again. Preparing before any member is
+appended leaves the transaction open.
+
+Any initializer failure retires the generation. The native provider preserves
+its records/session and forbids begin/abort from reopening it; the SDK latches
+failure and blocks subsequent calls, callbacks, handles and installations.
+Persistent initialized values and escaped opaque handles are therefore never
+accepted by another installation on the same instance. No cache clearing is
+claimed to roll back initializer effects. Recovery uses a new factory instance,
+which may share the compiled module. Ordinary IO call errors retain initialized
+globals and leave a healthy installed instance reusable.
+
+Invalid or repeated transitions return failure without changing state, so a
+repeated finish neither reruns initializers nor unloads a ready package. Before
+initialization, abort is idempotent and preserves the last diagnostic; begin
+clears it and starts a fresh transaction. A retired instance stays retired.
 
 Rollback protects staged provider state and candidate construction. It cannot undo arbitrary
 external effects, such as console output or unmanaged DOM mutation performed by
@@ -267,15 +268,20 @@ not the JavaScript application API.
 ## Host imports and reentrant callbacks
 
 A `@[vir_js]` declaration receives a finite package trampoline symbol; it does
-not widen native lookup. Package metadata supplies arity, erased-prefix count
-and effect information. The shim passes borrowed object arguments to
+not widen native lookup. Preparation builds one symbol-to-slot index containing
+each stored symbol and its implicit `___boxed` spelling, rejecting conflicting
+ownership before initialization. Aliases also cannot claim a symbol from the
+generated native registry; native validation uses the same registry lookup as
+execution. Display names are diagnostic; structural name
+keys and numeric slots determine identity. Package metadata supplies arity,
+erased-prefix count and effect information. The shim passes borrowed object arguments to
 `env.vir_js_call_objects`; JavaScript lifts them with manifest descriptors and
 lowers the returned value to an owned Lean object.
 
-The reusable trampoline grid covers slots 0–127 and IR arities 0–6. The producer's
+The reusable trampoline grid covers slots 0–127 and IR arities 1–6. The producer's
 `maxHostImportSlots` and `maxHostImportArity` definitions generate the C++ limits
 through `scripts/packages/check-package-abi.mjs --write` during a Wasm build.
-Compile-time index sequences generate each slot's seven fixed function
+Compile-time index sequences generate each slot's six fixed function
 signatures and their lookup tables. Preparation rejects aggregate slot overflow,
 excess arity, and impossible erased-prefix/world counts before initialization.
 The dispatch path retains its argument cleanup and excludes erased/world
@@ -283,8 +289,7 @@ arguments from the values borrowed by JavaScript.
 
 Package generation and preparation reject nullary pure host declarations: upstream native lookup treats
 zero-arity declarations as addresses of constant storage, not callable function
-pointers. The retained arity-0 trampoline does not provide that constant adapter.
-Use an explicit `Unit` argument for a callable pure import. This is distinct
+pointers. Use an explicit `Unit` argument for a callable pure import. This is distinct
 from an effectful import with no JavaScript arguments, whose IR
 arity includes its world argument.
 
@@ -299,10 +304,14 @@ and explicit `vir_closure_release` lifetime rules.
 
 Synchronous host exceptions use an out-of-band error slot, preserving the
 original JavaScript Error at the owning named/closure/initializer boundary.
-Effectful imports return `IO.Result.error` so Lean bind stops; ordinary IO
-failure leaves the instance reusable. Pure imports have no error carrier and
-trap rather than returning a fabricated value. Named calls, callbacks and
-initializers include Lean's formatted IO error text in their diagnostics.
+Effectful imports return `IO.Result.error`, but the retained JavaScript error
+quarantines the owning invocation even if Lean catches that IO error. Further
+effectful host imports return an error without executing bindings; a subsequent
+pure import traps because it has no error carrier. Ordinary Lean IO call errors
+and host exceptions without an exceptional Wasm unwind leave an installed
+instance reusable for a later JavaScript call. Expected host-domain failures
+should use explicit result values. Pure import failures never fabricate values.
+Named calls, callbacks and initializers include Lean's formatted IO error text in their diagnostics.
 
 The SDK transfers consuming call arguments before Wasm entry. Any exception
 escaping an exported Wasm function retires that instance: further calls,
@@ -311,7 +320,10 @@ cannot swallow a nested fatal call and resume its outer Lean frame; transactiona
 host resources roll back. The guarded export facade is runtime-owned and must
 not be replaced or bypassed with raw exports. Constructor failure before the
 facade exists is an instantiation failure; the factory never returns that
-instance.
+instance. Failure is latched before inspecting an arbitrary thrown value;
+non-stringifiable objects and proxies are retained as raw error causes. The
+private latch publishes its first transition through `runtime.onFailure`, with
+asynchronous, isolated listener delivery even when the exception was caught.
 
 Disposal after a fatal failure runs JavaScript cleanup and clears host roots,
 but does not call Wasm decrements, frees, closure releases or package abort.

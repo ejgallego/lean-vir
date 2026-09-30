@@ -8,6 +8,10 @@ import assert from "node:assert/strict";
 import { basePath, evaluate, navigate, waitForReady, waitForStatus } from "./harness.mjs";
 import { setInputValueAndDispatch, waitForBrowserState } from "./page-actions.mjs";
 import { runSelectedEntry } from "./dev-runner.mjs";
+import {
+  defaultPackageFile,
+  wasmPublicFile,
+} from "../../scripts/packages/browser-package-config.mjs";
 
 // Inject at the exported-call boundary to exercise real page recovery controls.
 // Runtime smoke tests separately exercise traps inside the actual Wasm engine.
@@ -70,6 +74,224 @@ async function installSyntheticCallTrap(cdp) {
     })();`,
   });
   return () => cdp.send("Page.removeScriptToEvaluateOnNewDocument", { identifier });
+}
+
+async function installTransientLandingPackageFailure(cdp) {
+  const { identifier } = await cdp.send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `(() => {
+      const originalFetch = window.fetch;
+      window.__virTestOriginalFetch = originalFetch;
+      window.__virTestLandingPackageRequests = 0;
+      window.fetch = function(input, ...args) {
+        const requestUrl = typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+        if (new URL(requestUrl, location.href).pathname.endsWith(${JSON.stringify(`/${defaultPackageFile}`)})) {
+          window.__virTestLandingPackageRequests += 1;
+          if (window.__virTestLandingPackageRequests === 1) {
+            return Promise.reject(new Error("synthetic transient package fetch failure"));
+          }
+        }
+        return Reflect.apply(originalFetch, this, [input, ...args]);
+      };
+    })();`,
+  });
+  return async () => {
+    await cdp.send("Page.removeScriptToEvaluateOnNewDocument", { identifier });
+    await evaluate(cdp, `(() => {
+      if (window.__virTestOriginalFetch) window.fetch = window.__virTestOriginalFetch;
+      delete window.__virTestOriginalFetch;
+    })()`);
+  };
+}
+
+async function installHeldLandingWasmFetch(cdp) {
+  const { identifier } = await cdp.send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `(() => {
+      const originalFetch = window.fetch;
+      window.__virTestOriginalHeldWasmFetch = originalFetch;
+      window.__virTestHeldWasmRequests = 0;
+      window.fetch = function(input, ...args) {
+        const requestUrl = typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+        if (
+          window.__virTestHeldWasmRequests === 0 &&
+          new URL(requestUrl, location.href).pathname.endsWith(${JSON.stringify(`/${wasmPublicFile}`)})
+        ) {
+          window.__virTestHeldWasmRequests += 1;
+          const receiver = this;
+          return new Promise((resolve, reject) => {
+            window.__virTestCompleteHeldWasmFetch = () => {
+              Reflect.apply(originalFetch, receiver, [input, ...args]).then(resolve, reject);
+            };
+          });
+        }
+        return Reflect.apply(originalFetch, this, [input, ...args]);
+      };
+    })();`,
+  });
+  return async () => {
+    await cdp.send("Page.removeScriptToEvaluateOnNewDocument", { identifier });
+    await evaluate(cdp, `(() => {
+      if (window.__virTestOriginalHeldWasmFetch) window.fetch = window.__virTestOriginalHeldWasmFetch;
+      delete window.__virTestOriginalHeldWasmFetch;
+    })()`);
+  };
+}
+
+export async function smokeLandingRuntimeRecovery(cdp, origin) {
+  const removeAcquisitionInstrumentation = await installSyntheticCallTrap(cdp);
+  const removeFetchFailure = await installTransientLandingPackageFailure(cdp);
+  try {
+    await navigate(cdp, `${origin}${basePath}`);
+    await setInputValueAndDispatch(cdp, "#sort-input", "4, 1, 3, 2", "input");
+    await evaluate(cdp, `document.querySelector("#sort-run").click()`);
+    const acquisitionFailure = await waitForBrowserState(cdp, `(() => {
+      const button = document.querySelector("#sort-run");
+      const result = document.querySelector("#sort-result");
+      return {
+        ready: !button.disabled && result.dataset.failed === "true",
+        message: result.textContent,
+        input: document.querySelector("#sort-input").value,
+        requests: window.__virTestLandingPackageRequests,
+        instances: window.__virTestWasmInstances ?? 0,
+      };
+    })()`, { timeoutMessage: "landing did not report its transient package fetch failure" });
+    assert.match(acquisitionFailure.message, /synthetic transient package fetch failure/);
+    assert.equal(acquisitionFailure.input, "4, 1, 3, 2");
+    assert.equal(acquisitionFailure.requests, 1);
+    assert.equal(acquisitionFailure.instances, 0);
+
+    await evaluate(cdp, `document.querySelector("#sort-run").click()`);
+    const acquisitionRecovered = await waitForBrowserState(cdp, `(() => {
+      const button = document.querySelector("#sort-run");
+      const result = document.querySelector("#sort-result");
+      return {
+        ready: !button.disabled && result.textContent.trim() === "[1, 2, 3, 4]",
+        result: result.textContent.trim(),
+        failed: result.dataset.failed,
+        input: document.querySelector("#sort-input").value,
+        requests: window.__virTestLandingPackageRequests,
+        instances: window.__virTestWasmInstances ?? 0,
+      };
+    })()`, { timeoutMessage: "landing did not retry package acquisition on the next Sort click" });
+    assert.equal(acquisitionRecovered.result, "[1, 2, 3, 4]");
+    assert.equal(acquisitionRecovered.failed, "false");
+    assert.equal(acquisitionRecovered.input, "4, 1, 3, 2");
+    assert.equal(acquisitionRecovered.requests, 2);
+    assert.equal(acquisitionRecovered.instances, 1);
+  } finally {
+    await removeFetchFailure();
+    await removeAcquisitionInstrumentation();
+  }
+
+  const removeTrap = await installSyntheticCallTrap(cdp);
+  try {
+    await navigate(cdp, `${origin}${basePath}?trapOnLoad=1`);
+    await setInputValueAndDispatch(cdp, "#sort-input", "4, 1, 3, 2", "input");
+    await evaluate(cdp, `document.querySelector("#sort-run").click()`);
+    const failed = await waitForBrowserState(cdp, `(() => {
+      const button = document.querySelector("#sort-run");
+      const result = document.querySelector("#sort-result");
+      return {
+        ready: !button.disabled && result.dataset.failed === "true",
+        message: result.textContent,
+        input: document.querySelector("#sort-input").value,
+        instances: window.__virTestWasmInstances,
+        calls: window.__virTestResolvedCalls,
+      };
+    })()`, { timeoutMessage: "landing did not report its fatal Wasm call" });
+    assert.match(failed.message, /synthetic page recovery trap/);
+    assert.equal(failed.input, "4, 1, 3, 2");
+    assert.equal(failed.instances, 1);
+    assert.equal(failed.calls, 1, "the failed Sort must not be replayed automatically");
+
+    await evaluate(cdp, `document.querySelector("#sort-run").click()`);
+    const recovered = await waitForBrowserState(cdp, `(() => {
+      const button = document.querySelector("#sort-run");
+      const result = document.querySelector("#sort-result");
+      return {
+        ready: !button.disabled && result.textContent.trim() === "[1, 2, 3, 4]",
+        result: result.textContent.trim(),
+        failed: result.dataset.failed,
+        input: document.querySelector("#sort-input").value,
+        instances: window.__virTestWasmInstances,
+        calls: window.__virTestResolvedCalls,
+      };
+    })()`, { timeoutMessage: "landing did not use a fresh runtime on the next Sort click" });
+    assert.equal(recovered.result, "[1, 2, 3, 4]");
+    assert.equal(recovered.failed, "false");
+    assert.equal(recovered.input, failed.input);
+    assert.equal(recovered.instances, failed.instances + 1);
+    assert.equal(recovered.calls, failed.calls + 1);
+  } finally {
+    await removeTrap();
+  }
+}
+
+export async function smokeLandingPagehideRecovery(cdp, origin) {
+  const removeTrap = await installSyntheticCallTrap(cdp);
+  const removeHeldFetch = await installHeldLandingWasmFetch(cdp);
+  try {
+    await navigate(cdp, `${origin}${basePath}`);
+    await setInputValueAndDispatch(cdp, "#sort-input", "6, 2, 5", "input");
+    await evaluate(cdp, `document.querySelector("#sort-run").click()`);
+    await waitForBrowserState(cdp, `({
+      ready: window.__virTestHeldWasmRequests === 1,
+      requests: window.__virTestHeldWasmRequests,
+    })`, { timeoutMessage: "landing did not reach its held Wasm load" });
+
+    await evaluate(cdp, `(() => {
+      window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true }));
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+    })()`);
+    const resumed = await evaluate(cdp, `({
+      runDisabled: document.querySelector("#sort-run").disabled,
+      result: document.querySelector("#sort-result").textContent,
+    })`);
+    assert.equal(resumed.runDisabled, false);
+    assert.match(resumed.result, /press Sort to try again/);
+
+    await evaluate(cdp, "window.__virTestCompleteHeldWasmFetch()");
+    const abandoned = await waitForBrowserState(cdp, `(() => {
+      const result = document.querySelector("#sort-result");
+      return {
+        ready: window.__virTestWasmInstances === 1 && !document.querySelector("#sort-run").disabled,
+        result: result.textContent,
+        input: document.querySelector("#sort-input").value,
+        instances: window.__virTestWasmInstances,
+        calls: window.__virTestResolvedCalls,
+      };
+    })()`, { timeoutMessage: "landing did not retire the runtime created for the abandoned request" });
+    assert.match(abandoned.result, /press Sort to try again/);
+    assert.equal(abandoned.input, "6, 2, 5");
+    assert.equal(abandoned.calls, 0, "a stale runtime must not run the abandoned sort");
+
+    await evaluate(cdp, `document.querySelector("#sort-run").click()`);
+    const retried = await waitForBrowserState(cdp, `(() => {
+      const button = document.querySelector("#sort-run");
+      const result = document.querySelector("#sort-result");
+      return {
+        ready: !button.disabled && result.textContent.trim() === "[2, 5, 6]",
+        result: result.textContent.trim(),
+        input: document.querySelector("#sort-input").value,
+        instances: window.__virTestWasmInstances,
+        calls: window.__virTestResolvedCalls,
+      };
+    })()`, { timeoutMessage: "landing did not retry after pagehide interrupted runtime creation" });
+    assert.equal(retried.result, "[2, 5, 6]");
+    assert.equal(retried.input, abandoned.input);
+    assert.equal(retried.instances, abandoned.instances + 1);
+    assert.equal(retried.calls, 1);
+  } finally {
+    await removeHeldFetch();
+    await removeTrap();
+  }
 }
 
 export async function smokeRunnerFatalRecovery(cdp, origin) {

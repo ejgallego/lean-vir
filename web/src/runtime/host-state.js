@@ -12,6 +12,7 @@ import {
   ExternrefRoots,
 } from "../host-boundary.js";
 import {
+  asError,
   collectCleanupError,
   throwCollectedErrors,
   throwWithCleanup,
@@ -82,8 +83,9 @@ export class VirHostState {
 
   recordCallError(error) {
     if (this.callError === null) {
-      this.callError =
-        error instanceof Error ? error : new Error(String(error));
+      // Quarantine before inspecting an arbitrary thrown value.
+      this.callError = new Error("JavaScript host exception", { cause: error });
+      this.callError = asError(error, "JavaScript host exception");
     }
   }
 

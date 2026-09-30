@@ -136,16 +136,10 @@ object * run_package_interpreter_initializer(object * decl_obj, object * init_ob
     session_entry entry;
     name decl(decl_obj, true);
     name init(init_obj, true);
-    try {
-        object * result = g_package_interpreter->initialize(decl, init);
-        // Upstream run_init catches evaluation exceptions and returns IO error.
-        // Failed initialization must not leave a possibly damaged cached session.
-        if (!lean_io_result_is_ok(result)) reset_package_interpreter();
-        return result;
-    } catch (...) {
-        reset_package_interpreter();
-        throw;
-    }
+    // Initializers may export closures/handles before returning an IO error.
+    // The package owner retires the entire instance on failure; retain this
+    // session and its declarations until that instance is discarded.
+    return g_package_interpreter->initialize(decl, init);
 }
 
 void reset_package_interpreter() {
@@ -158,14 +152,14 @@ void reset_package_interpreter() {
 }
 
 void clear_package_interpreter_globals() {
-    // Cached host trampolines encode package-local slots. A failed install may
-    // be retried with the same Lean names at different slots.
+    // Cached host trampolines encode package-local slots. Trusted raw loaders
+    // may reset a quiescent package; initializer failure never takes this path.
     if (ir::g_native_symbol_cache != nullptr) {
         ir::g_native_symbol_cache->clear();
     }
     if (ir::g_init_globals != nullptr) {
         // Upstream marks the values persistent: removing names prevents stale
-        // lookup on retry but does not reclaim those values or undo side effects.
+        // lookup after a trusted reset, but cannot reclaim storage or undo effects.
         ir::g_init_globals->clear();
     }
 }

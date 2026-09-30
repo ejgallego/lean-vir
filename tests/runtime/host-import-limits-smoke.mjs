@@ -60,9 +60,9 @@ try {
     } finally { runtime.dispose(); }
   });
 
-  await test("host display aliases do not replace structural identity", async () => {
+  await test("duplicate host display names do not replace structural identity", async () => {
     const aliases = structuredClone(info.manifest);
-    for (const entry of aliases.hostImports) entry.name = `client host alias ${entry.slot}`;
+    for (const entry of aliases.hostImports) entry.name = "client host alias";
     const runtime = await factory.createRuntime({ irPackageSet: [replaceIrPackageManifest(bytes, aliases)] });
     try {
       assert.equal(runtime.call("HostLimits.call127", "a", "b", "c", "d", "e"), "127:a/b/c/d/e");
@@ -82,6 +82,47 @@ try {
       if (module === "ArityOverflow") {
         for (const id of [0, 1, 2]) assert.match(diagnostics, new RegExp(`host${pad(id)}`));
       }
+    }
+  });
+
+  await test("raw loader rejects host and native symbol alias collisions before initialization", async () => {
+    const runtime = await factory.createRuntime();
+    const e = runtime.exports;
+    try {
+      for (const [symbols, diagnostic] of [
+        [["vir_host_collision", "vir_host_collision___boxed"], /ambiguous JavaScript host import symbol alias/],
+        [["vir_host_collision___boxed", "vir_host_collision"], /ambiguous JavaScript host import symbol alias/],
+        ...["lean_array_uget_borrowed", "lean_array_uget_borrowed___boxed", "l_ByteArray_empty"]
+          .map(symbol => [[symbol, "vir_host_distinct"], /conflicts with the native symbol registry/]),
+      ]) {
+        const conflicting = structuredClone(info.manifest.hostImports);
+        conflicting[0].symbol = symbols[0];
+        conflicting[1].symbol = symbols[1];
+        const malformed = replaceSection(
+          bytes,
+          SECTION.HOST_IMPORTS,
+          encodeHosts(conflicting),
+        );
+        const ptr = runtime.allocBytes(malformed);
+        try {
+          assert.equal(e.vir_begin_ir_package_set(), 1);
+          assert.equal(e.vir_append_ir_package(ptr, malformed.length), 0);
+          assert.match(runtime.lastPackageError(), diagnostic);
+          assert.equal(runtime.packageDeclCount(), 0, "rejected member must not partially append");
+        } finally {
+          runtime.freeBytes(ptr);
+          e.vir_abort_ir_package_set();
+        }
+      }
+
+      runtime.loadIrPackageSetBytes([bytes]);
+      assert.equal(
+        runtime.call("HostLimits.call127", "a", "b", "c", "d", "e"),
+        "127:a/b/c/d/e",
+        "rejected aliases must not poison the next valid package's symbol map",
+      );
+    } finally {
+      runtime.dispose();
     }
   });
 

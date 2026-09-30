@@ -86,6 +86,12 @@ remain cached for the page lifetime, one entry per distinct Wasm content; repeat
 Wasm rebuilds can therefore grow the cache. Concurrent acquisitions share
 compilation but each reads and hashes its bytes.
 
+The `readAsset` RPC returns only the requested path and base64-encoded bytes.
+There is no separate asset-stat request or timestamp, size, MIME, or revision
+metadata in this protocol. Rebuild the Lean provider and generated Infoview
+JavaScript bundle together when changing this response shape; no legacy metadata
+aliases are accepted.
+
 `IRPackage.fingerprint` is required. The roots-only build mode, `updateToken`,
 `autoReloadMs`, and `statIRPackage` are removed. The old roots array and separate
 `componentEntry` are replaced by `irPackage.entry`. Integrations should use the
@@ -112,6 +118,16 @@ the widget description and UI; repair restores it with a fresh component mount,
 even when the fingerprint matches the earlier valid program. Escaped continuations
 still retain their original runtime and execute their cleanup guards. There is no
 periodic retry or Retry button.
+
+The shell subscribes to the runtime's first-failure notification. A mounted
+callback that traps is reported even when application code catches the exception
+or handles a rejected Promise. The shell shows the failure, unmounts the component,
+and disposes the failed runtime. A local React error boundary contains errors from
+its now-invalid Lean cleanup callbacks while keeping the original failure visible.
+An aggregate is contained only when every member is an expected retirement
+error; mixed aggregates propagate intact to the upstream boundary.
+It does not call the component factory or replay the failed action. Reload the
+Infoview panel or change the widget code to create a fresh runtime.
 
 Fingerprint generation performs package analysis once per elaboration of the
 widget command. This can increase definition/build time and compiled module size;

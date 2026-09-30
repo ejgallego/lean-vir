@@ -93,17 +93,17 @@ static void * trampoline_for_arity(uint32_t slot) {
 template <size_t... Arities>
 static constexpr auto arity_dispatch(std::index_sequence<Arities...>) {
     return std::array<void * (*)(uint32_t), sizeof...(Arities)>{{
-        &trampoline_for_arity<Arities>...
+        &trampoline_for_arity<Arities + 1>...
     }};
 }
 
 static void * host_import_trampoline_for(uint32_t slot, uint32_t arity) {
-    if (slot >= vir::max_host_import_slots || arity > vir::max_host_import_arity) {
+    if (slot >= vir::max_host_import_slots || arity == 0 || arity > vir::max_host_import_arity) {
         return nullptr;
     }
     static constexpr auto table = arity_dispatch(
-        std::make_index_sequence<vir::max_host_import_arity + 1>{});
-    return table[arity](slot);
+        std::make_index_sequence<vir::max_host_import_arity>{});
+    return table[arity - 1](slot);
 }
 
 } // namespace
