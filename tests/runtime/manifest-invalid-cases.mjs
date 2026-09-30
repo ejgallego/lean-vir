@@ -6,7 +6,6 @@ Author: Emilio J. Gallego Arias
 
 import {
   INTERFACE_MANIFEST_VERSION,
-  MIN_INTERFACE_MANIFEST_VERSION,
 } from "../../web/src/runtime/interface-manifest.js";
 
 function packageTarget(overrides = {}) {
@@ -23,6 +22,7 @@ function hostImport(overrides = {}) {
   return {
     slot: 0,
     name: "Example.jsHost",
+    nameKey: "s4578616d706c65/s6a73486f7374/",
     source: "Example.lean",
     target: "test.host",
     boundary: "hostResource",
@@ -42,6 +42,23 @@ function hostImport(overrides = {}) {
 }
 
 export const invalidManifestCases = [
+  ...[undefined, "s0/", "n01/", "n-1/", "S41/", "sff/"].map(key => ({
+    name: `invalid structural export name key ${String(key)}`,
+    mutate: manifest => { manifest.exports[0].nameKey = key; },
+    pattern: /exports\[0\]\.nameKey.*structural Lean name key/,
+  })),
+  {
+    name: "duplicate structural export identity with distinct aliases",
+    mutate: manifest => { manifest.exports.push({ ...structuredClone(manifest.exports[0]),
+      entry: "another alias", id: "anotherId", jsName: "anotherJsName" }); },
+    pattern: /nameKey duplicates another interface export/,
+  },
+  {
+    name: "duplicate structural host identity with distinct aliases",
+    mutate: manifest => { manifest.hostImports = [hostImport(),
+      hostImport({ slot: 1, name: "another alias", symbol: "anotherSymbol" })]; },
+    pattern: /nameKey duplicates another host import/,
+  },
   {
     name: "missing manifest version",
     mutate: (manifest) => {
@@ -66,7 +83,7 @@ export const invalidManifestCases = [
   {
     name: "obsolete manifest version",
     mutate: (manifest) => {
-      manifest.version = MIN_INTERFACE_MANIFEST_VERSION - 1;
+      manifest.version = INTERFACE_MANIFEST_VERSION - 1;
     },
     pattern: /embedded interface manifest must be/,
   },
@@ -781,16 +798,6 @@ export const invalidManifestCases = [
       /arity does not match erased arguments, value arguments, and effect \(2\)/,
   },
   {
-    name: "duplicate host import name",
-    mutate: (manifest) => {
-      manifest.hostImports = [
-        hostImport(),
-        hostImport({ slot: 1, symbol: "vir_host_import_1" }),
-      ];
-    },
-    pattern: /hostImports\[1\]\.name duplicates another host import/,
-  },
-  {
     name: "duplicate host import symbol",
     mutate: (manifest) => {
       manifest.hostImports = [
@@ -798,6 +805,6 @@ export const invalidManifestCases = [
         hostImport({ slot: 1, name: "Example.otherHost" }),
       ];
     },
-    pattern: /hostImports\[1\]\.symbol duplicates another host import/,
+    pattern: /hostImports\[1\]\.symbol alias "vir_host_import_0" belongs to more than one host import/,
   },
 ];

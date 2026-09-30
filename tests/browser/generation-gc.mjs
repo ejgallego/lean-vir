@@ -32,6 +32,7 @@ try {
     `runVirGenerationGc(${JSON.stringify([...wasmBytes])},${JSON.stringify([...hostPackageBytes])})`,
   );
   assert.equal(result.gc.collectedGraphs, 3);
+  assert.deepEqual(result.fatal, { retired: true, recovered: true });
   await smokeBrowserReactLifetimes(cdp);
   console.log(
     "Chromium real-Wasm generation GC and React lifetime smoke ok",

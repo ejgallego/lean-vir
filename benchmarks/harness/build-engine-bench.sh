@@ -52,6 +52,7 @@ overlay_include="$out/include"
 
 package_header_tmp="$package_header.tmp"
 xxd -i -n vir_demo_ir_package "$demo_package" > "$package_header_tmp"
+node benchmarks/harness/engine-bench-entries.mjs "$demo_package" >> "$package_header_tmp"
 if ! cmp -s "$package_header_tmp" "$package_header"; then
   mv "$package_header_tmp" "$package_header"
 else

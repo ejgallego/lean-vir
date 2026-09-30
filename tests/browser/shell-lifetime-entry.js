@@ -28,6 +28,7 @@ const transport = {
 };
 const failures = [];
 const boundaryErrors = [];
+const boundaryErrorValues = [];
 const consoleMessages = [];
 const unexpectedConsole = [];
 const expectedConsole = [];
@@ -65,6 +66,7 @@ class ShellErrorBoundary extends React.Component {
 
   componentDidCatch(error) {
     boundaryErrors.push(String(error));
+    boundaryErrorValues.push(error);
   }
 
   render() {
@@ -267,6 +269,43 @@ const harness = (globalThis.__shellTest = {
           throw new Error("render sentinel");
         };
       }
+      if (state.trapOnCallback && args[0] === prefix + "createComponent") {
+        return function TrapOnClickComponent(props) {
+          React.useEffect(() => () => {
+            if (state.aggregateCleanup) {
+              const expected = new Error("retired cleanup", { cause: runtime.failure });
+              const unrelated = new Error("independent cleanup sentinel");
+              const members = ["expected-first", "overridden-every"].includes(state.aggregateCleanup) ? [expected, unrelated]
+                : state.aggregateCleanup === "unrelated-first" ? [unrelated, expected]
+                : state.aggregateCleanup === "nested" ? [expected, new AggregateError([expected, unrelated])]
+                : [expected, new AggregateError([expected, expected])];
+              state.cleanupAggregate = new AggregateError(members, "aggregate cleanup sentinel");
+              if (state.aggregateCleanup === "overridden-every") state.cleanupAggregate.errors.every = () => true;
+              throw state.cleanupAggregate;
+            }
+            if (state.throwIndependentCleanup) throw new Error("independent cleanup sentinel");
+          }, []);
+          return React.createElement(
+            React.Fragment,
+            null,
+            React.createElement(value, props),
+            React.createElement("button", {
+              id: "trap-mounted-runtime",
+              onClick() {
+                try {
+                  runtime.exports.vir_obj_tag(0xfffffff0);
+                } catch (error) {
+                  state.trapFailure = runtime.failure;
+                  state.trapCaught = true;
+                  Promise.reject(error).catch((reason) => {
+                    state.handledRejection = reason;
+                  });
+                }
+              },
+            }, "Trigger fatal runtime failure"),
+          );
+        };
+      }
       return state.invalidComponent && args[0] === prefix + "createComponent"
         ? null
         : value;
@@ -372,6 +411,8 @@ function checkContinuation(state, kind, stale) {
 async function normalUnmount() {
   const shell = await mountShell();
   await shell.ready();
+  check(transport.assetCalls === 1,
+    "runtime acquisition performs one direct Wasm asset read without stat metadata");
   const state = states.at(-1);
   check(
     state.contexts.includes(inheritedContextValue),
@@ -713,6 +754,100 @@ async function failedCandidates() {
   );
   check(states.at(-1).disposed === 1, "invalid setup hard-disposes candidate");
   await setupFailure.unmount();
+}
+
+async function mountedRuntimeTrap({ throwIndependentCleanup = false, aggregateCleanup = null } = {}) {
+  runtimeFault = { trapOnCallback: true, throwIndependentCleanup, aggregateCleanup };
+  const propagateCleanup = throwIndependentCleanup ||
+    (aggregateCleanup !== null && aggregateCleanup !== "expected-only");
+  const shell = await mountShell();
+  await shell.ready();
+  const failed = states.at(-1);
+  const buildsBeforeFailure = transport.builds;
+  const stateCountBeforeFailure = states.length;
+  const button = shell.container.querySelector("#trap-mounted-runtime");
+  check(button !== null, "mounted fatal callback control is present");
+  allowConsoleDiagnostic("VirRuntime failed during Wasm execution", 1);
+  if (throwIndependentCleanup) allowConsoleDiagnostic("independent cleanup sentinel", 2);
+  if (aggregateCleanup) allowConsoleDiagnostic("aggregate cleanup sentinel", propagateCleanup ? 2 : 1);
+  const globalReports = [];
+  const recordGlobalReport = (event) => {
+    globalReports.push(event.error ?? event.reason);
+  };
+  globalThis.addEventListener("error", recordGlobalReport);
+  globalThis.addEventListener("unhandledrejection", recordGlobalReport);
+  try {
+    await React.act(async () => button.click());
+    if (propagateCleanup) {
+      await until(() => shell.container.querySelector("[data-shell-error-boundary]"),
+        "unrelated fatal-unmount cleanup errors still reach the upstream boundary");
+      if (aggregateCleanup) check(boundaryErrorValues.includes(failed.cleanupAggregate),
+        "mixed cleanup aggregate reaches the upstream boundary unchanged");
+      check(shell.container.textContent.includes(aggregateCleanup ? "aggregate cleanup sentinel" : "independent cleanup sentinel"),
+        "fatal runtime handling must not hide unrelated cleanup errors");
+      check(failed.disposed === 1, "fatal disposal still completes when other cleanup fails");
+      await shell.unmount();
+      return;
+    }
+    await until(
+      () => failed.disposed === 1 &&
+        shell.container.querySelector('[data-vir-infoview-state="error"]'),
+      "fatal callback retires its published runtime",
+    );
+    const failureStatus = shell.container.querySelector(".vir-infoview-widget-status");
+    check(
+      failed.trapFailure instanceof WebAssembly.RuntimeError &&
+        failed.trapCaught === true &&
+        failed.handledRejection === failed.trapFailure &&
+        failureStatus.textContent.includes(failed.trapFailure.message) &&
+        failureStatus.textContent.includes("Reload the Infoview panel") &&
+        harness.loadedRef.current === null &&
+        !globalReports.some((error) => errorContains(error, failed.trapFailure)),
+      "a caught trap and handled rejection notify and retire without global errors",
+    );
+
+    const previousRpc = harness.rpc;
+    harness.rpc = { call: (...args) => previousRpc.call(...args) };
+    await shell.update({ setupHint: "same source after fatal failure" });
+    await tick();
+    check(
+      transport.builds === buildsBeforeFailure &&
+        states.length === stateCountBeforeFailure &&
+        failed.factoryCalls === 1,
+      "ordinary RPC context updates neither reacquire nor replay a fatal widget",
+    );
+
+    await shell.update({ irPackage: packageDescription("source-after-fatal") });
+    await until(
+      () => states.length === stateCountBeforeFailure + 1 &&
+        shell.container.querySelector('[data-vir-infoview-state="ready"]'),
+      "an explicit new widget fingerprint installs a fresh runtime",
+    );
+    const recovered = states.at(-1);
+    check(
+      recovered !== failed && recovered.factoryCalls === 1 &&
+        transport.builds === buildsBeforeFailure + 1,
+      "changed widget code obtains a fresh factory result exactly once",
+    );
+    await shell.unmount();
+  } finally {
+    globalThis.removeEventListener("error", recordGlobalReport);
+    globalThis.removeEventListener("unhandledrejection", recordGlobalReport);
+  }
+}
+
+function errorContains(error, target) {
+  const pending = [error];
+  const seen = new Set();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (current === target) return true;
+    if (current === null || typeof current !== "object" || seen.has(current)) continue;
+    seen.add(current);
+    if (current.cause !== undefined) pending.push(current.cause);
+    if (current instanceof AggregateError) pending.push(...current.errors);
+  }
+  return false;
 }
 
 function effectCount(state, event) {
@@ -1199,17 +1334,10 @@ function installMockRpc(wasmBase64, packageBase64, manifestPackageBase64) {
           dataBase64: transport.packageBase64,
         };
       }
-      check(
-        method.endsWith("statAsset") || method.endsWith("readAsset"),
-        "only mocked shell transport methods expected",
-      );
+      check(method.endsWith("readAsset"), "only mocked shell transport methods expected");
       transport.assetCalls++;
       return {
         path: params.path,
-        mime: "application/wasm",
-        byteSize: String(atob(wasmBase64).length),
-        modified: "1",
-        revision: "wasm-1",
         dataBase64: wasmBase64,
       };
     },
@@ -1331,6 +1459,11 @@ globalThis.runShellLifetime = async (
     await explicitShutdown();
     await normalUnmountFailure();
     await failedCandidates();
+    await mountedRuntimeTrap();
+    await mountedRuntimeTrap({ throwIndependentCleanup: true });
+    for (const aggregateCleanup of ["expected-first", "unrelated-first", "nested", "overridden-every", "expected-only"]) {
+      await mountedRuntimeTrap({ aggregateCleanup });
+    }
     await failedRefresh();
     await failedAcquisitionNewContext();
     await failedConnectionDoesNotReconnectItself();

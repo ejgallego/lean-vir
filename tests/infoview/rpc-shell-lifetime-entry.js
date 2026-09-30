@@ -652,7 +652,7 @@ async function run() {
     const generatedNode = container.querySelector("#rpc-live-edit");
     const generationCount = states.length;
     const packageCalls = () => calls.filter((call) =>
-      ["Lean.Vir.Infoview.buildIRPackage", "Lean.Vir.Infoview.statIRPackage", "Lean.Vir.Infoview.statAsset", "Lean.Vir.Infoview.readAsset"].includes(call.params.method));
+      ["Lean.Vir.Infoview.buildIRPackage", "Lean.Vir.Infoview.readAsset"].includes(call.params.method));
     const beforeProofEdits = packageCalls().length;
     for (let i = 0; i < 3; i++) {
       await editText(i === 0 ? "  exact h" : `  exact (h) -- edit ${i - 1}`, `  exact (h) -- edit ${i}`);

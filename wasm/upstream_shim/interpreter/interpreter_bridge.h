@@ -24,5 +24,8 @@ object * run_package_interpreter_initializer(object * decl_obj, object * init_ob
 // Borrow static error text for rejected entry; nullptr after accepted preparation.
 char const * package_interpreter_entry_error();
 void reset_package_interpreter();
+// Clear upstream's initializer names and native-symbol cache at package retirement,
+// after retiring the interpreter. Ordinary call errors must keep these globals.
+void clear_package_interpreter_globals();
 
 }

@@ -45,6 +45,8 @@ function WidgetLoader({ widgetProps: props, rpcSession }) {
   });
   const loadedRef = React.useRef(null);
   const [loaded, setLoaded] = React.useState(null);
+  const fatalRetirementRef = React.useRef(null);
+  const [fatalFailure, setFatalFailure] = React.useState(null);
   // Counts acquisition attempts, including attempts that reuse the installed code.
   const acquisitionSequenceRef = React.useRef(0);
   const acquisitionRef = React.useRef(null);
@@ -114,7 +116,10 @@ function WidgetLoader({ widgetProps: props, rpcSession }) {
         configurationKey,
         generation: acquisitionId,
       };
+      const candidateRuntime = candidate.runtime;
+      next.disposeRuntime = () => candidateRuntime.dispose();
       loadedRef.current = next;
+      setFatalFailure(null);
       setLoaded(next);
       candidate = null;
       setStatus({ kind: "ready", message: componentEntry.entry });
@@ -135,13 +140,51 @@ function WidgetLoader({ widgetProps: props, rpcSession }) {
     }
   }
 
+  React.useLayoutEffect(() => {
+    if (loaded === null) return;
+    const onFailure = (failure) => {
+      if (
+        loadedRef.current !== loaded ||
+        committedRequestRef.current.configurationKey !== configurationKey
+      ) return;
+      loadedRef.current = null;
+      fatalRetirementRef.current = { loaded, failure };
+      setFatalFailure(failure);
+      setLoaded((current) => current === loaded ? null : current);
+      setStatus({
+        kind: "error",
+        message: errorMessage(
+          failure,
+          "This widget runtime has failed. Reload the Infoview panel or change the widget code to start a fresh runtime.",
+        ),
+      });
+    };
+    const stopObservingFailure = loaded.service.runtime.onFailure(onFailure);
+    loaded.stopObservingFailure = stopObservingFailure;
+    return stopObservingFailure;
+  }, [loaded, configurationKey]);
+
   React.useEffect(() => {
     return () => {
       // React owns the descendant UI. Release shell ownership, not the
       // runtime: surviving callbacks and JSL keep their generation.
+      loadedRef.current?.stopObservingFailure?.();
       loadedRef.current = null;
     };
   }, [configurationKey]);
+
+  React.useEffect(() => {
+    return () => {
+      const retirement = fatalRetirementRef.current;
+      if (retirement?.loaded !== loaded) return;
+      fatalRetirementRef.current = null;
+      const errors = [retirement.failure];
+      collectCleanupError(errors, () => loaded.disposeRuntime());
+      if (errors.length > 1) {
+        console.error(new AggregateError(errors, "VIR widget runtime failed during disposal"));
+      }
+    };
+  }, [loaded]);
 
   React.useEffect(() => {
     const previousAttempt = acquisitionRef.current;
@@ -154,6 +197,7 @@ function WidgetLoader({ widgetProps: props, rpcSession }) {
     const attempt = { requestKey, rpcSession, failed: false };
     acquisitionRef.current = attempt;
     if (loadedRef.current?.configurationKey !== configurationKey) {
+      loadedRef.current?.stopObservingFailure?.();
       loadedRef.current = null;
       setLoaded(null);
       setStatus({ kind: "loading", message: "Loading VIR widget..." });
@@ -173,9 +217,11 @@ function WidgetLoader({ widgetProps: props, rpcSession }) {
       onPointerDown: stopInfoviewEvent,
       style: shellStyle,
     },
-    loaded?.configurationKey === configurationKey
-      ? e(loaded.component, { ...props, key: loaded.generation })
-      : null,
+    e(FatalRuntimeBoundary, { requestKey, failure: fatalFailure },
+      loaded?.configurationKey === configurationKey
+        ? e(loaded.component, { ...props, key: loaded.generation })
+        : null,
+    ),
     status.kind === "ready"
       ? null
       : e(
@@ -186,8 +232,71 @@ function WidgetLoader({ widgetProps: props, rpcSession }) {
   );
 }
 
+// Keep the shell mounted when removing a failed component invokes Lean-backed
+// effect cleanup. Such callbacks must still reject on a failed runtime; ordinary
+// rendering/cleanup errors continue to the upstream Infoview error boundary.
+class FatalRuntimeBoundary extends React.Component {
+  state = { error: null, requestKey: this.props.requestKey };
+
+  static getDerivedStateFromProps(props, state) {
+    return props.requestKey === state.requestKey
+      ? null
+      : { error: null, requestKey: props.requestKey };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error) {
+    // React may batch several cleanup errors into one render. Check every
+    // reported error, including ones replaced in the rendered error state.
+    if (this.props.failure === null ||
+        !isExpectedRetirementError(error, this.props.failure)) throw error;
+  }
+
+  render() {
+    if (this.state.error !== null) {
+      if (this.props.failure === null ||
+          !isExpectedRetirementError(this.state.error, this.props.failure)) {
+        throw this.state.error;
+      }
+      return null;
+    }
+    return this.props.children;
+  }
+}
+
 function stopInfoviewEvent(event) {
   event.stopPropagation();
+}
+
+// Suppression requires every failure to be attributable to this retirement.
+// A mixed aggregate must reach the upstream boundary intact.
+function isExpectedRetirementError(error, failure, ancestors = new Set()) {
+  if (error === failure) return true;
+  if (error === null || (typeof error !== "object" && typeof error !== "function") || ancestors.has(error)) {
+    return false;
+  }
+  ancestors.add(error);
+  try {
+    const expected = value => isExpectedRetirementError(value, failure, ancestors);
+    const cause = error.cause;
+    if (error instanceof AggregateError) {
+      const errors = error.errors;
+      if (!Array.isArray(errors) || errors.length === 0) return false;
+      for (let index = 0; index < errors.length; index++) {
+        if (!expected(errors[index])) return false;
+      }
+      return cause === undefined || expected(cause);
+    }
+    return expected(cause);
+  } catch {
+    // Uninspectable errors cannot establish that suppression is appropriate.
+    return false;
+  } finally {
+    ancestors.delete(error);
+  }
 }
 
 export function validateWidgetComponentEntry(runtime, entryName) {
@@ -280,7 +389,12 @@ export async function loadRuntimeService({ rpcSession, config, previous = null }
   // Compare the complete artifact, including interfaces and initializers.
   // Distinct descriptions can still emit identical bytes. Preserve the installed
   // component when the acquired artifacts match.
-  if (previous?.runtime.module === wasmModule && previous.packageDigest === packageDigest) {
+  if (
+    previous?.runtime?.failure === null &&
+    previous.runtime.disposed === false &&
+    previous.runtime.module === wasmModule &&
+    previous.packageDigest === packageDigest
+  ) {
     return previous;
   }
   const runtime = await createBundledVirRuntime({
@@ -347,32 +461,14 @@ export async function buildIRPackage(rpcSession, irPackage, position) {
     dataBase64: requiredString(response?.dataBase64, "IR package dataBase64") };
 }
 
-export async function statAsset(rpcSession, path) {
-  const response = await rpcSession.call("Lean.Vir.Infoview.statAsset", {
-    path,
-  });
-  return assetInfo(response, path);
-}
-
 function assetDataBase64(response, path) {
-  assetInfo(response, path);
-  return requiredString(response?.dataBase64, `asset ${path} dataBase64`);
-}
-
-function assetInfo(response, path) {
   const responsePath = requiredString(response?.path, `asset ${path} path`);
   if (responsePath !== path) {
     throw new Error(
       `VIR asset response path mismatch: expected ${path}, got ${responsePath}`,
     );
   }
-  return {
-    path: responsePath,
-    mime: requiredString(response?.mime, `asset ${path} mime`),
-    byteSize: requiredString(response?.byteSize, `asset ${path} byteSize`),
-    modified: requiredString(response?.modified, `asset ${path} modified`),
-    revision: requiredString(response?.revision, `asset ${path} revision`),
-  };
+  return requiredString(response?.dataBase64, `asset ${path} dataBase64`);
 }
 
 export function decodeBase64Bytes(base64) {

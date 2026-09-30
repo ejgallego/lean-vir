@@ -54,7 +54,6 @@ const {
   loadAssetBytes,
   loadRuntimeService,
   loadWasmModule,
-  statAsset,
   validateWidgetComponentEntry,
 } = await import(new URL("vir-infoview-widget-smoke.mjs", buildDir));
 
@@ -69,13 +68,8 @@ const runtime = await createVirRuntime({
   irPackageSet: [packageBytes],
 });
 let assetReadCount = 0;
-let assetStatCount = 0;
 let irPackageBuildCount = 0;
 let irPackageFingerprint = "ir-package-v1";
-const assetRevisions = new Map([
-  ["web/public/vir-upstream.wasm", "wasm-v1"],
-  ["web/public/native-infoview.irpkg", "package-v1"],
-]);
 const rpcSession = {
   async call(method, params) {
     if (method === "Lean.Vir.Infoview.buildIRPackage") {
@@ -87,23 +81,10 @@ const rpcSession = {
       };
     }
     const bytes = await readFile(new URL(params.path, repoRoot));
-    const metadata = {
-      path: params.path,
-      mime: params.path.endsWith(".wasm")
-        ? "application/wasm"
-        : "application/octet-stream",
-      byteSize: String(bytes.length),
-      modified: "100.0",
-      revision: assetRevisions.get(params.path) ?? "asset-v1",
-    };
-    if (method === "Lean.Vir.Infoview.statAsset") {
-      assetStatCount += 1;
-      return metadata;
-    }
     assert.equal(method, "Lean.Vir.Infoview.readAsset");
     assetReadCount += 1;
     return {
-      ...metadata,
+      path: params.path,
       dataBase64: bytes.toString("base64"),
     };
   },
@@ -130,10 +111,6 @@ assert.equal(
   decodeBase64Bytes(Buffer.from("vir").toString("base64"))[2],
   "r".charCodeAt(0),
 );
-assert.equal(
-  (await statAsset(rpcSession, "web/public/vir-upstream.wasm")).revision,
-  "wasm-v1",
-);
 await assert.rejects(
   () =>
     loadAssetBytes(
@@ -141,7 +118,6 @@ await assert.rejects(
         async call() {
           return {
             path: "web/public/other.wasm",
-            mime: "application/wasm",
             dataBase64: Buffer.from("vir").toString("base64"),
           };
         },
@@ -196,6 +172,15 @@ const irPackageFirstService = await loadRuntimeService({
   config: irPackageServiceConfig,
 });
 assert.equal(
+  await loadRuntimeService({
+    rpcSession,
+    config: irPackageServiceConfig,
+    previous: irPackageFirstService,
+  }),
+  irPackageFirstService,
+  "identical artifacts reuse a live Infoview runtime",
+);
+assert.equal(
   typeof irPackageFirstService.runtime.hostState.defaultBindings[
     "react.root.create"
   ],
@@ -240,9 +225,8 @@ assert.ok(firstWasmModule instanceof WebAssembly.Module);
 const readsBeforeCacheHit = assetReadCount;
 assert.equal(await loadWasmModule(rpcSession, irPackageServiceConfig.wasmPath), firstWasmModule);
 assert.equal(assetReadCount, readsBeforeCacheHit + 1, "acquisition identifies the bytes it reads");
-assetRevisions.set(irPackageServiceConfig.wasmPath, "wasm-v2");
 assert.equal(await loadWasmModule(rpcSession, irPackageServiceConfig.wasmPath), firstWasmModule,
-  "equal bytes reuse compilation despite changed metadata");
+  "equal bytes reuse compilation without metadata");
 
 function wasmReturning(value) {
   return Uint8Array.of(
@@ -253,8 +237,7 @@ function wasmReturning(value) {
 function assetSource(bytes) {
   return { async call(method, { path }) {
     assert.equal(method, "Lean.Vir.Infoview.readAsset");
-    return { path, mime: "application/wasm", byteSize: String(bytes.length),
-      modified: "1", revision: "same-metadata", dataBase64: Buffer.from(bytes).toString("base64") };
+    return { path, dataBase64: Buffer.from(bytes).toString("base64") };
   } };
 }
 const path = "same-project-relative-path.wasm";
@@ -304,20 +287,57 @@ staleRead.reject(new Error("superseded asset read"));
 await staleFailure;
 assert.equal(await loadWasmModule(sourceB, path), moduleB);
 
-const statsBeforeNoStat = assetStatCount;
 const latestSnapshot = await loadRuntimeService({
   rpcSession: {
     async call(method, params) {
-      assert.notEqual(method, "Lean.Vir.Infoview.statAsset",
-        "Wasm identity uses read bytes, not a pre-read metadata token");
+      assert.ok(
+        method === "Lean.Vir.Infoview.readAsset" ||
+          method === "Lean.Vir.Infoview.buildIRPackage",
+        `widget acquisition has no retired asset stat request: ${method}`,
+      );
       const response = await rpcSession.call(method, params);
       return response;
     },
   },
   config: irPackageServiceConfig,
 });
-assert.equal(assetStatCount, statsBeforeNoStat);
 latestSnapshot.runtime.dispose();
+
+const failedRuntimeService = await loadRuntimeService({
+  rpcSession,
+  config: irPackageServiceConfig,
+  previous: irPackageFirstService,
+});
+assert.equal(failedRuntimeService, irPackageFirstService,
+  "a healthy matching runtime remains reusable before failure");
+assert.throws(
+  () => failedRuntimeService.runtime.exports.vir_obj_tag(0xfffffff0),
+  WebAssembly.RuntimeError,
+  "the reuse regression uses an actual Wasm bounds trap",
+);
+assert.ok(failedRuntimeService.runtime.failure instanceof WebAssembly.RuntimeError);
+const recoveredFailedRuntime = await loadRuntimeService({
+  rpcSession,
+  config: irPackageServiceConfig,
+  previous: failedRuntimeService,
+});
+assert.notEqual(recoveredFailedRuntime, failedRuntimeService,
+  "matching artifacts create a fresh runtime after a Wasm trap");
+assert.equal(recoveredFailedRuntime.runtime.failure, null);
+assert.equal(recoveredFailedRuntime.runtime.disposed, false);
+recoveredFailedRuntime.runtime.dispose();
+
+irPackageSecondService.runtime.dispose();
+const recoveredDisposedRuntime = await loadRuntimeService({
+  rpcSession,
+  config: irPackageServiceConfig,
+  previous: irPackageSecondService,
+});
+assert.notEqual(recoveredDisposedRuntime, irPackageSecondService,
+  "matching artifacts create a fresh runtime after disposal");
+assert.equal(recoveredDisposedRuntime.runtime.failure, null);
+assert.equal(recoveredDisposedRuntime.runtime.disposed, false);
+recoveredDisposedRuntime.runtime.dispose();
 
 irPackageFingerprint = "ir-package-v2";
 irPackageServiceConfig.irPackage.fingerprint = irPackageFingerprint;

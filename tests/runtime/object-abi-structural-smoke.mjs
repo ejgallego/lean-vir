@@ -49,6 +49,30 @@ assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.fvarExpr"), {
   kind: "fvar",
   name: "x",
 });
+assert.deepEqual(
+  leanRuntime.call("Vir.Fixtures.ExprPrinter.anonymousNameExpr"),
+  {
+    kind: "fvar",
+    name: "[anonymous]",
+  },
+);
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.unicodeNameExpr"), {
+  kind: "fvar",
+  name: "αβ₁",
+});
+for (const entry of [
+  "numeralNameExpr",
+  "largeNumeralNameExpr",
+  "dottedStringNameExpr",
+  "emptyComponentNameExpr",
+  "escapedNameExpr",
+]) {
+  assert.throws(
+    () => leanRuntime.call(`Vir.Fixtures.ExprPrinter.${entry}`),
+    /unsupported numeric, escaped, empty, or non-identifier components/,
+    `expected ${entry} to be rejected by the raw Name getter`,
+  );
+}
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.mvarExpr"), {
   kind: "mvar",
   name: "m",
@@ -93,6 +117,23 @@ assert.equal(
   leanRuntime.call("Vir.Fixtures.ExprPrinter.exprCoverageScore"),
   "1232",
 );
+assert.equal(leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", {
+  kind: "bvar", index: 1048574,
+}), "1048575");
+for (const index of [1048575, "18446744073709551615", "18446744073709551616", "9".repeat(200)]) {
+  assert.throws(() => leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", {
+    kind: "bvar", index,
+  }), /maximum index 1048574/);
+  assert.equal(leanRuntime.failure, null, "invalid JS input must not trap the interpreter");
+  const bytes = new TextEncoder().encode(String(index));
+  const ptr = leanRuntime.allocBytes(bytes);
+  try {
+    assert.equal(leanRuntime.exports.vir_obj_expr_bvar(ptr, bytes.length), 0,
+      "raw ABI also rejects indices outside the kernel's cached range");
+  } finally {
+    leanRuntime.freeBytes(ptr);
+  }
+}
 assert.equal(
   leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", {
     kind: "bvar",

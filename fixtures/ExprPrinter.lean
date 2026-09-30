@@ -29,6 +29,27 @@ def sortParamExpr : Expr :=
 def fvarExpr : Expr :=
   .fvar ⟨`x⟩
 
+def anonymousNameExpr : Expr :=
+  .fvar ⟨.anonymous⟩
+
+def unicodeNameExpr : Expr :=
+  .fvar ⟨`αβ₁⟩
+
+def numeralNameExpr : Expr :=
+  .fvar ⟨.num `Numeral 1⟩
+
+def largeNumeralNameExpr : Expr :=
+  .fvar ⟨.num `Large (10 ^ 200)⟩
+
+def dottedStringNameExpr : Expr :=
+  .fvar ⟨.str `Dotted "part.with.dot"⟩
+
+def emptyComponentNameExpr : Expr :=
+  .fvar ⟨.str `Empty ""⟩
+
+def escapedNameExpr : Expr :=
+  .fvar ⟨.str `Escaped "part with space"⟩
+
 def mvarExpr : Expr :=
   .mvar ⟨`m⟩
 

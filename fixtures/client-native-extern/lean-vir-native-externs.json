@@ -2,6 +2,11 @@
   "format": "lean-vir-client-native-externs",
   "version": 1,
   "modules": ["ClientNativeFixture"],
-  "externs": ["ClientNativeFixture.increment"],
+  "externs": [
+    "ClientNativeFixture.increment",
+    "ClientNativeFixture.«quoted.dot»",
+    "ClientNativeFixture.«1»",
+    "ClientNativeFixture.café"
+  ],
   "providerSources": ["client_native_fixture.c"]
 }

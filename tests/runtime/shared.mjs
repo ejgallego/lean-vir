@@ -114,6 +114,7 @@ const validManifestShape = {
       id: "ok",
       jsName: "ok",
       entry: "ok",
+      nameKey: "s6f6b/",
       source: "Ok.lean",
       args: [{ name: "arg1", type: { type: "Nat", interfaceTag: 0 } }],
       result: { type: "Nat", interfaceTag: 0 },
@@ -134,6 +135,7 @@ export function assertValidManifestShape() {
     {
       slot: 0,
       name: "Example.pureHost",
+      nameKey: "s4578616d706c65/s70757265486f7374/",
       source: "Example.lean",
       target: "test.pureHost",
       boundary: "hostResource",

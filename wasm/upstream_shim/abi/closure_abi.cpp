@@ -10,6 +10,7 @@ Author: Emilio J. Gallego Arias
 #include <vector>
 
 #include "runtime/io.h"
+#include "runtime/io_error.h"
 #include "runtime/object.h"
 #include "interpreter/interpreter_bridge.h"
 
@@ -116,8 +117,13 @@ extern "C" object * vir_closure_call_objects(uint32_t root_id, object ** argv, u
     }
     if (is_io) {
         if (!lean_io_result_is_ok(result)) {
+            std::string detail = vir::io_result_error_message(result);
             lean_dec(result);
             g_closure_call_error = "IO callback failed";
+            if (!detail.empty()) {
+                g_closure_call_error += ": ";
+                g_closure_call_error += detail;
+            }
             return nullptr;
         }
         result = lean_io_result_take_value(result);

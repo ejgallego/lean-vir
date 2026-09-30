@@ -126,7 +126,10 @@ int main() {
     assert(destroyed == 2);
     action = [] { return &failure; };
     assert(run_package_interpreter_initializer(nullptr, nullptr) == &failure);
-    assert(created == 3 && destroyed == 3 && g_package_interpreter == nullptr);
+    assert(created == 3 && destroyed == 2 && g_package_interpreter != nullptr);
+    // Instance retirement, rather than same-instance reset, owns failure cleanup.
+    reset_package_interpreter();
+    assert(destroyed == 3);
 }
 `;
 const directory = new URL(

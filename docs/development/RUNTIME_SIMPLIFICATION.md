@@ -37,13 +37,14 @@ inherited without a shell bridge or second React root.
 | `Vir.Common` smoke protocol and default `common.*` providers | **Removed** | The only used echo operation belongs to the FreshHost fixture and its supplied host. The unused add operation and empty generated family/module are retired; genuine common JS providers remain. |
 | Stable-facade reload and its adoption/rebinding machinery | **Removed; explicit API change** | One runtime owns one package generation. A deferred runtime may install its first package; later code uses a fresh runtime from the same factory. Callers explicitly select the new runtime and retire the old generation. |
 | `HostBindingsLease` and release callbacks | **Remove after changing a supported contract** | Independent runtimes can share bindings with automatic last-owner disposal. Decide separately whether integrations instead own supplied services. |
-| Historical manifest versions and option variants | **Remove after changing a supported contract** | Name supported released artifacts and consumers before narrowing compatibility. |
+| Historical manifest versions and option variants | **Remove now (manifest 9-only)** | Regenerate package artifacts and install matching runtime ABI 4 JavaScript/Wasm SDK files; dated design evidence remains historical. |
 | Widget error presentation and JSON-input classifications | **Removed from general runtime responsibilities** | Diagnostics now live beside the Infoview app and input classification beside page controls; ABI tags remain central. |
 | Repeated validation of owned package bytes | **Duplicate member pass removed** | The factory copies and validates input before acquiring Wasm, then uses the existing internal installer on its fresh runtime. Public raw loads still validate; the effective backend manifest and binary contract remain checked. A single-member factory load parses two manifests instead of three. |
 | Browser defaults selected inside runtime mechanisms | **Moved to environment entry points** | Factory and host state receive providers. Node imports only common JS and console providers, without DOM, active-effect, Infoview or React dependencies. Browser host composition retains its existing supplied-hook behavior. |
 | Blanket unknown Wasm import stubs | **Removed** | Defaults recognize the shipped VIR/WASI surface; unavailable WASI services report error codes, and unknown unresolved imports fail before instantiation. Explicit overrides remain supported. |
 | Object-call fallback sentinel | **Removed** | There is one checked object ABI call path. Signature and export capability checks remain. |
-| Wasm compilation reuse, obsolete-candidate checks and failed-load cleanup | **Keep because it protects a specific behavior** | Shared compilation, failed cache eviction and prevention of stale publication remain. Polling and package stat are removed; required elaboration fingerprints select retained inputs. |
+| Asset stat RPC and filesystem metadata response | **Removed** | Asset identity comes from bytes actually read; retain path validation and the byte payload only. |
+| Wasm compilation reuse, obsolete-candidate checks and failed-load cleanup | **Keep because it protects a specific behavior** | Shared compilation, failed cache eviction and prevention of stale publication remain. Polling, `statIRPackage`, `statAsset`, and metadata-only asset fields are removed; required elaboration fingerprints select retained inputs. |
 | Thin native providers, rooting/refcounts, closure/handle retention and cleanup-error collection | **Keep because it protects a specific behavior** | Receiver/property semantics, cross-heap lifetime, partial-construction cleanup and independent teardown after an error. |
 | Structural conversion, including Expr/Level support | **Keep because it protects a specific behavior** | Existing explicit conversion clients; first avoid unnecessary round trips in document/widget paths and establish the specialized consumers. |
 
@@ -62,9 +63,15 @@ Hard disposal must allow mounted React roots to run their Lean effect cleanup
 before callback roots are released. A Chromium characterization confirms this
 reentry while both disposing flags are set; rejecting all disposal-time calls
 skips the cleanup. Restrictions on new retained activity need to preserve that
-path. A throwing decrement mock does not establish that a damaged Wasm
-generation can safely continue cleanup; recovery after a Wasm trap remains a
-separate contract decision.
+path. A fatal host failure or Wasm trap retires that generation: disposal still
+releases JavaScript-owned resources without re-entering Wasm, and recovery uses
+a fresh factory runtime. Failure after initializer execution begins also retires
+the instance: persistent values, opaque handles and external effects cannot be
+rolled back. Decode, preparation and manifest rejection before initialization
+remain retryable on an empty instance. Ordinary IO failures in an installed
+healthy generation remain recoverable. The runtime reports its first retirement
+through `onFailure`; applications own recovery and do not infer liveness from
+global browser exception reporting.
 
 The invariant is **one runtime object, one package generation**. It removes
 `replaceIrPackageSetBytes`, `replacePackageState`, `adoptRuntimeState`, the

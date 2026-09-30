@@ -451,22 +451,6 @@ static bool finish_section(reader const & r, char const * label, std::string & e
     return true;
 }
 
-static std::vector<uint32_t> build_call_summary_indices(
-    std::vector<decl_entry> const & entries,
-    std::vector<export_call_summary_entry> const & export_summaries) {
-    std::vector<uint32_t> indices(entries.size(), UINT32_MAX);
-    for (size_t i = 0; i < entries.size(); i++) {
-        object * call_name = entries[i].boxed_base ? entries[i].boxed_base : entries[i].name;
-        for (size_t j = 0; j < export_summaries.size(); j++) {
-            if (lean_name_eq(call_name, export_summaries[j].name)) {
-                indices[i] = static_cast<uint32_t>(j);
-                break;
-            }
-        }
-    }
-    return indices;
-}
-
 } // namespace
 
 decoded_ir_package::~decoded_ir_package() {
@@ -495,7 +479,6 @@ void decoded_ir_package::clear() {
     init_entries.clear();
     host_imports.clear();
     export_summaries.clear();
-    call_summary_indices.clear();
     interface_manifest.clear();
     format_version = 0;
 }
@@ -570,7 +553,6 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
         return false;
     }
 
-    out.call_summary_indices = build_call_summary_indices(out.entries, out.export_summaries);
     out.format_version = version;
     return true;
 }

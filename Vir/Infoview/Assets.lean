@@ -20,15 +20,8 @@ meta structure AssetRequest where
   path : String
   deriving Server.RpcEncodable
 
-meta structure AssetInfo where
+meta structure AssetResponse where
   path : String
-  mime : String
-  byteSize : String
-  modified : String
-  revision : String
-  deriving Server.RpcEncodable
-
-meta structure AssetResponse extends AssetInfo where
   dataBase64 : String
   deriving Server.RpcEncodable
 
@@ -81,19 +74,6 @@ meta def validateAssetPath (path : String) : Except String System.FilePath := do
     throw "asset path must not contain empty, '.', or '..' components"
   return filePath.normalize
 
-meta def mimeForPath (path : System.FilePath) : String :=
-  match path.extension with
-  | some "wasm" => "application/wasm"
-  | some "irpkg" => "application/octet-stream"
-  | some "js" => "text/javascript"
-  | _ => "application/octet-stream"
-
-meta def systemTimeToken (time : IO.FS.SystemTime) : String :=
-  s!"{time.sec}.{time.nsec}"
-
-meta def metadataRevision (metadata : IO.FS.Metadata) : String :=
-  s!"{systemTimeToken metadata.modified}:{metadata.byteSize}"
-
 meta partial def findLakeRoot? (dir : System.FilePath) : IO (Option System.FilePath) := do
   if (← System.FilePath.pathExists (dir / "lakefile.lean")) ||
       (← System.FilePath.pathExists (dir / "lakefile.toml")) then
@@ -122,7 +102,6 @@ meta def assetRoot : RequestM System.FilePath := do
 
 meta structure ResolvedAsset where
   requestPath : String
-  relPath : System.FilePath
   path : System.FilePath
 
 meta def resolveAssetPath (requestPath : String) : RequestM ResolvedAsset := do
@@ -134,32 +113,16 @@ meta def resolveAssetPath (requestPath : String) : RequestM ResolvedAsset := do
   let root ← assetRoot
   return {
     requestPath
-    relPath
     path := root / relPath
   }
-
-meta def assetInfo (asset : ResolvedAsset) : IO AssetInfo := do
-  let metadata ← System.FilePath.metadata asset.path
-  return {
-    path := asset.requestPath
-    mime := mimeForPath asset.relPath
-    byteSize := toString metadata.byteSize
-    modified := systemTimeToken metadata.modified
-    revision := metadataRevision metadata
-  }
-
-@[server_rpc_method]
-meta def statAsset (params : AssetRequest) : RequestM (RequestTask AssetInfo) := do
-  RequestM.asTask do
-    assetInfo (← resolveAssetPath params.path)
 
 @[server_rpc_method]
 meta def readAsset (params : AssetRequest) : RequestM (RequestTask AssetResponse) := do
   RequestM.asTask do
     let asset ← resolveAssetPath params.path
-    let info ← assetInfo asset
     let bytes ← IO.FS.readBinFile asset.path
-    return { info with
+    return {
+      path := asset.requestPath
       dataBase64 := base64Encode bytes
     }
 

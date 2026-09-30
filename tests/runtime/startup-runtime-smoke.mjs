@@ -7,13 +7,14 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 
 import { VirRuntime } from "../../web/src/runtime/core.js";
-import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
+import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
 
 function entry(name, startup) {
   return {
     id: name,
     jsName: name,
     entry: name,
+    nameKey: `s${Buffer.from(name).toString("hex")}/`,
     source: "StartupRuntime.lean",
     args: [],
     result: { type: "Unit", interfaceTag: 22 },
@@ -74,22 +75,12 @@ assert.deepEqual(calls.slice(-4), [
   "afterFailure",
 ]);
 
-const legacyInput = {
-  version: 6,
-  metadata: {},
-  exports: [{ ...entry("legacy", undefined), startup: undefined }],
-};
-const legacyManifest = validateInterfaceManifest(legacyInput);
-assert.equal(legacyManifest.exports[0].startup, false);
-assert.equal(legacyInput.exports[0].startup, undefined);
-assert.notEqual(legacyManifest, legacyInput);
-
 const installCalls = [];
 const invalidManifestText = JSON.stringify({
-  version: 8,
+  version: INTERFACE_MANIFEST_VERSION,
   metadata: {
     packageFormatVersion: 11,
-    manifestVersion: 8,
+    manifestVersion: INTERFACE_MANIFEST_VERSION,
     targets: [],
   },
   exports: [entry("invalid", undefined)],

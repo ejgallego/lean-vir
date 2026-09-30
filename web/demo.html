@@ -139,6 +139,9 @@ Author: Emilio J. Gallego Arias
               <button type="button" data-action="ignore">Ignore</button>
               <button type="button" id="pet-reset-button">Reset</button>
             </div>
+            <button id="pet-reinitialize-runtime" class="pet-reinitialize-runtime" type="button" hidden disabled>
+              Initialize pet controls
+            </button>
             <section class="pet-trace-band" aria-live="polite">
               <div>
                 <span>last action</span>
@@ -254,6 +257,9 @@ Author: Emilio J. Gallego Arias
             </button>
           </div>
           <p id="fixture-run-status" class="fixture-run-status">Waiting for WASM</p>
+          <button id="fixture-reload-runtime" class="fixture-reload-runtime" type="button" hidden disabled>
+            Reload failed runtime
+          </button>
           <div class="fixture-runner-layout">
             <div id="fixture-list" class="fixture-list"></div>
             <aside class="fixture-source-panel" aria-labelledby="fixture-source-title">

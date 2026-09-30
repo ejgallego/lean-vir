@@ -6,13 +6,17 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 
-import { untrackedBuildInputDigests } from "../../benchmarks/harness/bench-artifact-cache.mjs";
+import {
+  prepareBenchArtifacts,
+  untrackedBuildInputDigests,
+} from "../../benchmarks/harness/bench-artifact-cache.mjs";
 import {
   effectiveWasmBuildIdentity,
   resolveEffectiveWasmBuildTools,
@@ -165,4 +169,114 @@ test("artifact cache identity hashes untracked build-input contents", async (t) 
     before["Vir/NewExperiment.lean"],
     after["Vir/NewExperiment.lean"],
   );
+});
+
+test("artifact cache invalidates after successive dirty ABI-generator edits", async (t) => {
+  const repo = await mkdtemp(join(tmpdir(), "vir-artifact-cache-dirty-"));
+  const leanSource = await mkdtemp(join(tmpdir(), "vir-artifact-cache-lean-source-"));
+  t.after(() => rm(repo, { recursive: true, force: true }));
+  t.after(() => rm(leanSource, { recursive: true, force: true }));
+  const packageDirectory = join(repo, "scripts", "packages");
+  const input = join(packageDirectory, "check-package-abi.mjs");
+  const output = join(repo, "build", "artifact.txt");
+  const pathBin = join(repo, "path-bin");
+  const sdkBin = join(repo, ".tools", "wasi-sdk", "bin");
+  await writeFile(join(leanSource, "README"), "independent Lean source fixture\n");
+  const sourceInitialized = spawnSync("git", ["init", "--quiet"], {
+    cwd: leanSource,
+    encoding: "utf8",
+  });
+  assert.equal(sourceInitialized.status, 0, sourceInitialized.stderr);
+  const sourceAdded = spawnSync("git", ["add", "."], {
+    cwd: leanSource,
+    encoding: "utf8",
+  });
+  assert.equal(sourceAdded.status, 0, sourceAdded.stderr);
+  const sourceCommitted = spawnSync("git", [
+    "-c", "user.name=VIR source fixture", "-c", "user.email=source@example.invalid",
+    "commit", "--quiet", "-m", "fixture",
+  ], { cwd: leanSource, encoding: "utf8" });
+  assert.equal(sourceCommitted.status, 0, sourceCommitted.stderr);
+  await Promise.all([
+    mkdir(packageDirectory, { recursive: true }),
+    mkdir(join(repo, "build"), { recursive: true }),
+    writeFile(join(repo, ".gitignore"), "build/\n.tools/\npath-bin/\n"),
+    writeFile(join(repo, "lean-toolchain"), "leanprover/lean4:v4.34.0\n"),
+    writeVersionTool(join(sdkBin, "clang++"), "fake clang++"),
+    writeVersionTool(join(sdkBin, "wasm-ld"), "fake wasm-ld"),
+    writeVersionTool(join(sdkBin, "llvm-nm"), "fake llvm-nm"),
+    writeLeanTool(join(pathBin, "lean")),
+  ]);
+  await writeFile(input, "// committed generator\n");
+  const initialized = spawnSync("git", ["init", "--quiet"], {
+    cwd: repo,
+    encoding: "utf8",
+  });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const added = spawnSync("git", ["add", "."], { cwd: repo, encoding: "utf8" });
+  assert.equal(added.status, 0, added.stderr);
+  const committed = spawnSync("git", [
+    "-c", "user.name=VIR cache test", "-c", "user.email=cache@example.invalid",
+    "commit", "--quiet", "-m", "fixture",
+  ], { cwd: repo, encoding: "utf8" });
+  assert.equal(committed.status, 0, committed.stderr);
+
+  const previousPath = process.env.PATH;
+  const buildEnvironmentKeys = [
+    "CXX",
+    "FAKE_LEAN_PREFIX",
+    "LEAN4_SRC",
+    "LEAN_PREFIX",
+    "LLVM_NM",
+    "VIR_WASM_INITIAL_MEMORY",
+    "VIR_WASM_OPT_LEVEL",
+    "VIR_WASM_PROFILE",
+    "VIR_WASM_STACK_SIZE",
+    "WASI_SDK_PATH",
+    "WASI_TARGET",
+    "WASM_LD",
+  ];
+  const previousBuildEnvironment = Object.fromEntries(
+    buildEnvironmentKeys.map((key) => [key, process.env[key]]),
+  );
+  process.env.PATH = [pathBin, previousPath].filter(Boolean).join(delimiter);
+  for (const key of buildEnvironmentKeys) delete process.env[key];
+  process.env.FAKE_LEAN_PREFIX = join(repo, "lean-prefix");
+  process.env.LEAN4_SRC = leanSource;
+  const options = {
+    buildArtifacts: true,
+    artifactCacheEnabled: true,
+    artifactCachePath: join(repo, "cache"),
+    refreshArtifactCache: false,
+  };
+  let builds = 0;
+  const run = () => prepareBenchArtifacts({
+    root: pathToFileURL(`${repo}/`),
+    artifactPaths: ["build/artifact.txt"],
+    options,
+    build() {
+      builds += 1;
+      writeFileSync(output, readFileSync(input));
+    },
+  });
+  try {
+    await writeFile(input, "// generator change A\n");
+    const first = await run();
+    await writeFile(input, "// generator change B\n");
+    const second = await run();
+
+    assert.notEqual(first.restore.key, second.restore.key);
+    assert.equal(first.restore.status, "miss");
+    assert.equal(second.restore.status, "miss");
+    assert.equal(builds, 2);
+    assert.equal(readFileSync(output, "utf8"), "// generator change B\n");
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+    for (const key of buildEnvironmentKeys) {
+      const value = previousBuildEnvironment[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 });

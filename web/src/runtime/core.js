@@ -9,7 +9,7 @@ import { validateIrPackageSetMembers } from "./ir-package.js";
 import { encodePackageContract } from "./package-contract.js";
 import { releaseCallbackRoots } from "./callbacks.js";
 import { RuntimeCallTiming } from "./call-timing.js";
-import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
+import { asError, collectCleanupError, throwCollectedErrors } from "./cleanup.js";
 import { ObjectValueRuntime } from "./object-values.js";
 import {
   asBytes,
@@ -19,9 +19,9 @@ import {
 import {
   objectArgumentSupported,
   objectResultSupported,
-  objectTypeNeedsBoxedBoundary,
 } from "./object-abi.js";
 
+const runtimeBoundaries = new WeakMap();
 const textDecoder = new TextDecoder();
 const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
@@ -36,21 +36,24 @@ export class VirRuntime extends ObjectValueRuntime {
     } = {},
   ) {
     super();
-    this.exports = exports;
+    const boundary = guardWasmExports(exports, hostState);
+    runtimeBoundaries.set(this, boundary);
+    this.exports = boundary.exports;
     this.module = module;
     this.hostState = hostState;
     this.packageInfo = packageInfo;
     this.interfaceManifest = null;
     this.packageMetadata = null;
-    this.boxedCallEntryNames = new Set();
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
     this.completedStartupEntries = new Set();
+    this.runningStartupEntries = false;
     this.disposed = false;
     this.disposing = false;
     this.liveCallbacks = new Set();
     this.hostState?.attachRuntime(this);
+    this.hostState?.attach(this.exports);
 
     if (!this.exports.memory) {
       throw new Error("WASM memory export is missing");
@@ -62,7 +65,6 @@ export class VirRuntime extends ObjectValueRuntime {
       this.interfaceManifest = this.readPackageManifest();
       this.hostState?.setManifest(this.interfaceManifest);
       this.packageMetadata = this.interfaceManifest.metadata;
-      this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
       this.rebuildManifestExports();
       this.completedStartupEntries = new Set();
     }
@@ -118,6 +120,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.requireFunction("vir_append_ir_package");
     this.requireFunction("vir_prepare_ir_package_set");
     this.requireFunction("vir_finish_ir_package_set");
+    this.requireFunction("vir_package_decl_count");
     this.requireFunction("vir_abort_ir_package_set");
     if (this.exports.vir_begin_ir_package_set() === 0) {
       const detail = this.lastPackageError();
@@ -127,6 +130,7 @@ export class VirRuntime extends ObjectValueRuntime {
     }
 
     let transactionOpen = true;
+    let initializationStarted = false;
     try {
       let byteLength = 0;
       for (let index = 0; index < packageBytes.length; index += 1) {
@@ -154,30 +158,30 @@ export class VirRuntime extends ObjectValueRuntime {
       const interfaceManifest = this.readPackageManifest();
       this.hostState?.setManifest(interfaceManifest);
 
-      const count = this.exports.vir_finish_ir_package_set();
-      if (count === 0) {
+      initializationStarted = true;
+      const finished = this.exports.vir_finish_ir_package_set();
+      const hostError = this.hostState?.takeCallError();
+      if (hostError) throw hostError;
+      if (finished === 0) {
         const detail = this.lastPackageError();
         throw new Error(
           `IR package-set finalization failed${detail ? `: ${detail}` : ""}`,
         );
       }
-      const providerCount = this.packageDeclCount();
-      if (providerCount !== null && providerCount !== count) {
-        throw new Error(
-          `IR package-set declaration count mismatch: load returned ${count}, provider has ${providerCount}`,
-        );
-      }
       transactionOpen = false;
       return this.finishPackageInstall({
-        count: providerCount ?? count,
+        count: this.packageDeclCount(),
         byteLength,
         packageCount: packageBytes.length,
         interfaceManifest,
         packageSet,
       });
     } catch (error) {
+      // Initializers can publish persistent values and opaque handles. Once
+      // execution starts, failure cannot be rolled back into an empty instance.
+      if (initializationStarted) runtimeBoundaries.get(this).fail(error);
       const errors = [error];
-      if (transactionOpen) {
+      if (transactionOpen && !initializationStarted) {
         collectCleanupError(errors, () =>
           this.exports.vir_abort_ir_package_set(),
         );
@@ -197,7 +201,6 @@ export class VirRuntime extends ObjectValueRuntime {
     this.interfaceManifest = interfaceManifest;
     this.hostState?.setManifest(this.interfaceManifest);
     this.packageMetadata = this.interfaceManifest.metadata;
-    this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
     this.rebuildManifestExports();
     this.packageInfo = {
       count,
@@ -216,7 +219,6 @@ export class VirRuntime extends ObjectValueRuntime {
     this.interfaceManifest = null;
     this.hostState?.setManifest(null);
     this.packageMetadata = null;
-    this.boxedCallEntryNames = new Set();
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
@@ -288,6 +290,7 @@ export class VirRuntime extends ObjectValueRuntime {
   }
 
   call(name, ...args) {
+    this.requireLiveRuntime();
     const entry = this.findManifestEntry(name);
     if (entry === null) {
       throw new Error(`interface entry not found: ${name}`);
@@ -296,6 +299,7 @@ export class VirRuntime extends ObjectValueRuntime {
   }
 
   callTimed(name, ...args) {
+    this.requireLiveRuntime();
     const timing = new RuntimeCallTiming();
     const entry = this.findManifestEntry(name);
     if (entry === null) {
@@ -312,11 +316,19 @@ export class VirRuntime extends ObjectValueRuntime {
         "cannot run VIR startup hooks before loading an IR package",
       );
     }
-    for (const entry of this.interfaceManifest.exports) {
-      if (entry.startup && !this.completedStartupEntries.has(entry.entry)) {
-        this.callEntry(entry, []);
-        this.completedStartupEntries.add(entry.entry);
+    // Host bindings can synchronously reenter this method. Let the outer
+    // traversal finish each hook before proceeding to the next one.
+    if (this.runningStartupEntries) return;
+    this.runningStartupEntries = true;
+    try {
+      for (const entry of this.interfaceManifest.exports) {
+        if (entry.startup && !this.completedStartupEntries.has(entry.entry)) {
+          this.callEntry(entry, []);
+          this.completedStartupEntries.add(entry.entry);
+        }
       }
+    } finally {
+      this.runningStartupEntries = false;
     }
   }
 
@@ -382,15 +394,9 @@ export class VirRuntime extends ObjectValueRuntime {
       cache.objectCallPlan = null;
       return null;
     }
-    const hasBoxedDecl = this.boxedCallEntryNames.has(entry.entry);
-    if (
-      !hasBoxedDecl &&
-      (objectTypeNeedsBoxedBoundary(resultType) ||
-        entry.args.some((arg) => objectTypeNeedsBoxedBoundary(arg.type)))
-    ) {
-      cache.objectCallPlan = null;
-      return null;
-    }
+    // Preparation resolves the actual boxed declaration. The binary contract
+    // independently checks its boundary requirement; display aliases and
+    // target provenance cannot establish executable declaration availability.
     cache.objectCallPlan = {
       args: entry.args,
       resultType,
@@ -491,6 +497,18 @@ export class VirRuntime extends ObjectValueRuntime {
     if (this.disposed) {
       throw new Error("VirRuntime has been disposed");
     }
+    if (this.failure !== null) {
+      throw new Error("VirRuntime failed during Wasm execution; create a fresh runtime", { cause: this.failure });
+    }
+  }
+
+  get failure() {
+    return runtimeBoundaries.get(this)?.failure ?? null;
+  }
+
+  onFailure(listener) {
+    if (typeof listener !== "function") throw new TypeError("failure listener must be a function");
+    return runtimeBoundaries.get(this).subscribe(listener);
   }
 
   trackCallback(callback) {
@@ -538,16 +556,18 @@ export class VirRuntime extends ObjectValueRuntime {
         this.writePointerArray(argvPtr, argObjs);
       }
       try {
+        const argc = argObjs.length;
+        // The consuming ABI owns arguments from entry, including trap paths.
+        argObjs.length = 0;
         resultObj = this.exports.vir_closure_call_objects(
           rootId,
           argvPtr,
-          argObjs.length,
+          argc,
         );
       } catch (error) {
         const hostError = this.hostState?.takeCallError();
         throw hostError ?? error;
       }
-      argObjs.length = 0;
       const hostError = this.hostState?.takeCallError();
       if (hostError) {
         throw hostError;
@@ -617,6 +637,68 @@ export class VirRuntime extends ObjectValueRuntime {
   }
 }
 
+// Trap recovery cannot safely call into the abandoned interpreter/allocator.
+// Keep JS cleanup idempotent, but leave Wasm allocations to instance GC.
+const abandonedCleanupExports = new Set([
+  "vir_obj_dec", "vir_free_bytes", "vir_closure_release", "vir_abort_ir_package_set",
+]);
+
+function guardWasmExports(exports, hostState) {
+  const listeners = new Set();
+  const schedule = (subscription) => {
+    if (subscription.pending) return;
+    subscription.pending = true;
+    queueMicrotask(() => {
+      if (!listeners.delete(subscription)) return;
+      try {
+        subscription.listener(boundary.failure);
+      } catch (error) {
+        // Notifications cannot replace the original failure or escape as an
+        // unhandled microtask exception. Applications own listener diagnostics.
+        try { console.error("VIR failure listener threw", error); } catch {}
+      }
+    });
+  };
+  const boundary = {
+    failure: null,
+    exports: Object.create(null),
+    fail(error) {
+      if (boundary.failure !== null) return boundary.failure;
+      // Commit abandonment before touching the thrown value or host diagnostics.
+      boundary.failure = new Error("Wasm invocation failed", { cause: error });
+      let cause = error;
+      try { cause = hostState?.takeCallError() ?? error; } catch {}
+      boundary.failure = asError(cause, "Wasm invocation failed");
+      for (const subscription of listeners) schedule(subscription);
+      return boundary.failure;
+    },
+    subscribe(listener) {
+      const subscription = { listener, pending: false };
+      listeners.add(subscription);
+      if (boundary.failure !== null) schedule(subscription);
+      return () => { listeners.delete(subscription); };
+    },
+  };
+  for (const [name, value] of Object.entries(exports)) {
+    boundary.exports[name] = typeof value !== "function" ? value : (...args) => {
+      if (boundary.failure !== null) {
+        if (abandonedCleanupExports.has(name)) return 0;
+        throw new Error("VirRuntime failed during Wasm execution; create a fresh runtime", { cause: boundary.failure });
+      }
+      try {
+        const result = value(...args);
+        // A host binding may have caught a nested fatal call. It cannot revive
+        // the shared instance by returning an apparently successful result.
+        if (boundary.failure !== null) throw boundary.failure;
+        return result;
+      } catch (error) {
+        throw boundary.fail(error);
+      }
+    };
+  }
+  return boundary;
+}
+
 // Only called on the runtime's own parsed JSON, never caller-owned host values
 // or standalone validator inputs. Cached call/layout plans require stable data.
 function freezeManifestTree(manifest) {
@@ -631,21 +713,10 @@ function freezeManifestTree(manifest) {
 }
 
 function registerManifestEntryKey(map, key, entry) {
-  if (typeof key === "string" && key !== "" && map[key] === undefined) {
+  // Manifest validation guarantees that every nonempty alias has one owner.
+  if (typeof key === "string" && key !== "") {
     map[key] = entry;
   }
-}
-
-function boxedCallEntryNames(manifest) {
-  const names = new Set();
-  for (const target of manifest?.metadata?.targets ?? []) {
-    for (const root of target?.resolvedRoots ?? []) {
-      if (typeof root === "string" && root.endsWith("._boxed")) {
-        names.add(root.slice(0, -"._boxed".length));
-      }
-    }
-  }
-  return names;
 }
 
 function isIdentifier(text) {
