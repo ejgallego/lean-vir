@@ -258,7 +258,6 @@ def installArchive
     (outDir : FilePath)
     (expectVersion : String)
     (expectCommit? : Option String) : IO Unit := do
-  IO.FS.createDirAll (outDir.parent.getD ".")
   Vir.NativePayload.withSiblingDirectory outDir fun tmpRoot => do
     let unpackDir := tmpRoot / "unpack"
     let sdkDir := unpackDir / "lean-vir-sdk"

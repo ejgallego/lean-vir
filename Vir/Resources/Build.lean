@@ -207,11 +207,7 @@ def runtimePlan (compatibilityPath lockPath root : FilePath) : IO Unit := do
     return (contentId, source)
   let source ← if source == "-" then pure source
     else if source.startsWith "https://" then do
-      let host := ((source.drop "https://".length).toString.splitOn "/").head!
-      unless !host.isEmpty && !source.toList.any (fun c =>
-          c.isWhitespace || c.toNat < 33 || c.toNat == 127) do
-        fail "INVALID_RUNTIME_LOCK"
-          "HTTPS source must have a host and no whitespace/control characters"
+      fromExcept "INVALID_RUNTIME_LOCK" (Vir.NativePayload.checkAnonymousHttps source)
       pure source
     else do
       unless validPath source do fail "INVALID_RUNTIME_LOCK" s!"unsafe local source `{source}`"

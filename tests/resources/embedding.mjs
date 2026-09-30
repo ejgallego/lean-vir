@@ -7,7 +7,10 @@ Author: Emilio J. Gallego Arias
 // Isolated embedder test only: pack preparation here is deliberately explicit.
 // It is not the cold three-package/automatic-acquisition acceptance fixture.
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
+import {
+  mkdtempSync, mkdirSync, readFileSync, writeFileSync, renameSync,
+  truncateSync, symlinkSync,
+} from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,8 +19,8 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 mkdirSync(join(root, "build"), { recursive: true });
 const project = mkdtempSync(join(root, "build/resource-embedding-"));
 console.log(`embedding evidence: ${project}`);
-function run(command, args, name, expected = 0, cwd = project) {
-  const result = spawnSync(command, args, { cwd, encoding: "utf8", timeout: 180000 });
+function run(command, args, name, expected = 0, cwd = project, timeout = 180000) {
+  const result = spawnSync(command, args, { cwd, encoding: "utf8", timeout });
   writeFileSync(join(project, `${name}.log`), `${result.stdout ?? ""}${result.stderr ?? ""}`);
   if (result.error) throw result.error;
   assert.equal(result.status, expected, `${name}: ${result.stdout}\n${result.stderr}`);
@@ -59,4 +62,31 @@ renameSync(join(project, "pack.virres"), join(project, "pack.retained"));
 // Run elsewhere with the raw input missing; preserve the native library closure.
 assert.equal(run(executable, [], "without-pack", 0, "/tmp").trim(), expected);
 assert.equal(run("lake", ["env", "lean", "--run", "Main.lean"], "interpreted-without-pack").trim(), expected);
+// Each negative elaborates the actual macro, not just the shared reader. Sparse
+// oversize and finite nonregular/link inputs safely exercise the admission limit.
+const oversized = join(project, "oversized.virres");
+writeFileSync(oversized, "");
+truncateSync(oversized, 516 * 1024 * 1024 + 13);
+mkdirSync(join(project, "directory.virres"));
+symlinkSync(join(project, "pack.retained"), join(project, "linked.virres"));
+mkdirSync(join(project, "outside"));
+writeFileSync(join(project, "outside", "pack.virres"), readFileSync(join(project, "pack.retained")));
+symlinkSync(join(project, "outside"), join(project, "linked-parent"));
+const fifo = spawnSync("mkfifo", [join(project, "pipe.virres")], { encoding: "utf8" });
+assert.ifError(fifo.error);
+assert.equal(fifo.status, 0, fifo.stderr);
+for (const [label, path, error] of [
+  ["oversize", "oversized.virres", /PACK_LIMIT/],
+  ["directory", "directory.virres", /UNSAFE_RESOURCE_FILE/],
+  ["link", "linked.virres", /UNSAFE_RESOURCE_FILE/],
+  ["parent-link", "linked-parent/pack.virres", /UNSAFE_RESOURCE_DIRECTORY/],
+  ["fifo", "pipe.virres", /UNSAFE_RESOURCE_FILE/],
+]) {
+  writeFileSync(join(project, "Rejected.lean"), `module
+meta import Vir.Resources.Embed
+def rejected : Vir.Resources.Bundle := include_vir_bundle ${JSON.stringify(path)}
+`);
+  const output = run("lake", ["env", "lean", join(project, "Rejected.lean")], `reject-${label}`, 1, project, 10000);
+  assert.match(output, error, label);
+}
 console.log("embedding: native and interpreted consumers retain bytes without the source pack");

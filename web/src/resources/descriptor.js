@@ -113,14 +113,21 @@ export function encodeDescriptor(value) {
   return prepareDescriptor(value).encoded;
 }
 
+export function requireSha256() {
+  const subtle = globalThis.crypto?.subtle;
+  if (typeof subtle?.digest !== "function") {
+    throw new Error(
+      "WebCrypto SHA-256 is unavailable; serve resources in a secure context (HTTPS or trusted localhost)",
+    );
+  }
+  return subtle;
+}
+
 export async function sha256Hex(bytes) {
   if (!(bytes instanceof Uint8Array)) {
     throw new TypeError("SHA256 input must be a Uint8Array");
   }
-  const subtle = globalThis.crypto?.subtle;
-  if (subtle === undefined) {
-    throw new Error("WebCrypto SHA-256 is unavailable");
-  }
+  const subtle = requireSha256();
   const digest = new Uint8Array(
     await subtle.digest(
       "SHA-256",

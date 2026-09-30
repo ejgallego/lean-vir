@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { createVirRuntimeFactory } from "./vir-runtime.js";
 import { validateIrPackageSetMembers } from "./runtime/ir-package.js";
-import { sha256Hex, validateEnvelope } from "./resources/descriptor.js";
+import { requireSha256, sha256Hex, validateEnvelope } from "./resources/descriptor.js";
 import { resolveProgramExports } from "./resources/program-exports.js";
 import { assertResourceCompatibility } from "./resources/compatibility.js";
 
@@ -179,6 +179,7 @@ export async function createProgram(options) {
   }
   const runtimeUrl = requireManifestUrl(options.runtimeManifestUrl);
   const programUrl = requireManifestUrl(options.programManifestUrl);
+  requireSha256();
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(new Error("resource acquisition timeout")),

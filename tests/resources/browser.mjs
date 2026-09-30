@@ -359,6 +359,24 @@ try {
     );
     outcomes.push(`${name}: PASS (${result})`);
   }
+  const unavailableCrypto = await evaluate(cdp, `(async () => {
+    const originalCrypto = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    const originalFetch = globalThis.fetch;
+    let requests = 0;
+    globalThis.fetch = (...args) => { requests++; return originalFetch(...args); };
+    try {
+      Object.defineProperty(globalThis, 'crypto', {value: {}, configurable: true});
+      try { await openResourceProgram(); return {unexpected: true, requests}; }
+      catch (error) { return {message: error.message, requests}; }
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', originalCrypto);
+      globalThis.fetch = originalFetch;
+    }
+  })()`);
+  assert.match(unavailableCrypto.message, /WebCrypto SHA-256.*secure context/);
+  assert.equal(unavailableCrypto.requests, 0, "capability rejection before acquisition");
+  assert.equal(await evaluate(cdp, "resourceInstances"), 0);
+  outcomes.push("unavailable WebCrypto: reject before requests/instantiation PASS");
   const changed = async (f) => {
     const value = structuredClone(program);
     f(value.descriptor);

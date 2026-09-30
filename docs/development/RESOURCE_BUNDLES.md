@@ -109,6 +109,8 @@ The path is relative to this source file. This example describes the low-level
 operation, **not** a manual preparation requirement for application
 users. Library prerequisites own preparation, staging and dependency traces.
 The elaborator does not download, spawn processes or run another Lake build.
+Its input must be a regular file without symlink ancestors. The pack limit is
+enforced during the read, not only by an earlier file-size observation.
 
 Generated terms contain typed descriptor constructors and binary literals, not
 paths to reopen. Binary bytes use a checked Z85 string transport so the generated
@@ -145,7 +147,9 @@ are checked against that identity and the complete compatibility profile before 
 a transport override cannot change either. The content identity also binds all
 compatibility fields. Source-distributed packs need no external host tool;
 HTTPS uses `curl`, with user curl configuration disabled, HTTPS-only redirects,
-size/time limits, and no GitHub authentication or source-build fallback.
+size/time limits, and no GitHub authentication or source-build fallback. URL
+userinfo is rejected by both runtime-lock admission and transport, even when
+verified cache bytes are already available.
 
 Valid cache or staging bytes suffice offline. Missing staging is repaired even
 when compilation is otherwise warm. Corrupt candidates are replaced only from
@@ -312,7 +316,11 @@ try {
 
 All three URLs come from the host's published bundle plan, not from build paths.
 The two manifest arguments must be explicit same-origin HTTP(S) `URL` objects,
-without credentials, query strings or fragments. The envelope is
+without credentials, query strings or fragments. The page must provide WebCrypto
+SHA-256 in a secure context: use HTTPS for deployment, or trusted localhost/loopback
+HTTP for development. Remote plain HTTP is not supported. The loader checks this
+capability before making any requests; a secure context also depends on the
+embedding page, not only the manifest URL's scheme. The envelope is
 `{contentId, descriptor}`. The loader bounds requests/JSON, rejects duplicate
 keys and redirects, validates canonical identity and every declared payload,
 checks exact compatibility, then delegates complete package-set validation and

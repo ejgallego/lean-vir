@@ -6,11 +6,27 @@ import {
   descriptorContentId,
   encodeDescriptor,
   sha256Hex,
+  requireSha256,
   validateDescriptor,
   validateEnvelope,
 } from "../../web/src/resources/descriptor.js";
 
 if (globalThis.crypto === undefined) globalThis.crypto = webcrypto;
+
+test("reports unavailable SHA-256 capability, not a protocol guess", async () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+  try {
+    for (const value of [undefined, {}, { subtle: {} }]) {
+      Object.defineProperty(globalThis, "crypto", { value, configurable: true });
+      assert.throws(requireSha256, /WebCrypto SHA-256.*secure context.*HTTPS.*localhost/);
+      await assert.rejects(sha256Hex(new Uint8Array()), /WebCrypto SHA-256/);
+    }
+    Object.defineProperty(globalThis, "crypto", { value: webcrypto, configurable: true });
+    assert.equal(requireSha256(), webcrypto.subtle);
+  } finally {
+    Object.defineProperty(globalThis, "crypto", original);
+  }
+});
 
 const emptySha256 =
   "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";

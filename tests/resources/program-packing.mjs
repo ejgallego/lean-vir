@@ -20,6 +20,10 @@ import {
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { encodeDescriptor } from "../../web/src/resources/descriptor.js";
+import {
+  irPackageManifestChecksum,
+  readIrPackageInfo,
+} from "../../web/src/runtime/ir-package.js";
 
 // Run after building both native resource tools and the BrowserProgram :vir fixture.
 const repo = resolve(fileURLToPath(new URL("../../", import.meta.url)));
@@ -87,10 +91,10 @@ function run(label, args, error) {
   return result.stdout.trim();
 }
 const plan = () => run("plan", ["plan", recipePath, compat, repo]);
-const build = (label, error) => {
+const build = (label, error, input = program) => {
   const stdout = run(
     label,
-    ["build", recipePath, compat, program, repo, packPath],
+    ["build", recipePath, compat, input, repo, packPath],
     error,
   );
   return stdout.split("\n").at(-1);
@@ -112,6 +116,23 @@ writeRuntimeLock({
 assert.equal(
   JSON.parse(runtimePlan("runtime-plan-https")).source,
   "https://example.invalid/program.virres",
+);
+for (const [i, source] of [
+  "https://user:pass@example.invalid/program.virres",
+  "https://user@example.invalid/program.virres",
+  "https://user%40name:pass@example.invalid/program.virres",
+  "https://?query/no-host",
+  "https://#fragment/no-host",
+  "https://example.invalid/with space",
+].entries()) {
+  writeRuntimeLock({ ...runtimeLock, source });
+  runtimePlan(`runtime-plan-invalid-https-${i}`, /INVALID_RUNTIME_LOCK/);
+}
+// An @ in the path is not URL userinfo.
+writeRuntimeLock({ ...runtimeLock, source: "https://example.invalid/path@name" });
+assert.equal(
+  JSON.parse(runtimePlan("runtime-plan-https-path-at")).source,
+  "https://example.invalid/path@name",
 );
 writeRuntimeLock({ ...runtimeLock, source: "../elsewhere" });
 runtimePlan("runtime-plan-traversal", /INVALID_RUNTIME_LOCK/);
@@ -349,6 +370,44 @@ function writeCanonical(label, mutate) {
   return path;
 }
 run("canonical-verified", ["verify", program, recipe.module]);
+// Mutate valid inner metadata while preserving lengths, FNV checksums and every
+// package-set/outer hash. Integrity checks must not hide missing compatibility
+// checks, and both the root and dependency members must be admitted independently.
+function mutateInterface(files, role, transform) {
+  const set = JSON.parse(files.get("program.irpkg-set.json"));
+  const member = set.packages.find((entry) => entry.role === role);
+  assert.ok(member, `fixture requires a ${role} member`);
+  const bytes = Buffer.from(files.get(member.path));
+  const info = readIrPackageInfo(bytes);
+  const section = info.package.sections.find((entry) => entry.kind === 5);
+  const start = section.offset + 12;
+  const original = bytes.subarray(start, section.offset + section.byteLength);
+  const changed = Buffer.from(transform(original.toString(), info.manifest));
+  assert.notDeepEqual(changed, original);
+  assert.equal(changed.length, original.length, "mutation must preserve section layout");
+  changed.copy(bytes, start);
+  bytes.writeBigUInt64LE(irPackageManifestChecksum(changed), section.offset);
+  files.set(member.path, bytes);
+  member.sha256 = hash(bytes);
+  files.set("program.irpkg-set.json", Buffer.from(JSON.stringify(set)));
+}
+for (const role of ["root", "dependency"]) {
+  for (const [label, transform] of [
+    ["obsolete-interface", (text) => text.replace('"version":9', '"version":8')],
+    ["wrong-manifest-metadata", (text) => text.replace('"manifestVersion":9', '"manifestVersion":8')],
+    ["wrong-package-metadata", (text) => text.replace('"packageFormatVersion":11', '"packageFormatVersion":10')],
+    ["wrong-lean-revision", (text, manifest) => text.replace(
+      manifest.metadata.leanGithash, "0".repeat(manifest.metadata.leanGithash.length))],
+    ["missing-manifest-metadata", (text) => text.replace('"manifestVersion"', '"manifestVersioX"')],
+  ]) {
+    const name = `${role}-${label}`;
+    const candidate = writeCanonical(name, (_descriptor, files) =>
+      mutateInterface(files, role, transform));
+    run(`${name}-verify`, ["verify", candidate, recipe.module], /INVALID_COMPILED_PROGRAM/);
+    build(`${name}-build`, /INVALID_COMPILED_PROGRAM/, candidate);
+    assert.deepEqual(readFileSync(packPath), first, `${name}: preserve prior output`);
+  }
+}
 for (const [label, mutate] of [
   [
     "wrong-root",

@@ -45,6 +45,14 @@ public def checkFile (path : FilePath) : IO Unit := do
   if let some m ← metadata? path then
     unless m.type == .file do fail "UNSAFE_RESOURCE_FILE" path.toString
 
+/-! Check existing ancestors before creation, then check the resulting path.
+Creating first can traverse a link and mutate an unmanaged directory even when
+the later check rejects the destination. -/
+private def createManagedParents (path : FilePath) : IO Unit := do
+  checkParents path
+  IO.FS.createDirAll path
+  checkParents path
+
 /-! Bound the read itself, not just a racy size observation before
 `readBinFile`. The path must be a regular file with no symlink ancestors. -/
 public def readInput (path : FilePath) (limit : Nat) (limitCode : String) : IO ByteArray := do
@@ -68,8 +76,7 @@ public def sha256File (path : FilePath) : IO String := do
 renames stay on the destination filesystem. -/
 public def withSiblingDirectory (nearPath : FilePath) (f : FilePath → IO α) : IO α := do
   let parent := nearPath.parent.getD "."
-  IO.FS.createDirAll parent
-  checkParents parent
+  createManagedParents parent
   let mut directory? := none
   for _ in [:8] do
     let nonce := Vir.Resources.sha256 (← IO.getRandomBytes 32)
@@ -132,8 +139,7 @@ private def freshBackupPath (destination : FilePath) : IO FilePath := do
 private def promoteDirectory (source destination : FilePath) : IO Unit := do
   checkDirectory source
   let parent := destination.parent.getD "."
-  IO.FS.createDirAll parent
-  checkParents parent
+  createManagedParents parent
   if let some metadata ← metadata? destination then
     unless metadata.type == .dir do fail "UNSAFE_RESOURCE_DIRECTORY" destination.toString
     let backup ← freshBackupPath destination
@@ -155,12 +161,27 @@ public def promote (destination : FilePath) (payload : VerifiedPayload) : IO Uni
   | .bytes bytes => atomicInstall destination bytes
   | .directory path => promoteDirectory path destination
 
+/-! Explicit URL credentials must not bypass the anonymous transport policy.
+Keep this pure check shared with lock admission; never echo credential-bearing
+input in its diagnostics. -/
+public def checkAnonymousHttps (url : String) : Except String Unit := do
+  unless url.startsWith "https://" do throw "source must use HTTPS"
+  let authority := (url.drop "https://".length).toString.toList.takeWhile
+    (fun c => c != '/' && c != '?' && c != '#')
+  unless !authority.isEmpty && !url.toList.any (fun c =>
+      c.isWhitespace || c.toNat < 33 || c.toNat == 127) do
+    throw "HTTPS source must have a host and no whitespace/control characters"
+  if authority.contains '@' then throw "anonymous HTTPS source must not contain URL credentials"
+
 /-! Resource-runtime transport is always anonymous and ignores user curl
 configuration, including any credentials in a personal curl config. -/
 public def fetchAnonymousHttps (url : String) (destination : FilePath) (maxBytes : Nat)
     : IO Unit := do
-  if let some parent := destination.parent then IO.FS.createDirAll parent
+  match checkAnonymousHttps url with
+  | .error detail => fail "INVALID_RESOURCE_URL" detail
+  | .ok _ => pure ()
   checkFile destination
+  createManagedParents (destination.parent.getD ".")
   let args := #["-q", "--fail", "--silent", "--show-error", "--location",
     "--proto", "=https", "--proto-redir", "=https", "--connect-timeout", "20",
     "--max-time", "120", "--max-filesize", toString maxBytes,

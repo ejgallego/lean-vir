@@ -47,6 +47,10 @@ private def acquire (compatibilityPath : FilePath) (expected source : String)
   let profile ← Build.compatibility compatibilityPath
   unless expected.length == 64 && expected.toList.all ("0123456789abcdef".contains ·) do
     fail "INVALID_CONTENT_ID" expected
+  if source.startsWith "https://" then
+    match Vir.NativePayload.checkAnonymousHttps source with
+    | .error detail => fail "INVALID_RESOURCE_URL" detail
+    | .ok _ => pure ()
   -- Check both destinations before doing any acquisition or committing a cache.
   Build.checkFile cache
   Build.checkFile stage

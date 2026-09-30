@@ -100,6 +100,32 @@ acquire("reject-insecure-transport", "http://invalid.example/pack",
   { error: /UNSUPPORTED_RESOURCE_TRANSPORT/ });
 assert.ok(!existsSync(cache) && !existsSync(stage));
 
+// Userinfo is rejected at source admission, before cache reuse or invoking curl.
+// Keep this check on cold and warm candidates so anonymity does not depend on
+// which path happened to satisfy acquisition.
+for (const warm of [false, true]) {
+  if (warm) {
+    writeFileSync(cache, bytes);
+    writeFileSync(stage, bytes);
+  }
+  const beforeCache = warm ? snapshot(cache) : null;
+  const beforeStage = warm ? snapshot(stage) : null;
+  for (const source of [
+    "https://user:pass@example.invalid/pack",
+    "https://user@example.invalid/pack",
+    "https://?query/no-host",
+  ]) {
+    acquire(`invalid-anonymous-url-${warm}-${source.includes("pass") ? "password" : source.includes("user") ? "user" : "host"}`,
+      source, { error: /INVALID_RESOURCE_URL/ });
+    if (warm) {
+      assert.deepEqual(snapshot(cache), beforeCache);
+      assert.deepEqual(snapshot(stage), beforeStage);
+    } else assert.ok(!existsSync(cache) && !existsSync(stage));
+  }
+}
+unlinkSync(cache);
+unlinkSync(stage);
+
 // A transport replacement cannot change either selected content or Lean revision.
 const descriptorSize = bytes.readUInt32LE(8);
 const originalJson = bytes.subarray(12, 12 + descriptorSize).toString("utf8");

@@ -106,6 +106,11 @@ def check (bundle : Bundle) (root : String) : Except String Checked := do
       (← entry.getObjValAs? String "sha256") == sha256 file.bytes) "invalid member identity"
     let interface ← manifest file.bytes
     let metadata ← interface.getObjVal? "metadata"
+    require ((← interface.getObjValAs? Nat "version") == currentInterfaceManifestVersion &&
+      (← metadata.getObjValAs? Nat "manifestVersion") == currentInterfaceManifestVersion &&
+      (← metadata.getObjValAs? Nat "packageFormatVersion") == currentPackageFormatVersion &&
+      (← metadata.getObjValAs? String "leanGithash") ==
+        bundle.descriptor.compatibility.leanRevision) "interface compatibility mismatch"
     let owner ← metadata.getObjVal? "packageSetMember"
     require ((← owner.getObjValAs? String "module") == moduleName &&
       (← owner.getObjValAs? String "role") == role) "interface ownership mismatch"

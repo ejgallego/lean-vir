@@ -12,6 +12,7 @@ meta import Lean.Elab.Deriving.ToExpr
 meta import Vir.Resources.Types
 meta import Vir.Resources.Bytes
 public meta import Vir.Resources.Pack
+public meta import Vir.NativePayload
 
 /-! Inclusion is only an elaboration operation on a prepared, complete pack.
 Lake owns preparation and tracing. No downloader, build, or runtime file access. -/
@@ -43,10 +44,8 @@ elab "include_vir_bundle " path:str : term => do
   let relative := System.FilePath.mk path.getString
   if relative.isAbsolute then throwError "include_vir_bundle expects a source-relative path"
   let resolved := directory / relative
-  let size := (← resolved.metadata).byteSize
-  if size.toNat > maxPayloadBytes + maxDescriptorBytes + 12 then
-    throwError "PACK_LIMIT: {resolved}"
-  let bytes ← IO.FS.readBinFile resolved
+  let bytes ← Vir.NativePayload.readInput resolved
+    (maxPayloadBytes + maxDescriptorBytes + 12) "PACK_LIMIT"
   match Pack.decode bytes with
   | .error error => throwError "invalid resource pack {resolved}: {repr error}"
   | .ok bundle => return toExpr bundle
