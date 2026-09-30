@@ -29,8 +29,9 @@ private def word (bytes : ByteArray) (offset count : Nat) : Except String Nat :=
   require (offset + count ≤ bytes.size) "truncated package word"
   return (List.range count).foldl (fun n i => n + bytes[offset + i]!.toNat * 256^i) 0
 
-/-- Read the actual interface section; never maintain a second export inventory. -/
-private def manifest (bytes : ByteArray) : Except String Json := do
+/-- Extract the bounded, checksummed interface JSON using the shared format constants.
+This is not a decoder for the declarations or other executable IR sections. -/
+private def readInterfaceManifest (bytes : ByteArray) : Except String Json := do
   let magicSize ← word bytes 0 4
   require (magicSize == packageMagic.utf8ByteSize &&
     bytes.extract 4 (4 + magicSize) == packageMagic.toUTF8) "invalid package magic"
@@ -66,13 +67,18 @@ structure Member where
   file : File
   deriving Inhabited
 
+/-- Validated container plus canonical build-adapter inventory, member ownership and
+compiler/interface identity. Not complete IR decoding, ABI type validation or
+execution admission; those remain at the browser/runtime boundaries. -/
 structure Checked where
   private mk ::
   bundle : Bundle
   members : Array Member
   exports : Array String
 
-def check (bundle : Bundle) (root : String) : Except String Checked := do
+/-- Only call after complete container validation. Private so an ordinary Bundle
+cannot bypass integrity checks through the public in-memory entry point. -/
+private def checkValidatedBundle (bundle : Bundle) (root : String) : Except String Checked := do
   require (bundle.descriptor.kind == .program &&
     bundle.descriptor.logicalId == "vir-compiled/" ++ root &&
     bundle.descriptor.compatibility == Build.currentCompatibility &&
@@ -102,9 +108,13 @@ def check (bundle : Bundle) (root : String) : Except String Checked := do
     require ((← entry.getObjValAs? String "role") == role &&
       (← entry.getObjValAs? String "path") == path) "invalid member role/path"
     let some file := bundle.file? path | throw s!"missing package member {path}"
-    require ((← entry.getObjValAs? Nat "byteLength") == file.bytes.size &&
-      (← entry.getObjValAs? String "sha256") == sha256 file.bytes) "invalid member identity"
-    let interface ← manifest file.bytes
+    let some info := bundle.descriptor.files.find? (·.path == path)
+      | throw s!"missing validated package member {path}"
+    -- Container validation already binds this inventory to the exact payload.
+    -- Bind the inner set to it without hashing the same member bytes again.
+    require ((← entry.getObjValAs? Nat "byteLength") == info.byteLength &&
+      (← entry.getObjValAs? String "sha256") == info.sha256) "invalid member identity"
+    let interface ← readInterfaceManifest file.bytes
     let metadata ← interface.getObjVal? "metadata"
     require ((← interface.getObjValAs? Nat "version") == currentInterfaceManifestVersion &&
       (← metadata.getObjValAs? Nat "manifestVersion") == currentInterfaceManifestVersion &&
@@ -120,10 +130,20 @@ def check (bundle : Bundle) (root : String) : Except String Checked := do
     members := members.push { moduleName, role, file }
   return { bundle, members, exports }
 
+/-- Validate an ordinary in-memory bundle before checking its compiled-program
+inventory/metadata. No prior Pack.decode, trusted constructor or caller check is
+required. A successful result does not certify arbitrary executable IR. -/
+def check (bundle : Bundle) (root : String) : Except String Checked := do
+  bundle.validate |>.mapError (fun e => s!"{e.code}: {reprStr e}")
+  checkValidatedBundle bundle root
+
+/-- Bounded regular-file read and canonical pack decoding, then the same program
+metadata checks as `check`. Pack.decode already validates the full container;
+the private continuation avoids repeating payload hashing here. -/
 def read (path : FilePath) (root : String) : IO Checked := do
   let bytes ← Build.readInput path Build.packLimit "PROGRAM_LIMIT"
   let bundle ← IO.ofExcept <| (Pack.decode bytes).mapError (fun e => s!"{e.code}: {reprStr e}")
-  IO.ofExcept <| (check bundle root).mapError ("INVALID_COMPILED_PROGRAM: " ++ ·)
+  IO.ofExcept <| (checkValidatedBundle bundle root).mapError ("INVALID_COMPILED_PROGRAM: " ++ ·)
 
 def fileInfo (file : File) (mediaType : String) : FileInfo :=
   { path := file.path, mediaType, byteLength := file.bytes.size, sha256 := sha256 file.bytes }

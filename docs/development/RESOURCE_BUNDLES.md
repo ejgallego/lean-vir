@@ -21,9 +21,10 @@ Lookup operations (`file?`, `entryPath?`, `exportName?`) perform no I/O.
 
 `Bundle.validate` checks the schema, portable paths, exact inventory, required
 roles, byte lengths, SHA-256 and descriptor identity. It does not execute JavaScript
-or inspect Lean package declarations. The program producer and browser
-loader also verify the complete package-set closure and actual exports;
-passing structural bundle validation alone is not executable-program acceptance.
+or inspect Lean package declarations. Compiled-program adaptation additionally
+checks member inventory, ownership and interface/compiler metadata; browser and
+runtime loading have their own ABI and executable-IR admission checks. Passing
+structural bundle validation alone is not executable-program acceptance.
 
 Portable inventories retain their exact spelling. Besides case-folded duplicate
 filenames and file/directory collisions, shared directory prefixes must have one
@@ -99,6 +100,35 @@ notice closure; these bounds do not permit missing dependencies.
 The root envelope namespace `bundle.json` is reserved case-insensitively, both
 as a payload filename and as a directory prefix. Nested payload names such as
 `assets/bundle.json` do not conflict with the root envelope.
+
+### Compiled-program checking is not execution admission
+
+`Vir.Resources.Program.Checked` is an internal build-adapter result for one
+canonical marked program, not a certificate about arbitrary executable code.
+Its constructor is private. Public `Program.check` accepts an ordinary `Bundle`
+and validates its complete container before checking the program inventory.
+`Program.read` adds bounded regular-file reading and canonical `Pack.decode`,
+then uses the same private program checks without hashing the payloads twice.
+The private adapter binds package-set lengths/hashes to the already verified
+outer inventory instead of recomputing every member digest. Unvalidated inputs
+cannot reach that path through the public API.
+Neither entry point requires an undocumented caller-side integrity check.
+
+| Boundary | What it establishes | What it does not establish |
+| --- | --- | --- |
+| `Bundle.validate` / `Pack.decode` | Portable schema/inventory, lengths, payload hashes and descriptor identity; decoding also checks canonical transport framing | Lean IR validity, callable ABI or behavior |
+| `Program.check` / `Program.read` | The above integrity plus canonical ordered member inventory, selected root, per-member hashes/ownership, bounded checksummed interface JSON and pinned compiler/interface versions | Full interface type grammar, complete executable-section decoding or execution admission |
+| Browser `readIrPackageInfo` / `validateIrPackageSetMembers` | Required unique non-overlapping sections, actual interface ABI grammar and package-set member/identity consistency | Decoding or proving the behavior of executable IR bodies |
+| Resource `createProgram` and the Wasm package loader | Verified resource admission, requested root export/signature binding, actual IR decoding and runtime installation checks | Kernel checking of arbitrary generated IR or a proof of formatter semantics |
+
+The native resource adapter intentionally extracts metadata using the existing
+`Vir.GeneratePackage.PackageFormat` constants. The browser interface validator
+and Wasm IR decoder remain authorities for their respective representations; do
+not mistake the adapter's interface-section reader for another full IR parser or
+import the compiler/interpreter into lightweight acquisition tools to make it one.
+The direct in-memory regression and the native packing campaign exercise these
+different boundaries, including inventory/hash, ownership, inner framing and
+compiler/interface rejection before replacing output.
 
 ## Embedding
 

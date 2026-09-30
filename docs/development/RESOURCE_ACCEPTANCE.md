@@ -23,9 +23,11 @@ that successor needs its own exact source/pack handoff.
    identities, exact member inventory and compatibility. No build paths escape.
 2. `lakefile.lean`: independent core/program/carrier ownership, ordinary library
    prerequisites, full implementation traces, and cache-returned artifact paths.
-3. `Vir/Resources/Build.lean` and the two resource tools: shared bounded native
-   I/O, required exports and atomic installation. Runtime-only preparation must
-   not depend on the program generator.
+3. `Vir/Resources/Build.lean`, `Program.lean` and the native resource tools:
+   shared bounded native I/O, container integrity, member/interface metadata,
+   required exports and atomic installation. Runtime-only preparation must not
+   depend on the program generator. `Program.Checked` is build-adapter validation,
+   not full IR execution admission; see the contract's boundary table.
 4. `Vir/Resources/Embed.lean`: preparation has already happened; elaboration only
    validates and embeds bytes. Native rendering does not reopen producer files.
 5. `web/src/resource-program.js`: validate published resources, resolve roles to

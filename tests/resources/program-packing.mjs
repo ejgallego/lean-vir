@@ -370,6 +370,15 @@ function writeCanonical(label, mutate) {
   return path;
 }
 run("canonical-verified", ["verify", program, recipe.module]);
+// Exercise public in-memory admission, not only read -> Pack.decode -> check.
+const direct = spawnSync("lake", ["env", "lean", "--run",
+  "tests/resources/ProgramCheck.lean", program, recipe.module], {
+  cwd: repo, encoding: "utf8", timeout: 180000,
+});
+const directLog = `${direct.stdout ?? ""}${direct.stderr ?? ""}`;
+writeFileSync(join(evidence, "direct-program-check.log"), directLog);
+assert.ifError(direct.error);
+assert.equal(direct.status, 0, directLog);
 // Mutate valid inner metadata while preserving lengths, FNV checksums and every
 // package-set/outer hash. Integrity checks must not hide missing compatibility
 // checks, and both the root and dependency members must be admitted independently.
@@ -390,6 +399,49 @@ function mutateInterface(files, role, transform) {
   files.set(member.path, bytes);
   member.sha256 = hash(bytes);
   files.set("program.irpkg-set.json", Buffer.from(JSON.stringify(set)));
+}
+function mutateMemberBytes(files, role, transform) {
+  const set = JSON.parse(files.get("program.irpkg-set.json"));
+  const member = set.packages.find(entry => entry.role === role);
+  assert.ok(member);
+  const bytes = Buffer.from(files.get(member.path));
+  const original = Buffer.from(bytes);
+  transform(bytes);
+  assert.notDeepEqual(bytes, original);
+  files.set(member.path, bytes);
+  member.sha256 = hash(bytes);
+  files.set("program.irpkg-set.json", Buffer.from(JSON.stringify(set)));
+}
+// These are the native adapter's actual framing boundary, not full IR decoding.
+// Keep outer/set hashes valid so rejection must come from the selected member.
+for (const role of ["root", "dependency"]) {
+  for (const [label, transform] of [
+    ["package-magic", bytes => { bytes[4] ^= 1; }],
+    ["package-version", bytes => { bytes.writeUInt32LE(10, 4 + bytes.readUInt32LE(0)); }],
+    ["section-bounds", bytes => {
+      const firstEntry = 4 + bytes.readUInt32LE(0) + 12;
+      bytes.writeUInt32LE(bytes.length + 1, firstEntry + 4);
+    }],
+  ]) {
+    const name = `${role}-${label}`;
+    const candidate = writeCanonical(name, (_descriptor, files) =>
+      mutateMemberBytes(files, role, transform));
+    run(`${name}-verify`, ["verify", candidate, recipe.module], /INVALID_COMPILED_PROGRAM/);
+    build(`${name}-build`, /INVALID_COMPILED_PROGRAM/, candidate);
+    assert.deepEqual(readFileSync(packPath), first, `${name}: preserve prior output`);
+  }
+  const name = `${role}-embedded-owner`;
+  const candidate = writeCanonical(name, (_descriptor, files) =>
+    mutateInterface(files, role, (text, manifest) => {
+      const owner = manifest.metadata.packageSetMember;
+      const before = `"packageSetMember":${JSON.stringify(owner)}`;
+      const after = `"packageSetMember":${JSON.stringify({ ...owner, module: `X${owner.module.slice(1)}` })}`;
+      assert.ok(text.includes(before), "mutation must target embedded ownership, not diagnostic module fields");
+      return text.replace(before, after);
+    }));
+  run(`${name}-verify`, ["verify", candidate, recipe.module], /INVALID_COMPILED_PROGRAM/);
+  build(`${name}-build`, /INVALID_COMPILED_PROGRAM/, candidate);
+  assert.deepEqual(readFileSync(packPath), first, `${name}: preserve prior output`);
 }
 for (const role of ["root", "dependency"]) {
   for (const [label, transform] of [
