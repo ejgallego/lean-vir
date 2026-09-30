@@ -7,13 +7,14 @@ module
 
 public import Init
 
-/-! Internal binary-literal transport. Uses the Z85 technique from VersoUtil.BinFiles
+/-! Internal binary-literal primitive, independent of resource bundles and files.
+Uses the Z85 technique from VersoUtil.BinFiles
 at af35c08a123574b36aaf4f435eaaf492ce5da985 (Apache-2.0), without a Verso dependency.
 Four bytes become five printable ASCII characters; the original length removes
 zero padding. Decoding is checked, including overflow and nonzero padding.
 This encoding is an implementation detail, not a resource interchange format. -/
 
-namespace Vir.Resources.Bytes
+namespace Vir.BinaryLiteral
 
 private def alphabet : ByteArray :=
   "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#".toUTF8
@@ -51,10 +52,10 @@ public def decode (text : String) (size : Nat) : Except String ByteArray := do
       else if byte != 0 then throw "nonzero binary literal padding"
   return out
 
-/-- Used only for validated literals produced by the inclusion elaborator. -/
+/-- Decode a checked literal produced during elaboration; no filesystem access. -/
 public def decode! (text : String) (size : Nat) : ByteArray :=
   match decode text size with
   | .ok bytes => bytes
   | .error message => panic! message
 
-end Vir.Resources.Bytes
+end Vir.BinaryLiteral

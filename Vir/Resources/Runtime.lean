@@ -6,8 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.Resources.Types
-meta import Vir.Resources.Embed
+public import Vir.Resources.Embed
 
 /-- Complete runtime bytes prepared by this module's library prerequisite. -/
 public def Vir.Resources.Runtime.bundle : Vir.Resources.Bundle :=

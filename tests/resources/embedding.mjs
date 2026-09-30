@@ -39,8 +39,7 @@ name = "check"
 root = "Main"
 `);
 writeFileSync(join(project, "Carrier.lean"), `module
-public import Vir.Resources.Types
-meta import Vir.Resources.Embed
+public import Vir.Resources.Embed
 public def carried : Vir.Resources.Bundle := include_vir_bundle "pack.virres"
 `);
 writeFileSync(join(project, "Main.lean"), `import Carrier
@@ -53,8 +52,38 @@ def main : IO Unit := do
     throw <| IO.userError "embedded bytes differ"
   IO.println carried.contentId
 `);
+// Ordinary resource values must not pull in binary-literal transport, the
+// inclusion elaborator or the pack parser. Only prepared carriers need those.
+writeFileSync(join(project, "DataOnly.lean"), `module
+import Vir.Resources.Types
+meta import Lean.Elab.Command
+run_cmd do
+  let env ← Lean.getEnv
+  for name in #[\`Vir.Resources.Bytes, \`Vir.BinaryLiteral,
+      \`Vir.Resources.Embed, \`Vir.Resources.Pack] do
+    if env.header.moduleNames.contains name then
+      throwError "resource types imported embedding machinery: {name}"
+`);
 run(join(root, ".lake/build/bin/vir_resource_tests"), ["pack", join(project, "pack.virres")], "prepare");
+run("lake", ["env", "lean", "DataOnly.lean"], "data-only-imports");
 run("lake", ["build", "check"], "compile");
+writeFileSync(join(project, "Phases.lean"), `module
+import Carrier
+meta import Lean.Elab.Command
+run_cmd do
+  let env ← Lean.getEnv
+  for (name, allowed) in #[
+      (\`Vir.Resources.Types, #[\`Init]),
+      (\`Vir.BinaryLiteral, #[\`Init]),
+      (\`Vir.Resources.Embed, #[\`Init, \`Vir.Resources.Types, \`Vir.BinaryLiteral])] do
+    let some index := env.getModuleIdx? name | throwError "missing carrier dependency: {name}"
+    let runtimeImports := (env.header.moduleData[index.toNat]!.imports.filter (!·.isMeta)).map (·.module)
+    -- Lean records implicit Init as well as an explicit exported Init import.
+    -- Check the exact admitted set without depending on duplicate entries/order.
+    unless runtimeImports.all allowed.contains && allowed.all runtimeImports.contains do
+      throwError "unexpected ordinary imports for {name}: {runtimeImports}"
+`);
+run("lake", ["env", "lean", "Phases.lean"], "carrier-import-phases");
 const expected = "31aa0de3db1b738af032d0a1c98074426f9b0cad7657d79035c62284d87c2d8e";
 const executable = join(project, "compiled output/bin/check");
 assert.equal(run(executable, [], "native").trim(), expected);
@@ -68,6 +97,9 @@ const oversized = join(project, "oversized.virres");
 writeFileSync(oversized, "");
 truncateSync(oversized, 516 * 1024 * 1024 + 13);
 mkdirSync(join(project, "directory.virres"));
+const corrupted = Buffer.from(readFileSync(join(project, "pack.retained")));
+corrupted[corrupted.length - 1] ^= 1;
+writeFileSync(join(project, "corrupt.virres"), corrupted);
 symlinkSync(join(project, "pack.retained"), join(project, "linked.virres"));
 mkdirSync(join(project, "outside"));
 writeFileSync(join(project, "outside", "pack.virres"), readFileSync(join(project, "pack.retained")));
@@ -81,9 +113,10 @@ for (const [label, path, error] of [
   ["link", "linked.virres", /UNSAFE_RESOURCE_FILE/],
   ["parent-link", "linked-parent/pack.virres", /UNSAFE_RESOURCE_DIRECTORY/],
   ["fifo", "pipe.virres", /UNSAFE_RESOURCE_FILE/],
+  ["corrupt", "corrupt.virres", /invalid resource pack.*HASH_MISMATCH/s],
 ]) {
   writeFileSync(join(project, "Rejected.lean"), `module
-meta import Vir.Resources.Embed
+import Vir.Resources.Embed
 def rejected : Vir.Resources.Bundle := include_vir_bundle ${JSON.stringify(path)}
 `);
   const output = run("lake", ["env", "lean", join(project, "Rejected.lean")], `reject-${label}`, 1, project, 10000);

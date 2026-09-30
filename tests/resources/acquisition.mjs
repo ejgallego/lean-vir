@@ -314,8 +314,7 @@ lean_lib Client where
   roots := #[\`Client]
 `);
 writeFileSync(join(client, "Carrier.lean"), `module
-public import Vir.Resources.Types
-meta import Vir.Resources.Embed
+public import Vir.Resources.Embed
 public def carried : Vir.Resources.Bundle := include_vir_bundle ".vir-generated/fixture.virres"
 `);
 writeFileSync(join(client, "Client.lean"), `module

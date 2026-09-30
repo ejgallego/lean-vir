@@ -6,11 +6,12 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.Resources.Types
-public import Vir.Resources.Bytes
+-- Only carriers need the pure binary-literal decoder, not resource data types.
+public import Vir.BinaryLiteral
 public meta import Lean.Elab.Term
 meta import Lean.Elab.Deriving.ToExpr
 meta import Vir.Resources.Types
-meta import Vir.Resources.Bytes
+public meta import Vir.BinaryLiteral.ToExpr
 public meta import Vir.Resources.Pack
 public meta import Vir.NativePayload
 
@@ -24,8 +25,7 @@ meta section
 
 private instance : ToExpr ByteArray where
   toTypeExpr := mkConst ``ByteArray
-  toExpr bytes := mkApp2 (mkConst ``Bytes.decode!)
-    (mkStrLit (Bytes.encode bytes)) (toExpr bytes.size)
+  toExpr := BinaryLiteral.toExpr
 
 deriving instance ToExpr for BundleKind
 deriving instance ToExpr for Compatibility

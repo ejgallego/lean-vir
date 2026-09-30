@@ -39,13 +39,13 @@ lean_lib Vir where
 /-- Resource data/tools must never depend on the optional runtime carrier. -/
 lean_lib VirResourceCore where
   roots := #[]
-  globs := #[.one `Vir.Resources, .one `Vir.Resources.Types, .one `Vir.Resources.Bytes,
+  globs := #[.one `Vir.BinaryLiteral, .one `Vir.Resources, .one `Vir.Resources.Types,
     .one `Vir.Resources.Sha256, .one `Vir.Resources.Validate, .one `Vir.Resources.Pack,
     .one `Vir.Resources.Build, .one `Vir.Resources.Program, .one `Vir.NativePayload]
 
 lean_lib VirResourceEmbed where
   roots := #[]
-  globs := #[.one `Vir.Resources.Embed]
+  globs := #[.one `Vir.BinaryLiteral.ToExpr, .one `Vir.Resources.Embed]
 
 lean_lib VirResourceBrowserFixture where
   roots := #[`tests.resources.BrowserProgram]

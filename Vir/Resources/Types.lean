@@ -6,9 +6,6 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Init
--- Generated carriers use this pure decoder at runtime, even when Embed itself
--- is imported only as meta. It performs no acquisition or filesystem access.
-public import Vir.Resources.Bytes
 
 /-! Portable, complete resource values. No acquisition or elaboration dependencies. -/
 

@@ -136,8 +136,7 @@ The inclusion elaborator only reads an already-prepared, validated pack:
 
 ```lean
 module
-public import Vir.Resources.Types
-meta import Vir.Resources.Embed
+public import Vir.Resources.Embed
 
 public def bundle : Vir.Resources.Bundle :=
   include_vir_bundle "prepared.virres"
@@ -153,15 +152,28 @@ enforced during the read, not only by an earlier file-size observation.
 Generated terms contain typed descriptor constructors and binary literals, not
 paths to reopen. Binary bytes use a checked Z85 string transport so the generated
 term does not contain one expression node per byte. The technique is adapted
-from Apache-2.0 `VersoUtil.BinFiles`; VIR has no Verso dependency. The pure decoder
-is exposed through `Types` so a meta-only `Embed` import still produces legal
-runtime code under Lean's module phase rules.
+from Apache-2.0 `VersoUtil.BinFiles`; VIR has no Verso dependency. One internal
+`Vir.BinaryLiteral` primitive owns that checked transport; its separate meta-only
+`ToExpr` helper constructs literals without reading files or knowing resource formats.
+The inclusion wrapper owns bounded file reading and canonical pack validation.
+This is adapted infrastructure, not yet a cross-project shared utility package.
+
+Carriers use the single ordinary `public import Vir.Resources.Embed` above. It
+exports resource types and the pure decoder; parser, file admission and expression
+construction dependencies remain meta-only. Lean's phase rules require that ordinary
+import route for the generated decoder call. Replace the older `Types` plus
+meta-only `Embed` import pair when updating a carrier; `Types` no longer imports
+binary-literal transport. No syntax, descriptor, pack or browser API changes are
+needed. Embedding the raw pack for runtime parsing is deliberately not an alternative:
+validation happens before typed constructors are embedded.
 
 The focused test uses a separate downstream package and custom build directory,
 then removes its pack and runs the native executable from another working
 directory. `lake env lean --run Main.lean` also works with the compiled carrier
 and pack absent. Re-elaborating the carrier itself still requires preparation;
-raw invocations that skip its library prerequisites are not promised.
+raw invocations that skip its library prerequisites are not promised. The test also
+checks the data-only import boundary and the carrier's ordinary versus meta-only
+dependencies, and rejects a corrupt payload before embedding it.
 
 ## Native acquisition and staging
 

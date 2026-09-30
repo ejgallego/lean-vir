@@ -9,12 +9,12 @@ import Lean
 import Vir.Resources
 import Vir.Resources.Pack
 import Vir.Resources.Sha256
-import Vir.Resources.Bytes
+import Vir.BinaryLiteral
 import Vir.GeneratePackage.PackageFormat
 public meta import Vir.Resources
 public meta import Vir.Resources.Pack
 public meta import Vir.Resources.Sha256
-public meta import Vir.Resources.Bytes
+public meta import Vir.BinaryLiteral
 
 open Vir.Resources
 
@@ -111,9 +111,16 @@ private def unitTests : IO Unit := do
   hashTests
   for size in [:260] do
     let bytes : ByteArray := ⟨(Array.range size).map Nat.toUInt8⟩
-    check s!"binary literal round trip {size}" ((Bytes.decode (Bytes.encode bytes) size).toOption == some bytes)
-  for (text, size) in #[("", 1), ("~~~~~", 4), ("#####", 4), ("00001", 1)] do
-    check "malformed binary literal" (Bytes.decode text size |>.toOption.isNone)
+    check s!"binary literal round trip {size}"
+      ((Vir.BinaryLiteral.decode (Vir.BinaryLiteral.encode bytes) size).toOption == some bytes)
+  -- Standard Z85 vector: this transport remains compatible with the existing
+  -- inclusion technique; validation does not rely only on encode/decode agreement.
+  let vector : ByteArray := ⟨#[0x86, 0x4f, 0xd2, 0x6f, 0xb5, 0x59, 0xf7, 0x5b]⟩
+  check "binary literal known encoding" (Vir.BinaryLiteral.encode vector == "HelloWorld")
+  check "binary literal known decoding"
+    ((Vir.BinaryLiteral.decode "HelloWorld" 8).toOption == some vector)
+  for (text, size) in #[("", 1), ("~~~~~", 4), ("#####", 4), ("00001", 1), ("00000", 0)] do
+    check "malformed binary literal" (Vir.BinaryLiteral.decode text size |>.toOption.isNone)
   let r := runtime
   let d := r.descriptor
   let _ ← success "runtime validation" r.validate
