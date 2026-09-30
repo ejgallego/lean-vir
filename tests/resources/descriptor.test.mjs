@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { webcrypto } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import {
   descriptorContentId,
@@ -65,6 +66,23 @@ function runtime(overrides = {}) {
     exports: [],
     ...overrides,
   };
+}
+
+// Shared with Unit.lean: lexical portability, not a filesystem qualification.
+const portablePaths = JSON.parse(readFileSync(new URL("./portable-paths.json", import.meta.url)));
+for (const { paths, code } of portablePaths) {
+  test(`portable inventory ${JSON.stringify(paths)}: ${code}`, () => {
+    for (const names of [paths, [...paths].reverse()]) {
+      const descriptor = runtime({
+        files: names.map(path => ({ path, mediaType: "text/plain", byteLength: 0, sha256: emptySha256 })),
+        fileEntries: [{ role: "runtimeModule", path: names[0] }, { role: "wasm", path: names[0] }],
+      });
+      if (code === "OK") {
+        const actual = validateDescriptor(descriptor);
+        assert.deepEqual(actual.files.map(f => f.path).sort(), [...names].sort());
+      } else assert.throws(() => validateDescriptor(descriptor), new RegExp(code));
+    }
+  });
 }
 
 test("canonical v1 identity and Unicode/control spelling match Lean", async () => {

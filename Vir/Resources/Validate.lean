@@ -8,6 +8,7 @@ module
 public import Vir.Resources.Types
 import Vir.Resources.Sha256
 import Init.Data.Array.QSort
+import Std.Data.HashMap.Basic
 
 public section
 namespace Vir.Resources
@@ -105,6 +106,18 @@ private def paths (id : String) (names : Array String) : Except ResourceError Un
       parentPath := if parentPath.isEmpty then part else parentPath ++ "/" ++ part
       if folded.contains parentPath then
         throw { code := "PATH_PREFIX_CONFLICT", logicalId := id, path := some name }
+  -- Directory spelling is part of the portable inventory, not just leaf spelling.
+  -- Keep the original spelling; merging Assets/ and assets/ is not normalization.
+  let mut directories : Std.HashMap String String := {}
+  for name in names do
+    let mut parentPath := ""
+    for part in (name.splitOn "/").dropLast do
+      parentPath := if parentPath.isEmpty then part else parentPath ++ "/" ++ part
+      let key := parentPath.toLower
+      if let some spelling := directories[key]? then
+        unless spelling == parentPath do
+          throw { code := "DIRECTORY_CASE_CONFLICT", logicalId := id, path := some name }
+      else directories := directories.insert key parentPath
 
 private def uniqueRoles (id : String) (roles : Array String) : Except ResourceError Unit := do
   if roles.size > maxFiles then throw { code := "TOO_MANY_ROLES", logicalId := id }

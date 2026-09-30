@@ -1,11 +1,21 @@
 # Embedded resources: review and acceptance
 
 This is a draft implementation, not yet the default cold-install client workflow.
-The API uses main's Lean 4.34.0 toolchain. A historical downstream Slides PrettyM
-demo remains pinned to its separate, qualified Lean 4.35.0-rc3 resource checkpoint;
-unstacking this PR does not migrate that demo. The checked-in runtime lock uses available-only
+The API uses main's Lean 4.34.0 toolchain. The supplied-pack Slides strict-creation
+checkpoint is qualified on 4.34; its older 4.35 canary remains historical evidence.
+The checked-in runtime lock uses available-only
 selection (`source: "-"`); it does not identify a public download. Publication of
 a durable runtime distribution remains a release prerequisite.
+
+The accepted downstream baseline is Slides `51c6d782` / VIR `47e82e9a`, runtime
+`401b115e` and pure Except-v2 program `97b280b7`. Slides reports 101 native,
+11 Node and 30 Chromium/Firefox passing checks; VIR reviewed the retained
+identities and actual exported signature without duplicating those runs.
+VIR's exact-head CI `36720794347` and candidate `36720794235` both passed.
+These are baseline evidence, not qualification of later changes or the newly
+selected runtime pack. The directory-prefix admission fix changes bundled
+JavaScript and therefore the runtime content identity; downstream adoption of
+that successor needs its own exact source/pack handoff.
 
 ## Review order
 
@@ -56,16 +66,16 @@ checks. The downstream Slides tests belong to Slides and are not run by VIR CI.
 | T18 Concurrent/interrupted production | Covered at installer boundary | Concurrent same-identity native installations and interrupted/failed transport checks. |
 | T19 Compiled bytes | Covered | Native generator works with raw program packs unavailable; focused embedding also covers removed raw inputs. |
 | T20 Site relocation | Covered | Actual Slides program executes at root and nested URL prefixes. |
-| T21 Real PrettyM | Covered on historical 4.35 demo | Downstream browser/native shared 21-case semantic corpus; no automatic 4.34 Slides adoption claim. |
+| T21 Real PrettyM | Covered on supplied-pack 4.34 checkpoint | Slides51c6d782 / VIR47e82e9a native and Chromium/Firefox results use the same pure Except-v2 wrapper. Older 4.35 demo/corpus remains separate historical evidence. |
 | T22 Format edges | Covered | Shared corpus includes Unicode, tags, groups and alignment/width cases. |
-| T23 Invalid requests | Covered on historical 4.35 demo | Slides test-only a5b42f8 / VIR4d00dbf replays the same 13 generated native bounds cases in Wasm at root/nested URLs, including exact escaped 1 MiB output and one byte over. Successful calls after each expected error check recovery. No 4.34 Slides adoption claim. |
+| T23 Invalid requests | Covered on supplied-pack 4.34 checkpoint | Slides51c6d782 checks its finite policy, actual identity/signature rejection, pending creation cancellation and cleanup, pagehide during Wasm creation, and same-program recovery. Broader realistic-goal, latency and final product qualification remain downstream. Historical a5b42f8 / VIR4d00dbf bounds evidence is retained, not reused to qualify the 4.34 pair. |
 | T24 Calls/disposal | Partial | Independent runtimes, sequential disposal/remount and deferred client mount races pass. The documented mount example is tested for both completion orders, pending unmount, stale/current rejection and cleanup failure. The resource browser gate measures 300 scalar calls and collection of 14 disposed Wasm memories, including retained facades after normal and throwing cleanup; dynamic PrettyM/callback retention is not inferred. See below. |
-| T25 Paths/collisions | Covered | Portable path, case/prefix collision, integrity and link/hardlink tests; seven real-facet aliases preserve sentinels before rejection, including Lake trace/hash writes and warm-cache paths. Slides reserves publisher namespaces. |
+| T25 Paths/collisions | Covered lexically and for the tested host operations | Shared Lean/JS corpus rejects inconsistent directory-prefix casing, duplicate leaves, file/directory collisions and reserved paths in either inventory order; safe spelling is retained. No case-insensitive-filesystem materialization test is claimed. Earlier link/hardlink and seven real-facet alias checks retain their separate host scope. |
 | T26 Shared producer | Covered | Two distinct intermediary packages, each with two carriers, share one producer/runtime in a cold build. Publication contains one runtime plus four programs; client-specific edits preserve peer program bytes. |
 | T27 Build cycles | Covered | Program importing its owning carrier rejected before compiled jobs wait. |
 | T28 Execution modes | Covered for documented modes | Compiled native and focused interpreted byte access; raw carrier elaboration without prerequisites is unsupported. |
 | T29 Identity vectors | Covered | Cross-language canonical descriptor/hash and mutation/reordering checks. |
-| T30 Semantics disclosure | Covered | Demo declares columns; ordinary pixel-measured Slides formatter unchanged. |
+| T30 Semantics disclosure | Covered for the bounded consumer checkpoint | Slides documents width/finite-policy semantics. Lean owns formatting, VIR execution and JS browser measurement/presentation. Mandatory production UI consolidation and removal of the superseded JS formatter remain Slides-owned. |
 
 The cache campaign accepts an optional real pack:
 

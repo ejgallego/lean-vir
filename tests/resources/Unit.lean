@@ -89,7 +89,25 @@ private def hashTests : IO Unit := do
       (1000, "41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3")] do
     check s!"padding length {size}" (sha256 ⟨Array.replicate size 97⟩ == digest)
 
+-- Shared lexical corpus. Validation must preserve spelling, never normalize it.
+private def portablePathTests : IO Unit := do
+  let json ← IO.ofExcept (Lean.Json.parse (include_str "portable-paths.json"))
+  let cases ← IO.ofExcept json.getArr?
+  for entry in cases do
+    let names ← IO.ofExcept (entry.getObjValAs? (Array String) "paths")
+    let code ← IO.ofExcept (entry.getObjValAs? String "code")
+    for paths in #[names, names.reverse] do
+      let descriptor := { runtime.descriptor with
+        files := paths.map fun path => ⟨path, "text/plain", 0, sha256 ByteArray.empty⟩
+        fileEntries := #[⟨"runtimeModule", paths[0]!⟩, ⟨"wasm", paths[0]!⟩] }
+      if code == "OK" then
+        let _ ← success s!"portable inventory {paths}" (validateDescriptor descriptor)
+        check "inventory spelling preserved" (descriptor.files.map (·.path) == paths)
+      else failure code (validateDescriptor descriptor)
+  IO.println s!"portable paths: {cases.size} shared lexical cases, both inventory orders passed"
+
 private def unitTests : IO Unit := do
+  portablePathTests
   hashTests
   for size in [:260] do
     let bytes : ByteArray := ⟨(Array.range size).map Nat.toUInt8⟩

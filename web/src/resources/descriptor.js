@@ -208,6 +208,21 @@ function checkPaths(paths) {
       }
     }
   }
+  // Reject conflicting directory spellings without rewriting either inventory.
+  const directories = new Map();
+  for (const path of paths) {
+    const parts = path.split("/");
+    let parent = "";
+    for (const part of parts.slice(0, -1)) {
+      parent = parent === "" ? part : `${parent}/${part}`;
+      const key = parent.toLowerCase();
+      const previous = directories.get(key);
+      if (previous !== undefined && previous !== parent) {
+        fail("DIRECTORY_CASE_CONFLICT");
+      }
+      directories.set(key, parent);
+    }
+  }
 }
 
 function checkUniqueRoles(entries) {

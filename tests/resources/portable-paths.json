@@ -1,0 +1,22 @@
+[
+  {"paths": ["Assets/a.js", "assets/b.js"], "code": "DIRECTORY_CASE_CONFLICT"},
+  {"paths": ["Assets/a.js", "Assets/b.js"], "code": "OK"},
+  {"paths": ["assets/A.js", "assets/b.js"], "code": "OK"},
+  {"paths": ["Assets/a.js"], "code": "OK"},
+  {"paths": ["Root/Icons/a.svg", "Root/icons/b.svg"], "code": "DIRECTORY_CASE_CONFLICT"},
+  {"paths": ["Root/Icons/a.svg", "root/Icons/b.svg"], "code": "DIRECTORY_CASE_CONFLICT"},
+  {"paths": ["Root/Icons/a.svg", "Root/Icons/Nested/b.svg", "Root/icons/Nested/c.svg"], "code": "DIRECTORY_CASE_CONFLICT"},
+  {"paths": ["Root/Icons/a.svg", "Root/Icons/Nested/b.svg"], "code": "OK"},
+  {"paths": ["Root/Icons/a.svg", "Other/icons/b.svg"], "code": "OK"},
+  {"paths": ["Root/A/a.svg", "Root/B/b.svg"], "code": "OK"},
+  {"paths": ["a.js", "A.js"], "code": "DUPLICATE_PATH"},
+  {"paths": ["Assets/a.js", "assets/A.JS"], "code": "DUPLICATE_PATH"},
+  {"paths": ["a.js", "a.js"], "code": "DUPLICATE_PATH"},
+  {"paths": ["Assets", "assets/b.js"], "code": "PATH_PREFIX_CONFLICT"},
+  {"paths": ["Root/Icons", "Root/icons/b.svg"], "code": "PATH_PREFIX_CONFLICT"},
+  {"paths": ["Assets/a.js", "Assets/a.js/child"], "code": "PATH_PREFIX_CONFLICT"},
+  {"paths": ["bundle.json"], "code": "INVALID_PATH"},
+  {"paths": ["BUNDLE.JSON/child"], "code": "INVALID_PATH"},
+  {"paths": ["Assets/bundle.json", "Assets/other.json"], "code": "OK"},
+  {"paths": ["a/../b.js"], "code": "INVALID_PATH"}
+]

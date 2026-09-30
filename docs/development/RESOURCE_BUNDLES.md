@@ -25,6 +25,14 @@ or inspect Lean package declarations. The program producer and browser
 loader also verify the complete package-set closure and actual exports;
 passing structural bundle validation alone is not executable-program acceptance.
 
+Portable inventories retain their exact spelling. Besides case-folded duplicate
+filenames and file/directory collisions, shared directory prefixes must have one
+consistent spelling: `Assets/a.js` plus `assets/b.js` is rejected with
+`DIRECTORY_CASE_CONFLICT`, as is `Root/Icons/a.svg` plus `Root/icons/b.svg`.
+Using `Assets/` consistently is valid; unrelated directories need not share
+capitalization. This is lexical portability admission, not filesystem case
+normalization or a claim that every filesystem has been tested.
+
 `ResourceSet.validate` requires equal Lean revision and VIR compatibility version and rejects
 conflicting contents under one logical identity. `ResourceSet.bundles` validates
 first and returns one copy of each repeated identical logical/content identity.
@@ -156,6 +164,18 @@ when compilation is otherwise warm. Corrupt candidates are replaced only from
 verified bytes; a cold offline miss identifies the required bundle. There is no
 fallback revision, filename-based trust or successful return after a failed
 download. Reads are bounded independently of a prior filesystem size check.
+
+For public distribution, a release owner must publish the exact verified
+`CONTENT_ID.virres` as an immutable, anonymously downloadable asset. Prepare a
+draft, upload without overwriting an existing asset, verify the uploaded bytes,
+then publish. Only after that verification should the owning runtime lock replace
+`source: "-"` with the actual durable HTTPS URL; keep its content ID unchanged.
+Qualify acquisition into fresh cache/staging directories with no supplied pack,
+then warm offline reuse and an actionable cold offline miss. The owning-library
+workflow remains the application entry point. This is a separate release gate:
+synthetic transport tests, authenticated CI artifacts and locally supplied packs
+do not establish anonymous installation. Neither publication nor an acquisition
+miss should build Wasm or select a different revision implicitly.
 
 Installation writes to a fresh sibling directory, then renames the complete
 file. It never truncates a cached/hardlinked destination and leaves valid warm
@@ -470,5 +490,8 @@ required exports, strict recipes/locks, profile mismatches, and atomic replaceme
 of larger hardlinked outputs without altering their other names.
 Anonymous cold acquisition needs a durable prebuilt distribution; a local archive
 is not evidence for that requirement. The full T01–T30 campaign and resource
-size/compile-memory/browser measurements remain outstanding. The actual Slides
-pixel-measured formatter is untouched; the accepted local canary uses columns only.
+size/compile-memory/browser measurements remain outstanding. The historical 4.35
+column canary remains separate from the supplied-pack 4.34 strict creation and
+Except-v2 consumer qualification recorded in the acceptance status. Slides owns
+formatter policy, measurement and presentation; retiring the superseded production
+JavaScript formatter remains downstream work, not a supported fallback design.
