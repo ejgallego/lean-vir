@@ -1,6 +1,6 @@
 # Documentation
 
-Start with the [quickstart](../README.md) to use VIR, or the
+Start with the [project overview](../README.md) to use VIR, or the
 [developer guide](DEVELOPER_GUIDE.md) to change its implementation.
 
 ## Guides: use VIR
