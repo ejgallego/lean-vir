@@ -116,6 +116,9 @@ if grep -E 'Built .*ModuleSetFixture[.]Root:vir' "$tmp/no-op.stdout" "$tmp/no-op
   exit 1
 fi
 
+# The facets acquire vir_program, not the standalone generator used below.
+# Fetch this test-only prerequisite explicitly, including in a cold checkout.
+lake build vir_irpkg
 for repro_dir in "$tmp/repro-a" "$tmp/repro-b"; do
   mkdir -p "$repro_dir/Root.parts"
   lake env .lake/build/bin/vir_irpkg \
