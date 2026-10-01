@@ -42,7 +42,6 @@ for (const option of ["hostBindings", "defaultHostBindings"]) {
       const first = await factory.instantiate();
       const second = await other.instantiate();
       const state = first.hostState;
-      state.resourceRoots.root({ application: true });
       try {
         first.dispose();
         second.requireLiveRuntime();
@@ -59,7 +58,7 @@ for (const option of ["hostBindings", "defaultHostBindings"]) {
         assert.equal(service.lifecycle.debugResourceCounts().active, 1);
         service.bindings["browser.timer.setInterval"](() => {}, 60_000);
         assert.equal(service.lifecycle.debugResourceCounts().active, 2);
-        assert.equal(state.resourceRoots.debugCounts().active, 0);
+        assert.equal(state.resourceRootCounts().active, 0);
         assert.equal(state.userBindings, null);
         assert.equal(state.defaultBindings, null);
       } finally {
@@ -83,11 +82,10 @@ test("supplied disposers are never inspected, including direct host-state dispos
   }).instantiate();
   runtime.dispose();
   const state = new VirHostState({ hostBindings: supplied, defaultHostBindings: supplied });
-  state.resourceRoots.root({});
   state.dispose();
   state.dispose();
   assert.equal(reads, 0);
-  assert.equal(state.resourceRoots.debugCounts().active, 0);
+  assert.equal(state.resourceRootCounts().active, 0);
   assert.equal(state.userBindings, null);
   assert.equal(state.defaultBindings, null);
 });
@@ -147,7 +145,7 @@ for (const failure of ["imports", "memory"]) {
   });
 }
 
-test("owned-provider cleanup failure still drops bridge roots and map references", async () => {
+test("owned-provider cleanup failure still drops map references in a hostless runtime", async () => {
   const failure = new Error("provider cleanup sentinel");
   let disposals = 0;
   const runtime = await new VirRuntimeFactory({
@@ -157,35 +155,25 @@ test("owned-provider cleanup failure still drops bridge roots and map references
     }),
   }).instantiate();
   const state = runtime.hostState;
-  state.resourceRoots.root({});
   assert.throws(() => runtime.dispose(), error => error === failure);
   assert.equal(disposals, 1);
-  assert.equal(state.resourceRoots.debugCounts().active, 0);
+  assert.equal(state.resourceRootCounts().active, 0);
   assert.equal(state.userBindings, null);
   assert.equal(state.defaultBindings, null);
   runtime.dispose();
   assert.equal(disposals, 1);
 });
 
-test("host-state construction failure cleans up only the fresh result", async (t) => {
-  const service = activeBindings();
-  const failure = new Error("externref table construction sentinel");
+test("a failed fresh-provider builder leaves supplied services application-owned", async () => {
+  const failure = new Error("provider builder sentinel");
   let suppliedDisposals = 0;
   const factory = new VirRuntimeFactory({
     wasmModule: module,
     hostBindings: { [VIR_HOST_DISPOSE]() { suppliedDisposals++; } },
-    defaultHostBindings: () => service.bindings,
+    defaultHostBindings: () => { throw failure; },
   });
-  t.mock.method(WebAssembly, "Table", function () { throw failure; });
-  try {
-    await assert.rejects(factory.instantiate(), error => error === failure);
-    assert.equal(service.disposals, 1);
-    assert.equal(service.lifecycle.debugResourceCounts().active, 0);
-    assert.equal(suppliedDisposals, 0);
-  } finally {
-    t.mock.restoreAll();
-    service.lifecycle.dispose();
-  }
+  await assert.rejects(factory.instantiate(), error => error === failure);
+  assert.equal(suppliedDisposals, 0);
 });
 
 test("failed creation retains both the original and owned-provider cleanup errors", async () => {
@@ -199,7 +187,6 @@ test("failed creation retains both the original and owned-provider cleanup error
     }),
     imports: (_module, hostState) => {
       state = hostState;
-      state.resourceRoots.root({});
       throw failure;
     },
   });
@@ -208,7 +195,7 @@ test("failed creation retains both the original and owned-provider cleanup error
     assert.deepEqual(error.errors, [failure, cleanup]);
     return true;
   });
-  assert.equal(state.resourceRoots.debugCounts().active, 0);
+  assert.equal(state.resourceRootCounts().active, 0);
   assert.equal(state.defaultBindings, null);
   state.dispose();
   assert.equal(disposals, 1);

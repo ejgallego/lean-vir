@@ -34,26 +34,6 @@ extern "C" lean_object * vir_js_call_objects(uint32_t slot, lean_object ** argv,
     abort();
 }
 
-[[noreturn]] static void unsupported_resource_operation(char const * operation) {
-    fprintf(stderr, "unexpected JavaScript resource %s in engine benchmark\n", operation);
-    abort();
-}
-
-extern "C" uint32_t vir_resource_root(__externref_t value) {
-    (void) value;
-    unsupported_resource_operation("root");
-}
-
-extern "C" __externref_t vir_resource_get(uint32_t root_id) {
-    (void) root_id;
-    unsupported_resource_operation("get");
-}
-
-extern "C" void vir_resource_release(uint32_t root_id) {
-    (void) root_id;
-    unsupported_resource_operation("release");
-}
-
 #include "vir_fixtures_basic_package.inc"
 
 static bool g_benchmark_failed = false;

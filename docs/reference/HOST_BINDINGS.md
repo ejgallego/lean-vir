@@ -135,9 +135,13 @@ externref table slot  ◀── numeric root id ──▶  Lean external object
 ```
 
 The root id is private transport. It is never presented to a host binding and
-does not replace the JavaScript value with a handle object. A separate live-id
-set makes every JavaScript value valid, including `null` and `undefined`.
-Dropping the Lean external object releases its table slot.
+does not replace the JavaScript value with a handle object. The Wasm module owns
+the unexported table and its slot allocator. Separate per-slot liveness metadata
+makes every JavaScript value valid, including `null` and `undefined`.
+Dropping the Lean external object releases its table slot without entering JS.
+Disposal terminally clears the table; that instance cannot acquire new roots.
+See the [resource allocator design](../development/WASM_RESOURCE_ROOTS.md) for
+growth failure, slot reuse and retirement after a trap.
 
 ## JavaScript Reachability
 

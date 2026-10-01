@@ -9,8 +9,6 @@ import {
   throwCollectedErrors,
 } from "./runtime/cleanup.js";
 
-const EXTERNREF_TABLE_INITIAL_LENGTH = 1;
-
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 
 export function disposeHostBindings(bindings) {
@@ -85,62 +83,4 @@ function closeHostCallTransaction(transaction) {
   }
   transaction.active = false;
   hostCallTransactions.pop();
-}
-
-export class ExternrefRoots {
-  constructor({ initial = EXTERNREF_TABLE_INITIAL_LENGTH } = {}) {
-    requireExternrefTableSupport();
-    if (!Number.isInteger(initial) || initial < 1) {
-      throw new Error(
-        "externref root table initial length must reserve root id 0",
-      );
-    }
-    this.table = new WebAssembly.Table({ element: "externref", initial }, null);
-    this.freeRootIds = [];
-    for (let rootId = initial - 1; rootId >= 1; rootId -= 1)
-      this.freeRootIds.push(rootId);
-    this.liveRootIds = new Set();
-  }
-
-  root(value) {
-    const rootId = this.freeRootIds.pop() ?? this.table.grow(1, null);
-    if (rootId <= 0 || rootId > 0xffffffff) {
-      throw new Error(
-        "Lean VIR externref root table exceeded the 32-bit root id range",
-      );
-    }
-    this.table.set(rootId, value);
-    this.liveRootIds.add(rootId);
-    return rootId;
-  }
-
-  get(rootId) {
-    return Number.isInteger(rootId) && this.liveRootIds.has(rootId)
-      ? this.table.get(rootId)
-      : undefined;
-  }
-
-  has(rootId) {
-    return Number.isInteger(rootId) && this.liveRootIds.has(rootId);
-  }
-
-  release(rootId) {
-    if (!Number.isInteger(rootId) || !this.liveRootIds.delete(rootId))
-      return undefined;
-    this.table.set(rootId, null);
-    this.freeRootIds.push(rootId);
-    return undefined;
-  }
-
-  clear() {
-    for (const rootId of Array.from(this.liveRootIds)) this.release(rootId);
-  }
-
-  debugCounts() {
-    return {
-      active: this.liveRootIds.size,
-      capacity: this.table.length - 1,
-      reusable: this.freeRootIds.length,
-    };
-  }
 }

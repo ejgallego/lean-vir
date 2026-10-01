@@ -89,7 +89,7 @@ end Fatal`,
       assert.throws(() => runtime.runStartupEntries(), /fresh runtime/);
       assert.throws(() => runtime.retainLeanObjectHandleValue(held, "old root"), /fresh runtime/);
       runtime.dispose(); runtime.dispose();
-      assert.equal(hostState.resourceRoots.debugCounts().active, 0);
+      assert.equal(hostState.resourceRootCounts().active, 0);
       assert.equal(hostState.leanObjectHandleCells.size, 0);
       assert.equal(runtime.liveCallbacks.size, 0);
       assert.equal(hostState.callTimings.length, 0);

@@ -143,6 +143,10 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_resource`            | Represent an exact JavaScript `externref` value as a Lean object.                                 | Returns an owned Lean external object whose finalizer releases its externref-table slot.                            |
 | `vir_obj_resource_externref`  | Recover the exact JavaScript value from a Lean resource object.                                   | No ownership change; JavaScript identity is preserved.                                                              |
 | `vir_obj_resource_is_valid`   | Check whether a Lean object has the resource external class and a nonzero root ID.                | No allocation or ownership change; does not independently check root-table or generation liveness.                  |
+| `vir_resource_roots_clear`    | Terminally drop all JavaScript roots for this instance.                                           | Idempotent; forbids future rooting, retains metadata until instance collection, and is allowed after a fatal trap. |
+| `vir_resource_roots_active`   | Count live JavaScript roots.                                                                      | Diagnostic only; allowed after a fatal trap.                                                                        |
+| `vir_resource_roots_capacity` | Count allocated root slots, excluding reserved zero.                                               | Diagnostic only; capacity remains allocated after clearing.                                                        |
+| `vir_resource_roots_reusable` | Count currently reusable root slots.                                                              | Diagnostic only; returns zero after terminal clearing.                                                              |
 | `vir_obj_closure_root`        | Root a Lean function object so JavaScript can call it later.                                      | Retains the function through the closure root table; input object ownership is unchanged.                           |
 | `vir_closure_call_objects`    | Call a rooted Lean closure with owned Lean object arguments.                                      | Consumes all argument objects after accepting a non-null `argv`; returns one owned result object or `0` on failure. |
 | `vir_closure_call_error`      | Return a borrowed pointer to the last closure-call diagnostic.                                    | Borrowed until the next closure call or runtime teardown.                                                           |
@@ -181,7 +185,10 @@ Resource inspection requires a valid, live Lean object reference. A boxed
 JavaScript `null` is a valid resource and unboxes to `null`; a non-resource
 object also unboxes to `null`. Use `vir_obj_resource_is_valid` to distinguish
 them. That predicate checks the external class and nonzero ID, while the
-runtime's root table and generation lifecycle govern root availability.
+runtime's root table and generation lifecycle govern root availability. Root
+allocation metadata lives in linear memory; the references themselves live in
+the unexported Wasm table. Metadata growth precedes table growth, and failed
+growth publishes no root. Release needs no allocation.
 
 Object constructors return an owned Lean object pointer. JavaScript owns
 that reference and must release it with `vir_obj_dec` unless a call helper
@@ -218,6 +225,10 @@ cleanup must not attempt to re-enter the failed instance to release or inspect
 them. Disposal releases JavaScript-owned resources, while the abandoned Wasm
 objects are reclaimed with the instance. Create a fresh runtime for subsequent
 object calls.
+
+Terminal resource-table clearing and its three count diagnostics are the narrow
+exceptions to the failed-generation guard. They do not inspect or release Lean
+heap objects; see the [allocator design](../development/WASM_RESOURCE_ROOTS.md).
 
 ## Call path
 
