@@ -74,15 +74,15 @@ export async function runGenerationLifecycleCases(
   // Fault injection releases the actual Wasm roots first, then throws. Every
   // independent cleanup must still run; repeated disposal must not release twice.
   let hostDisposals = 0;
-  const failures = await makeGeneration((bindings) =>
-    createRuntime({
-      ...bindings,
-      [VIR_HOST_DISPOSE]: () => {
-        hostDisposals++;
-        throw new Error("host cleanup sentinel");
-      },
-    }),
-  );
+  const failures = await makeGeneration(createRuntime);
+  // Inject into the runtime-owned fresh default provider, preserving its cleanup.
+  const ownedBindings = failures.runtime.hostState.defaultBindings;
+  const disposeOwnedBindings = ownedBindings[VIR_HOST_DISPOSE];
+  ownedBindings[VIR_HOST_DISPOSE] = () => {
+    disposeOwnedBindings?.call(ownedBindings);
+    hostDisposals++;
+    throw new Error("host cleanup sentinel");
+  };
   const failedState = failures.runtime.hostState;
   const counts = injectReleaseFailures(failures.runtime);
   rejects(() => failures.runtime.dispose(), /cleanup|teardown/i);
@@ -175,12 +175,12 @@ export async function runSharedBindingGcCases(
   first.dispose();
   check(
     disposals === 0,
-    "one shared owner cannot dispose another owner's bindings",
+    "runtime disposal preserves application-owned bindings",
   );
   second.dispose();
-  check(disposals === 1, "last explicit shared owner disposes bindings once");
+  check(disposals === 0, "final runtime disposal preserves supplied bindings");
   second.dispose();
-  check(disposals === 1, "shared binding disposal is idempotent");
+  check(disposals === 0, "repeated runtime disposal preserves supplied bindings");
 
   // An externally owned factory/passive shared map has no reverse runtime edge.
   const weak = await makeSharedGraph(factory, packageBytes);
@@ -203,10 +203,11 @@ export async function runSharedBindingGcCases(
     () => retained.deref() === undefined,
     "shared-map target released",
   );
-  // Collection does not decrement existing numeric lease counts. This test
-  // establishes reachability only, not automatic shared-binding teardown.
+  check(disposals === 0, "generation collection does not dispose application services");
+  sharedBindings[VIR_HOST_DISPOSE]();
+  check(disposals === 1, "the application disposes its shared bindings");
   return {
-    explicitSharedDisposal: true,
+    applicationOwnedBindings: true,
     passiveFactory: true,
     retainedMap: true,
   };

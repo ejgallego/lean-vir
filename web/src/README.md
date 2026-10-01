@@ -40,7 +40,7 @@ unrelated responsibilities.
 - `runtime/object-values.js`: object ABI lowering and lifting between
   JavaScript values and owned Lean objects.
 - `runtime/host-state.js`: host import dispatch state, exact-value externref
-  roots, host-binding lookup, and host-binding disposal.
+  roots, host-binding lookup, and runtime-owned fresh-provider disposal.
 - `runtime/object-abi.js`: object ABI support checks, layout planning, scalar
   field packing, and unpacking helpers used by the object-value runtime.
 - `runtime/object-abi-exports.js`: shared object ABI export-name manifest used
