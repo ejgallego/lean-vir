@@ -393,10 +393,12 @@ private def sameResourceLibrary (a b : LeanLib) : Bool :=
   a.name == b.name && a.pkg.keyName == b.pkg.keyName
 
 private def resourceLibraryStem (lib : LeanLib) : Except String String := do
+  -- Keep Lean's name spelling (including quotes); it must be one filename,
+  -- not an ASCII-only identifier or a rewritten slug.
   let stem := lib.name.toString
-  unless !stem.isEmpty && stem.toList.all (fun c =>
-      c.isAlphanum && c.toNat < 128 || c == '_') do
-    throw "virResourcePack requires an ASCII alphanumeric/underscore library name"
+  unless !stem.isEmpty && stem != "." && stem != ".." &&
+      !stem.contains '/' && !stem.contains '\\' && !stem.contains '\x00' do
+    throw "virResourcePack requires a library name usable as one filename"
   return stem
 
 /-- Resolve only independent program inputs; never fetch the carrier's modules

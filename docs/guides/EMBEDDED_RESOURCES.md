@@ -75,7 +75,10 @@ Create `vir-resources/ClientResources.json`:
 }
 ```
 
-The recipe filename matches the carrier library. `module` names one composition
+The recipe filename uses the carrier's Lean name spelling, including quotes
+when needed (for example, `«Client-Resources».json` for `lean_lib «Client-Resources»`).
+Dotted and Unicode names are also supported; names containing path separators
+are not filenames. `module` names one composition
 root. Roles are stable client-facing names;
 `interfaceId` records the call contract, not a generated type check.
 

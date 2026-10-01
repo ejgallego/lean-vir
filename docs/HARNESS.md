@@ -34,7 +34,7 @@ maintainer requests a tracked fixture or report change.
 | Release Wasm and its debug companion | `npm run build:demo:release` strips the release file; the debug companion remains optimized and unstripped. SDK/local archives and SDK import smokes need both. |
 | `web/dist/`, including SDK/local archives and analysis pages | `npm run build:site`; required before `test:pages:browser`. |
 | Infoview JavaScript bundle under `build/generated/` | `lake build VirInfoview` requires npm dependencies. The default `Vir` library needs no npm bundle. |
-| Local `.irpkg` and reports | Follow [local packages](guides/PACKAGES.md#generate-a-local-package) or [package configuration](guides/PACKAGES.md#configure-package-generation). |
+| Local `.irpkg` and reports | Follow [config-based local package preparation](guides/PACKAGES.md#generate-a-local-package). |
 
 Other ignored outputs include object caches and reports under `build/`, package
 `.input.json` / `.report.md` files and `downloads/` under `web/public/`, the
