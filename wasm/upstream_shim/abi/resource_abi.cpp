@@ -14,7 +14,7 @@ Author: Emilio J. Gallego Arias
 #error "VIR resource payload encoding requires wasm32"
 #endif
 
-static_assert(sizeof(uintptr_t) == sizeof(uint32_t));
+static_assert(sizeof(uintptr_t) >= sizeof(uint32_t), "resource root ID must fit in the opaque payload");
 
 extern "C" uint32_t vir_resource_root(__externref_t value);
 extern "C" __externref_t vir_resource_get(uint32_t root_id);
@@ -23,8 +23,8 @@ extern "C" void vir_resource_release(uint32_t root_id);
 namespace lean {
 namespace {
 
-// On the supported wasm32 toolchain, the opaque external payload carries the
-// root ID directly. It is never a pointer to dereference; zero remains invalid.
+// The opaque external payload carries the root ID directly, widened through
+// uintptr_t. It is never a pointer to dereference; zero remains invalid.
 static void * encode_root_id(uint32_t root_id) {
     return reinterpret_cast<void *>(static_cast<uintptr_t>(root_id));
 }
@@ -63,7 +63,8 @@ object * vir_resource_object_from_externref(__externref_t value) {
 }
 
 uint32_t vir_resource_root_id(object * value) {
-    if (!lean_is_external(value) || lean_get_external_class(value) != vir_resource_external_class()) {
+    if (g_vir_resource_external_class == nullptr || !lean_is_external(value) ||
+        lean_get_external_class(value) != g_vir_resource_external_class) {
         return 0;
     }
     return decode_root_id(lean_get_external_data(value));
