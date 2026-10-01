@@ -29,40 +29,113 @@ const optionResourceType = {
   element: resourceType,
 };
 
-assert.equal(typeof runtime.exports.vir_call_resolved, "undefined");
-assert.equal(typeof runtime.exports.vir_call_result_size, "undefined");
+const roots = runtime.hostState.resourceRoots;
+const initialRoots = roots.debugCounts().active;
+let finalizerReleases = 0;
+const releaseRoot = runtime.hostState.releaseRootedResourceFromFinalizer;
+runtime.hostState.releaseRootedResourceFromFinalizer = (rootId) => {
+  finalizerReleases++;
+  return releaseRoot.call(runtime.hostState, rootId);
+};
 
-for (const value of [
-  null,
-  undefined,
-  false,
-  0,
-  -0,
-  42n,
-  "raw",
-  { name: "object" },
-  ["array"],
-  () => "callback",
-]) {
-  let object = runtime.makeObjectValue(resourceType, value, "raw resource");
-  try {
-    assert.equal(
-      Object.is(
-        runtime.liftObjectValue(resourceType, object, "raw resource"),
-        value,
-      ),
-      true,
-    );
-    assert.equal(runtime.exports.vir_obj_resource_is_valid(object), 1);
-  } finally {
+try {
+  assert.equal(typeof runtime.exports.vir_call_resolved, "undefined");
+  assert.equal(typeof runtime.exports.vir_call_result_size, "undefined");
+
+  const objectValue = { name: "object" };
+  const arrayValue = ["array"];
+
+  for (const value of [
+    null,
+    undefined,
+    false,
+    0,
+    -0,
+    NaN,
+    42n,
+    "raw",
+    Symbol("resource"),
+    objectValue,
+    arrayValue,
+    () => "callback",
+  ]) {
+    const releasesBefore = finalizerReleases;
+    let object = runtime.makeObjectValue(resourceType, value, "raw resource");
+    try {
+      assert.equal(roots.debugCounts().active, initialRoots + 1);
+      assert.equal(
+        Object.is(
+          runtime.liftObjectValue(resourceType, object, "raw resource"),
+          value,
+        ),
+        true,
+      );
+      assert.equal(runtime.exports.vir_obj_resource_is_valid(object), 1);
+    } finally {
+      runtime.exports.vir_obj_dec(object);
+      object = 0;
+    }
+    assert.equal(roots.debugCounts().active, initialRoots);
+    assert.equal(finalizerReleases, releasesBefore + 1);
+  }
+
+  {
+    const value = { shared: true };
+    const releasesBefore = finalizerReleases;
+    const object = runtime.exports.vir_obj_resource(value);
+    const independentlyBoxed = runtime.exports.vir_obj_resource(value);
+    assert.notEqual(object, independentlyBoxed);
+    assert.equal(roots.debugCounts().active, initialRoots + 2);
+    runtime.exports.vir_obj_inc(object);
     runtime.exports.vir_obj_dec(object);
-    object = 0;
+    assert.equal(finalizerReleases, releasesBefore);
+    assert.equal(runtime.exports.vir_obj_resource_externref(object), value);
+    runtime.exports.vir_obj_dec(object);
+    assert.equal(finalizerReleases, releasesBefore + 1);
+    assert.equal(roots.debugCounts().active, initialRoots + 1);
+    assert.equal(
+      runtime.exports.vir_obj_resource_externref(independentlyBoxed),
+      value,
+    );
+    runtime.exports.vir_obj_dec(independentlyBoxed);
+    assert.equal(finalizerReleases, releasesBefore + 2);
+    assert.equal(roots.debugCounts().active, initialRoots);
   }
-  // Releasing the Lean-side root cannot mutate or invalidate the JavaScript
-  // value. JavaScript reachability is the lifetime oracle.
-  if (value !== null && typeof value === "object") {
-    assert.equal(value.name ?? value[0], value.name ?? "array");
+
+  {
+    // Use valid Lean values of other kinds, never forged object pointers.
+    const string = makeObjectString(runtime, "not a resource");
+    const scalar = runtime.exports.vir_obj_scalar(0);
+    try {
+      for (const value of [string, scalar]) {
+        assert.equal(runtime.exports.vir_obj_resource_is_valid(value), 0);
+        assert.equal(runtime.exports.vir_obj_resource_externref(value), null);
+      }
+    } finally {
+      runtime.exports.vir_obj_dec(string);
+      runtime.exports.vir_obj_dec(scalar);
+    }
+    assert.equal(roots.debugCounts().active, initialRoots);
   }
+
+  {
+    const rootResource = runtime.hostState.rootResource;
+    const releasesBefore = finalizerReleases;
+    runtime.hostState.rootResource = () => 0;
+    try {
+      assert.equal(runtime.exports.vir_obj_resource({ failed: true }), 0);
+    } finally {
+      runtime.hostState.rootResource = rootResource;
+    }
+    assert.equal(finalizerReleases, releasesBefore);
+    assert.equal(roots.debugCounts().active, initialRoots);
+  }
+
+  // Releasing a Lean root leaves the independently reachable JS values intact.
+  assert.deepEqual(objectValue, { name: "object" });
+  assert.deepEqual(arrayValue, ["array"]);
+} finally {
+  runtime.hostState.releaseRootedResourceFromFinalizer = releaseRoot;
 }
 
 assert.throws(

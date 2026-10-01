@@ -11,6 +11,11 @@ async function run(args = []) {
     args: ["constructor-providers.wasm", ...args],
   });
   const { instance } = await WebAssembly.instantiate(wasm, {
+    env: {
+      vir_resource_release() {
+        throw new Error("a foreign external object must not release a JS resource root");
+      },
+    },
     wasi_snapshot_preview1: {
       ...wasi.wasiImport,
       clock_time_get() { throw new Error("constructor initialization must not require a clock"); },

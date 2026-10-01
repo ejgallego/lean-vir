@@ -14,10 +14,10 @@ describes supported mappings and gaps.
 | --------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Lean library          | `Vir/`                                                                       | Runtime monads, JavaScript phantom types, browser/React APIs, and interface classification. |
 | Package tools         | `tools/`                                                                     | IR package construction, manifests, closure discovery, and reports.                         |
-| Interpreter shim      | `wasm/upstream_shim/`                                                        | Upstream interpreter integration, package provider, object ABI, and externref roots.        |
+| Interpreter shim      | `wasm/upstream_shim/`                                                        | Upstream interpreter integration, package provider, object ABI, and Lean resource boxing/finalization. |
 | Runtime facade        | `web/src/vir-runtime.js`, `web/src/runtime/core.js`                          | Instantiation, one-generation package loading, calls, and disposal.                         |
 | Object ABI            | `web/src/runtime/object-values.js`, `web/src/runtime/host-state.js`          | Lean object lowering/lifting and host-import dispatch.                                      |
-| JS boundary           | `web/src/host-boundary.js`                                                   | Externref roots and host-call rollback transactions.                                        |
+| JS boundary           | `web/src/host-boundary.js`                                                   | JavaScript root-table ownership and host-call rollback transactions.                        |
 | Active host lifecycle | `web/src/host/vir-active-host-bindings.js`                                   | Shared lifecycle plus timer and frame teardown.                                             |
 | Browser providers     | `web/src/vir-host-bindings.js`, `web/src/host/vir-infoview-host-bindings.js` | Browser targets and the repository-owned infoview protocol.                                 |
 | React providers       | `web/src/vir-react-host-bindings.js`, `web/src/react/`                       | Official browser React host.                                                               |

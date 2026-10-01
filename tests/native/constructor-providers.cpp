@@ -4,8 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-// Run the same cases against pinned native Lean and the actual Wasm link inputs.
+// Shared cases compare pinned native Lean with the actual Wasm link inputs.
 // Printed metadata is pointer-size independent; ownership checks run in both.
+// The Wasm build additionally checks rejection of a foreign external class.
 #include <lean/lean.h>
 #include <cstdio>
 #include <cstdlib>
@@ -182,6 +183,26 @@ static void once_providers() {
     nested_once_providers();
 }
 
+#if defined(__wasm32__)
+namespace lean { void initialize_object(); }
+extern "C" uint8_t vir_obj_resource_is_valid(O *);
+
+static unsigned foreign_finalizations = 0;
+static void finalize_foreign(void * data) {
+    check(data == &foreign_finalizations, "foreign external payload unchanged");
+    ++foreign_finalizations;
+}
+
+static void foreign_external_resource_check() {
+    lean::initialize_object();
+    lean_external_class * cls = lean_register_external_class(finalize_foreign, nullptr);
+    O * foreign = lean_alloc_external(cls, &foreign_finalizations);
+    check(vir_obj_resource_is_valid(foreign) == 0, "foreign external class is not a JS resource");
+    lean_dec(foreign);
+    check(foreign_finalizations == 1, "foreign external finalizes once");
+}
+#endif
+
 int main(int argc, char ** argv) {
     if (argc > 1 && std::strcmp(argv[1], "--same-cell-recursion") == 0) {
 #if defined(__wasm__)
@@ -191,6 +212,9 @@ int main(int argc, char ** argv) {
 #endif
         return 0;
     }
+#if defined(__wasm32__)
+    foreign_external_resource_check();
+#endif
     once_providers();
     O * prefix = name("αβ₁");
     O * suffix = lean_mk_string("child");
