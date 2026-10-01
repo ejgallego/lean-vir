@@ -2,16 +2,20 @@
 
 Start with [the application workflow](guides/EMBEDDED_RESOURCES.md), or the
 [developer guide](DEVELOPER_GUIDE.md) to work on VIR itself.
+Read [support scope](SUPPORT.md) for the officially supported boundary and
+experimental conveniences; shipped coverage is not a support commitment.
 
 ## Guides: use VIR
 
 - [Application setup](guides/EMBEDDED_RESOURCES.md): prepare the program and runtime
   through a client library, publish their files and call Lean from JavaScript.
-- [Lean library](guides/LEAN_VIR_LIBRARY.md): effects, boundary values and API entry points.
-- [React](guides/REACT.md): native values, components, hooks, JSX and supported calls.
+- [Lean library](guides/LEAN_VIR_LIBRARY.md): core effects and boundary values,
+  alongside explicitly identified experimental helpers.
 
 ## Experimental
 
+- [DOM helpers](guides/LEAN_VIR_LIBRARY.md): browser receivers, events, timers and canvas.
+- [React and JSX](guides/REACT.md): native values, components, hooks and implemented call shapes.
 - [Infoview widgets and RPC](guides/INFOVIEW.md): editor activation, sessions, server
   references and ProofWidgets compatibility; try the
   [RPC tutorial](../examples/tutorials/RpcReferenceWidget.md).

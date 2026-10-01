@@ -1,5 +1,9 @@
 # Binding reference, shipped inventory, and author actions
 
+This is an implementation inventory, not a promise of official support for every
+listed binding. See [support scope](SUPPORT.md); DOM/React/widget bindings and
+broad generated JS conveniences remain experimental even when shipped and tested.
+
 The generated binding reference is the primary human report for VIR's
 pre-release library surface. One HTML document presents three projections of the
 same machine data:

@@ -99,6 +99,12 @@ await writeFile(
 This SDK contains the JavaScript runtime modules and wasm32-wasip1 interpreter
 for the matching lean_vir package revision.
 
+Official support covers the runtime, packages, object API and minimal JS/Lean
+interop. DOM, React/JSX, widgets and broad generated or automatic conversion
+conveniences are experimental, including when shipped in this archive.
+See the support scope for details and the planned 0.1.1 JSON converter API:
+https://github.com/ejgallego/lean-vir/blob/main/docs/SUPPORT.md
+
 The JavaScript files are ES modules. The generic runtime and host-binding
 modules do not import React; js/vir-react-host-bindings.js imports react and
 react-dom/client and should only be used by browser React integrations. Their

@@ -1,5 +1,9 @@
 # Host Bindings
 
+Explicit host imports and Js/JSL/callback ownership belong to the official
+[support scope](../SUPPORT.md). DOM, React and widget providers described here
+are experimental, including those installed by the default browser entry.
+
 This page documents the JavaScript side of Lean-to-JavaScript host imports.
 The Lean declarations are listed in [LEAN_VIR_LIBRARY.md](../guides/LEAN_VIR_LIBRARY.md),
 and the runtime facade is documented in [JS_API.md](../guides/JS_API.md).

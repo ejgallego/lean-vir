@@ -4,10 +4,16 @@ Lean VIR runs selected [Lean 4](https://github.com/leanprover/lean4) declaration
 in the browser through Lean's real IR interpreter compiled to `wasm32-wasip1`.
 It packages compiled module IR; it is not a general Lean-to-Wasm compiler.
 
+VIR officially supports the runtime, package workflow, low-level object API and
+minimal two-way JS/Lean interop. DOM, React/JSX and editor/widget integrations are
+experimental conveniences, including when available through default imports.
+See [support scope](docs/SUPPORT.md) for the boundary and the planned 0.1.1 JSON
+converters.
+
 ## Try it
 
 Open the [hosted demos](https://ejgallego.github.io/lean-vir/), including
-[React Tamagotchi](https://ejgallego.github.io/lean-vir/react.html) and
+[experimental React Tamagotchi](https://ejgallego.github.io/lean-vir/react.html) and
 [`Format.pretty`](https://ejgallego.github.io/lean-vir/format.html).
 No local Lean or Wasm build is needed to try the hosted site.
 
@@ -40,13 +46,15 @@ and limits are recorded in [the acceptance checklist](docs/development/RESOURCE_
 
 ## Experimental
 
-[Editor widgets and RPC](docs/guides/INFOVIEW.md) use live editor environments,
-including unsaved code. They are experimental and outside the first-release
-application workflow.
+[DOM helpers](docs/guides/LEAN_VIR_LIBRARY.md),
+[React and JSX](docs/guides/REACT.md), and
+[editor widgets and RPC](docs/guides/INFOVIEW.md) are available to try outside the
+official support scope. Editor widgets use live environments, including unsaved
+code. Their presence in the library or demos does not extend the support promise.
 
 ## Develop VIR
 
-The default `lake build` builds the core Lean library. To work on VIR itself:
+The default `lake build` builds the Lean library. To work on VIR itself:
 
 ```bash
 npm install
