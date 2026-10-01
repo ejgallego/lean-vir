@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-// Producer-local acceptance. The maintainer supplies a matching prebuilt pack;
-// the leaf application's only command and dependency are the normal client ones.
+// Supplied-pack or anonymous published-pack acceptance. In both modes the leaf
+// application's only command and dependency are the normal client ones.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -23,11 +23,34 @@ import {
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = fileURLToPath(new URL("../../", import.meta.url));
+const sourceRoot = fileURLToPath(new URL("../../", import.meta.url));
 const source = process.argv[2];
 if (!source)
-  throw new Error("usage: node tests/resources/client.mjs EXACT_RUNTIME_PACK");
-const evidence = mkdtempSync(join(root, "build/resource-client-"));
+  throw new Error(
+    "usage: node tests/resources/client.mjs EXACT_RUNTIME_PACK | --published",
+  );
+const published = source === "--published";
+const evidence = mkdtempSync(join(sourceRoot, "build/resource-client-"));
+console.log(`resource client evidence: ${evidence}`);
+let root = sourceRoot;
+if (published) {
+  // A committed source snapshot, not the producer's warm build/cache/stage.
+  root = join(evidence, "producer");
+  mkdirSync(root);
+  const archive = spawnSync("git", ["archive", "HEAD"], {
+    cwd: sourceRoot,
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (archive.error) throw archive.error;
+  assert.equal(archive.status, 0, archive.stderr.toString());
+  const extracted = spawnSync("tar", ["-x", "-C", root], {
+    input: archive.stdout,
+  });
+  if (extracted.error) throw extracted.error;
+  assert.equal(extracted.status, 0, extracted.stderr.toString());
+  assert.ok(!existsSync(join(root, ".lake")));
+  assert.ok(!existsSync(join(root, ".vir-generated")));
+}
 const client = join(evidence, "client");
 const leaf = join(evidence, "user");
 cpSync(join(root, "fixtures/resources/client"), client, { recursive: true });
@@ -55,33 +78,65 @@ function run(cwd, label, cmd, args, error = null) {
   return log;
 }
 const lock = JSON.parse(readFileSync(join(root, "vir-resources/runtime.json")));
+if (published) assert.match(lock.source, /^https:\/\//);
 const runtimeCache = join(
   root,
   ".lake/build/vir/resources/runtime",
   `${lock.contentId}.virres`,
 );
 const runtimeStage = join(root, ".vir-generated/VirResourceRuntime.virres");
-run(
-  root,
-  "seed-maintainer-runtime",
-  join(root, ".lake/build/bin/vir_resource_pack"),
-  [
-    "acquire",
-    join(root, "vir-resources/compatibility.json"),
-    lock.contentId,
-    resolve(source),
-    runtimeCache,
-    runtimeStage,
-  ],
-);
+if (!published)
+  run(
+    root,
+    "seed-maintainer-runtime",
+    join(root, ".lake/build/bin/vir_resource_pack"),
+    [
+      "acquire",
+      join(root, "vir-resources/compatibility.json"),
+      lock.contentId,
+      resolve(source),
+      runtimeCache,
+      runtimeStage,
+    ],
+  );
 const build = (label) =>
   run(leaf, label, "lake", ["exe", "generate-site", join(evidence, "site")]);
 const snapshot = (path) => {
   const s = statSync(path, { bigint: true });
   return [s.ino, s.mtimeNs, s.size];
 };
-console.log(`resource client evidence: ${evidence}`);
 build("cold");
+if (published) {
+  const before = [snapshot(runtimeCache), snapshot(runtimeStage)];
+  const tool = join(root, ".lake/build/bin/vir_resource_pack");
+  const acquisition = [
+    "acquire",
+    join(root, "vir-resources/compatibility.json"),
+    lock.contentId,
+    lock.source,
+  ];
+  run(root, "warm-offline", tool, [
+    ...acquisition,
+    runtimeCache,
+    runtimeStage,
+    "--offline",
+  ]);
+  assert.deepEqual([snapshot(runtimeCache), snapshot(runtimeStage)], before);
+  run(
+    root,
+    "cold-offline-miss",
+    tool,
+    [
+      ...acquisition,
+      join(evidence, "absent-cache.virres"),
+      join(evidence, "absent-stage.virres"),
+      "--offline",
+    ],
+    new RegExp(`RESOURCE_OFFLINE_MISS: required bundle ${lock.contentId}`),
+  );
+  assert.ok(!existsSync(join(evidence, "absent-cache.virres")));
+  assert.ok(!existsSync(join(evidence, "absent-stage.virres")));
+}
 const programStage = join(client, ".vir-generated/ClientResources.virres");
 const programFirst = readFileSync(programStage);
 const first = [snapshot(programStage), snapshot(runtimeStage)];
@@ -143,5 +198,5 @@ for (const id of readdirSync(destination)) {
   assert.ok(existsSync(join(destination, id, "bundle.json")));
 }
 console.log(
-  `resource client: ordinary cold/warm build, program edit, stage repair, cycle, relocated native execution PASS (${evidence})`,
+  `resource client (${published ? "anonymous published" : "supplied"}): ordinary cold/warm build, program edit, stage repair, cycle, relocated native execution PASS (${evidence})`,
 );
