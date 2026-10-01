@@ -7,9 +7,9 @@ These scripts serve the hosted demos, tests, benchmarks and runtime distribution
 | Files | Current callers / purpose |
 | --- | --- |
 | `irpkg-generator.mjs` | Shared Lake acquisition adapter for repository producers and tests; it returns resolved executable, compiled inputs and search path. |
-| `lean-to-irpkg.mjs`, `prepare-irpkg.mjs`, `module-package-config.mjs` | Single-module positional CLI and config-list CLI for the development runner/pages. Both use the same acquisition and selection helpers. |
+| `prepare-irpkg.mjs`, `module-package-config.mjs` | Config-list preparation for the development runner/pages, through shared acquisition and selection helpers. |
 | `generate-browser-package.mjs`, `browser-package-{config,plan}.mjs` | Demo/fixture catalogs and explicit selection, including the generator memory test. |
-| `quickstart-url.mjs`, `check-demo-package.sh` | Development-runner directions and demo-output checks. |
+| `check-demo-package.sh` | Demo-output checks. |
 | `inspect-irpkg.mjs`, `irpkg-format.mjs`, `package-versions.mjs`, `check-package-abi.mjs` | Compiler-output inspection and ABI consistency tests. |
 | `package-{sdk,local}-artifact.mjs`, `sdk-payloads.mjs`, `artifact-bundle.mjs` | Older runtime archives and hosted demo downloads, called by `build:site` and distribution checks. |
 | `lean-zip/`, `illuminate/`, `vir-client-package-lib.mjs` | Pinned external benchmark/acceptance producers, not normal client installation. |

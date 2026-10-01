@@ -255,35 +255,7 @@ for `examples/MyApp.lean`. Sources must begin with `module`; expose intended
 callable definitions with `public def` or `public section`. Independent
 downstream projects use the Lake workflow above.
 
-For the bundled quickstart, run `npm run quickstart`, then
-`npm run dev -- --port 5173` and open the printed URL. The general CLI is:
-
-```bash
-npm run generate:irpkg -- <Module.Name> [package.irpkg] [root ...]
-```
-
-Select explicit exports, or omit roots to export the module's public definitions:
-
-```bash
-npm run generate:irpkg -- Quickstart web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet
-npm run generate:irpkg -- Fib build/generated/local.irpkg
-```
-
-The command builds the module and generator with Lake, then loads compiled IR.
-Source commands such as `#eval` run during compilation, never again during
-packaging. Reached opaque imports are materialized through their owning modules
-and folded into the single output package; the Lake facet uses the same closure
-logic but emits members by owner.
-
-Use the actual module identity, not a source path or Lake target/facet syntax.
-Without an output path, `App.Widget` writes `build/generated/Widget.irpkg` and
-`Widget.report.md`; quoted module names require an explicit path. A successful
-command prints format/toolchain metadata, declaration/export/host-import counts,
-targets and resolved roots. Its report also lists closure declarations, native
-externs, initializers and diagnostics. Unpackageable exports or unsupported
-interfaces exit nonzero and point to the report.
-
-## Configure package generation
+Use a configuration file to select the module and its exports:
 
 ```json
 {
@@ -299,6 +271,17 @@ interfaces exit nonzero and point to the report.
 npm run prepare:irpkg -- examples/fib.virpkg.json
 npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json
 ```
+
+For the bundled quickstart, run `npm run prepare:irpkg -- examples/quickstart.virpkg.json`,
+then `npm run dev -- --port 5173` and open
+`http://127.0.0.1:5173/dev.html?package=local-quickstart.irpkg`.
+
+The command builds the module and generator with Lake, then loads compiled IR.
+Source commands such as `#eval` run during compilation, never again during
+packaging. Reached opaque imports are materialized through their owning modules
+and folded into the single output package; the Lake facet uses the same closure
+logic but emits members by owner. The report lists closure declarations, native
+externs, initializers and diagnostics; unsupported interfaces exit nonzero.
 
 `roots` is the only selection setting. A nonempty array selects exactly those
 exports; omission or `[]` selects all public definitions of the module. An

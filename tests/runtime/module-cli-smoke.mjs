@@ -35,22 +35,22 @@ function run(script, args) {
 }
 
 try {
-  const cliPackage = join(scratch, "fib.irpkg");
-  const generated = run("scripts/packages/lean-to-irpkg.mjs", [
-    "Fib",
-    cliPackage,
-  ]);
-  assert.match(generated.stdout, /mode:\s+auto-discover public definitions/);
-  assert.match(generated.stdout, /local package ready/);
-  const cliBytes = await readFile(cliPackage);
-  const cliManifest = readIrPackageInfo(cliBytes).manifest;
+  const singlePackage = join(scratch, "fib.irpkg");
+  const singleConfig = join(scratch, "single.json");
+  await writeFile(singleConfig, JSON.stringify({
+    version: 2, module: "Fib", package: singlePackage,
+  }));
+  const generated = run("scripts/packages/prepare-irpkg.mjs", [singleConfig]);
+  assert.match(generated.stdout, /mode:\s+public module definitions from Fib/);
+  const singleBytes = await readFile(singlePackage);
+  const singleManifest = readIrPackageInfo(singleBytes).manifest;
   assert.deepEqual(
-    cliManifest.exports.map((entry) => entry.entry),
+    singleManifest.exports.map((entry) => entry.entry),
     ["fib"],
   );
-  assert.equal(cliManifest.metadata.targets[0].module, "Fib");
-  assert.equal(cliManifest.metadata.targets[0].mode, "all");
-  assert.equal(cliManifest.metadata.targets[0].source, undefined);
+  assert.equal(singleManifest.metadata.targets[0].module, "Fib");
+  assert.equal(singleManifest.metadata.targets[0].mode, "all");
+  assert.equal(singleManifest.metadata.targets[0].source, undefined);
   assert.match(await readFile(join(scratch, "fib.report.md"), "utf8"), /fib/);
 
   const configs = [
@@ -80,8 +80,8 @@ try {
   assert.match(prepared.stdout, /roots:\s+Quickstart.double/);
   assert.deepEqual(
     await readFile(configs[0].package),
-    cliBytes,
-    "CLI and config all-public selection must produce identical packages",
+    singleBytes,
+    "single and batched all-public selection must produce identical packages",
   );
   const quickstartBytes = await readFile(configs[1].package);
   const manifest = readIrPackageInfo(quickstartBytes).manifest;
@@ -98,7 +98,7 @@ try {
     ),
   });
   for (const [bytes, entry, input, expected] of [
-    [cliBytes, "fib", 8, "21"],
+    [singleBytes, "fib", 8, "21"],
     [quickstartBytes, "Quickstart.double", 21, "42"],
     [await readFile(configs[2].package), "Quickstart.total", [2, 3, 5], "10"],
   ]) {

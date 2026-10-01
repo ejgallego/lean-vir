@@ -170,7 +170,7 @@ an explicit matched capability/profile contract, not merely passing this variabl
   compiler/runtime development, not a second first-release application workflow.
   Library-owned applications do not invoke them as manual preparation steps.
 
-`generate:irpkg`, `prepare:irpkg` and `generate:package` are repository commands
+`prepare:irpkg` and `generate:package` are repository commands
 for demo/fixture selection. `build:sdk-artifact` and `build:site` serve runtime
 distribution and the hosted demos. Their continued use is not an application
 requirement. See [the tooling inventory](../../scripts/packages/README.md) and
