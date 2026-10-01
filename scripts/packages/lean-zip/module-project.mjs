@@ -1,7 +1,8 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { runSync } from "../../process-utils.mjs";
+import { readToolchain } from "../vir-client-package-lib.mjs";
 
 export const exportsModule = "VirLeanZipAcceptance.Exports";
 export const oracleTarget = "virLeanZipAcceptanceOracle";
@@ -16,17 +17,11 @@ export async function createLeanZipModuleProject({
   directory = resolve(directory);
   client = resolve(client);
   producer = resolve(producer);
-  const toolchain = (
-    await readFile(join(producer, "lean-toolchain"), "utf8")
-  ).trim();
-  const clientToolchain = (
-    await readFile(join(client, "lean-toolchain"), "utf8")
-  ).trim();
-  if (clientToolchain !== toolchain) {
-    throw new Error(
-      `Lean toolchain mismatch: VIR uses ${toolchain}, lean-zip uses ${clientToolchain}`,
-    );
-  }
+  // The temporary project is the compiler root. Build the selected client
+  // source with VIR's pinned toolchain, while retaining the client's declared
+  // pin as provenance in the exported package.
+  const toolchain = await readToolchain(producer);
+  const clientToolchain = await readToolchain(client);
   await mkdir(directory);
   await writeFile(join(directory, "lean-toolchain"), `${toolchain}\n`);
   const sourceDirectory = join(producer, "fixtures/lean-zip");
@@ -53,6 +48,8 @@ export async function createLeanZipModuleProject({
   );
   return Object.freeze({
     directory,
+    toolchain,
+    clientToolchain,
     lake(args, options = {}) {
       return runSync("lake", args, { ...options, cwd: directory });
     },

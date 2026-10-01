@@ -34,11 +34,22 @@ extern "C" lean_object * lean_st_ref_get(lean_object * ref) {
     return value;
 }
 
-extern "C" lean_object * lean_st_ref_set(lean_object * ref, lean_object * value) {
+// Single-threaded WASI equivalents of the pinned upstream ST primitives.
+// swap transfers the old owning reference to its caller; put also accepts the
+// empty slot left by take. Ref.set is now Lean code that discards swap's result.
+extern "C" lean_object * lean_st_ref_swap(lean_object * ref, lean_object * value) {
+    lean_ref_object * ref_obj = lean_to_ref(ref);
+    lean_object * old_value = ref_obj->m_value;
+    if (old_value == nullptr) lean_internal_panic("null reference read");
+    ref_obj->m_value = value;
+    return old_value;
+}
+
+extern "C" lean_object * lean_st_ref_put(lean_object * ref, lean_object * value) {
     lean_ref_object * ref_obj = lean_to_ref(ref);
     lean_object * old_value = ref_obj->m_value;
     ref_obj->m_value = value;
-    lean_dec(old_value);
+    if (old_value != nullptr) lean_dec(old_value);
     return lean_box(0);
 }
 

@@ -23,6 +23,90 @@ The Wasm build defaults to 4 MiB initial memory and a 1 MiB stack. Set
 The size explorer additionally requires GNU `objdump`, `readelf` and `c++filt`
 from binutils.
 
+## Toolchain Upgrades
+
+Before upgrading `lean-toolchain`:
+
+- Compare affected Lean adapters with the new upstream source, then update their
+  immutable source links.
+- Refresh `vir-resources/compatibility.json` and qualify a runtime bundle for
+  that compiler before changing `vir-resources/runtime.json`; preserve the
+  bundle's content identity rather than relabeling an older bundle.
+- Record catalog compatibility and the remaining migration work using the
+  roadmap below. Older producer pins preserve historical reproducibility;
+  they do not qualify a workload under the new toolchain.
+- Refresh compiler-specific artifacts and run the affected acquisition,
+  importer, fixture and downstream acceptance checks below.
+
+### Catalog Migration Roadmap
+
+The goal is for every active VIR catalog workload to work with the current
+`lean-toolchain`. Migrate in stages; completing the entire catalog is not a
+prerequisite for the initial toolchain/runtime support PR.
+
+| Stage | Work | Acceptance goal |
+| --- | --- | --- |
+| Toolchain foundation | Update the interpreter boundary, adapters, fixtures and matching runtime resources. | Core/native/Wasm checks pass with matching compiler identities; default runtime resources are publicly obtainable before merge. |
+| Catalog ports | Migrate prettyM's module export path, then Illuminate's client project, then lean-zip's module/native API boundary. | Each actual exporter and its package/browser checks pass under the current VIR toolchain. |
+| Catalog enforcement | Pin the qualified producer/client commits and enable the current-toolchain check in candidate CI. | Every active VIR workload is covered; historical comparison backends disclose their own compiler/source identities. |
+
+Give each remaining port an owner, next action and acceptance checks in its PR
+or tracking issue, or on the private `WORKBOARD.md` when present. Keep client
+source changes in their owning repositories and preserve source/compiler
+provenance. A source pin, an older green workflow or a unit-only check is not
+current-toolchain qualification. Keep unqualified migration candidates local;
+publish catalog pins only when their exact source commits are available.
+
+## Backports
+
+Development happens on `main`, with the toolchain pinned in `lean-toolchain`.
+VIR maintains zero or one older Lean line. This table owns the maintenance
+target; activation and retirement are explicit maintainer decisions.
+
+| Branch | Lean line | State |
+| --- | --- | --- |
+| `lean-v4.34` | 4.34 | Reserved; activate from the last accepted 4.34 checkpoint before upgrading `main`. |
+
+Until activation there is no active maintenance branch. Historical feature
+branches and local checkpoints do not imply supported release lines. On the
+next upgrade, retain at most one maintenance line and update this table.
+
+New features and fixes start on `main`. Select backports that the maintained
+line needs; include supporting tests or harness changes when necessary to keep
+the fix coherent. Toolchain upgrades themselves stay on `main`. Work directly
+on a maintenance line only for an explicitly requested line-specific repair.
+When a maintenance line is active, record the decision in the source PR:
+`Backport lean-v4.34: #<PR>`, `pending`, or `not needed: <reason>`. Deferred
+backports go on the canonical `WORKBOARD.md` with an owner and revisit trigger
+when that private board is present. In ordinary clones without the board, keep
+the decision and revisit trigger in the source PR or a tracking issue.
+
+Prefer backporting the landed commit so normal squash merges remain usable:
+
+```bash
+git fetch origin
+git worktree add .worktrees/backport-4.34-fix -b fix/backport-4.34-fix origin/lean-v4.34
+cd .worktrees/backport-4.34-fix
+git cherry-pick -x <landed-main-commit>
+scripts/pr-message.sh --base lean-v4.34 --backport-of <source-PR-number> \
+  --title 'fix: <behavior preserved on Lean 4.34>'
+```
+
+The helper only prints a PR scaffold. It does not fetch, create branches, push,
+or publish. For a dependent series, cherry-pick the required landed commits in
+order. Explain conflict adaptations and any omitted prerequisite in the
+backport PR; link the source PR and backport PR in both directions.
+
+Check `git status --short --branch` and `lean-toolchain` before implementation.
+Run the affected checks from this guide with the maintenance toolchain. Refresh
+the line's Lean source, Wasm and packages before runtime checks; artifacts from
+`main` do not qualify a backport. Use the existing PR CI for validation.
+
+This borrows the development/maintenance distinction, linked PRs and
+`cherry-pick -x` provenance from the
+[Verso Blueprint harness](https://github.com/leanprover/verso-blueprint/blob/v4.34.0/doc/MAINTAINER_GUIDE.md#working-from-linked-worktrees).
+Ordinary Git, this table and the existing PR helper cover VIR's single-line use.
+
 ## Generated Artifacts
 
 Generated artifacts are ignored and should remain outside commits unless the

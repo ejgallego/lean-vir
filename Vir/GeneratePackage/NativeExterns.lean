@@ -339,7 +339,11 @@ def nativeExternSpecs : Array NativeExternSpec := #[
     generateBoxedWrapper := true
   },
   {
-    name := `ST.Prim.Ref.set,
+    name := `ST.Prim.Ref.swap,
+    generateBoxedWrapper := true
+  },
+  {
+    name := `ST.Prim.Ref.put,
     generateBoxedWrapper := true
   },
   {
@@ -387,6 +391,10 @@ def nativeExternSpecs : Array NativeExternSpec := #[
   },
   {
     name := `Array.push,
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Array.propagateMark,
     generateBoxedWrapper := true
   },
   {
