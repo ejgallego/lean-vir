@@ -66,6 +66,68 @@ private def program : Bundle := Id.run do
 private def withDescriptor (bundle : Bundle) (descriptor : Descriptor) : Bundle :=
   { bundle with descriptor, contentId := descriptor.contentId }
 
+private def siteTests : IO Unit := do
+  let second := withDescriptor program { program.descriptor with logicalId := "test/second" }
+  let resources : ResourceSet := ⟨runtime, #[program, second, program]⟩
+  -- Independent comparison with the former client-side publication recipe.
+  let expectedFiles := (#[runtime, program, second]).foldl (init := #[]) fun files bundle =>
+    let base := "lib/vir/" ++ bundle.contentId
+    let envelope := ("{\"contentId\":\"" ++ bundle.contentId ++ "\",\"descriptor\":" ++
+      String.fromUTF8! (encodeDescriptor bundle.descriptor) ++ "}").toUTF8
+    (files.push { path := base ++ "/bundle.json", bytes := envelope : File }) ++
+      bundle.files.map (fun file => { file with path := base ++ "/" ++ file.path })
+  let site ← success "prepare nested site" (resources.forSite "lib/vir")
+  check "site inventory paths" (site.files.map (·.path) == expectedFiles.map (·.path))
+  check "site inventory bytes" (site.files.map (·.bytes) == expectedFiles.map (·.bytes))
+  check "runtime module path" (site.runtimeModule == "lib/vir/" ++ runtime.contentId ++ "/runtime.js")
+  check "runtime manifest path" (site.runtimeManifest == "lib/vir/" ++ runtime.contentId ++ "/bundle.json")
+  check "program order and duplicate references" (site.programManifests ==
+    #[program, second, program].map (fun b => "lib/vir/" ++ b.contentId ++ "/bundle.json"))
+  let root ← success "prepare site root" (resources.forSite "")
+  check "root inventory paths" (root.files.map (·.path) ==
+    site.files.map (fun file => String.intercalate "/" ((file.path.splitOn "/").drop 2)))
+  check "prefix does not change bytes" (root.files.map (·.bytes) == site.files.map (·.bytes))
+  check "root runtime manifest" (root.runtimeManifest == runtime.contentId ++ "/bundle.json")
+  check "root runtime module" (root.runtimeModule == runtime.contentId ++ "/runtime.js")
+  check "root program manifests" (root.programManifests ==
+    #[program, second, program].map (fun b => b.contentId ++ "/bundle.json"))
+  let empty ← success "runtime-only site" ({ resources with programs := #[] }.forSite "Assets/VIR")
+  check "runtime-only programs" empty.programManifests.isEmpty
+  check "runtime-only inventory" (empty.files.size == runtime.files.size + 1)
+  check "prefix spelling preserved" (empty.runtimeModule == "Assets/VIR/" ++ runtime.contentId ++ "/runtime.js")
+  for outputPrefix in #["../vir", "/vir", "vir/", "a//b", "a\\b", "https://site", "CON", "a/../b", "bundle.json"] do
+    failure "INVALID_PATH" (resources.forSite outputPrefix)
+  let incompatible := withDescriptor program { program.descriptor with
+    compatibility := { compatibility with leanRevision := "other" } }
+  failure "INCOMPATIBLE" ({ resources with programs := #[incompatible] }.forSite "")
+  failure "EXPECTED_PROGRAM" ({ resources with programs := #[runtime] }.forSite "")
+  failure "EXPECTED_RUNTIME" ({ resources with runtime := program }.forSite "")
+  let conflict := withDescriptor program { program.descriptor with exports := #[] }
+  failure "LOGICAL_ID_CONFLICT" ({ resources with programs := #[program, conflict] }.forSite "")
+  failure "HASH_MISMATCH" ({ resources with runtime :=
+    { runtime with files := runtime.files.set! 0 ⟨"runtime.js", "abd".toUTF8⟩ } }.forSite "")
+  failure "INVENTORY_MISMATCH" ({ resources with runtime :=
+    { runtime with files := runtime.files.pop } }.forSite "")
+  IO.println "resource site: canonical envelopes, unchanged bytes, prefixes, ordering and dedup passed"
+
+-- Read-only real-pack comparison against the former client publication recipe.
+private def sitePackTests (runtimePath programPath : String) : IO Unit := do
+  let r ← success "read runtime pack" (Pack.decode (← IO.FS.readBinFile runtimePath))
+  let p ← success "read program pack" (Pack.decode (← IO.FS.readBinFile programPath))
+  for outputPrefix in #["", "lib/vir", "nested/Assets"] do
+    let site ← success "prepare real site" ((ResourceSet.mk r #[p]).forSite outputPrefix)
+    let mut expected : Array File := #[]
+    for bundle in #[r, p] do
+      let base := if outputPrefix.isEmpty then bundle.contentId else outputPrefix ++ "/" ++ bundle.contentId
+      let bytes := ("{\"contentId\":\"" ++ bundle.contentId ++ "\",\"descriptor\":" ++
+        String.fromUTF8! (encodeDescriptor bundle.descriptor) ++ "}").toUTF8
+      expected := expected.push ⟨base ++ "/bundle.json", bytes⟩
+      for file in bundle.files do
+        expected := expected.push { file with path := base ++ "/" ++ file.path }
+    check "real publication paths" (site.files.map (·.path) == expected.map (·.path))
+    check "real publication bytes" (site.files.map (·.bytes) == expected.map (·.bytes))
+    IO.println s!"resource site packs: {repr outputPrefix}, {site.files.size} exact files, runtime {r.contentId}, program {p.contentId}"
+
 -- Native acquisition must instead check the actual pinned compiler identity.
 private def nativeRuntime : Bundle :=
   withDescriptor runtime { runtime.descriptor with
@@ -108,6 +170,7 @@ private def portablePathTests : IO Unit := do
   IO.println s!"portable paths: {cases.size} shared lexical cases, both inventory orders passed"
 
 private def unitTests : IO Unit := do
+  siteTests
   portablePathTests
   hashTests
   for size in [:260] do
@@ -209,6 +272,7 @@ public def main (args : List String) : IO Unit := do
     IO.FS.writeBinFile path (← success "prepare embedding fixture" (Pack.encode runtime))
   | ["native-pack", path] =>
     IO.FS.writeBinFile path (← success "prepare acquisition fixture" (Pack.encode nativeRuntime))
+  | ["site", runtimePath, programPath] => sitePackTests runtimePath programPath
   | "hash" :: paths =>
     for path in paths do IO.println (sha256 (← IO.FS.readBinFile path))
-  | _ => throw <| IO.userError "usage: vir_resource_tests [descriptor | native-descriptor | pack FILE | native-pack FILE | hash FILE...]"
+  | _ => throw <| IO.userError "usage: vir_resource_tests [descriptor | native-descriptor | pack FILE | native-pack FILE | site RUNTIME_PACK PROGRAM_PACK | hash FILE...]"
