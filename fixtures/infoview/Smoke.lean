@@ -127,7 +127,7 @@ unsafe def snapshotPackage (suffix : String) : IO (String × ByteArray) := do
     "private initialize snapshotPrefix : String ← pure \"snapshot:\"\n" ++
     "@[noinline] private def snapshotSuffix (_ : Unit) : String := " ++
     s!"{Lean.Json.compress (.str suffix)}\n" ++
-    "public def snapshotValue : String := InfoviewFixtures.ImportedHelper.labelBefore () ++ snapshotPrefix ++ snapshotSuffix ()\n"
+    "public def snapshotValue : String := InfoviewFixtures.ImportedHelper.labelBefore \"\" ++ snapshotPrefix ++ snapshotSuffix ()\n"
   let env ← snapshotEnvironment source contents
   let roots := #[`snapshotValue]
   let input ← IO.ofExcept <| Vir.GeneratePackage.prepareSnapshotInput source env roots
