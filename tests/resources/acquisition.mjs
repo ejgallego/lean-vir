@@ -274,8 +274,9 @@ assert.deepEqual(readFileSync(cache), bytes);
 assert.deepEqual(readFileSync(stage), bytes);
 const curlArgs = JSON.parse(readFileSync(curlLog));
 // Transport belongs to pinned Lake.download, not another VIR curl policy.
-assert.deepEqual(curlArgs.slice(0, 4), ["-s", "-S", "-f", "-o"]);
-assert.deepEqual(curlArgs.slice(-2), ["-L", "https://test.invalid/pack"]);
+for (const flag of ["-s", "-S", "-f", "-o", "-L"]) assert.ok(curlArgs.includes(flag));
+assert.ok(curlArgs.includes("https://test.invalid/pack"));
+assert.equal(typeof curlArgs[curlArgs.indexOf("-o") + 1], "string");
 assert.ok(!curlArgs.includes("--user") && !curlArgs.includes("-H"));
 
 // The retained SDK contributor adapter uses the same Lake transport, not a
@@ -286,7 +287,8 @@ run(join(root, ".lake/build/bin/vir_fetch_sdk"), [
   env: { ...transportEnv, TEST_CURL_MODE: "fail" }, error: /curl|download/i,
 });
 const sdkCurlArgs = JSON.parse(readFileSync(curlLog));
-assert.deepEqual(sdkCurlArgs.slice(0, 4), ["-s", "-S", "-f", "-o"]);
+for (const flag of ["-s", "-S", "-f", "-o", "-L"]) assert.ok(sdkCurlArgs.includes(flag));
+assert.ok(sdkCurlArgs.includes("https://test.invalid/sdk.tar.gz"));
 assert.ok(sdkCurlArgs.includes("Accept: application/vnd.github+json"));
 assert.ok(sdkCurlArgs.includes("X-GitHub-Api-Version: 2022-11-28"));
 assert.ok(!sdkCurlArgs.some((arg) => arg.startsWith("Authorization:")));

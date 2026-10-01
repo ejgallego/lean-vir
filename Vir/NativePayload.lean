@@ -176,9 +176,9 @@ public def promote (destination : FilePath) (payload : VerifiedPayload) : IO Uni
   | .bytes bytes => atomicInstall destination bytes
   | .directory path => promoteDirectory path destination
 
-/-! Explicit URL credentials must not bypass the anonymous transport policy.
-Keep this pure check shared with lock admission; never echo credential-bearing
-input in its diagnostics. -/
+/-! Resource locks admit public HTTPS URLs without embedded credentials.
+This pure check is URL admission, not isolation from host curl configuration.
+Keep it shared with lock admission; never echo credential-bearing input. -/
 public def checkAnonymousHttps (url : String) : Except String Unit := do
   unless url.startsWith "https://" do throw "source must use HTTPS"
   let authority := (url.drop "https://".length).toString.toList.takeWhile

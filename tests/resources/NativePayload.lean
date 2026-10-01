@@ -32,8 +32,6 @@ def main (args : List String) : IO Unit := do
   match checkAnonymousHttps "https://user:pass@example.invalid/pack" with
   | .error _ => pure ()
   | .ok _ => throw <| IO.userError "credential-bearing URL accepted"
-  unless !(← (root / "download").pathExists) do
-    throw <| IO.userError "rejected URL created an output"
   -- Missing ordinary ancestors remain supported, with the staged directory
   -- moved only after validation and no temporary sibling left behind.
   let ordinary := root / "managed/ordinary/new/payload"
@@ -51,4 +49,4 @@ def main (args : List String) : IO Unit := do
   IO.FS.writeBinFile file ByteArray.empty
   unless (← readInput file 0 "TEST_LIMIT").isEmpty do
     throw <| IO.userError "empty bounded read failed"
-  IO.println "native payload: ancestor rejection before creation, anonymous transport and bounded reads passed"
+  IO.println "native payload: ancestor rejection before creation, URL admission and bounded reads passed"

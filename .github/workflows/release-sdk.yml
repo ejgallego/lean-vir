@@ -47,11 +47,11 @@ jobs:
       - run: lake build vir_resource_pack
       - run: npm run package:runtime
 
-      - name: Publish durable SDK asset
+      - name: Publish durable runtime artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
+          # Verify/reuse identical runtime assets on reruns; never replace them.
+          node scripts/resources/publish-runtime.mjs "$GITHUB_REF_NAME" build/artifacts/runtime/*.virres
           gh release upload "$GITHUB_REF_NAME" build/artifacts/lean-vir-sdk.tar.gz --clobber
-          # Content-named runtime packs are immutable; never replace an asset.
-          gh release upload "$GITHUB_REF_NAME" build/artifacts/runtime/*.virres

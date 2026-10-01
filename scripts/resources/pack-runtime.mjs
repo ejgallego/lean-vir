@@ -9,7 +9,7 @@ Author: Emilio J. Gallego Arias
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
 import { assertResourceCompatibility } from "../../web/src/resources/compatibility.js";
@@ -96,6 +96,7 @@ const descriptor = validateDescriptor({
 });
 const contentId = await descriptorContentId(descriptor);
 // Refuse an existing destination: failed runs remain inspectable, never overwritten.
+await mkdir(dirname(output), { recursive: true });
 await mkdir(output);
 const payloads = join(output, "payloads");
 await mkdir(payloads);

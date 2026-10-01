@@ -32,6 +32,7 @@ maintainer requests a tracked fixture or report change.
 | --- | --- |
 | `web/public/vir-upstream.wasm`, `vir-upstream.dev.wasm` and browser `.irpkg` packages | `npm run build:demo`; runtime and no-build smoke checks reuse these files. |
 | Release Wasm and its debug companion | `npm run build:demo:release` strips the release file; the debug companion remains optimized and unstripped. SDK/local archives and SDK import smokes need both. |
+| Content-named runtime pack and provenance under `build/artifacts/runtime/` | Maintainers run `lake build vir_resource_pack` then `npm run package:runtime` with an already-qualified release Wasm and build identity. The destination must not exist; parent directories are created. This never builds Wasm or runs during application acquisition. |
 | `web/dist/`, including SDK/local archives and analysis pages | `npm run build:site`; required before `test:pages:browser`. |
 | Infoview JavaScript bundle under `build/generated/` | `lake build VirInfoview` requires npm dependencies. The default `Vir` library needs no npm bundle. |
 | Local `.irpkg` and reports | Follow [config-based local package preparation](guides/PACKAGES.md#generate-a-local-package). |
@@ -60,6 +61,11 @@ semantics require the separate Chromium checks below.
 
 ### Package and fixture work
 
+- Runtime production/release tooling: `npm run test:resources:production` checks
+  missing-parent packaging, existing-output preservation and immutable release
+  upload/reuse/mismatch behavior. It requires npm and fetched Lean notices, but
+  uses synthetic Wasm and a fake GitHub CLI, not a public release or interpreter
+  qualification.
 - Embedded resource acquisition/tracing: `npm run test:resources:cache` includes
   cold/warm rejection of empty, missing and valid ambient native-manifest settings,
   direct native producer rejection, output preservation and unset recovery. It
@@ -293,7 +299,8 @@ records the pinned-version findings and their implications for hook adoption.
 ## CI Shape
 
 CI builds the release/debug Wasm pair and browser packages once, runs upstream
-smoke, and uploads demo artifacts plus a commit-addressed `lean-vir-sdk` archive.
+smoke, and uploads demo artifacts, a commit-addressed `lean-vir-sdk` archive,
+and a `lean-vir-runtime` artifact containing the content-named pack and provenance.
 Pure runtime jobs consume those artifacts without installing Lean;
 Lean-dependent runtime and fixture jobs reuse them while building their Lean
 inputs. They do not refetch Lean source or reinstall the WASI SDK.
@@ -304,12 +311,15 @@ The [workflow files](../.github/workflows) own job definitions. Pages runs
 `npm run build:site`; [surface analysis](development/SURFACE_ANALYSIS.md) explains its
 deployed surface/size explorers.
 
-## SDK Releases
+## Runtime Releases
 
 Tags named `v<package.json version>` trigger
 [release-sdk.yml](../.github/workflows/release-sdk.yml), which validates tag and
 ABI versions, builds the SDK, imports its packaged modules and uploads the
-archive to the matching release. Create the tag from the final merged commit
+archive plus a content-named runtime pack to the matching release. Runtime pack
+publication uploads absent assets, verifies and reuses byte-identical assets on
+reruns, and rejects different bytes without replacing them. The retained legacy
+SDK archive upload remains replaceable. Create the tag from the final merged commit
 so its manifest identifies the revision clients use. Before the tag exists,
 select `VIR_SDK_ARCHIVE` or the exact-commit artifact path; the zero-argument
 `:virSdk` facet targets the tagged release. See
