@@ -29,8 +29,9 @@ assets together; see [matching runtime assets](docs/guides/JS_API.md#matching-ru
 - Use `wip/<slug>` only for local exploratory branches that are not ready for
   review.
 
-Prefer short, descriptive slugs. This repository does not use tracked branch
-policy metadata or a backport workflow.
+Prefer short, descriptive slugs. The repository has no tracked branch-policy
+registry; see [backports](docs/HARNESS.md#backports) for the maintenance target
+and workflow.
 
 ## Worktrees
 

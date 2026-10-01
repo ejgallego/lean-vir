@@ -66,16 +66,17 @@ gets a fresh Lean import state and environment: sharing a union environment
 would expose unrelated targets' declarations and private metadata. Neither
 visibility flags nor extension state are shared between these contexts.
 
-`CachedImports` is a narrow adapter of the pinned Lean import algorithm at
-exported level with interpretation IR. It originated with Lean 4.33 and was
-checked against the pinned 4.34 importer, which still has no overlapping-import
-artifact cache hook. The adapter uses `import all Lean.Environment` for its
-internal acquisition types/readers and ordinary `finalizeImport`. On toolchain
-changes, compare it with upstream `importModulesCore` and run the import-cache
-equivalence tests. `CompiledImportCache.empty` fixes the resolved artifact map
-for one index; changing the map requires a fresh cache. Resolved data/IR reads
-are memoized just like conventional search-path reads. Search paths and file
-contents must remain fixed, and the cache is not process-global.
+`CachedImports` originated with Lean 4.33 and adapts the pinned
+`importModulesCore` at exported level with
+interpretation IR. It uses `import all Lean.Environment` for its internal
+acquisition types/readers and ordinary `finalizeImport`; see [the upstream
+implementation at the source revision used for this adapter](https://github.com/leanprover/lean4/blob/470d5ce1400764999581fd26d5d72b00d990b0f4/src/Lean/Environment.lean#L2108).
+On toolchain changes, compare it with the new upstream implementation, update
+the source link, and run the import-cache equivalence tests.
+`CompiledImportCache.empty` fixes the resolved artifact map for one index;
+changing the map requires a fresh cache. Resolved data/IR reads are memoized
+just like conventional search-path reads. Search paths and file contents must
+remain fixed, and the cache is not process-global.
 Compacted regions must not be explicitly freed:
 imported extension closures can retain references outside the index.
 
@@ -126,9 +127,12 @@ Local label removal does not retract compiled marker additions; see
 persistent removal metadata. Runtime ABI, manifest compatibility and raw-byte
 or package-set transport remain independent of input acquisition.
 
-Analysis tools may still elaborate sources, and historical benchmark catalogs
-use their pinned producers. Neither is a package-generator fallback. External
-adapters require matching module-capable dependencies/toolchains.
+Analysis tools may still elaborate sources. Every active package/browser
+catalog entry and exporter must work with the current `lean-toolchain`; archived
+benchmark identities remain provenance and do not qualify current catalog
+compatibility. Neither analysis tools nor historical evidence is a
+package-generator fallback. External adapters require matching module-capable
+dependencies/toolchains.
 
 ## Implementation ownership
 

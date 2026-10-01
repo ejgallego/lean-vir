@@ -23,7 +23,7 @@ Options:
   --repo OWNER/REPO
                    Override the repository shown in the scaffold. Defaults to ejgallego/lean-vir.
   --backport-of PR  Link a source PR by number and provide a default backport summary.
-                   Requires --base with a maintenance branch (not main).
+                   Requires --base to name a non-main target.
   -h, --help       Show this help.
 USAGE
 }
@@ -113,7 +113,7 @@ done
 
 if [ -n "$backport_of" ]; then
   if [ -z "$base" ] || [ "$base" = main ]; then
-    echo "--backport-of requires --base with a maintenance branch" >&2
+    echo "--backport-of requires --base to name a non-main target" >&2
     exit 2
   fi
   if [ "$summary_set" = false ]; then

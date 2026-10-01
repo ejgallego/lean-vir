@@ -36,6 +36,21 @@ The Wasm build defaults to 4 MiB initial memory and a 1 MiB stack. Set
 The size explorer additionally requires GNU `objdump`, `readelf` and `c++filt`
 from binutils.
 
+## Toolchain Upgrades
+
+Before upgrading `lean-toolchain`:
+
+- Compare affected Lean adapters with the new upstream source, then update their
+  immutable source links.
+- Refresh `vir-resources/compatibility.json` and qualify a runtime bundle for
+  that compiler before changing `vir-resources/runtime.json`; preserve the
+  bundle's content identity rather than relabeling an older bundle.
+- Update and check every active package/browser catalog entry and exporter
+  against the current `lean-toolchain`. Archived benchmark identities remain
+  provenance; they do not qualify an active catalog entry.
+- Refresh compiler-specific artifacts and run the affected acquisition,
+  importer, fixture and downstream acceptance checks below.
+
 ## Backports
 
 Development happens on `main`, with the toolchain pinned in `lean-toolchain`.
@@ -56,7 +71,9 @@ the fix coherent. Toolchain upgrades themselves stay on `main`. Work directly
 on a maintenance line only for an explicitly requested line-specific repair.
 When a maintenance line is active, record the decision in the source PR:
 `Backport lean-v4.34: #<PR>`, `pending`, or `not needed: <reason>`. Deferred
-backports go on the canonical `WORKBOARD.md` with an owner and revisit trigger.
+backports go on the canonical `WORKBOARD.md` with an owner and revisit trigger
+when that private board is present. In ordinary clones without the board, keep
+the decision and revisit trigger in the source PR or a tracking issue.
 
 Prefer backporting the landed commit so normal squash merges remain usable:
 
