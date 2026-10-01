@@ -33,16 +33,14 @@ export class VirHostState {
   constructor({
     hostBindings = null,
     defaultHostBindings = null,
-    releaseHostBindings = null,
-    releaseDefaultHostBindings = null,
+    ownsDefaultHostBindings = false,
   } = {}) {
     this.exports = null;
     this.manifest = null;
     this.hostImports = [];
     this.userBindings = hostBindings;
     this.defaultBindings = defaultHostBindings;
-    this.releaseHostBindings = releaseHostBindings;
-    this.releaseDefaultHostBindings = releaseDefaultHostBindings;
+    this.ownsDefaultHostBindings = ownsDefaultHostBindings;
     this.runtime = null;
     this.resourceRoots = new ExternrefRoots();
     this.leanObjectHandleCells = new Set();
@@ -333,20 +331,7 @@ export class VirHostState {
     try {
       this.clearCallError();
 
-      const userRelease = collectCleanupError(
-        errors,
-        () => this.releaseHostBindings?.() ?? true,
-      );
-      if (userRelease.ok && userRelease.value) {
-        collectCleanupError(errors, () =>
-          disposeHostBindings(this.userBindings),
-        );
-      }
-      const defaultRelease = collectCleanupError(
-        errors,
-        () => this.releaseDefaultHostBindings?.() ?? true,
-      );
-      if (defaultRelease.ok && defaultRelease.value) {
+      if (this.ownsDefaultHostBindings) {
         collectCleanupError(errors, () =>
           disposeHostBindings(this.defaultBindings),
         );
@@ -360,6 +345,8 @@ export class VirHostState {
       this.disposing = false;
       this.runtime = null;
       this.exports = null;
+      this.userBindings = null;
+      this.defaultBindings = null;
     }
     throwCollectedErrors(errors, "Vir host state disposal failed");
   }

@@ -190,11 +190,6 @@ export class VirRuntimeFactory {
     this.imports = imports;
     this.hostBindings = hostBindings;
     this.defaultHostBindings = defaultHostBindings;
-    this.hostBindingsLease = new HostBindingsLease(hostBindings);
-    this.defaultHostBindingsLease =
-      defaultHostBindings !== null && typeof defaultHostBindings !== "function"
-        ? new HostBindingsLease(defaultHostBindings)
-        : null;
   }
 
   async module() {
@@ -232,22 +227,17 @@ export class VirRuntimeFactory {
   }
 
   instantiateModule(module) {
-    const defaultHostBindings =
-      typeof this.defaultHostBindings === "function"
-        ? this.defaultHostBindings()
-        : (this.defaultHostBindings ?? {});
-    const defaultHostBindingsLease =
-      this.defaultHostBindingsLease ??
-      new HostBindingsLease(defaultHostBindings);
-    const hostBindings = this.hostBindingsLease.acquire();
-    const defaultBindings = defaultHostBindingsLease.acquire();
+    const ownsDefaultHostBindings =
+      typeof this.defaultHostBindings === "function";
+    const defaultHostBindings = ownsDefaultHostBindings
+      ? this.defaultHostBindings()
+      : (this.defaultHostBindings ?? {});
     let hostState = null;
     try {
       hostState = new VirHostState({
-        hostBindings: hostBindings.value,
-        defaultHostBindings: defaultBindings.value,
-        releaseHostBindings: hostBindings.release,
-        releaseDefaultHostBindings: defaultBindings.release,
+        hostBindings: this.hostBindings,
+        defaultHostBindings,
+        ownsDefaultHostBindings,
       });
       const imports =
         typeof this.imports === "function"
@@ -255,7 +245,7 @@ export class VirRuntimeFactory {
           : createVirImports(module, this.imports ?? {}, hostState);
       const instance = new WebAssembly.Instance(module, imports);
       hostState.attach(instance.exports);
-      // Constructor failure cannot expose a runtime; the catch releases leases.
+      // Constructor failure cannot expose a runtime; clean up its fresh provider.
       instance.exports.__wasm_call_ctors?.();
       return new VirRuntime(instance.exports, {
         module,
@@ -265,9 +255,10 @@ export class VirRuntimeFactory {
       const errors = [error];
       if (hostState !== null) {
         collectCleanupError(errors, () => hostState.dispose());
-      } else {
-        collectCleanupError(errors, () => releaseBindings(defaultBindings));
-        collectCleanupError(errors, () => releaseBindings(hostBindings));
+      } else if (ownsDefaultHostBindings) {
+        collectCleanupError(errors, () =>
+          disposeHostBindings(defaultHostBindings),
+        );
       }
       throwCollectedErrors(
         errors,
@@ -530,31 +521,6 @@ async function sha256Hex(bytes) {
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join(
     "",
   );
-}
-
-class HostBindingsLease {
-  constructor(value) {
-    this.value = value;
-    this.references = 0;
-  }
-
-  acquire() {
-    this.references += 1;
-    let live = true;
-    return {
-      value: this.value,
-      release: () => {
-        if (!live) return false;
-        live = false;
-        this.references -= 1;
-        return this.references === 0;
-      },
-    };
-  }
-}
-
-function releaseBindings(bindings) {
-  if (bindings.release()) disposeHostBindings(bindings.value);
 }
 
 function selectWasmUrl({ wasmUrl, wasmDebugUrl, debugWasm }) {

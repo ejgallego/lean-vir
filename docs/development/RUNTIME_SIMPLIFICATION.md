@@ -36,7 +36,7 @@ inherited without a shell bridge or second React root.
 | `findTaggedUnionConstructor` | **Removed** | Repository search found no consumer; indexed constructor accessors remain for execution. |
 | `Vir.Common` smoke protocol and default `common.*` providers | **Removed** | The only used echo operation belongs to the FreshHost fixture and its supplied host. The unused add operation and empty generated family/module are retired; genuine common JS providers remain. |
 | Stable-facade reload and its adoption/rebinding machinery | **Removed; explicit API change** | One runtime owns one package generation. A deferred runtime may install its first package; later code uses a fresh runtime from the same factory. Callers explicitly select the new runtime and retire the old generation. |
-| `HostBindingsLease` and release callbacks | **Remove after changing a supported contract** | Independent runtimes can share bindings with automatic last-owner disposal. Decide separately whether integrations instead own supplied services. |
+| `HostBindingsLease` and release callbacks | **Removed; explicit ownership-contract change** | Preconstructed user/default maps remain application-owned. Function-valued default bindings transfer fresh per-runtime results to VIR, preserving built-in and Infoview/React provider cleanup without shared-map reference counting. |
 | Historical manifest versions and option variants | **Remove now (manifest 9-only)** | Regenerate package artifacts and install matching runtime ABI 4 JavaScript/Wasm SDK files; dated design evidence remains historical. |
 | Widget error presentation and JSON-input classifications | **Removed from general runtime responsibilities** | Diagnostics now live beside the Infoview app and input classification beside page controls; ABI tags remain central. |
 | Repeated validation of owned package bytes | **Duplicate member pass removed** | The factory copies and validates input before acquiring Wasm, then uses the existing internal installer on its fresh runtime. Public raw loads still validate; the effective backend manifest and binary contract remain checked. A single-member factory load parses two manifests instead of three. |
@@ -49,7 +49,8 @@ inherited without a shell bridge or second React root.
 | Structural conversion, including Expr/Level support | **Keep because it protects a specific behavior** | Existing explicit conversion clients; first avoid unnecessary round trips in document/widget paths and establish the specialized consumers. |
 
 Factory acquisition coalesces overlapping requests and permits a failed fetch or
-compilation to retry. Instances still own separate memories and host leases.
+compilation to retry. Instances own separate memories, bridge roots and fresh
+default providers; applications own supplied/shared binding maps.
 Hover setup rolls back partial registrations and failed result publication;
 successful callers own the returned idempotent cleanup.
 
@@ -76,8 +77,8 @@ global browser exception reporting.
 The invariant is **one runtime object, one package generation**. It removes
 `replaceIrPackageSetBytes`, `replacePackageState`, `adoptRuntimeState`, the
 replacement-factory back-reference and replacement-only resets. It does not require
-a generation manager. Compiled `WebAssembly.Module` reuse and shared host-binding
-leases remain available through the factory.
+a generation manager. Compiled `WebAssembly.Module` reuse and application-owned
+shared host bindings remain available through the factory.
 
 The first patch flattens the Infoview loader. It preserves the package RPC
 protocol, binding ownership and UI lifetime. Internal shell
@@ -103,7 +104,8 @@ interactions, generated bootstrap wiring, no required React, and a shared page
 package load. Record asset requests and startup work using existing tooling.
 The runtime consumer decision is now explicit: downstream callers must select a
 fresh generation and dispose the previous one when invalidation is intended;
-host-binding ownership is a separate decision. Add no public API, manager, generic
+host-binding ownership now follows the explicit supplied-map/fresh-provider rule
+above. Add no public API, manager, generic
 adapter, compatibility fallback or runtime dependency to the loader cleanup. Measure deletions across
 execution, tests and documentation separately; no latency or bundle-size benefit
 is inferred from source reduction.
