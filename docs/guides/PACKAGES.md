@@ -1,12 +1,16 @@
-# Packages
+# Package tooling reference
 
-VIR packages selected Lean declarations for its browser runtime. Downstream
-projects use Lake's module `:vir` facet to build a package set and its package
-`:virSdk` facet to install the matching JavaScript/Wasm SDK. The repository's
-npm commands build focused, single-member packages for local development.
-This is a browser-program workflow, not a general Lean-to-Wasm compiler.
+Applications follow [library-owned setup](EMBEDDED_RESOURCES.md). This page
+documents lower-level tools retained for VIR development and existing
+integrations, not an alternative first-release application workflow.
 
-For application calls, follow [Call Lean from JavaScript](CALL_LEAN_FROM_JS.md).
+The module `:vir` facet writes compiler package files; `:virSdk` installs the
+JavaScript/Wasm distribution used by older hosts. Repository npm commands select
+declarations for demos and tests. Applications do not manually assemble these
+outputs or run the commands below.
+
+[Direct runtime calls](CALL_LEAN_FROM_JS.md) describes the repository development
+runner, not normal application setup.
 [Generator internals](../reference/GENERATE_PACKAGE.md) owns compiled/live input selection;
 [the format reference](../reference/IRPKG_FORMAT.md) owns binary and manifest schemas.
 
@@ -161,9 +165,9 @@ The facet tracks Lake's transitive import artifacts, so imported implementation
 changes regenerate the set even when the root's public interface and `.olean`
 stay unchanged. The selected `VIR_NATIVE_EXTERN_MANIFEST` path and contents are
 also inputs. A missing root, report or listed shard, or a member whose length
-or SHA-256 differs from the descriptor, invalidates the cached target. Size
-checks use filesystem metadata; one portable Node crypto invocation hashes all
-members.
+or SHA-256 differs from the descriptor, is repaired from the shared compiled
+program result. Verification and hashing run in the native Lean tool; this path
+does not require Node.
 
 Compiled inputs use Lake's resolved artifact paths, including cache-only hits
 with no conventional `.olean` or `.ir` files restored under `.lake/build`.
@@ -172,11 +176,20 @@ setup file; later owning-module loads use the same mapping. No cache restoration
 setting is required. The setup file is build-local input metadata, not part of
 the published package set; output locations and descriptor ownership are unchanged.
 
-The descriptor is one Lake target. Invalidating it regenerates every reached
-member; unchanged members are not independently cached. Before generation the
-facet removes the previous descriptor, root and root-specific shard directory.
+The marked program is one cached Lake result, shared with `virResourcePack`.
+Its key includes full implementation/location traces, compiler/producer identity,
+root selection and native profile. A program edit regenerates every reached
+member; unchanged members are not independently cached. The loose-file adapter
+preserves the existing output names and installs the descriptor last. Repairing
+loose outputs does not rerun IR analysis. This is build-directory publication,
+not a transactional deployment mechanism for concurrent readers.
 Non-module inputs fail explicitly and invalidate stale outputs, including when
 replacing a previously successful module; there is no source fallback.
+
+The internal result reuses the validated resource-pack container and its bounded
+inventory (4096 files, 512 MiB of payload). It is not a public resource recipe:
+roles/support files and runtime acquisition do not affect its identity. Reports
+and setup maps remain build-local and are not embedded in public resources.
 
 Module identities and ordinal shard names avoid checkout-local paths in the
 package set. Manifests omit wall-clock timestamps, so identical
@@ -242,35 +255,7 @@ for `examples/MyApp.lean`. Sources must begin with `module`; expose intended
 callable definitions with `public def` or `public section`. Independent
 downstream projects use the Lake workflow above.
 
-For the bundled quickstart, run `npm run quickstart`, then
-`npm run dev -- --port 5173` and open the printed URL. The general CLI is:
-
-```bash
-npm run generate:irpkg -- <Module.Name> [package.irpkg] [root ...]
-```
-
-Select explicit exports, or omit roots to export the module's public definitions:
-
-```bash
-npm run generate:irpkg -- Quickstart web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet
-npm run generate:irpkg -- Fib build/generated/local.irpkg
-```
-
-The command builds the module and generator with Lake, then loads compiled IR.
-Source commands such as `#eval` run during compilation, never again during
-packaging. Reached opaque imports are materialized through their owning modules
-and folded into the single output package; the Lake facet uses the same closure
-logic but emits members by owner.
-
-Use the actual module identity, not a source path or Lake target/facet syntax.
-Without an output path, `App.Widget` writes `build/generated/Widget.irpkg` and
-`Widget.report.md`; quoted module names require an explicit path. A successful
-command prints format/toolchain metadata, declaration/export/host-import counts,
-targets and resolved roots. Its report also lists closure declarations, native
-externs, initializers and diagnostics. Unpackageable exports or unsupported
-interfaces exit nonzero and point to the report.
-
-## Configure package generation
+Use a configuration file to select the module and its exports:
 
 ```json
 {
@@ -286,6 +271,17 @@ interfaces exit nonzero and point to the report.
 npm run prepare:irpkg -- examples/fib.virpkg.json
 npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json
 ```
+
+For the bundled quickstart, run `npm run prepare:irpkg -- examples/quickstart.virpkg.json`,
+then `npm run dev -- --port 5173` and open
+`http://127.0.0.1:5173/dev.html?package=local-quickstart.irpkg`.
+
+The command builds the module and generator with Lake, then loads compiled IR.
+Source commands such as `#eval` run during compilation, never again during
+packaging. Reached opaque imports are materialized through their owning modules
+and folded into the single output package; the Lake facet uses the same closure
+logic but emits members by owner. The report lists closure declarations, native
+externs, initializers and diagnostics; unsupported interfaces exit nonzero.
 
 `roots` is the only selection setting. A nonempty array selects exactly those
 exports; omission or `[]` selects all public definitions of the module. An

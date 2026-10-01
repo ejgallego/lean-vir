@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -15,6 +16,17 @@ import {
 function config(overrides = {}) {
   return { version: 2, module: "Examples.Fib", ...overrides };
 }
+
+test("development runner documents a valid config-based command", () => {
+  const html = readFileSync(new URL("../../web/dev.html", import.meta.url), "utf8");
+  const example = html.match(/Save as my-module\.virpkg\.json:\n(\{[\s\S]*?\})\n\nnpm run prepare:irpkg -- my-module\.virpkg\.json/);
+  assert.ok(example, "runner must show both the config and its preparation command");
+  const normalized = normalizeModulePackageConfig(JSON.parse(example[1]));
+  assert.equal(normalized.module, "MyModule");
+  assert.equal(normalized.packagePath, "web/public/local.irpkg");
+  assert.deepEqual(normalized.roots, ["Namespace.entry1", "Namespace.entry2"]);
+  assert.ok(html.includes("dev.html?package=local.irpkg"));
+});
 
 test("module package defaults select all public definitions", () => {
   assert.deepEqual(normalizeModulePackageConfig(config()), {

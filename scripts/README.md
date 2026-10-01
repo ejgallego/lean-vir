@@ -5,6 +5,9 @@ maintainer tooling for Lean VIR. Most files are implementation details behind
 the stable npm commands in `package.json`; prefer those commands in
 documentation and routine validation.
 
+Application authors follow [library-owned setup](../docs/guides/EMBEDDED_RESOURCES.md);
+these scripts are not application build prerequisites.
+
 The documentation owners are:
 
 - `README.md` for the user-facing quickstart.

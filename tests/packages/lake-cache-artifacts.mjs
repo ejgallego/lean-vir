@@ -40,11 +40,16 @@ const cache = path.join(temporary, "lake-cache");
 const retained = path.join(temporary, "conventional-builds");
 const logs = path.join(temporary, "logs");
 const hiddenSource = path.join(consumer, "CacheFixture", "Hidden.lean");
+const consumerBuild = path.join(consumer, "build with spaces");
+const producerBuild = path.join(producer, ".lake", "build");
 const descriptorPath = path.join(
-  consumer,
-  ".lake/build/vir/module-sets/CacheFixture/Root.irpkg-set.json",
+  consumerBuild,
+  "vir/module-sets/CacheFixture/Root.irpkg-set.json",
 );
-const setupPath = descriptorPath.replace(/[.]irpkg-set[.]json$/, ".setup.json");
+const setupPath = path.join(
+  consumerBuild,
+  "vir/programs/CacheFixture/Root.setup.json",
+);
 let succeeded = false;
 
 try {
@@ -62,6 +67,14 @@ try {
   assert.match(coldLog, /Built .*CacheFixture[.]Root:vir/);
   const cold = packageSummary();
   await assertRuntimeResult("cold", "42");
+
+  // The facet uses vir_program; npm producers use vir_irpkg. Prepare both
+  // executables before removing conventional artifacts, so the cache-only phase
+  // tests acquisition rather than a legitimate first compilation of a new tool.
+  const coldProducer = runLake("cold-producer-acquire", [
+    "run", "lean_vir/virPrepare", "CacheFixture.Root",
+  ]);
+  assert.equal(coldProducer.status, 0, coldProducer.log);
 
   moveConventionalBuilds("cold");
   const cacheOnly = runBuild("cache-only", false);
@@ -95,6 +108,7 @@ try {
     assert.deepEqual(cached.contract, cold.contract);
     assert.deepEqual(cached.memberHashes, cold.memberHashes);
     await assertRuntimeResult("cache-only", "42");
+    await assertProducerBridge("cache-only", cached, "42", true);
 
     const beforeWarm = outputSnapshot();
     const warmLog = build("warm-no-op", false);
@@ -136,6 +150,7 @@ try {
     assert.deepEqual(changedCached.contract, changed.contract);
     assert.deepEqual(changedCached.memberHashes, changed.memberHashes);
     await assertRuntimeResult("changed cache-only", "43");
+    await assertProducerBridge("changed-cache-only", changedCached, "43");
 
     moveConventionalBuilds("changed-cache-only");
     build("restore-control", true);
@@ -223,7 +238,8 @@ function writeConsumer() {
       "import Lake",
       "open Lake DSL",
       "",
-      "package cache_consumer",
+      "package cache_consumer where",
+      '  buildDir := "build with spaces"',
       'require lean_vir from "../producer"',
       "",
       "@[default_target]",
@@ -275,8 +291,8 @@ function hiddenModule(increment) {
   ].join("\n");
 }
 
-function runBuild(label, restore) {
-  const result = spawnSync("lake", ["-v", "build", "+CacheFixture.Root:vir"], {
+function runLake(label, args, restore = false) {
+  const result = spawnSync("lake", args, {
     cwd: consumer,
     encoding: "utf8",
     timeout: 10 * 60_000,
@@ -288,11 +304,107 @@ function runBuild(label, restore) {
       LAKE_RESTORE_ARTIFACTS: restore ? "true" : "false",
     },
   });
-  const log = `${result.stdout ?? ""}\n${result.stderr ?? ""}` +
+  const log =
+    `${result.stdout ?? ""}\n${result.stderr ?? ""}` +
     (result.error ? `\n${result.error.stack ?? result.error}\n` : "");
   writeFileSync(path.join(logs, `${label}.log`), log);
   assert.ifError(result.error);
-  return { status: result.status, log };
+  return { status: result.status, log, stdout: result.stdout };
+}
+
+function runBuild(label, restore) {
+  return runLake(label, ["-v", "build", "+CacheFixture.Root:vir"], restore);
+}
+
+async function assertProducerBridge(
+  label,
+  reference,
+  expected,
+  negative = false,
+) {
+  const args = [
+    "run",
+    "lean_vir/virPrepare",
+    "CacheFixture.Root",
+    "CacheFixture.Root",
+  ];
+  const acquired = runLake(`${label}-acquire`, args);
+  assert.equal(acquired.status, 0, acquired.log);
+  const resolved = JSON.parse(acquired.stdout);
+  assert.ok(path.isAbsolute(resolved.path));
+  assert.ok(path.isAbsolute(resolved.setup));
+  assert.equal(path.dirname(resolved.setup), path.join(consumerBuild, "vir/compiled-inputs"));
+  const setupBefore = readFileSync(resolved.setup);
+  const setupStat = statSync(resolved.setup);
+  const warmed = runLake(`${label}-acquire-warm`, args);
+  assert.equal(warmed.status, 0, warmed.log);
+  assert.deepEqual(JSON.parse(warmed.stdout), resolved);
+  assert.deepEqual(readFileSync(resolved.setup), setupBefore);
+  assert.equal(statSync(resolved.setup).mtimeMs, setupStat.mtimeMs);
+
+  const output = path.join(consumer, `${label}-producer.irpkg`);
+  const report = path.join(consumer, `${label}-producer.report.md`);
+  const descriptor = path.join(consumer, `${label}-producer.irpkg-set.json`);
+  const generate = (setupArgs) => {
+    const result = spawnSync(
+      resolved.path,
+      [
+        output,
+        report,
+        ...setupArgs,
+        "--module-set-output",
+        descriptor,
+        path.join(consumer, `${label}-shards`),
+        "CacheFixture.Root",
+        path.basename(output),
+        `${label}-shards`,
+        "--target-marked-module",
+        "CacheFixture.Root",
+      ],
+      {
+        cwd: consumer,
+        env: { ...process.env, LEAN_PATH: resolved.leanPath },
+        encoding: "utf8",
+        timeout: 120_000,
+      },
+    );
+    writeFileSync(
+      path.join(
+        logs,
+        `${label}-producer-${setupArgs.length ? "resolved" : "conventional"}.log`,
+      ),
+      `${result.stdout ?? ""}\n${result.stderr ?? ""}`,
+    );
+    assert.ifError(result.error);
+    return result;
+  };
+  if (negative) {
+    const conventional = generate([]);
+    assert.notEqual(
+      conventional.status,
+      0,
+      "conventional-path control unexpectedly succeeded",
+    );
+    assert.match(
+      conventional.stderr + conventional.stdout,
+      /unknown module prefix|object file.*does not exist|failed to load|missing.*[.]ir/i,
+    );
+  }
+  const generated = generate(["--setup", resolved.setup]);
+  assert.equal(generated.status, 0, generated.stderr + generated.stdout);
+  const members = JSON.parse(readFileSync(descriptor, "utf8")).packages;
+  assert.deepEqual(
+    Object.fromEntries(members.map((member) => [member.module, member.sha256])),
+    reference.memberHashes,
+  );
+  for (const member of members) {
+    assert.equal(
+      sha256(readFileSync(path.join(path.dirname(descriptor), member.path))),
+      member.sha256,
+    );
+  }
+  assertNoConventionalCompiledInputs(`${label}-producer`);
+  await assertRuntimeResult(`${label} producer bridge`, expected, descriptor);
 }
 
 function build(label, restore) {
@@ -303,11 +415,10 @@ function build(label, restore) {
 }
 
 function moveConventionalBuilds(label) {
-  for (const [name, root] of [
-    ["consumer", consumer],
-    ["producer", producer],
+  for (const [name, buildDir] of [
+    ["consumer", consumerBuild],
+    ["producer", producerBuild],
   ]) {
-    const buildDir = path.join(root, ".lake", "build");
     assert.ok(
       existsSync(buildDir),
       `missing ${name} build tree before ${label}`,
@@ -318,8 +429,7 @@ function moveConventionalBuilds(label) {
 
 function conventionalCompiledInputs() {
   const found = [];
-  for (const root of [consumer, producer]) {
-    const buildDir = path.join(root, ".lake", "build");
+  for (const buildDir of [consumerBuild, producerBuild]) {
     if (!existsSync(buildDir)) continue;
     walk(buildDir, (file) => {
       if (/[.]ir(?:[.]sig)?$|[.]olean(?:[.]server|[.]private)?$/.test(file)) {
@@ -346,7 +456,7 @@ function assertRestoredCompiledInputs() {
     "CacheFixture/Root.ir",
   ]) {
     assert.ok(
-      existsSync(path.join(consumer, ".lake/build/lib/lean", relative)),
+      existsSync(path.join(consumerBuild, "lib/lean", relative)),
       `restoration control did not restore ${relative}`,
     );
   }
@@ -392,7 +502,7 @@ function assertCacheResolvedSetup() {
 
 function assertRestoredSetup() {
   const setup = JSON.parse(readFileSync(setupPath, "utf8"));
-  const conventional = path.join(consumer, ".lake", "build", "lib", "lean");
+  const conventional = path.join(consumerBuild, "lib", "lean");
   for (const moduleName of [
     "CacheFixture.Base",
     "CacheFixture.Hidden",
@@ -479,11 +589,13 @@ function assertPackageContract(summary) {
   );
   for (const member of summary.members) {
     assert.equal(
-      member.descriptorSha256, member.actualSha256,
+      member.descriptorSha256,
+      member.actualSha256,
       `${member.module}: descriptor sha256 mismatch`,
     );
     assert.equal(
-      member.descriptorByteLength, member.actualByteLength,
+      member.descriptorByteLength,
+      member.actualByteLength,
       `${member.module}: descriptor byteLength mismatch`,
     );
     assert.deepEqual(member.owner, {
@@ -506,13 +618,15 @@ function assertRejectsStaleDescriptorIntegrity() {
   const original = readFileSync(descriptorPath);
   try {
     for (const [field, value] of [
-      ["sha256", "0".repeat(64)], ["byteLength", 0],
+      ["sha256", "0".repeat(64)],
+      ["byteLength", 0],
     ]) {
       const descriptor = JSON.parse(original);
       descriptor.packages[1][field] = value;
       writeFileSync(descriptorPath, JSON.stringify(descriptor));
       assert.throws(
-        () => packageSummary(), new RegExp(`descriptor ${field} mismatch`),
+        () => packageSummary(),
+        new RegExp(`descriptor ${field} mismatch`),
       );
     }
   } finally {
@@ -541,12 +655,13 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-async function assertRuntimeResult(label, expected) {
+async function assertRuntimeResult(label, expected, setPath = descriptorPath) {
   if (!options.wasm) return;
-  const { createVirRuntime } = await import("../../web/src/vir-runtime-node.js");
-  const descriptor = JSON.parse(readFileSync(descriptorPath, "utf8"));
+  const { createVirRuntime } =
+    await import("../../web/src/vir-runtime-node.js");
+  const descriptor = JSON.parse(readFileSync(setPath, "utf8"));
   const irPackageSet = descriptor.packages.map(({ path: memberPath }) =>
-    readFileSync(path.join(path.dirname(descriptorPath), memberPath)),
+    readFileSync(path.join(path.dirname(setPath), memberPath)),
   );
   const runtime = await createVirRuntime({ wasmBytes, irPackageSet });
   try {

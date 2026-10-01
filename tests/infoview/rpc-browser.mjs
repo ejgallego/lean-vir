@@ -21,7 +21,8 @@ const temp = await mkdtemp(join(tmpdir(), "vir-rpc-browser-"));
 await withCleanup(async () => {
   const packagePath = join(temp, "rpc.irpkg");
   const generator = prepareVirIrpkgSync({
-    lakeTargets: ["VirInfoview", "+tutorials.RpcReferenceWidget"],
+    lakeTargets: ["VirInfoview"],
+    modules: ["tutorials.RpcReferenceWidget"],
   });
   assert.equal(
     generator.ok,
@@ -33,6 +34,7 @@ await withCleanup(async () => {
     [
       packagePath,
       join(temp, "rpc.report.md"),
+      ...generator.setupArgs,
       "--target-module",
       "tutorials.RpcReferenceWidget",
       ...[

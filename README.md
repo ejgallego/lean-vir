@@ -1,341 +1,70 @@
 # Lean VIR
 
-Lean VIR runs selected [Lean 4](https://github.com/leanprover/lean4)
-declarations in the browser through Lean's real IR interpreter compiled to
-`wasm32-wasip1`.
+Lean VIR runs selected [Lean 4](https://github.com/leanprover/lean4) declarations
+in the browser through Lean's real IR interpreter compiled to `wasm32-wasip1`.
+It packages compiled module IR; it is not a general Lean-to-Wasm compiler.
 
-For downstream Lake packages, the preferred workflow is:
+## Try it
 
-1. add `lean_vir` as a pinned Lake dependency;
-2. mark browser exports with `@[vir_export]` and startup hooks with
-   `@[vir_startup]`;
-3. build the module's `.irpkg` with its `:vir` facet and install the matching
-   browser SDK with `:virSdk`;
-4. load the package and call `runStartupEntries()` from the browser host.
+Open the [hosted demos](https://ejgallego.github.io/lean-vir/), including
+[React Tamagotchi](https://ejgallego.github.io/lean-vir/react.html) and
+[`Format.pretty`](https://ejgallego.github.io/lean-vir/format.html).
+No local Lean or Wasm build is needed to try the hosted site.
 
-See
-[Lake Facets, Exports, And Startup Hooks](#lake-facets-exports-and-startup-hooks)
-for the short form and [docs/guides/PACKAGES.md](docs/guides/PACKAGES.md) for
-the complete client workflow. The repository-local package runner remains the
-quickest way to explore one Lean module manually: it reads the embedded interface
-manifest and builds runnable controls automatically.
+## Use VIR in an application
 
-## Lake Facets, Exports, And Startup Hooks
-
-Pin `lean_vir` in the client `lakefile.lean`:
-
-```lean
-require lean_vir from git
-  "https://github.com/ejgallego/lean-vir" @ "<tag-or-commit>"
-```
-
-Then mark exports directly in Lean and build the containing module:
+Write your browser program in a Lean module and mark its public entry points:
 
 ```lean
 module
-
-public import Vir.Browser
 meta import Vir.Attributes
 
-public section
-
 @[vir_export]
-def answer : Nat := 42
-
-@[vir_startup]
-def mount : Lean.Vir.Browser.DomM Unit := pure ()
+public def answer : Nat := 42
 ```
 
-Use `@[vir_export]` for declarations that JavaScript calls explicitly. A
-`@[vir_startup]` hook is also exported, but the host normally invokes it through
-`vir.runStartupEntries()` after loading the package.
+The application's client library declares that program and prepares its browser
+files through Lake. It also acquires the matching prebuilt **runtime**: the
+JavaScript loader and Wasm interpreter that execute the program.
 
-For either marker, Lean reports private or non-executable declarations and
-unavailable dependencies in the visible compiled closure, including a path to
-the blocker. `@[vir_export]` also rejects erased, implicit, and instance
-binders and classifies every argument and result against the supported
-JavaScript interface, including its compiled runtime layout. `@[vir_startup]`
-checks its complete zero-argument, `Unit`-result contract and names unexpected
-parameters, the actual non-`Unit` result, or an unsupported effect constructor.
-If imported IR is opaque, Lean identifies the compiled IR that package
-generation still requires. If IR compilation is postponed, it tells the user
-how to make that IR available. The `:vir` build repeats marker checks for raw
-metadata and reports generated boxed-boundary, package-wide, or unresolved
-dependency problems.
+Build the application with its ordinary Lake command. Its native site generator
+writes the prepared files, and the browser calls the program's exported functions.
+Applications do not locate VIR build directories, invoke packaging scripts, or
+build Wasm. Program compilation and runtime acquisition remain independent.
 
-```bash
-lake build +MySlides.Runtime:vir
-lake build :virSdk
-```
+Follow [the application setup guide](docs/guides/EMBEDDED_RESOURCES.md) for the
+library declaration, publication and JavaScript call. Use the Lean toolchain
+selected by your VIR dependency; HTTPS runtime acquisition needs `curl`.
+The integration is under review for the first release; current qualification
+and limits are recorded in [the acceptance checklist](docs/development/RESOURCE_ACCEPTANCE.md).
 
-When the dependency is pinned to an unreleased commit rather than a release
-tag, request the SDK artifact built from that same commit:
+## Experimental
 
-```bash
-VIR_SDK_COMMIT=<same-commit> lake build :virSdk
-```
+[Editor widgets and RPC](docs/guides/INFOVIEW.md) use live editor environments,
+including unsaved code. They are experimental and outside the first-release
+application workflow.
 
-The module facet writes a package-set descriptor, root member, reached
-dependency members, and report under `.lake/build/vir/module-sets/`. Descriptor
-v2 records every member's byte length and SHA-256; the package facet installs
-the versioned browser SDK. `vir.runStartupEntries()`
-runs `@[vir_startup]` declarations in manifest order and skips each hook after
-it succeeds. See
-[docs/guides/PACKAGES.md](docs/guides/PACKAGES.md) and the entirely
-Lean-authored [canvas slide example](examples/SlidesCanvas.lean), which is a
-real Lake target in this repository:
+## Develop VIR
 
-```bash
-lake build +SlidesCanvas:vir
-```
-
-## One Lean File To Browser
-
-Set up the toolchain once:
+The default `lake build` builds the core Lean library. To work on VIR itself:
 
 ```bash
 npm install
-npm run fetch:lean
-npm run install:wasi
-npm run build:demo
-```
-
-Generate the bundled quickstart package and start the local server:
-
-```bash
-npm run quickstart
-npm run dev -- --port 5173
-```
-
-Open:
-
-```text
-http://127.0.0.1:5173/dev.html?package=local-quickstart.irpkg
-```
-
-To package a Lake-registered module, pass its module name, output package, and any number
-of Lean declarations to expose:
-
-```bash
-npm run generate:irpkg -- Quickstart web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet Quickstart.total Quickstart.choose Quickstart.classify Quickstart.validateName
-```
-
-The export names are Lean declaration names. Use fully qualified names for
-declarations inside namespaces, such as `Quickstart.total`. If you omit export
-names, the generator packages public definitions owned by the module:
-
-```bash
-npm run generate:irpkg -- Fib web/public/local-fib.irpkg
-```
-
-Put packages under `web/public/` when you want to load them by URL from the
-runner. For packages written elsewhere, use the `/dev.html` file picker:
-
-```bash
-npm run generate:irpkg -- MergeSort build/generated/local.irpkg SortDemo.demo
-```
-
-The package runner starts a fresh WASM interpreter, reads the manifest embedded
-in the `.irpkg`, renders inputs for the selected export, and calls the Lean
-declaration in the browser.
-
-Inspect a package without starting the browser:
-
-```bash
-npm run inspect:irpkg -- web/public/local-quickstart.irpkg
-npm run inspect:irpkg -- --json web/public/local-quickstart.irpkg
-```
-
-## Calling Lean From JavaScript
-
-Use `/dev.html` for quick manual testing. In an app, load a focused `.irpkg` as a
-one-member set and call an exported declaration by its Lean name:
-
-```js
-import { createVirRuntimeFactory, fetchBytes } from "./src/vir-runtime.js";
-
-const factory = createVirRuntimeFactory({ wasmUrl: "/vir-upstream.wasm" });
-const bytes = await fetchBytes("/local-quickstart.irpkg");
-const runtime = await factory.createRuntime({ irPackageSet: [bytes] });
-
-const result = runtime.call("Quickstart.double", 21);
-```
-
-The manifest-driven call path supports pure declarations and recognized
-synchronous effects (`RuntimeM`, `IO`, `DomM`, and `ReactM`) over the currently
-supported scalar, array/list, option, product, sum, except, structure, enum,
-`ByteArray`, and `Lean.Expr` shapes. See
-[docs/guides/CALL_LEAN_FROM_JS.md](docs/guides/CALL_LEAN_FROM_JS.md) for the full JavaScript
-guide, including `Sum` and `Except` result shapes.
-
-## Try, Examples, And Reports
-
-`npm run dev -- --port 5173` opens the project landing page. It keeps the public
-surfaces separate by purpose:
-
-- **Try:** edit a small array and call Lean's merge sort through VIR.
-- **Examples:** run the React Tamagotchi or the focused `Format.pretty`
-  workload.
-- **Use:** follow the export, package, and JavaScript call path or download a
-  matching browser bundle.
-- **Developer tools:** open the DOM Tamagotchi and runtime diagnostics at
-  `/demo.html`, or inspect an `.irpkg` with the package runner at `/dev.html`.
-- **Inspect:** compare browser backends, runnable library coverage, and Wasm
-  size.
-
-Public applications live under [examples/](examples), small teaching sources
-under [examples/tutorials/](examples/tutorials), and conformance or regression
-coverage under [fixtures/](fixtures). See
-[Examples, tutorials, and fixtures](docs/development/EXAMPLES_AND_FIXTURES.md) for the
-ownership rules.
-
-The deployment from `main` follows the same layout:
-
-- [Lean VIR landing page](https://ejgallego.github.io/lean-vir/)
-- [React Tamagotchi](https://ejgallego.github.io/lean-vir/react.html)
-- [`Format.pretty`](https://ejgallego.github.io/lean-vir/format.html?case=list&width=12)
-- [Browser benchmark catalog](https://ejgallego.github.io/lean-vir/benchmarks/)
-- [VIR runnable-surface report](https://ejgallego.github.io/lean-vir/surface/)
-- [VIR Wasm size explorer](https://ejgallego.github.io/lean-vir/size/)
-
-The benchmark catalog currently deploys the verified `prettyM/default` and
-`lean-zip/default` candidates with their differential test packages. The
-runnable-surface report tracks installed declarations with complete VIR
-closures; the size explorer breaks the release and debug Wasm artifacts down by
-section, object, and symbol.
-
-See [docs/development/SURFACE_ANALYSIS.md](docs/development/SURFACE_ANALYSIS.md) for local analysis,
-rendering, and serving commands.
-
-## Browser Bundles And SDK Artifacts
-
-A downloadable static bundle is published with the hosted demo:
-
-[lean-vir-local.tar.gz](https://ejgallego.github.io/lean-vir/downloads/lean-vir-local.tar.gz)
-
-Unpack it, serve the extracted `lean-vir-local/` directory with a local HTTP
-server, and open the server URL.
-
-To build the same archive locally, run `npm run build:local-artifact`.
-
-The latest developer SDK artifact contains the JavaScript runtime entry files,
-their internal helper modules, the release `vir-upstream.wasm`, the optimized debug companion
-`vir-upstream.dev.wasm`, and a machine-readable `lean-vir-artifact.json`
-manifest:
-
-[lean-vir-sdk.tar.gz](https://ejgallego.github.io/lean-vir/downloads/lean-vir-sdk.tar.gz)
-
-```bash
-npm run build:sdk-artifact
-```
-
-Client Lake packages should normally install the matching SDK with
-`lake build :virSdk`, as shown above. The lower-level package executable remains
-available for explicit artifact-management workflows. The first complete
-client is
-[ejgallego/lean-vir-examples](https://github.com/ejgallego/lean-vir-examples).
-
-```bash
-LEAN_VIR_COMMIT=<lean-vir-git-commit>
-lake exe lean_vir/vir_fetch_sdk \
-  --commit "$LEAN_VIR_COMMIT" \
-  --out web/public/vendor/lean-vir
-```
-
-`--commit` downloads the `lean-vir-sdk` artifact produced by
-[GitHub Actions](https://github.com/ejgallego/lean-vir/actions) for that exact
-commit and rejects the install if the SDK manifest was built from a different
-commit. This keeps commit-pinned Lake dependencies and downloaded WASM/JS
-artifacts in sync before there are tagged releases. GitHub requires
-authentication for Actions artifact downloads, so set `GITHUB_TOKEN` or run
-[`gh auth login`](https://cli.github.com/manual/gh_auth_login) once before using
-the commit-artifact path.
-
-Tagged releases publish the same archive as a durable
-[GitHub Releases](https://github.com/ejgallego/lean-vir/releases) asset. The
-`:virSdk` facet defaults to the release matching the installed `lean_vir`
-package version once that release has been published;
-`vir_fetch_sdk --tag <tag>` can override the download source, but the artifact
-version must still match the installed package. Unreleased or commit-pinned
-clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
-
-## Where To Go Next
-
-- [docs/README.md](docs/README.md) for a map of maintainer and integration
-  documentation.
-- [docs/development/EXAMPLES_AND_FIXTURES.md](docs/development/EXAMPLES_AND_FIXTURES.md) for deciding
-  whether client code is a public example, a tutorial, or a test fixture.
-- [benchmarks/browser/README.md](benchmarks/browser/README.md) for contributing
-  a self-contained browser example, differential suite, or artifact build.
-- [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for implementation paths,
-  call-flow diagrams, and object ownership.
-- [docs/guides/PACKAGES.md](docs/guides/PACKAGES.md) for module registration, marked exports,
-  Lake facets, local packages and SDK installation.
-- [docs/reference/CLIENT_NATIVE_EXTERNS.md](docs/reference/CLIENT_NATIVE_EXTERNS.md) for selecting
-  project-owned native externs and compiling their C/C++ providers into Wasm.
-- [docs/guides/CALL_LEAN_FROM_JS.md](docs/guides/CALL_LEAN_FROM_JS.md) for calling exported
-  Lean declarations from app JavaScript.
-- [docs/guides/JS_API.md](docs/guides/JS_API.md) for using the runtime wrapper from
-  JavaScript.
-- [docs/reference/HOST_BINDINGS.md](docs/reference/HOST_BINDINGS.md) for JavaScript host binding
-  targets, external hosts, and resource cleanup.
-- [docs/guides/LEAN_VIR_LIBRARY.md](docs/guides/LEAN_VIR_LIBRARY.md) for Lean-side host
-  import helpers.
-- [docs/guides/REACT.md](docs/guides/REACT.md) for components, hooks and supported React calls;
-  [docs/guides/INFOVIEW.md](docs/guides/INFOVIEW.md) for editor widgets and RPC.
-- [docs/reference/IRPKG_FORMAT.md](docs/reference/IRPKG_FORMAT.md) and
-  [docs/reference/OBJECT_ABI.md](docs/reference/OBJECT_ABI.md) for package metadata and object transport.
-
-## Repository Layout
-
-- `Vir/` and `tools/` contain the Lean library and package tools; colocated
-  `Vir/*.bindings.json` manifests and `Vir/bindings.schema.json` describe the
-  shipped JavaScript boundary.
-- `wasm/upstream_shim/` owns the local interpreter, package, ABI, and WASI
-  boundary sources.
-- `web/src/` contains the distributable runtime and host-binding code;
-  repository browser applications and page helpers live under `web/app/`, and
-  reusable static tool templates under `web/tools/`.
-- `examples/` contains runnable applications and tutorials; `fixtures/`
-  contains regression-only Lean and host inputs, including the authored
-  `type-anchors/` comparison fixtures.
-- `benchmarks/harness/` owns repository-level benchmark runners and comparison
-  helpers; `benchmarks/browser/` is a standalone browser benchmark catalog with
-  its own package, docs, tests, and ignored artifacts.
-- `tests/` contains test-only runners, cases, and shared support grouped by the
-  subsystem they exercise.
-- `scripts/` contains repository build, analysis, and maintainer tooling;
-  binding-audit, package/artifact, report-analysis, and native-boundary
-  implementations are grouped under `scripts/bindings/`, `scripts/packages/`,
-  `scripts/analysis/`, and `scripts/native/` respectively.
-  Generated reports, packages, bundles, and site output stay under ignored
-  `build/`, `web/public/`, or `web/dist/` paths. Checked-in generated binding
-  declarations live beside their Lean modules and are guarded by drift checks.
-
-The default Lake target builds the core `Vir` library without browser tooling.
-Use `lake build VirInfoview` when working on the optional infoview integration;
-that target requires the repository npm dependencies and generates its bundle
-below `build/generated/infoview/`.
-
-## Contributor Checks
-
-```bash
 npm run setup
 npm run doctor
-npm run test:site
-npm run test:pages:browser
-npm test
 ```
 
-Generated outputs under `build/`, `web/dist/`, and `web/public/*.wasm` /
-`web/public/*.irpkg` are ignored by git.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [the harness](docs/HARNESS.md)
+before running broader builds or tests. Ordinary client applications should not
+run this setup sequence.
 
-Contributor workflow and harness details live in
-[CONTRIBUTING.md](CONTRIBUTING.md) and [docs/HARNESS.md](docs/HARNESS.md).
+[Build internals](docs/guides/BUILD_WORKFLOWS.md) documents the compiler, runtime
+distribution and repository tooling behind the application workflow.
+
+[Documentation](docs/README.md) links the API guides, implementation references,
+examples, and validation instructions.
 
 ## License
 
-This repository is licensed under Apache-2.0. See [LICENSE](LICENSE) and
-[NOTICE](NOTICE).
-Generated WASM artifacts can include object code compiled from Lean 4 source,
-which is also Apache-2.0 and keeps its upstream notices.
+Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Generated Wasm can contain Lean 4 object code and retains its upstream notices.

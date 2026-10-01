@@ -49,6 +49,7 @@ const environmentLookupSharedHarnessPaths = [
   "web/src/runtime/package-contract.js",
   "web/src/runtime/package-targets.js",
   "web/src/runtime/vir-codec.js",
+  "web/src/runtime/versions.js",
   "web/src/runtime/vir-value-normalizers.js",
   "web/src/vir-host-bindings.js",
   "web/src/vir-runtime.js",

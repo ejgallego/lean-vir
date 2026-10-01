@@ -36,6 +36,20 @@ target infoviewBundle (pkg) : System.FilePath := do
 lean_lib Vir where
   roots := #[`Vir]
 
+/-- Resource data/tools must never depend on the optional runtime carrier. -/
+lean_lib VirResourceCore where
+  roots := #[]
+  globs := #[.one `Vir.BinaryLiteral, .one `Vir.Resources, .one `Vir.Resources.Types,
+    .one `Vir.Hash, .one `Vir.Resources.Validate, .one `Vir.Resources.Pack,
+    .one `Vir.Resources.Build, .one `Vir.Resources.Program, .one `Vir.NativePayload]
+
+lean_lib VirResourceEmbed where
+  roots := #[]
+  globs := #[.one `Vir.BinaryLiteral.ToExpr, .one `Vir.Resources.Embed]
+
+lean_lib VirResourceBrowserFixture where
+  roots := #[`tests.resources.BrowserProgram]
+
 /-- Optional Lean infoview integration and its generated JavaScript shell. -/
 lean_lib VirInfoview where
   roots := #[`Vir.Infoview]
@@ -83,9 +97,26 @@ lean_exe vir_irpkg where
   root := `tools.GeneratePackage
   supportInterpreter := true
 
+/-- Internal canonical marked-program producer and output adapters. -/
+lean_exe vir_program where
+  root := `tools.VirProgram
+  supportInterpreter := true
+
 lean_exe vir_fetch_sdk where
   root := `tools.VirFetchSdk
   supportInterpreter := true
+
+/-- Pure resource-format regression tests, independent of runtime acquisition. -/
+lean_exe vir_resource_tests where
+  root := `tests.resources.Unit
+
+/-- Native preparation only; never depends on a resource carrier. -/
+lean_exe vir_resource_pack where
+  root := `tools.VirResourcePack
+
+/-- Resource wrapping only; does not import the compiler or interpreter. -/
+lean_exe vir_resource_program where
+  root := `tools.VirResourceProgram
 
 lean_exe vir_native_wrappers where
   root := `tools.GenerateNativeWrappers
@@ -104,197 +135,167 @@ private def virModuleOutput (mod : Module) (kind ext : String) : System.FilePath
 
 private def virSdkVersion : String := "0.1.0"
 
-private def virPackageSetFormat : String := "lean-vir-ir-package-set"
+/- Keep this small preflight in the Lake configuration: importing the unbuilt
+native tool here would create a bootstrap dependency. Lake may remove the output
+or write its trace/hash *before* invoking the tool, including on cache hits.
+This rejects accidental aliases, not concurrent hostile directory replacement. -/
+private def resourceMetadata? (path : System.FilePath) : IO (Option IO.FS.Metadata) := do
+  try return some (← path.symlinkMetadata)
+  catch e => match e with
+    | .noFileOrDirectory .. => return none
+    | _ => throw e
 
-private def virPackageSetVersion : Nat := 2
+private partial def checkResourceDirectory (path : System.FilePath) : IO Unit := do
+  if let some parent := path.parent then
+    if parent != path then checkResourceDirectory parent
+  if let some metadata ← resourceMetadata? path then
+    unless metadata.type == .dir do
+      throw <| IO.userError s!"UNSAFE_RESOURCE_DIRECTORY: {path}"
 
-private def virJsonStringField? (json : Lean.Json) (field : String) : Option String :=
-  match json.getObjVal? field with
-  | .ok (.str value) => some value
-  | _ => none
+private def checkResourceOutput (path : System.FilePath) : IO Unit := do
+  checkResourceDirectory (path.parent.getD ".")
+  if let some metadata ← resourceMetadata? path then
+    unless metadata.type == .file do
+      throw <| IO.userError s!"UNSAFE_RESOURCE_FILE: {path}"
 
-private def virJsonNatField? (json : Lean.Json) (field : String) : Option Nat :=
-  match json.getObjVal? field >>= Lean.Json.getNat? with
-  | .ok value => some value
-  | .error _ => none
-
-private def virNodeCmd : String :=
-  if System.Platform.isWindows then "node.exe" else "node"
-
-private def virSha256Script : String :=
-  "import { readFileSync } from \"node:fs\";" ++
-  "import { createHash } from \"node:crypto\";" ++
-  "for (const path of process.argv.slice(1)) {" ++
-  "process.stdout.write(createHash(\"sha256\").update(readFileSync(path)).digest(\"hex\") + \"\\n\");" ++
-  "}"
-
-private def virSha256Files? (paths : Array System.FilePath) : IO (Option (Array String)) := do
-  if paths.isEmpty then
-    return some #[]
-  try
-    let out ← IO.Process.output {
-      cmd := virNodeCmd
-      args := #["--input-type=module", "--eval", virSha256Script, "--"] ++
-        paths.map (fun path => path.toString)
-    }
-    if out.exitCode != 0 then
-      return none
-    let hashes := out.stdout.splitOn "\n" |>.filter (fun hash => !hash.isEmpty) |>.toArray
-    if hashes.size == paths.size && hashes.all (fun hash =>
-        hash.length == 64 && hash.toList.all ("0123456789abcdef".contains ·)) then
-      return some hashes
-    return none
-  catch _ =>
-    return none
-
-private def virPackageSetComplete
-    (descriptorPath : System.FilePath)
-    (expectedRootModule expectedRootPath expectedShardDir : String) : IO Bool := do
-  if !(← descriptorPath.pathExists) then
-    return false
-  let .ok descriptor := Lean.Json.parse (← IO.FS.readFile descriptorPath)
-    | return false
-  let some format := virJsonStringField? descriptor "format"
-    | return false
-  if format != virPackageSetFormat then
-    return false
-  let .ok versionJson := descriptor.getObjVal? "version"
-    | return false
-  let .ok version := versionJson.getNat?
-    | return false
-  if version != virPackageSetVersion then
-    return false
-  let .ok packagesJson := descriptor.getObjVal? "packages"
-    | return false
-  let .ok packages := packagesJson.getArr?
-    | return false
-  if packages.isEmpty then
-    return false
-  let baseDir := descriptorPath.parent.getD "."
-  let mut modules : Array String := #[]
-  let mut paths : Array String := #[]
-  let mut memberPaths : Array System.FilePath := #[]
-  let mut expectedHashes : Array String := #[]
-  let mut index := 0
-  for packageJson in packages do
-    let some moduleName := virJsonStringField? packageJson "module"
-      | return false
-    if moduleName.trimAscii.toString.isEmpty || moduleName.toName.isAnonymous ||
-        moduleName.toName.toString != moduleName ||
-        modules.contains moduleName then
-      return false
-    modules := modules.push moduleName
-    let some role := virJsonStringField? packageJson "role"
-      | return false
-    let expectedRole := if index + 1 == packages.size then "root" else "dependency"
-    if role != expectedRole || (role == "root" && moduleName != expectedRootModule) then
-      return false
-    let some path := virJsonStringField? packageJson "path"
-      | return false
-    if path.trimAscii.toString.isEmpty || paths.contains path then
-      return false
-    let expectedPath :=
-      if role == "root" then
-        expectedRootPath
-      else
-        (System.FilePath.mk expectedShardDir / s!"{index}.irpkg").toString
-    if path != expectedPath then
-      return false
-    paths := paths.push path
-    let some expectedByteLength := virJsonNatField? packageJson "byteLength"
-      | return false
-    let some expectedSha256 := virJsonStringField? packageJson "sha256"
-      | return false
-    if expectedSha256.length != 64 ||
-        !expectedSha256.toList.all ("0123456789abcdef".contains ·) then
-      return false
-    let memberPath := baseDir / path
-    if !(← memberPath.pathExists) || (← memberPath.isDir) then
-      return false
-    let metadata ← memberPath.metadata
-    if metadata.byteSize.toNat != expectedByteLength then
-      return false
-    memberPaths := memberPaths.push memberPath
-    expectedHashes := expectedHashes.push expectedSha256
-    index := index + 1
-  return (← virSha256Files? memberPaths) == some expectedHashes
-
-private def buildVirPackageSetFacet
-    (mod : Module) : FetchM (Job System.FilePath) := do
-  let generatorJob ← vir_irpkg.fetch
+/- One compiled-input boundary for loose package sets and embedded resources.
+Callers resolve/check the import graph first (resource carriers must stay out of
+it). This job carries implementation contents as well as their resolved paths;
+serializing its result must not replace that semantic dependency trace. -/
+private def fetchVirCompiledSetup
+    (mod : Module) (imports : Array Module) : FetchM (Job Lean.ModuleSetup) := do
   -- Lean 4.33's importAllArts facet returns exportInfo.arts, not allArts,
   -- despite using allArtsTrace. Extract both explicitly so private artifact
   -- groups reach the generator as well as participating in invalidation.
-  let moduleJob ← mod.exportInfo.fetch
-  let importsJob ← mod.transImports.fetch
-  let importArtsJob ← importsJob.bindM fun imports => do
-    let jobs ← imports.mapM fun imported => do
-      (← imported.exportInfo.fetch).mapM fun info => do
-        addTrace info.allArtsTrace
-        return (imported.name, info.allArts)
-    return Job.collectArray jobs "VIR imported module IR"
+  let jobs ← (imports.push mod).mapM fun input => do
+    (← input.exportInfo.fetch).mapM fun info => do
+      addTrace info.allArtsTrace
+      return (input.name, info.allArts)
+  (Job.collectArray jobs "VIR compiled inputs").mapM fun artifacts => do
+    let importArts := artifacts.foldl (init := ({} : Lean.NameMap Lean.ImportArtifacts))
+      fun arts (name, paths) => arts.insert name paths
+    let setup : Lean.ModuleSetup := { name := mod.name, importArts }
+    addLeanTrace
+    -- Cache relocation can change paths without changing implementation bytes.
+    addPureTrace (Lean.toJson setup).compress "VIR resolved input locations"
+    return setup
+
+/-- Internal bridge for repository package producers. Selection and output stay
+with the generator; Lake returns executable and full compiled-artifact paths.
+This is not an additional application build workflow or public module facet. -/
+script virPrepare (args) do
+  let noBuild := args.head? == some "--no-build"
+  let names := (if noBuild then args.drop 1 else args).toArray
+  let pkg ← getRootPackage
+  let result ← runBuild (cfg := { noBuild, verbosity := .quiet }) do
+    let generator ← vir_irpkg.fetch
+    let inputs ← names.mapM fun name => do
+      let some mod ← findModule? name.toName
+        | error s!"VIR compiled input `{name}` is not Lake-registered"
+      (← mod.transImports.fetch).bindM fun imports => fetchVirCompiledSetup mod imports
+    generator.bindM fun generator => (Job.collectArray inputs "VIR producer inputs").mapM fun inputs => do
+      let setup : Lean.ModuleSetup := {
+        name := .anonymous
+        importArts := inputs.foldl (init := {}) fun arts setup =>
+          setup.importArts.foldl (fun arts name paths => arts.insert name paths) arts }
+      let setupPath := pkg.buildDir / "vir/compiled-inputs" /
+        s!"{(Hash.ofString (Lean.toJson names).compress).hex}.setup.json"
+      let inputTrace ← getTrace
+      if !names.isEmpty then
+        buildFileUnlessUpToDate' setupPath do
+          createParentDirs setupPath
+          IO.FS.writeFile setupPath (Lean.toJson setup).compress
+        -- The writer replaces the job trace with its file-content trace. Retain
+        -- implementation identity even when private edits leave the JSON equal.
+        addTrace inputTrace
+      return Lean.Json.mkObj [
+        ("path", Lean.toJson generator.toString),
+        ("setup", if names.isEmpty then .null else Lean.toJson setupPath.toString),
+        ("leanPath", Lean.toJson (← getAugmentedLeanPath).toString)]
+  IO.println result.compress
+  return 0
+
+/-- Internal shared cached result. Public adapters do not repeat IR analysis. -/
+module_facet virProgram (mod : Module) : System.FilePath := do
+  let generatorJob ← vir_program.fetch
+  let inputsJob ← (← mod.transImports.fetch).bindM fun imports =>
+    fetchVirCompiledSetup mod imports
+  let output := virModuleOutput mod "programs" "virprogram"
+  let setupPath := virModuleOutput mod "programs" "setup.json"
+  let clientNativeManifest? ← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST"
+  generatorJob.bindM fun generator => inputsJob.mapM fun setup => do
+    -- A rejected non-module must not inherit an earlier generation diagnostic.
+    let diagnostic := output.addExtension "report.md"
+    checkResourceOutput diagnostic
+    removeFileIfExists diagnostic
+    unless (setup.importArts.find? mod.name).any (·.ir?.isSome) do
+      error s!"VIR package input `{mod.name}` requires a `module` header and compiled IR"
+    addTrace (← computeTrace generator)
+    addPureTrace "virProgram/v1" "VIR compiled program contract"
+    addPureTrace mod.name.toString "VIR module"
+    addPureTrace (clientNativeManifest?.getD "<unset>") "VIR client-native extern manifest"
+    if let some manifest := clientNativeManifest? then
+      unless manifest.isEmpty do addTrace (← computeTrace (System.FilePath.mk manifest))
+    for path in #[output, setupPath, output.addExtension "report.md",
+        output.addExtension "trace", output.addExtension "hash"] do
+      checkResourceOutput path
+    let inputTrace ← getTrace
+    let artifact ← buildArtifactUnlessUpToDate output (ext := "virprogram") do
+      createParentDirs output
+      removeFileIfExists setupPath
+      IO.FS.writeFile setupPath (Lean.toJson setup).compress
+      proc {
+        cmd := generator.toString
+        args := #["build", setupPath.toString, output.toString]
+        env := ← getAugmentedEnv }
+    -- An artifact-map path is authoritative, not necessarily the conventional output.
+    proc { cmd := generator.toString, args := #["verify", artifact.path.toString, mod.name.toString] }
+    addTrace inputTrace
+    return artifact.path
+
+private def buildVirPackageSetFacet (mod : Module) : FetchM (Job System.FilePath) := do
+  let toolJob ← vir_program.fetch
+  let programJob ← (mod.facet `virProgram).fetch
+  -- The public descriptor must not survive a failed regeneration. Preserve the
+  -- original job's diagnostics while giving this adapter a cleanup boundary.
+  let programJob := programJob.mapResult fun
+    | .ok value state => .ok (Except.ok value) state
+    | .error err state => .ok (Except.error err) state
   let packagePath := virModuleOutput mod "module-sets" "irpkg"
   let reportPath := virModuleOutput mod "module-sets" "report.md"
   let descriptorPath := virModuleOutput mod "module-sets" "irpkg-set.json"
   let shardDir := virModuleOutput mod "module-sets" "parts"
-  let setupPath := virModuleOutput mod "module-sets" "setup.json"
-  let moduleName := mod.name.toString
   let rootRelativePath := mod.fileName "irpkg"
   let shardRelativeDir := shardDir.fileName.getD shardDir.toString
-  let clientNativeManifest? ← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST"
-  generatorJob.bindM fun generator =>
-    moduleJob.bindM fun artifacts =>
-      importArtsJob.mapM fun imports => do
-        unless artifacts.allArts.ir?.isSome do
-          -- Rejection must also invalidate an older successful source package.
-          removeFileIfExists descriptorPath
-          removeFileIfExists packagePath
-          removeFileIfExists reportPath
-          removeDirAllIfExists shardDir
-          error s!"VIR package input `{moduleName}` requires a `module` header and compiled IR"
-        addLeanTrace
-        addTrace artifacts.allArtsTrace
-        addTrace (← computeTrace generator)
-        addPureTrace moduleName "VIR module"
-        addPureTrace (clientNativeManifest?.getD "<unset>") "VIR client-native extern manifest"
-        if let some manifest := clientNativeManifest? then
-          unless manifest.isEmpty do
-            addTrace (← computeTrace (System.FilePath.mk manifest))
-        let packageSetComplete ← virPackageSetComplete descriptorPath moduleName
-          rootRelativePath shardRelativeDir
-        if (← descriptorPath.pathExists) &&
-            (!(← reportPath.pathExists) || !packageSetComplete) then
-          IO.FS.removeFile descriptorPath
-        buildFileUnlessUpToDate' descriptorPath do
-          removeFileIfExists descriptorPath
-          removeFileIfExists packagePath
-          removeDirAllIfExists shardDir
-          createParentDirs packagePath
-          createParentDirs reportPath
-          createParentDirs descriptorPath
-          IO.FS.createDirAll shardDir
-          -- Keep Lake's resolved paths, including private data and full IR.
-          -- Cache-only builds need not restore conventional .lake/build files.
-          let importArts := imports.foldl (init := ({} : Lean.NameMap Lean.ImportArtifacts))
-            fun arts (name, paths) => arts.insert name paths
-          let setup : Lean.ModuleSetup := {
-            name := mod.name
-            importArts := importArts.insert mod.name artifacts.allArts
-          }
-          IO.FS.writeFile setupPath (Lean.toJson setup).compress
-          proc {
-            cmd := generator.toString
-            args := #[
-              packagePath.toString,
-              reportPath.toString,
-              "--setup", setupPath.toString
-            ] ++ #[
-              "--module-set-output", descriptorPath.toString, shardDir.toString, moduleName,
-              rootRelativePath, shardRelativeDir
-            ] ++ #["--target-marked-module", moduleName]
-            env := ← getAugmentedEnv
-          }
-        return descriptorPath
+  let reportRelativePath := mod.fileName "report.md"
+  toolJob.bindM fun tool => programJob.mapM fun result => do
+    for path in #[descriptorPath, packagePath, reportPath,
+        descriptorPath.addExtension "trace", descriptorPath.addExtension "hash"] do
+      checkResourceOutput path
+    checkResourceDirectory shardDir
+    let program ← match result with
+      | .ok program => pure program
+      | .error err =>
+        removeFileIfExists descriptorPath
+        removeFileIfExists packagePath
+        removeDirAllIfExists shardDir
+        removeFileIfExists reportPath
+        let diagnostic := (virModuleOutput mod "programs" "virprogram").addExtension "report.md"
+        if (← diagnostic.pathExists) then
+          proc { cmd := tool.toString, args := #["report", diagnostic.toString, reportPath.toString] }
+        throw err
+    let args := #[program.toString, mod.name.toString, descriptorPath.toString,
+      rootRelativePath, shardRelativeDir, reportRelativePath]
+    let checked ← IO.Process.output { cmd := tool.toString, args := #["check"] ++ args }
+    if checked.exitCode != 0 then removeFileIfExists descriptorPath
+    let inputTrace ← getTrace
+    buildFileUnlessUpToDate' descriptorPath do
+      removeFileIfExists descriptorPath
+      removeDirAllIfExists shardDir
+      createParentDirs descriptorPath
+      proc { cmd := tool.toString, args := #["install"] ++ args }
+    addTrace inputTrace
+    return descriptorPath
 
 /--
 Build a composable VIR package set from the module's `@[vir_export]` and
@@ -348,3 +349,110 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
         env := ← getAugmentedEnv
       }
     return manifestPath
+
+/- Embedded resource preparation. These declarations use Lake/Lean only: no
+import of an unbuilt VIR implementation into downstream lake configurations. -/
+
+input_file virResourceCompatibility where
+  path := "vir-resources/compatibility.json"
+  text := true
+
+input_file virResourceRuntimeLock where
+  path := "vir-resources/runtime.json"
+  text := true
+
+target virRuntimePack (pkg) : System.FilePath := do
+  let tool ← vir_resource_pack.fetch
+  let profile ← virResourceCompatibility.fetch
+  let lock ← virResourceRuntimeLock.fetch
+  tool.bindM fun tool => profile.bindM fun profile => lock.mapM fun lock => do
+      let plan ← captureProc {
+        cmd := tool.toString
+        args := #["runtime-plan", profile.toString, lock.toString, pkg.dir.toString] }
+      let json ← IO.ofExcept (Lean.Json.parse plan)
+      let contentId ← IO.ofExcept <| json.getObjValAs? String "contentId"
+      let source ← IO.ofExcept <| json.getObjValAs? String "source"
+      if source != "-" && !source.startsWith "https://" then
+        addTrace (← computeTrace (System.FilePath.mk source))
+      addLeanTrace
+      let cache := pkg.buildDir / "vir/resources/runtime" / s!"{contentId}.virres"
+      let stage := pkg.dir / ".vir-generated/VirResourceRuntime.virres"
+      -- Check the full profile before installation, in the same acquisition pass.
+      proc { cmd := tool.toString, args := #["acquire", profile.toString, contentId, source,
+        cache.toString, stage.toString] }
+      addTrace (← computeTrace stage)
+      return stage
+
+/-- Optional carrier: no other VIR library or native tool imports it. -/
+lean_lib VirResourceRuntime where
+  roots := #[]
+  globs := #[.one `Vir.Resources.Runtime]
+  needs := #[virRuntimePack]
+
+private def sameResourceLibrary (a b : LeanLib) : Bool :=
+  a.name == b.name && a.pkg.keyName == b.pkg.keyName
+
+private def resourceLibraryStem (lib : LeanLib) : Except String String := do
+  -- Keep Lean's name spelling (including quotes); it must be one filename,
+  -- not an ASCII-only identifier or a rewritten slug.
+  let stem := lib.name.toString
+  unless !stem.isEmpty && stem != "." && stem != ".." &&
+      !stem.contains '/' && !stem.contains '\\' && !stem.contains '\x00' do
+    throw "virResourcePack requires a library name usable as one filename"
+  return stem
+
+/-- Resolve only independent program inputs; never fetch the carrier's modules
+or extra dependencies while producing the prerequisite for that carrier. -/
+library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
+  -- Enforce this before any cache lookup. Resource runtime capabilities come
+  -- from the locked bundle, not an ambient custom native-provider selection.
+  if (← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST").isSome then
+    error "VIR_RESOURCE_NATIVE_PROFILE_UNSUPPORTED: unset VIR_NATIVE_EXTERN_MANIFEST; resource programs require the locked runtime profile"
+  let stem ← IO.ofExcept (resourceLibraryStem lib)
+  let recipe ← inputTextFile (lib.pkg.dir / "vir-resources" / s!"{stem}.json")
+  let profile ← virResourceCompatibility.fetch
+  let tool ← vir_resource_program.fetch
+  let packTool ← vir_resource_pack.fetch
+  tool.bindM fun tool => packTool.bindM fun packTool => profile.bindM fun profile =>
+  recipe.bindM fun recipe => do
+    let planText ← captureProc {
+      cmd := tool.toString
+      args := #["plan", recipe.toString, profile.toString, lib.pkg.dir.toString] }
+    let plan ← IO.ofExcept (Lean.Json.parse planText)
+    let moduleName ← IO.ofExcept <| plan.getObjValAs? String "module"
+    let supportPaths ← IO.ofExcept <| plan.getObjValAs? (Array String) "supportFiles"
+    let some mod ← findModule? moduleName.toName
+      | error s!"VIR resource program module `{moduleName}` is not Lake-registered"
+    if sameResourceLibrary mod.lib lib then
+      error s!"VIR resource cycle: program `{moduleName}` belongs to its carrier library `{lib.name}`"
+    let imports ← mod.transImports.fetch
+    imports.bindM fun imports => do
+      for imported in imports do
+        if sameResourceLibrary imported.lib lib then
+          error s!"VIR resource cycle: `{moduleName}` imports carrier module `{imported.name}` in `{lib.name}`"
+      -- Source-only transImports was checked before requesting compilation, so
+      -- the common carrier/program cycle produces a diagnostic, not a job wait.
+      let program ← (mod.facet `virProgram).fetch
+      let support ← supportPaths.mapM fun path => inputBinFile (lib.pkg.dir / System.FilePath.mk path)
+      let support := Job.collectArray support "VIR resource support files"
+      program.bindM fun program => support.mapM fun _ => do
+        addPureTrace "virResourcePack/v2" "VIR resource producer contract"
+        let output := lib.pkg.buildDir / "vir/resources/programs" / s!"{stem}.virres"
+        for path in #[output, output.addExtension "trace", output.addExtension "hash"] do
+          checkResourceOutput path
+        let inputTrace ← getTrace
+        let artifact ← buildArtifactUnlessUpToDate output (ext := "virres") do
+          createParentDirs output
+          proc {
+            cmd := tool.toString
+            args := #["build", recipe.toString, profile.toString, program.toString,
+              lib.pkg.dir.toString, output.toString], env := ← getAugmentedEnv }
+        let stage := lib.pkg.dir / ".vir-generated" / s!"{stem}.virres"
+        -- Always repair/verify staging, even when Lake returns a cached artifact
+        -- somewhere other than output. No restoration of conventional IR paths.
+        discard <| captureProc {
+          cmd := packTool.toString
+          args := #["stage", profile.toString, artifact.path.toString, stage.toString] }
+        addTrace inputTrace
+        addTrace (← computeTrace stage)
+        return artifact.path

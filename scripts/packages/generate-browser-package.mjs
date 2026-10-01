@@ -79,14 +79,12 @@ const plans = selectBrowserPackages(packageSpecs, args.packages).map(
 );
 
 const lakeTargets = [
-  ...new Set(
-    plans.flatMap(({ spec, modules }) => [
-      ...(spec.lakeTargets ?? []),
-      ...modules.map((module) => `+${module}`),
-    ]),
-  ),
+  ...new Set(plans.flatMap(({ spec }) => spec.lakeTargets ?? [])),
 ];
-const generator = prepareVirIrpkgSync({ lakeTargets });
+const generator = prepareVirIrpkgSync({
+  lakeTargets,
+  modules: plans.flatMap((plan) => plan.modules),
+});
 if (!generator.ok) {
   process.exit(generator.status);
 }
@@ -105,10 +103,14 @@ for (const { spec, targetArgs } of plans) {
     spec.report ?? packagePath.replace(/\.irpkg$/, ".report.md");
   const packageStart = timerStart();
   try {
-    runSync(generator.path, [packagePath, reportPath, ...targetArgs], {
-      cwd: root,
-      env: generator.env,
-    });
+    runSync(
+      generator.path,
+      [packagePath, reportPath, ...generator.setupArgs, ...targetArgs],
+      {
+        cwd: root,
+        env: generator.env,
+      },
+    );
   } catch (error) {
     process.exit(error.status ?? 1);
   }
@@ -132,8 +134,7 @@ const packageSummary = packageTimings
   .map((timing) => `${timing.id}=${formatSeconds(timing.seconds)}s`)
   .join(", ");
 console.log(
-  `browser package timing: lean-lib=${formatSeconds(generator.libSeconds)}s ` +
-    `generator=${formatSeconds(generator.generatorSeconds)}s packages=${formatSeconds(packagesSeconds)}s ` +
+  `browser package timing: acquisition=${formatSeconds(generator.generatorSeconds)}s packages=${formatSeconds(packagesSeconds)}s ` +
     `total=${formatSeconds(elapsedSeconds(scriptStart))}s`,
 );
 console.log(`browser package files: ${packageSummary}`);

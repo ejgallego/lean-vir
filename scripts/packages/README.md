@@ -1,24 +1,25 @@
-# Package tooling
+# Repository packaging tools
 
-This directory owns repository-local tooling for `.irpkg` files, generated
-browser packages, and distributable SDK and local artifacts. The stable command
-surface is the corresponding npm scripts in the repository `package.json`.
-The demo-package diagnostic wrapper also lives here behind `npm run
-check:package`.
+Applications do not use this directory. Their owning libraries prepare the
+program and runtime through Lake; see [application setup](../../docs/guides/EMBEDDED_RESOURCES.md).
+These scripts serve the hosted demos, tests, benchmarks and runtime distribution.
 
-The side-effect-free format, version, fixture-configuration, and SDK-payload
-modules are imported by tests and benchmark tooling. Command implementations
-remain colocated here because their paths are repository internals; no direct
-script-path compatibility is promised.
+| Files | Current callers / purpose |
+| --- | --- |
+| `irpkg-generator.mjs` | Shared Lake acquisition adapter for repository producers and tests; it returns resolved executable, compiled inputs and search path. |
+| `prepare-irpkg.mjs`, `module-package-config.mjs` | Config-list preparation for the development runner/pages, through shared acquisition and selection helpers. |
+| `generate-browser-package.mjs`, `browser-package-{config,plan}.mjs` | Demo/fixture catalogs and explicit selection, including the generator memory test. |
+| `check-demo-package.sh` | Demo-output checks. |
+| `inspect-irpkg.mjs`, `irpkg-format.mjs`, `package-versions.mjs`, `check-package-abi.mjs` | Compiler-output inspection and ABI consistency tests. |
+| `package-{sdk,local}-artifact.mjs`, `sdk-payloads.mjs`, `artifact-bundle.mjs` | Older runtime archives and hosted demo downloads, called by `build:site` and distribution checks. |
+| `lean-zip/`, `illuminate/`, `vir-client-package-lib.mjs` | Pinned external benchmark/acceptance producers, not normal client installation. |
 
-Shared process, filesystem, timing, and repository-path helpers remain one
-level above this directory because they serve multiple tooling owners. Shared
-SDK/local bundle layout and publication policy lives in `artifact-bundle.mjs`.
+The npm command names remain for those callers. They are not a promise of
+multiple application workflows or stable script paths. “Package” means compiler
+output here; “SDK” names the older runtime archive, not a separate user concept.
 
-External-client browser exporters and their package-local smoke payloads live
-under their client owner directories, currently `illuminate/` and `lean-zip/`.
-Their common VIR runtime, source identity, argument, and checksum machinery is
-kept in `vir-client-package-lib.mjs`. Benchmark catalog entry points are
-resolved inside exact immutable producer revisions, so a path move takes effect
-only when the corresponding source pin advances. `npm run accept:lean-zip`
-remains the stable lean-zip maintainer command.
+There is real migration work before deleting the older tools: demos and tests
+still consume their loose outputs, and pinned benchmark producers retain their
+own selection requirements. Do not add an application wrapper over these scripts
+or duplicate Lake acquisition in JavaScript. Migrate a caller with byte/behavior
+tests, then remove the unused command and its configuration.

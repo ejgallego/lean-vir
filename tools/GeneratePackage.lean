@@ -92,8 +92,9 @@ unsafe def main (args : List String) : IO UInt32 := do
           rootRelativePath :: shardRelativeDir :: targetArgs =>
           match Vir.parseDottedName moduleName, parseTargets targetArgs with
           | .ok rootModule, .ok targets =>
-              Vir.GeneratePackage.runModuleSet targets rootModule
+              let result ← Vir.GeneratePackage.runModuleSet targets rootModule
                 packagePath descriptorPath shardDir rootRelativePath shardRelativeDir reportPath importArts
+              return match result with | .ok _ => 0 | .error status => status
           | .error err, _ | _, .error err =>
               IO.eprintln err
               return 2

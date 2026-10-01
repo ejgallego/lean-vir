@@ -1,4 +1,8 @@
-# Infoview widgets and RPC
+# Experimental Infoview widgets and RPC
+
+Editor widgets are experimental and outside the first-release
+[application workflow](EMBEDDED_RESOURCES.md). They retain live editor inputs
+rather than rebuilding the saved application program.
 
 VIR aims to let Lean-authored browser components use the same React values,
 infoview contexts and libraries as TypeScript-authored ProofWidgets components.

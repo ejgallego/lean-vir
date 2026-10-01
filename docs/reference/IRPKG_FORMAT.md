@@ -338,6 +338,10 @@ in private state. Pointer calls and callback rooting are specified in
 
 ## Validation and trust limits
 
+The [supported-input review assumptions](../development/REVIEW_ASSUMPTIONS.md)
+apply: cooperative users/developers and trusted generated packages. Unsupported
+artifact manipulation has undefined behavior, not a promised rejection contract.
+
 Before exposing entries, JavaScript validates export argument/result trees,
 host descriptors and metadata. It rejects unsupported tags, malformed recursive
 children, invalid enum constructors, inconsistent field layouts, invalid

@@ -6,6 +6,8 @@ Author: Emilio J. Gallego Arias
 
 module
 
+public import Vir.GeneratePackage.PackageSet
+
 public import Lean.Compiler.IR.CompilerM
 public import Vir.GeneratePackage.CachedImports
 public import Vir.GeneratePackage.NativeExterns
@@ -172,18 +174,6 @@ structure PackageTargetMetadata where
   origin : PackageTargetOrigin
   mode : TargetMode
   resolvedRoots : Array Name
-
-inductive PackageSetMemberRole where
-  | dependency
-  | root
-
-namespace PackageSetMemberRole
-
-def label : PackageSetMemberRole → String
-  | .dependency => "dependency"
-  | .root => "root"
-
-end PackageSetMemberRole
 
 structure PackageSetMemberMetadata where
   moduleName : Name

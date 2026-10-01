@@ -49,6 +49,7 @@ export function createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGene
     const args = [
       fileURLToPath(packagePath),
       fileURLToPath(reportPath),
+      ...irpkgGenerator.setupArgs,
       "--target-module",
       moduleBySource.get(fixture.source),
       ...fixtureRoots(fixture),

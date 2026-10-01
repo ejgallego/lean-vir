@@ -84,6 +84,12 @@ asks for that machinery.
 
 ## Development Notes
 
+- Follow [the review assumptions](docs/development/REVIEW_ASSUMPTIONS.md).
+  Supported workflows assume cooperative users/developers; unsupported artifact
+  manipulation has undefined behavior. Justify checks by ordinary configuration,
+  acquisition, compatibility, portability or ownership failures, not an implicit
+  hostile-input threat model. Reproduce inferred defects before changing behavior.
+
 - Keep generated `build/` outputs out of Git.
 - Keep generated `web/dist/` outputs out of Git.
 - `web/public/vir-upstream.wasm` is generated and should not be committed.

@@ -1,7 +1,7 @@
 # Harness
 
 This guide covers maintainer setup, generated artifacts, check selection and CI.
-Start with the [quickstart](../README.md) to use VIR, the
+Start with the [workflow overview](../README.md) to use VIR, the
 [developer guide](DEVELOPER_GUIDE.md) to change its implementation, or
 [tests/README.md](../tests/README.md) to add a test.
 
@@ -34,7 +34,7 @@ maintainer requests a tracked fixture or report change.
 | Release Wasm and its debug companion | `npm run build:demo:release` strips the release file; the debug companion remains optimized and unstripped. SDK/local archives and SDK import smokes need both. |
 | `web/dist/`, including SDK/local archives and analysis pages | `npm run build:site`; required before `test:pages:browser`. |
 | Infoview JavaScript bundle under `build/generated/` | `lake build VirInfoview` requires npm dependencies. The default `Vir` library needs no npm bundle. |
-| Local `.irpkg` and reports | Follow [local packages](guides/PACKAGES.md#generate-a-local-package) or [package configuration](guides/PACKAGES.md#configure-package-generation). |
+| Local `.irpkg` and reports | Follow [config-based local package preparation](guides/PACKAGES.md#generate-a-local-package). |
 
 Other ignored outputs include object caches and reports under `build/`, package
 `.input.json` / `.report.md` files and `downloads/` under `web/public/`, the
@@ -60,6 +60,12 @@ semantics require the separate Chromium checks below.
 
 ### Package and fixture work
 
+- Embedded resource acquisition/tracing: `npm run test:resources:cache` includes
+  cold/warm rejection of empty, missing and valid ambient native-manifest settings,
+  direct native producer rejection, output preservation and unset recovery. It
+  also exercises cache-only artifacts, private implementation changes and stage
+  repair. Its default synthetic runtime tests build integrity,
+  not Wasm execution; supply an exact runtime pack for the real-pack campaign.
 - Interface head reduction and its rejection boundaries: `npm run test:interface`
   checks the classifier and export attributes locally and through a compiled
   module import, without Wasm or npm dependencies.
@@ -186,7 +192,8 @@ npm run test:runtime -- --group pure
 `VIR_RUNTIME_TEST_FILTER` also selects smokes; `VIR_RUNTIME_JOBS` controls worker
 count. The `pure` group reuses demo artifacts and runs in parallel. The `lean`
 group generates packages or checks SDK imports and runs serially to avoid
-concurrent writes to shared `build/lean-lib` and `.lake` outputs. Pure runtime
+concurrent writes to shared `.lake` outputs. `build:lean-lib` uses Lake's ordinary
+library target, not a second hand-ordered compilation tree. Pure runtime
 smokes are distinct from the artifact-free runner unit tests.
 
 ## Browser Smoke

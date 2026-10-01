@@ -1,0 +1,441 @@
+/*
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+*/
+
+import { createVirRuntimeFactory } from "./vir-runtime.js";
+import { validateIrPackageSetMembers } from "./runtime/ir-package.js";
+import {
+  requireSha256,
+  sha256Hex,
+  validateEnvelope,
+} from "./resources/descriptor.js";
+import {
+  resolveProgramExports,
+  snapshotExpectedExports,
+  checkExpectedExportMetadata,
+} from "./resources/program-exports.js";
+import { assertResourceCompatibility } from "./resources/compatibility.js";
+
+const manifestLimit = 4 * 1024 * 1024 + 1024;
+const decoder = new TextDecoder("utf-8", { fatal: true });
+
+function requireManifestUrl(value) {
+  if (
+    !(value instanceof URL) ||
+    !["http:", "https:"].includes(value.protocol) ||
+    value.origin !== new URL(import.meta.url).origin ||
+    value.username ||
+    value.password ||
+    value.search ||
+    value.hash
+  ) {
+    throw new TypeError(
+      "resource manifests require explicit same-origin HTTP(S) URLs without credentials, query or fragment",
+    );
+  }
+  return new URL(value.href);
+}
+
+// Reject duplicates before JSON.parse discards them. This is a bounded lexical
+// preflight, not a second JSON grammar: JSON.parse still checks complete syntax.
+function parseJson(bytes, label) {
+  if (bytes.length > manifestLimit)
+    throw new Error(`${label}: manifest too large`);
+  const text = decoder.decode(bytes);
+  const stack = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') {
+      const start = i;
+      for (i++; i < text.length; i++) {
+        if (text[i] === "\\") i++;
+        else if (text[i] === '"') break;
+      }
+      const frame = stack.at(-1);
+      if (frame?.key) {
+        const key = JSON.parse(text.slice(start, i + 1));
+        if (frame.keys.has(key))
+          throw new Error(`${label}: duplicate JSON key ${key}`);
+        frame.keys.add(key);
+        frame.key = false;
+      }
+    } else if (ch === "{" || ch === "[") {
+      stack.push(ch === "{" ? { keys: new Set(), key: true } : null);
+      if (stack.length > 16) throw new Error(`${label}: JSON nesting limit`);
+    } else if (ch === "}" || ch === "]") stack.pop();
+    else if (ch === "," && stack.at(-1)) stack.at(-1).key = true;
+  }
+  return JSON.parse(text);
+}
+
+async function fetchBounded(url, limit, signal, mediaType = null) {
+  const response = await fetch(url, {
+    credentials: "omit",
+    redirect: "error",
+    cache: "no-cache",
+    signal,
+  });
+  if (!response.ok) throw new Error(`resource ${url}: HTTP ${response.status}`);
+  const type = response.headers
+    .get("content-type")
+    ?.split(";")[0]
+    .trim()
+    .toLowerCase();
+  if (mediaType !== null && type !== mediaType) {
+    await response.body?.cancel();
+    throw new Error(
+      `resource ${url}: expected Content-Type ${mediaType}, got ${type}`,
+    );
+  }
+  const length = response.headers.get("content-length");
+  if (length !== null && (!/^\d+$/.test(length) || Number(length) > limit)) {
+    await response.body?.cancel();
+    throw new Error(`resource ${url}: length exceeds ${limit}`);
+  }
+  if (response.body === null) return new Uint8Array();
+  const reader = response.body.getReader();
+  let size = 0;
+  const chunks = [];
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > limit)
+        throw new Error(`resource ${url}: length exceeds ${limit}`);
+      chunks.push(value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => {});
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return bytes;
+}
+
+function creationError(phase, cause, context = {}, name = "Error") {
+  const error = new Error(`program creation failed during ${phase}`, { cause });
+  error.name = name;
+  error.phase = phase;
+  error.context = Object.freeze({ ...context });
+  return error;
+}
+
+async function fetchManifest(url, kind, signal, perform) {
+  const value = await perform(`${kind}-manifest`, async () =>
+    parseJson(
+      await fetchBounded(url, manifestLimit, signal, "application/json"),
+      "resource envelope",
+    ),
+  );
+  const envelope = await perform("integrity", () => validateEnvelope(value), {
+    bundle: kind,
+  });
+  await perform(`${kind}-manifest`, () => {
+    if (envelope.descriptor.kind !== kind)
+      throw new Error("incorrect resource bundle kind");
+  });
+  const roleUrl = (role) => {
+    const entry = envelope.descriptor.fileEntries.find(
+      (item) => item.role === role,
+    );
+    if (!entry) throw new Error(`missing resource file role ${role}`);
+    return new URL(entry.path, url);
+  };
+  return { ...envelope, roleUrl };
+}
+
+async function fetchPayloads(envelope, url, signal, perform) {
+  const files = new Map();
+  // A small bounded worker pool: do not start thousands of requests at once.
+  let next = 0;
+  const worker = async () => {
+    while (next < envelope.descriptor.files.length) {
+      const info = envelope.descriptor.files[next++];
+      const fileUrl = new URL(info.path, url);
+      const mime =
+        info.mediaType === "application/wasm"
+          ? "application/wasm"
+          : info.mediaType === "text/javascript"
+            ? "text/javascript"
+            : null;
+      const context = {
+        bundle: envelope.descriptor.kind,
+        path: info.path.slice(0, 256),
+      };
+      const bytes = await perform(
+        "resource-fetch",
+        () => fetchBounded(fileUrl, info.byteLength, signal, mime),
+        context,
+      );
+      await perform(
+        "integrity",
+        async () => {
+          if (
+            bytes.length !== info.byteLength ||
+            (await sha256Hex(bytes)) !== info.sha256
+          )
+            throw new Error("resource integrity mismatch");
+        },
+        context,
+      );
+      files.set(fileUrl.href, bytes);
+    }
+  };
+  await Promise.all(
+    Array.from(
+      { length: Math.min(4, envelope.descriptor.files.length) },
+      worker,
+    ),
+  );
+  return { ...envelope, files };
+}
+
+/**
+ * Open one independent Lean program instance. The publisher owns the trusted ESM
+ * bootstrap; this function verifies the selected bundle inventories before Lean
+ * evaluation. It neither discovers build paths nor starts marked startup hooks.
+ */
+export async function createProgram(options) {
+  if (
+    !options ||
+    typeof options !== "object" ||
+    !Object.hasOwn(options, "runtimeManifestUrl") ||
+    !Object.hasOwn(options, "programManifestUrl") ||
+    Reflect.ownKeys(options).some(
+      (key) =>
+        ![
+          "runtimeManifestUrl",
+          "programManifestUrl",
+          "expectedExports",
+          "signal",
+        ].includes(key),
+    )
+  ) {
+    throw new TypeError(
+      "createProgram expects runtimeManifestUrl, programManifestUrl and optional expectedExports/signal",
+    );
+  }
+  const signal = options.signal;
+  if (signal !== undefined && !(signal instanceof AbortSignal))
+    throw new TypeError("signal must be an AbortSignal");
+  let expected;
+  try {
+    expected = snapshotExpectedExports(options.expectedExports);
+  } catch (cause) {
+    throw creationError("program-validation", cause);
+  }
+  let runtimeUrl, programUrl;
+  try {
+    runtimeUrl = requireManifestUrl(options.runtimeManifestUrl);
+  } catch (cause) {
+    throw creationError("runtime-manifest", cause);
+  }
+  try {
+    programUrl = requireManifestUrl(options.programManifestUrl);
+  } catch (cause) {
+    throw creationError("program-manifest", cause);
+  }
+  if (signal?.aborted)
+    throw creationError("runtime-manifest", signal.reason, {}, "AbortError");
+  try {
+    requireSha256();
+  } catch (cause) {
+    throw creationError("runtime-creation", cause);
+  }
+  const controller = new AbortController();
+  let primary = null;
+  let phase = "runtime-manifest";
+  const stop = (error) => {
+    if (primary === null) {
+      primary = error;
+      controller.abort(error);
+    }
+    return primary;
+  };
+  const checkStopped = () => {
+    if (primary !== null) throw primary;
+  };
+  const abort = () =>
+    stop(creationError(phase, signal.reason, {}, "AbortError"));
+  signal?.addEventListener("abort", abort, { once: true });
+  const timeout = setTimeout(
+    () =>
+      stop(
+        creationError(
+          phase,
+          new Error("resource acquisition timeout"),
+          {},
+          "TimeoutError",
+        ),
+      ),
+    120000,
+  );
+  let detached = false;
+  const detach = () => {
+    if (detached) return;
+    detached = true;
+    clearTimeout(timeout);
+    signal?.removeEventListener("abort", abort);
+  };
+  const perform = async (nextPhase, action, context = {}) => {
+    phase = nextPhase;
+    try {
+      checkStopped();
+      const value = await action();
+      checkStopped();
+      return value;
+    } catch (cause) {
+      throw stop(primary ?? creationError(nextPhase, cause, context));
+    }
+  };
+  let runtime = null;
+  try {
+    // Admit descriptors before payload acquisition. ABI shape checks still need
+    // verified package bytes, and all checks precede runtime instantiation.
+    const [runtimeManifest, programManifest] = await Promise.all([
+      fetchManifest(runtimeUrl, "runtime", controller.signal, perform),
+      fetchManifest(programUrl, "program", controller.signal, perform),
+    ]);
+    await perform("program-validation", () =>
+      checkExpectedExportMetadata(expected, programManifest.descriptor.exports),
+    );
+    await perform("compatibility", () => {
+      if (
+        JSON.stringify(runtimeManifest.descriptor.compatibility) !==
+        JSON.stringify(programManifest.descriptor.compatibility)
+      )
+        throw new Error("incompatible runtime and program resource bundles");
+      assertResourceCompatibility(runtimeManifest.descriptor.compatibility);
+      if (
+        runtimeManifest.descriptor.logicalId ===
+        programManifest.descriptor.logicalId
+      )
+        throw new Error(
+          "runtime and program resource logical identities conflict",
+        );
+      if (runtimeManifest.roleUrl("runtimeModule").href !== import.meta.url)
+        throw new Error(
+          "runtimeModule role does not identify the executing resource module",
+        );
+    });
+    const [engine, program] = await Promise.all([
+      fetchPayloads(runtimeManifest, runtimeUrl, controller.signal, perform),
+      fetchPayloads(programManifest, programUrl, controller.signal, perform),
+    ]);
+    const compatibility = engine.descriptor.compatibility;
+    phase = "program-validation";
+    const wasmUrl = engine.roleUrl("wasm");
+    const wasmInfo = engine.descriptor.files.find(
+      (info) => new URL(info.path, runtimeUrl).href === wasmUrl.href,
+    );
+    if (wasmInfo.mediaType !== "application/wasm")
+      throw new Error("wasm role requires application/wasm");
+    const setUrl = program.roleUrl("programSet");
+    // The existing runtime owns package-set semantics. Restrict its byte reader
+    // to the already verified inventory: missing/escaping members never fetch.
+    const verifiedBytes = async (url) => {
+      const bytes = program.files.get(String(url));
+      if (!bytes)
+        throw new Error(`program member is outside verified inventory: ${url}`);
+      return bytes;
+    };
+    const factory = createVirRuntimeFactory({
+      wasmBytes: engine.files.get(wasmUrl.href),
+      fetchBytes: verifiedBytes,
+    });
+    // Preflight duplicate keys and JSON depth before the existing descriptor parser.
+    parseJson(await verifiedBytes(setUrl), "program package-set");
+    const packageSet = await perform("program-validation", () =>
+      factory.fetchIrPackageSet(setUrl),
+    );
+    const { manifests } = validateIrPackageSetMembers(
+      packageSet.members.map((m) => m.bytes),
+      {
+        members: packageSet.members,
+      },
+    );
+    for (const manifest of manifests) {
+      // IR and interface format versions were checked by the package validator.
+      if (manifest.metadata.leanGithash !== compatibility.leanRevision) {
+        throw new Error(
+          "program compiled identity does not match resource compatibility",
+        );
+      }
+    }
+    resolveProgramExports(
+      program.descriptor.exports,
+      manifests.at(-1).exports,
+      expected,
+    );
+    // Assign before the post-await abort check so a late owned instance cannot
+    // escape cleanup. Creation itself may be non-preemptible.
+    await perform("runtime-creation", async () => {
+      runtime = await factory.createRuntime({ irPackageSet: packageSet });
+    });
+    // Use the installed entries (including their runtime call-index cache), not
+    // structurally equivalent entries parsed during the preflight above.
+    const exports = resolveProgramExports(
+      program.descriptor.exports,
+      runtime.interfaceManifest.exports,
+      expected,
+    );
+    checkStopped();
+    detach(); // Final check and ownership handoff have no intervening await.
+    let disposed = false;
+    return Object.freeze({
+      get status() {
+        return disposed
+          ? "disposed"
+          : runtime.failure === null
+            ? "active"
+            : "failed";
+      },
+      call(role, ...args) {
+        if (disposed) throw new Error("program has been disposed");
+        const entry = exports.get(role);
+        if (entry === undefined)
+          throw new Error(`unknown program export role ${role}`);
+        return runtime.callEntry(entry, args);
+      },
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        try {
+          runtime.dispose();
+        } finally {
+          // A retained closed facade must not keep the Wasm heap reachable,
+          // including when runtime cleanup reports an error.
+          runtime = null;
+          exports.clear();
+        }
+      },
+    });
+  } catch (error) {
+    const failure = stop(primary ?? creationError(phase, error));
+    const owned = runtime;
+    runtime = null; // Detach before invoking arbitrary cleanup, even on throw.
+    if (owned !== null) {
+      try {
+        owned.dispose();
+      } catch (cleanupError) {
+        Object.defineProperty(failure, "cleanupError", {
+          value: cleanupError,
+          enumerable: true,
+        });
+      }
+    }
+    throw failure;
+  } finally {
+    detach();
+  }
+}

@@ -19,10 +19,6 @@ const helpCases = [
     /browser packages are generated/u,
   ],
   [
-    "scripts/packages/lean-to-irpkg.mjs",
-    /Generate one manifest-bearing \.irpkg/u,
-  ],
-  [
     "scripts/packages/inspect-irpkg.mjs",
     /Inspect one manifest-bearing Lean IR package/u,
   ],
@@ -68,19 +64,10 @@ test("lean-zip acceptance requires an explicit checkout argument", () => {
 test("module package CLIs reject invalid inputs before invoking build tools", () => {
   const scratch = mkdtempSync(join(tmpdir(), "vir-module-config-errors-"));
   try {
-    const cases = [
-      [
-        "scripts/packages/lean-to-irpkg.mjs",
-        ["examples/Fib.lean"],
-        /module identity/,
-      ],
-      [
-        "scripts/packages/lean-to-irpkg.mjs",
-        ["Fib", "--help"],
-        /must be a non-empty path/,
-      ],
-    ];
+    const cases = [];
     for (const [config, pattern] of [
+      [{ version: 2, module: "examples/Fib.lean" }, /module identity/],
+      [{ version: 2, module: "Fib", package: "--help" }, /must be a non-empty path/],
       [{ version: 1, source: "examples/Fib.lean" }, /unknown field source/],
       [{ version: 2, module: "Fib", roots: "fib" }, /roots.*must be an array/],
       [

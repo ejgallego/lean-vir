@@ -20,7 +20,8 @@ import {
   IR_PACKAGE_SET_VERSION,
 } from "../../web/src/vir-runtime.js";
 import { IR_PACKAGE_MAGIC, IR_PACKAGE_SECTION } from "./irpkg-format.mjs";
-import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION } from "./package-versions.mjs";
+import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION, VIR_COMPATIBILITY_VERSION } from "./package-versions.mjs";
+import { assertResourceCompatibility } from "../../web/src/resources/compatibility.js";
 
 const args = process.argv.slice(2);
 if (args.some(arg => arg !== "--write")) {
@@ -169,25 +170,26 @@ assertEqual(
   "SDK fetcher version mismatch",
 );
 assertEqual(
-  leanNatConstant(sdkFetcherSource, "sdkRuntimeAbiVersion"),
+  leanNatConstant(packageFormat, "currentRuntimeAbiVersion"),
   RUNTIME_ABI_VERSION,
-  "SDK fetcher runtime ABI version mismatch",
+  "runtime ABI version mismatch",
 );
+assertEqual(
+  leanNatConstant(packageFormat, "currentVirCompatibilityVersion"),
+  VIR_COMPATIBILITY_VERSION,
+  "VIR resource compatibility version mismatch",
+);
+assertResourceCompatibility(JSON.parse(await readRepoText("vir-resources/compatibility.json")));
+// Producer behavior is exercised by resources/acquisition.mjs and the SDK
+// acceptance/rejection cases in packages/lake-facets.sh, not source spelling.
 assertEqual(
   leanStringConstant(lakefileSource, "virSdkVersion"),
   packageJson.version,
   "Lake SDK facet version mismatch",
 );
-assertEqual(
-  leanStringConstant(lakefileSource, "virPackageSetFormat"),
-  IR_PACKAGE_SET_FORMAT,
-  "Lake package-set descriptor format mismatch",
-);
-assertEqual(
-  leanNatConstant(lakefileSource, "virPackageSetVersion"),
-  IR_PACKAGE_SET_VERSION,
-  "Lake package-set descriptor version mismatch",
-);
+// Both Lake adapters now consume the shared native program result. Its format
+// authority is PackageFormat.lean, checked against the runtime above; Lake no
+// longer owns a second descriptor codec or duplicate format/version constants.
 
 const emitSource = await readRepoText("Vir/GeneratePackage/Emit.lean");
 const manifestEncodeSource = await readRepoText("Vir/GeneratePackage/Manifest/Encode.lean");
