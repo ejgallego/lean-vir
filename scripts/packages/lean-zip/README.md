@@ -21,11 +21,13 @@ Authored Lean sources remain under `fixtures/lean-zip/`. Generated packages,
 reports, runtime bundles, and smoke inputs remain caller-owned or ignored
 artifacts and are not committed.
 
-Both commands require module-capable lean-zip sources and the exact toolchain
-named in VIR's `lean-toolchain`. The temporary project depends on the supplied
-client and producer by local path and reads the adapter sources from VIR.
-It does not edit their sources, configuration or dependency pins; ordinary Lake
-builds may populate their build caches. The acceptance command removes its
+Both commands require module-capable lean-zip sources. Their temporary Lake
+project uses the toolchain pinned by the selected VIR producer, even when the
+client checkout declares an older pin. The client source and dependency
+manifest stay unchanged. The browser package records both the client-declared
+and effective VIR toolchains in `BUILD.json`; this records what was compiled
+without claiming that lean-zip itself supports that toolchain. Ordinary Lake
+builds may populate producer caches. The acceptance command removes its
 temporary project unless `--keep` is requested; the browser exporter always
 removes its temporary project.
 
@@ -38,8 +40,7 @@ tested workload, not a fresh whole-runtime build.
 The `lean-zip-module-project` runtime smoke checks module compilation and
 inherited native linking with a small test dependency; it does not establish
 lean-zip compression equivalence. Compression acceptance does not validate the
-separate browser package export or repin historical browser catalogs, which
-continue to invoke their pinned producers.
+separate browser package export.
 
 ## Acceptance boundary
 

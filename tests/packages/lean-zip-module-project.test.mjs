@@ -3,7 +3,6 @@ import {
   mkdir,
   mkdtemp,
   readFile,
-  readdir,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -20,7 +19,10 @@ async function workspace(t) {
   const producer = join(root, "producer with spaces");
   for (const path of [client, producer]) {
     await mkdir(path);
-    await writeFile(join(path, "lean-toolchain"), "pinned-toolchain\n");
+    await writeFile(
+      join(path, "lean-toolchain"),
+      "leanprover/lean4:v4.35.0-rc3\n",
+    );
   }
   return { directory: join(root, "project"), client, producer };
 }
@@ -54,24 +56,30 @@ test("dependent project names compiled roots without copying client configuratio
   assert.doesNotMatch(config, /client-specific/);
   assert.equal(
     await readFile(join(project.directory, "lean-toolchain"), "utf8"),
-    "pinned-toolchain\n",
+    "leanprover/lean4:v4.35.0-rc3\n",
   );
   for (const [file, contents] of Object.entries(originals)) {
     assert.equal(await readFile(join(paths.client, file), "utf8"), contents);
   }
 });
 
-test("toolchain mismatch fails before creating the project", async (t) => {
+test("project uses the VIR pin while retaining the client's declared pin", async (t) => {
   const paths = await workspace(t);
   await writeFile(
     join(paths.client, "lean-toolchain"),
     "different-toolchain\n",
   );
-  await assert.rejects(
-    createLeanZipModuleProject(paths),
-    /Lean toolchain mismatch/,
+  const project = await createLeanZipModuleProject(paths);
+  assert.equal(
+    await readFile(join(project.directory, "lean-toolchain"), "utf8"),
+    "leanprover/lean4:v4.35.0-rc3\n",
   );
-  await assert.rejects(readdir(paths.directory), { code: "ENOENT" });
+  assert.equal(project.toolchain, "leanprover/lean4:v4.35.0-rc3");
+  assert.equal(project.clientToolchain, "different-toolchain");
+  assert.deepEqual(
+    await readFile(join(paths.client, "lean-toolchain"), "utf8"),
+    "different-toolchain\n",
+  );
 });
 
 test("existing directories are never overwritten or removed", async (t) => {
