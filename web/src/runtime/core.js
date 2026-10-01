@@ -47,8 +47,8 @@ export class VirRuntime extends ObjectValueRuntime {
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
-    this.completedStartupEntries = new Set();
-    this.runningStartupEntries = false;
+    this.startupState = "pending";
+    this.startupError = null;
     this.disposed = false;
     this.disposing = false;
     this.liveCallbacks = new Set();
@@ -66,7 +66,6 @@ export class VirRuntime extends ObjectValueRuntime {
       this.hostState?.setManifest(this.interfaceManifest);
       this.packageMetadata = this.interfaceManifest.metadata;
       this.rebuildManifestExports();
-      this.completedStartupEntries = new Set();
     }
   }
 
@@ -222,7 +221,6 @@ export class VirRuntime extends ObjectValueRuntime {
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
-    this.completedStartupEntries = new Set();
   }
 
   hasPackageState() {
@@ -318,17 +316,21 @@ export class VirRuntime extends ObjectValueRuntime {
     }
     // Host bindings can synchronously reenter this method. Let the outer
     // traversal finish each hook before proceeding to the next one.
-    if (this.runningStartupEntries) return;
-    this.runningStartupEntries = true;
+    if (this.startupState === "running" || this.startupState === "complete") return;
+    if (this.startupState === "failed") throw this.startupError;
+    this.startupState = "running";
     try {
       for (const entry of this.interfaceManifest.exports) {
-        if (entry.startup && !this.completedStartupEntries.has(entry.entry)) {
+        if (entry.startup) {
           this.callEntry(entry, []);
-          this.completedStartupEntries.add(entry.entry);
         }
       }
-    } finally {
-      this.runningStartupEntries = false;
+      this.startupState = "complete";
+    } catch (error) {
+      // A failed hook may already have performed effects. Never resume it.
+      this.startupState = "failed";
+      this.startupError = error;
+      throw error;
     }
   }
 
