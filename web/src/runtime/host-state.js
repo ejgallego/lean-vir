@@ -9,7 +9,6 @@ import {
   beginHostCallTransaction,
   commitHostCallTransaction,
   disposeHostBindings,
-  ExternrefRoots,
 } from "../host-boundary.js";
 import {
   asError,
@@ -42,7 +41,6 @@ export class VirHostState {
     this.defaultBindings = defaultHostBindings;
     this.ownsDefaultHostBindings = ownsDefaultHostBindings;
     this.runtime = null;
-    this.resourceRoots = new ExternrefRoots();
     this.leanObjectHandleCells = new Set();
     this.callError = null;
     this.callTimings = [];
@@ -93,25 +91,13 @@ export class VirHostState {
     return error;
   }
 
-  rootResource(value) {
-    return this.resourceRoots.root(value);
-  }
-
-  getRootedResource(rootId) {
-    return this.resourceRoots.get(rootId);
-  }
-
-  releaseRootedResource(rootId) {
-    return this.resourceRoots.release(rootId);
-  }
-
-  releaseRootedResourceFromFinalizer(rootId) {
-    try {
-      return this.releaseRootedResource(rootId);
-    } catch (error) {
-      this.recordFinalizerError(error);
-      return undefined;
-    }
+  resourceRootCounts() {
+    if (this.exports === null) return { active: 0, capacity: 0, reusable: 0 };
+    return {
+      active: this.exports.vir_resource_roots_active(),
+      capacity: this.exports.vir_resource_roots_capacity(),
+      reusable: this.exports.vir_resource_roots_reusable(),
+    };
   }
 
   recordFinalizerError(error) {
@@ -139,7 +125,8 @@ export class VirHostState {
   }
 
   clearResourceRoots() {
-    this.resourceRoots.clear();
+    // Small hostless modules used by the raw boundary may have no resource ABI.
+    this.exports?.vir_resource_roots_clear?.();
   }
 
   callObjects(slot, argvPtr, argc) {
