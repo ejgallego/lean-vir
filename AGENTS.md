@@ -3,9 +3,10 @@
 This repository is a proof of concept for running Lean 4's real IR interpreter
 in `wasm32-wasip1`.
 
-Keep the repository workflow small and explicit. Do not introduce backport
-policy, branch-policy metadata, or a large Python harness unless the maintainer
-asks for that machinery.
+Keep the repository workflow small and explicit. Use ordinary Git and the
+existing Node/shell harness for the zero-or-one maintenance-line workflow in
+[docs/HARNESS.md](docs/HARNESS.md#backports). Keep branch-policy registries and
+larger harness machinery out unless the maintainer requests them.
 
 ## Scope
 
@@ -75,6 +76,15 @@ asks for that machinery.
   handoff, but do not ask former owners for permission to start independent work.
   Resolve ambiguous or stale assignments once on the board, not through a chain
   of owner approvals. Delegation does not transfer an existing active task.
+
+- Before choosing a base, read [the backport guidelines](docs/HARNESS.md#backports).
+  Start new work from `main`; a maintenance checkout is for selected backports
+  or explicitly requested maintenance work. Verify the branch, base commit and
+  `lean-toolchain` rather than inferring the line from the worktree name.
+- For a backport, name the source PR/landed commit and maintenance target in the
+  lane claim. Preserve `cherry-pick -x` provenance, explain conflict adaptations,
+  and validate using that line's own toolchain and generated artifacts.
+
 - Use the canonical mailbox at `.agents/mailbox/` in the primary/root
   checkout. Linked implementation worktrees must not create separate
   mailboxes.

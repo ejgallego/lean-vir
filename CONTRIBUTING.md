@@ -75,6 +75,10 @@ subjects such as `update files` or `misc cleanup`.
 
 ## Pull Requests
 
+Development targets `main`. Selected fixes may also target the single
+maintenance line; see [backports](docs/HARNESS.md#backports) for the current
+target, provenance, PR links and validation workflow.
+
 Before opening or editing a PR, run:
 
 ```bash
