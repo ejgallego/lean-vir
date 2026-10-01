@@ -10,7 +10,7 @@ import test from "node:test";
 
 // Execute the actual documentation example, not a second lifecycle implementation.
 // These are scheduling/ownership tests; real Wasm is covered by browser.mjs.
-const guide = readFileSync(new URL("../../docs/guides/EMBEDDED_RESOURCES.md", import.meta.url), "utf8");
+const guide = readFileSync(new URL("../../docs/guides/RESOURCE_LIFETIME.md", import.meta.url), "utf8");
 const source = guide.match(/<!-- resource-mount-example -->\s*```js\n([\s\S]*?)\n```/)[1];
 function setup() {
   const pending = [], states = [];

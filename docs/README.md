@@ -7,8 +7,8 @@ experimental conveniences; shipped coverage is not a support commitment.
 
 ## Guides: use VIR
 
-- [Application setup](guides/EMBEDDED_RESOURCES.md): prepare the program and runtime
-  through a client library, publish their files and call Lean from JavaScript.
+- [Application setup](guides/EMBEDDED_RESOURCES.md): a complete plain greeting
+  project, its Lake build, site publication and JavaScript call.
 - [Lean library](guides/LEAN_VIR_LIBRARY.md): core effects and boundary values,
   alongside explicitly identified experimental helpers.
 
@@ -24,6 +24,8 @@ experimental conveniences; shipped coverage is not a support commitment.
 
 - [Build internals](guides/BUILD_WORKFLOWS.md): Lake acquisition, generation,
   runtime distribution and retained contributor tools.
+- [Optional resource contracts and lifecycle](guides/RESOURCE_LIFETIME.md):
+  independent callable expectations, cancellation and overlapping loads.
 - [Package tooling](guides/PACKAGES.md): loose compiler outputs and SDK installation.
   [Direct runtime calls](guides/CALL_LEAN_FROM_JS.md) and the
   [JavaScript runtime API](guides/JS_API.md) document the lower-level loader.
