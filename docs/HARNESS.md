@@ -32,11 +32,30 @@ Before upgrading `lean-toolchain`:
 - Refresh `vir-resources/compatibility.json` and qualify a runtime bundle for
   that compiler before changing `vir-resources/runtime.json`; preserve the
   bundle's content identity rather than relabeling an older bundle.
-- Update and check every active package/browser catalog entry and exporter
-  against the current `lean-toolchain`. Archived benchmark identities remain
-  provenance; they do not qualify an active catalog entry.
+- Record catalog compatibility and the remaining migration work using the
+  roadmap below. Older producer pins preserve historical reproducibility;
+  they do not qualify a workload under the new toolchain.
 - Refresh compiler-specific artifacts and run the affected acquisition,
   importer, fixture and downstream acceptance checks below.
+
+### Catalog Migration Roadmap
+
+The goal is for every active VIR catalog workload to work with the current
+`lean-toolchain`. Migrate in stages; completing the entire catalog is not a
+prerequisite for the initial toolchain/runtime support PR.
+
+| Stage | Work | Acceptance goal |
+| --- | --- | --- |
+| Toolchain foundation | Update the interpreter boundary, adapters, fixtures and matching runtime resources. | Core/native/Wasm checks pass with matching compiler identities; default runtime resources are publicly obtainable before merge. |
+| Catalog ports | Migrate prettyM's module export path, then Illuminate's client project, then lean-zip's module/native API boundary. | Each actual exporter and its package/browser checks pass under the current VIR toolchain. |
+| Catalog enforcement | Pin the qualified producer/client commits and enable the current-toolchain check in candidate CI. | Every active VIR workload is covered; historical comparison backends disclose their own compiler/source identities. |
+
+Give each remaining port an owner, next action and acceptance checks in its PR
+or tracking issue, or on the private `WORKBOARD.md` when present. Keep client
+source changes in their owning repositories and preserve source/compiler
+provenance. A source pin, an older green workflow or a unit-only check is not
+current-toolchain qualification. Keep unqualified migration candidates local;
+publish catalog pins only when their exact source commits are available.
 
 ## Backports
 

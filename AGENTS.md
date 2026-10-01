@@ -22,6 +22,8 @@ larger harness machinery out unless the maintainer requests them.
 ## Toolchain
 
 - Use the Lean toolchain pinned in `lean-toolchain`.
+- For upgrades, follow [the catalog migration roadmap](docs/HARNESS.md#catalog-migration-roadmap):
+  record owners and acceptance goals; port the catalog in separate follow-ups.
 - Use the local WASI SDK installed by `npm run install:wasi`.
 - Use Node/npm for the browser harness and smoke tests.
 
