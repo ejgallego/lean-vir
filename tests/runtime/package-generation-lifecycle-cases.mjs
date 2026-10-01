@@ -137,7 +137,7 @@ export async function runIrPackageLifecycleSmoke({
   assert.equal(
     sharedBindingDisposals,
     0,
-    "failed candidate must preserve a binding map leased by the live runtime",
+    "failed candidate must preserve application-owned bindings",
   );
 
   const secondRuntime = await hostFactory.createRuntime({
@@ -176,6 +176,9 @@ export async function runIrPackageLifecycleSmoke({
   assert.equal(firstGenerationLifecycle.phase, "disposed");
   assert.equal(sharedBindingDisposals, 0);
   secondRuntime.dispose();
+  assert.equal(secondGenerationLifecycle.phase, "disposed");
+  assert.equal(sharedBindingDisposals, 0);
+  hostFactory.hostBindings[VIR_HOST_DISPOSE]();
   assert.equal(sharedBindingDisposals, 1);
 
   const initializerFactory = createVirRuntimeFactory({

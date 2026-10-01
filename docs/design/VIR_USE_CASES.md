@@ -54,7 +54,7 @@ automatic transfer of React state or internal Lean values between generations.
 | Promise or callback survives UI replacement | Execute the original Lean continuation and its stale-result guard; never silently enter the successor program. | Browser and real-server shell lifetime suites. |
 | Headless/browser caller runs multiple entries | Keep interpreter state and initialized constants within a generation; calls and callbacks do not instantiate fresh interpreters. | `tests/runtime/interpreter-constant-cache-smoke.mjs`, CLI and module-package tests. |
 | Multi-module package set | Preserve member ordering, identity checks, initialization and startup semantics. A complete set is one generation, not one runtime per member. | `tests/runtime/module-package-set-smoke.mjs` and descriptor tests. |
-| Several runtimes share compiled Wasm and host services | Isolate Lean heaps and per-runtime resources; reuse compilation. Preserve the current shared-binding disposal contract while removing reload. | `tests/infoview/widget.mjs`, `tests/runtime/generation-lifecycle-cases.js`. |
+| Several runtimes share compiled Wasm and host services | Isolate Lean heaps and per-runtime resources; reuse compilation. The application owns supplied/shared services; VIR disposes fresh per-runtime default providers. | `tests/infoview/widget.mjs`, `tests/runtime/host-binding-ownership.test.mjs`, `tests/runtime/generation-lifecycle-cases.js`. |
 | Host intentionally resets a computation | Create a fresh runtime, select it, then explicitly dispose the previous one when invalidation is intended. An old cleanup failure must be surfaced while the selected runtime remains owned. | Generation lifecycle tests exercise fresh creation, failed candidates, explicit disposal and shared binding ownership; the JavaScript guide shows the handover order. |
 | Separate fetching or raw instantiation from installation | Keep useful transport control and Wasm-only clients. Deferred first installation remains a supported synchronous operation; replacing loaded code requires a fresh runtime. | Factory/descriptor and low-level runtime callers exercise deferred installation and candidate failure without requiring stable runtime identity. |
 
@@ -79,7 +79,8 @@ Keep tests for meaningful behavior: failed first installation leaves a deferred
 runtime empty, explicit disposal invalidates handles, initialization and
 per-generation constant identity remain correct, shared services survive another
 runtime's disposal, and a rejected second load leaves the installed generation
-unchanged. Keep host-service ownership as a separate decision.
+unchanged. Supplied host services remain application-owned after every runtime
+shuts down; fresh default-provider results remain runtime-owned.
 
 ## Small acquisition protocol
 

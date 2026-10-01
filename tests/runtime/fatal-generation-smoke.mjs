@@ -96,7 +96,7 @@ end Fatal`,
     }
     assert.equal(caughtNested, true);
     assert.equal(rollbacks, 1, "a binding cannot commit resources after catching a nested fatal call");
-    assert.equal(releases, 4);
+    assert.equal(releases, 0, "retired runtimes preserve application-owned bindings");
   });
   await test("hostile thrown values cannot reopen a real Lean/Wasm generation", async () => {
     const originalFailure = failure;
@@ -155,6 +155,9 @@ end Fatal`,
     } finally { runtime.dispose(); runtime.dispose(); }
     await assert.rejects(() => factory.createRuntime({ irPackageSet: [initBytes] }), error => error === failure);
   });
+  assert.equal(releases, 0, "failed creation and disposal preserve supplied bindings");
+  factory.hostBindings[VIR_HOST_DISPOSE]();
+  assert.equal(releases, 1, "the application disposes its shared services");
 } finally { await rm(dir, { recursive: true, force: true }); }
 
 function u32(n) {

@@ -207,7 +207,9 @@ const nextRuntime = await hostFactory.createRuntime({
 assert.equal(nextRuntime.call("fib", 12), "144");
 firstRuntime.dispose();
 nextRuntime.dispose();
-assert.equal(bindingDisposals, 1);
+assert.equal(bindingDisposals, 0);
+hostFactory.hostBindings[VIR_HOST_DISPOSE]();
+assert.equal(bindingDisposals, 1, "the application disposes its shared bindings");
 
 assert.throws(
   () => hostRuntime.call("HostInterop.titleHandshake", "node"),

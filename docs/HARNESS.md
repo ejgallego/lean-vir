@@ -224,8 +224,8 @@ CHROMIUM=/path/to/chromium node tests/browser/generation-gc.mjs
 They cover callback/JSL finalizers and whole-generation collection. The browser
 check bundles current source with real Wasm and official React Strict Mode and
 Suspense. Retention controls distinguish collection from explicit cleanup.
-Controlled-GC budgets are diagnostic: collection does not establish shared-map
-lease cleanup or a Wasm capacity plateau.
+Controlled-GC budgets are diagnostic: collection does not establish cleanup of
+application-owned shared services or a Wasm capacity plateau.
 
 For normal shell unmount/refresh and failed-setup teardown with real React and
 Lean continuation bodies, but mocked asset/package RPC:
