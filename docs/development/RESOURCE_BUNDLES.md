@@ -110,19 +110,21 @@ as a payload filename and as a directory prefix. Nested payload names such as
 
 `Vir.Resources.Program.Checked` is an internal build-adapter result for one
 canonical marked program, not a certificate about arbitrary executable code.
-Its constructor is private. Public `Program.check` accepts an ordinary `Bundle`
-and validates its complete container before checking the program inventory.
-`Program.read` adds bounded regular-file reading and canonical `Pack.decode`,
-then uses the same private program checks without hashing the payloads twice.
-The private adapter binds package-set lengths/hashes to the already verified
-outer inventory instead of recomputing every member digest. Unvalidated inputs
-cannot reach that path through the public API.
-Neither entry point requires an undocumented caller-side integrity check.
+Its constructor is private. `Program.read` admits a persisted artifact through
+regular-file reading and `Pack.decode`, then checks its program inventory and
+metadata without hashing payloads twice. The adapter binds inner lengths/hashes
+to the admitted outer inventory, and the loose adapter reuses those digests.
+
+Trusted generation returns typed member metadata directly from emission. Its
+adapter neither reparses its own package set nor reopens interface sections to
+reconstruct that result. There is no arbitrary in-memory `Program.check` entry
+point: persisted admission and trusted construction are distinct operations.
+The shared package-set serializer preserves field order and member bytes.
 
 | Boundary | What it establishes | What it does not establish |
 | --- | --- | --- |
 | `Bundle.validate` / `Pack.decode` | Portable schema/inventory, lengths, payload hashes and descriptor identity; decoding also checks canonical transport framing | Lean IR validity, callable ABI or behavior |
-| `Program.check` / `Program.read` | The above integrity plus canonical ordered member inventory, selected root, per-member hashes/ownership, bounded checksummed interface JSON and pinned compiler/interface versions | Full interface type grammar, complete executable-section decoding or execution admission |
+| `Program.read` | The above integrity plus canonical ordered member inventory, selected root, per-member hashes/ownership, checksummed interface JSON and pinned compiler/interface versions | Full interface type grammar, complete executable-section decoding or execution admission |
 | Browser `readIrPackageInfo` / `validateIrPackageSetMembers` | Required unique non-overlapping sections, actual interface ABI grammar and package-set member/identity consistency | Decoding or proving the behavior of executable IR bodies |
 | Resource `createProgram` and the Wasm package loader | Verified resource admission, requested root export/signature binding, actual IR decoding and runtime installation checks | Kernel checking of arbitrary generated IR or a proof of formatter semantics |
 
@@ -131,9 +133,11 @@ The native resource adapter intentionally extracts metadata using the existing
 and Wasm IR decoder remain authorities for their respective representations; do
 not mistake the adapter's interface-section reader for another full IR parser or
 import the compiler/interpreter into lightweight acquisition tools to make it one.
-The direct in-memory regression and the native packing campaign exercise these
-different boundaries, including inventory/hash, ownership, inner framing and
-compiler/interface rejection before replacing output.
+The persisted-read regression and native packing campaign exercise these
+boundaries, including inventory/hash, ownership, inner framing and
+compiler/interface rejection before replacing output. Historical forged-Bundle
+tests described an earlier API; they did not establish a supported adversarial
+input contract or a kernel-soundness defect.
 
 ## Embedding
 

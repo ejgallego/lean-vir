@@ -77,8 +77,8 @@ structure Checked where
   members : Array Member
   exports : Array String
 
-/-- Only call after complete container validation. Private so an ordinary Bundle
-cannot bypass integrity checks through the public in-memory entry point. -/
+/-- Only call after persisted-container decoding. Trusted generation retains its
+own metadata instead of routing an in-memory result through this adapter. -/
 private def checkValidatedBundle (bundle : Bundle) (root : String) : Except String Checked := do
   require (bundle.descriptor.kind == .program &&
     bundle.descriptor.logicalId == "vir-compiled/" ++ root &&
@@ -131,16 +131,9 @@ private def checkValidatedBundle (bundle : Bundle) (root : String) : Except Stri
     members := members.push { moduleName, role, file, info }
   return { bundle, members, exports }
 
-/-- Validate an ordinary in-memory bundle before checking its compiled-program
-inventory/metadata. No prior Pack.decode, trusted constructor or caller check is
-required. A successful result does not certify arbitrary executable IR. -/
-def check (bundle : Bundle) (root : String) : Except String Checked := do
-  bundle.validate |>.mapError (fun e => s!"{e.code}: {reprStr e}")
-  checkValidatedBundle bundle root
-
-/-- Bounded regular-file read and canonical pack decoding, then the same program
-metadata checks as `check`. Pack.decode already validates the full container;
-the private continuation avoids repeating payload hashing here. -/
+/-- Read the persisted artifact and admit its program metadata. Pack.decode owns
+container validation; do not repeat payload hashing in the private continuation.
+This is metadata adaptation, not a certificate about executable IR behavior. -/
 def read (path : FilePath) (root : String) : IO Checked := do
   let bytes ← Build.readInput path Build.packLimit "PROGRAM_LIMIT"
   let bundle ← IO.ofExcept <| (Pack.decode bytes).mapError (fun e => s!"{e.code}: {reprStr e}")

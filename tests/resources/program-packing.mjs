@@ -370,13 +370,13 @@ function writeCanonical(label, mutate) {
   return path;
 }
 run("canonical-verified", ["verify", program, recipe.module]);
-// Exercise public in-memory admission, not only read -> Pack.decode -> check.
+// Exercise the persisted-artifact adapter and its requested-root/member binding.
 const direct = spawnSync("lake", ["env", "lean", "--run",
-  "tests/resources/ProgramCheck.lean", program, recipe.module], {
+  "tests/resources/ProgramRead.lean", program, recipe.module], {
   cwd: repo, encoding: "utf8", timeout: 180000,
 });
 const directLog = `${direct.stdout ?? ""}${direct.stderr ?? ""}`;
-writeFileSync(join(evidence, "direct-program-check.log"), directLog);
+writeFileSync(join(evidence, "program-read.log"), directLog);
 assert.ifError(direct.error);
 assert.equal(direct.status, 0, directLog);
 // Mutate valid inner metadata while preserving lengths, FNV checksums and every

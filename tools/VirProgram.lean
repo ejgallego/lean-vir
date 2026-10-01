@@ -22,33 +22,35 @@ private unsafe def build (setupPath output : FilePath) : IO Unit := do
       #[{ origin := .module setup.name, mode := .marked }] setup.name
       (temporary / "program.irpkg") setPath (temporary / "parts")
       "program.irpkg" "parts" (temporary / "report.md") setup.importArts
-    unless result == 0 do
-      let report := temporary / "report.md"
-      if (← Build.metadata? report).isSome then
-        Build.atomicInstall diagnostic (← Build.readInput report maxPayloadBytes "PROGRAM_LIMIT")
-      throw <| IO.userError s!"PROGRAM_GENERATION_FAILED: {setup.name}; report: {diagnostic}"
-    let json ← Build.readJson setPath maxDescriptorBytes
-    let members ← IO.ofExcept <| (json.getObjVal? "packages" >>= Json.getArr?)
-    let paths ← IO.ofExcept <| members.mapM (fun member => member.getObjValAs? String "path")
+    let generated ← match result with
+      | .ok generated => pure generated
+      | .error _ =>
+        let report := temporary / "report.md"
+        if (← Build.metadata? report).isSome then
+          Build.atomicInstall diagnostic (← Build.readInput report maxPayloadBytes "PROGRAM_LIMIT")
+        throw <| IO.userError s!"PROGRAM_GENERATION_FAILED: {setup.name}; report: {diagnostic}"
     let mut files := #[]
     let mut infos := #[]
     let mut total := 0
-    for path in #["program.irpkg-set.json", "report.md"] ++ paths do
-      unless validPath path do throw <| IO.userError s!"INVALID_PACKAGE_PATH: {path}"
+    for path in #["program.irpkg-set.json", "report.md"] ++ generated.map (·.path) do
       let bytes ← Build.readInput (temporary / path) (maxPayloadBytes - total) "PROGRAM_LIMIT"
       total := total + bytes.size
       let file : File := { path, bytes }
       files := files.push file
-      infos := infos.push <| Program.fileInfo file <|
-        if path.endsWith ".json" then "application/json"
-        else if path.endsWith ".md" then "text/markdown"
-        else "application/vnd.lean-vir.ir-package"
+      -- Emission already established member digests and lengths. Only the two
+      -- adapter-owned text files need new metadata; do not parse our own set or
+      -- reopen every interface to reconstruct the generator's result.
+      infos := infos.push <| match generated.find? (·.path == path) with
+        | some member => {
+            path, mediaType := "application/vnd.lean-vir.ir-package",
+            byteLength := member.byteLength, sha256 := member.sha256 }
+        | none => Program.fileInfo file <|
+            if path.endsWith ".json" then "application/json" else "text/markdown"
     let descriptor : Descriptor := {
       schemaVersion := 1, logicalId := "vir-compiled/" ++ setup.name.toString,
       kind := .program, compatibility := Build.currentCompatibility, files := infos,
       fileEntries := #[{ role := "programSet", path := "program.irpkg-set.json" }], exports := #[] }
     let bundle : Bundle := { contentId := descriptor.contentId, descriptor, files }
-    discard <| IO.ofExcept (Program.check bundle setup.name.toString)
     let packed ← IO.ofExcept <| (Pack.encode bundle).mapError (fun e => s!"{e.code}: {reprStr e}")
     Build.atomicInstall output packed
 

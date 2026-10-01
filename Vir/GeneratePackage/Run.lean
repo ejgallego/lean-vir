@@ -175,22 +175,22 @@ unsafe def runModuleSet
     (rootRelativePath shardRelativeDir : String)
     (reportPath : System.FilePath)
     (importArts : NameMap ImportArtifacts := {})
-    (requiredExports : Array Name := #[]) : IO UInt32 := do
+    (requiredExports : Array Name := #[]) : IO (Except UInt32 (Array PackageSet.Member)) := do
   if targets.size != 1 then
     IO.eprintln s!"module package-set generation requires exactly one target, got {targets.size}"
-    return 1
+    return .error 1
   let some target := targets[0]?
     | IO.eprintln "module package-set generation requires one target"
-      return 1
+      return .error 1
   match target.mode with
   | .marked => pure ()
   | _ =>
       IO.eprintln "module package-set generation requires a marked module target"
-      return 1
+      return .error 1
   let targetModule := target.origin.moduleName
   if targetModule != rootModule then
     IO.eprintln s!"module package-set root `{rootModule}` does not match target `{targetModule}`"
-    return 1
+    return .error 1
 
   let index ← loadRunDeclIndex targets importArts
   let analysis ← analyzePackage (← generatedAtUtc) targets index
@@ -202,12 +202,12 @@ unsafe def runModuleSet
     printBlockingDiagnostics closure manifest
       "missing IR declarations after loading imported module IR:"
     IO.eprintln s!"see {reportPath}"
-    return 1
+    return .error 1
 
   for required in requiredExports do
     unless manifest.exports.any (·.entry == required) do
       IO.eprintln s!"required VIR interface export `{required}` is absent from marked module `{rootModule}`"
-      return 1
+      return .error 1
 
   writeTextFile reportPath report
 
@@ -216,7 +216,7 @@ unsafe def runModuleSet
     | .error err =>
         IO.eprintln err
         pure none
-  let some moduleOrder := moduleOrder? | return 1
+  let some moduleOrder := moduleOrder? | return .error 1
 
   let dependencyModules := moduleOrder.filter (· != rootModule)
   let mut pendingMembers : Array PackageSet.Member := #[]
@@ -236,7 +236,7 @@ unsafe def runModuleSet
     match emitPackage moduleClosure dependencyManifest with
     | .error err =>
         IO.eprintln s!"while emitting module shard `{moduleName}`: {err}"
-        return 1
+        return .error 1
     | .ok bytes =>
         writeBinFile outputPath bytes
         pendingMembers := pendingMembers.push {
@@ -258,7 +258,7 @@ unsafe def runModuleSet
   match emitPackage rootClosure rootManifest with
   | .error err =>
       IO.eprintln s!"while emitting root module `{rootModule}`: {err}"
-      return 1
+      return .error 1
   | .ok bytes =>
       writeBinFile packagePath bytes
       pendingMembers := pendingMembers.push {
@@ -276,6 +276,6 @@ unsafe def runModuleSet
       IO.println s!"package format: {rootManifest.metadata.packageFormatVersion}"
       IO.println s!"declarations: {closure.decls.size + closure.externs.size} ({closure.decls.size} Lean IR, {closure.externs.size} native externs)"
       IO.println s!"interface exports: {manifest.exports.size}"
-      return 0
+      return .ok pendingMembers
 
 end Vir.GeneratePackage
