@@ -1,5 +1,9 @@
 # Vir Library
 
+This guide covers core interop and experimental conveniences. DOM, React/JSX,
+widgets and broad generated JS bindings are outside the official
+[support scope](../SUPPORT.md), even when included by `import Vir`.
+
 Import `Vir.*` modules to use APIs in the `Lean.Vir.*` namespace. These APIs
 call JavaScript while Lean runs through VIR's Wasm interpreter. This guide
 helps choose modules, effects and value representations; use the
@@ -16,14 +20,14 @@ effects and reviewed protocol operations.
 
 | Import | Use it for |
 | --- | --- |
-| `Vir` | The common library, browser/React helpers, ProofWidgets notation and package markers. |
+| `Vir` | Convenience umbrella for core interop, package markers and experimental browser/React/ProofWidgets helpers. |
 | `Vir.Runtime` | `RuntimeM` and Lean-owned mutable `RuntimeRef` cells. |
 | `Vir.Js` | Exact JavaScript values, collections, functions, Promises and explicit conversions. |
-| `Vir.Browser` | DOM receivers, events, timers, animation and canvas. |
-| `Vir.React.Core` | Native React nodes, roots, components and hooks. |
-| `Vir.React` | Convenience import for native React bindings. |
-| `Vir.ProofWidgets` | Optional HTML/JSX notation over native React values. |
-| `Vir.Infoview` | The optional widget shell, native panel props, RPC and local editor capabilities. |
+| `Vir.Browser` | Experimental DOM receivers, events, timers, animation and canvas. |
+| `Vir.React.Core` | Experimental native React nodes, roots, components and hooks. |
+| `Vir.React` | Convenience import for experimental native React bindings. |
+| `Vir.ProofWidgets` | Experimental HTML/JSX notation over native React values. |
+| `Vir.Infoview` | Experimental widget shell, native panel props, RPC and local editor capabilities. |
 | `Vir.Attributes` / `Vir.ExternFallback` | Package markers / explicit use of a Lean extern reference body. |
 
 Choose the effect according to the operation:
@@ -43,7 +47,7 @@ hook ordering, and requires no separate monad implementation.
 `new`, `get`, `set`, `modify` and `modifyGet` operations run in
 `RuntimeM`; replacing the contents follows Lean reference counting.
 
-Repository package commands build the core library automatically.
+Repository package commands build the library automatically.
 The optional infoview integration requires `lake build VirInfoview` and the
 repository npm dependencies because it generates a JavaScript bundle. For a
 downstream project, follow [Lake integration](PACKAGES.md).

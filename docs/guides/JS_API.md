@@ -1,5 +1,10 @@
 # JavaScript Runtime API
 
+The [support scope](../SUPPORT.md) covers runtime loading, object ownership and
+minimal two-way interop. This reference also describes experimental DOM/UI
+providers and broad automatic structural conversion. The default browser entry
+includes experimental providers; using that entry does not expand official support.
+
 `web/src/vir-runtime.js` loads `vir-upstream.wasm`, loads a non-empty set of
 manifest-bearing `.irpkg` members, and exposes their aggregate Lean declarations
 through a generic JavaScript call API without requiring callers to manage WASM
@@ -11,7 +16,10 @@ This page documents the underlying runtime API for contributors and existing
 hosts. [Direct runtime calls](CALL_LEAN_FROM_JS.md) is a repository development
 example, not another application workflow.
 
-The module is also exposed through the package entry point:
+The module is also exposed through this checkout's package entry point. The
+repository npm package is private; the specifiers below assume a local package
+or a host-configured mapping, not an `npm install lean-vir` distribution. Prepared
+application assets use the loader described in the application guide.
 
 ```js
 import { createVirRuntime, VIR_HOST_DISPOSE } from "lean-vir";
@@ -387,7 +395,11 @@ object lane. DOM and React object markers such as `Lean.Vir.Browser.Element`
 and `Lean.Vir.React.Root` must therefore appear as `Lean.Vir.Js ...` at the
 boundary.
 
-The broad structural surface above is the descriptor-guided object lowering
+The broad structural surface above is experimental automatic marshaling, not the
+planned explicitly invoked JSON converter API for 0.1.1. It remains available
+with the limits described here.
+
+This surface is the descriptor-guided object lowering
 surface for JavaScript-to-Lean export calls. Host imports are narrower than exports:
 low-level JavaScript imports use `Unit`, `Lean.Vir.Js α` resources,
 `Lean.Vir.Js.Nullable α` resources for JavaScript `null`, callback arguments

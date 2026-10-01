@@ -1,4 +1,8 @@
-# React
+# Experimental React and JSX
+
+React, DOM mounting, hooks and ProofWidgets HTML/JSX are experimental conveniences
+outside VIR's official [support scope](../SUPPORT.md). This guide describes their
+current implementation and limits.
 
 VIR binds native React values and operations for Lean-authored components.
 Start here for component authoring; use [Infoview](INFOVIEW.md) to mount a
@@ -311,7 +315,7 @@ Purity, hook order, dependency completeness, effect discipline and replay-safe
 reducers remain programmer responsibilities, just as in TypeScript React.
 VIR keeps no speculative hook slots, action queues or dependency leases.
 
-## Supported calls and gaps
+## Implemented calls and gaps
 
 This table describes selected call shapes, not full React coverage. The
 [generated declarations](../../Vir/React/Generated.lean) and

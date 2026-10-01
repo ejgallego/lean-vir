@@ -1,5 +1,8 @@
 # Run Lean in a web application
 
+This guide uses VIR's runtime and package workflow. DOM/React mounting and editor
+widgets are optional experimental conveniences; see [support scope](../SUPPORT.md).
+
 The client library declares a **program** (compiled Lean code) and prepares the
 matching **runtime** (the JavaScript loader and Wasm interpreter). The application
 builds through Lake, writes their compiled resource values to its site, and calls

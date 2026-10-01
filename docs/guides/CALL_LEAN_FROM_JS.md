@@ -7,6 +7,8 @@ through the owning library; application builds do not compile Wasm.
 This page is a contributor example for the repository's development runner and
 its lower-level API. It deliberately builds the runtime from source and writes
 compiler output directly. These are not first-release application instructions.
+DOM/React examples use experimental conveniences; the underlying call and host
+binding APIs are part of the [support scope](../SUPPORT.md).
 
 The contributor example proceeds as follows:
 

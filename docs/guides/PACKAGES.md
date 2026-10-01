@@ -3,6 +3,8 @@
 Applications follow [library-owned setup](EMBEDDED_RESOURCES.md). This page
 documents lower-level tools retained for VIR development and existing
 integrations, not an alternative first-release application workflow.
+Program generation and loading are part of the [support scope](../SUPPORT.md);
+the DOM examples below use experimental bindings.
 
 The module `:vir` facet writes compiler package files; `:virSdk` installs the
 JavaScript/Wasm distribution used by older hosts. Repository npm commands select
