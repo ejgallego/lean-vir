@@ -6,56 +6,45 @@ Author: Emilio J. Gallego Arias
 
 import { spawnSync } from "node:child_process";
 
-import { repositoryPath, repositoryRoot } from "../repository-paths.mjs";
+import { repositoryRoot } from "../repository-paths.mjs";
 import { elapsedSeconds, timerStart } from "../timing-utils.mjs";
 
-export const virIrpkgPath = repositoryPath(
-  ".lake",
-  "build",
-  "bin",
-  "vir_irpkg",
-);
-
 export function virIrpkgLakeBuildArgs(lakeTargets = []) {
-  return ["build", "Vir", "vir_irpkg", ...lakeTargets];
+  return ["build", "vir_irpkg", ...lakeTargets];
+}
+
+/** Resolve an already-built tool for callers packaging a separate project. */
+export function resolveVirIrpkgPathSync() {
+  const generator = prepareVirIrpkgSync({ noBuild: true });
+  if (!generator.ok) throw new Error(irpkgGeneratorFailureMessage(generator));
+  return generator.path;
 }
 
 /** Build this repository's generator and resolve its matching Lake environment. */
-export function prepareVirIrpkgSync({ lakeTargets = [] } = {}) {
-  const libStart = timerStart();
-  const libResult = spawnSync("bash", ["scripts/build-lean-lib.sh"], {
-    cwd: repositoryRoot,
-    stdio: "inherit",
-  });
-  const libSeconds = elapsedSeconds(libStart);
-
-  if ((libResult.status ?? 1) !== 0) {
-    return failed("lean-lib", libResult, { libSeconds, generatorSeconds: 0 });
-  }
-
+export function prepareVirIrpkgSync({
+  lakeTargets = [],
+  modules = [],
+  noBuild = false,
+} = {}) {
   const generatorStart = timerStart();
-  const generatorResult = spawnSync(
-    "lake",
-    virIrpkgLakeBuildArgs(lakeTargets),
-    { cwd: repositoryRoot, stdio: "inherit" },
-  );
-  const generatorSeconds = elapsedSeconds(generatorStart);
-
-  if ((generatorResult.status ?? 1) !== 0) {
-    return failed("vir-irpkg", generatorResult, {
-      libSeconds,
-      generatorSeconds,
+  if (lakeTargets.length && !noBuild) {
+    const built = spawnSync("lake", ["build", ...lakeTargets], {
+      cwd: repositoryRoot,
+      stdio: "inherit",
     });
+    if ((built.status ?? 1) !== 0) {
+      return failed("vir-irpkg", built, {
+        generatorSeconds: elapsedSeconds(generatorStart),
+      });
+    }
   }
-
-  // Lake owns search paths, including dependency packages and custom build dirs.
-  const leanPath = spawnSync(
+  const resolved = spawnSync(
     "lake",
     [
-      "env",
-      process.execPath,
-      "-e",
-      "process.stdout.write(process.env.LEAN_PATH ?? '')",
+      "run",
+      "virPrepare",
+      ...(noBuild ? ["--no-build"] : []),
+      ...new Set(modules),
     ],
     {
       cwd: repositoryRoot,
@@ -63,31 +52,29 @@ export function prepareVirIrpkgSync({ lakeTargets = [] } = {}) {
       stdio: ["ignore", "pipe", "inherit"],
     },
   );
-
-  if ((leanPath.status ?? 1) !== 0) {
-    return failed("lake-env", leanPath, { libSeconds, generatorSeconds });
+  const generatorSeconds = elapsedSeconds(generatorStart);
+  if ((resolved.status ?? 1) !== 0) {
+    return failed("compiled-inputs", resolved, { generatorSeconds });
   }
-
+  const result = JSON.parse(resolved.stdout);
   return {
     ok: true,
-    path: virIrpkgPath,
+    path: result.path,
+    setupArgs: result.setup === null ? [] : ["--setup", result.setup],
     env: {
       ...process.env,
-      LEAN_PATH: leanPath.stdout,
+      LEAN_PATH: result.leanPath,
     },
-    libSeconds,
     generatorSeconds,
   };
 }
 
 export function irpkgGeneratorFailureMessage(result) {
   switch (result.phase) {
-    case "lean-lib":
-      return "Lean.Vir library build failed";
     case "vir-irpkg":
       return "vir_irpkg generator build failed";
-    case "lake-env":
-      return "could not resolve the Lake module search path";
+    case "compiled-inputs":
+      return "could not acquire the Lake-resolved generator and compiled inputs";
     default:
       return "vir_irpkg generator preparation failed";
   }

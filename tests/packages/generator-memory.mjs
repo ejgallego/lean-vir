@@ -20,7 +20,6 @@ import { planBrowserPackage } from "../../scripts/packages/browser-package-plan.
 import {
   irpkgGeneratorFailureMessage,
   prepareVirIrpkgSync,
-  virIrpkgPath,
 } from "../../scripts/packages/irpkg-generator.mjs";
 import { readIrPackageInfo } from "../../scripts/packages/irpkg-format.mjs";
 import { repositoryRoot } from "../../scripts/repository-paths.mjs";
@@ -55,36 +54,14 @@ const spec = packageSpecs.find(({ id }) => id === "demo-host");
 assert.ok(spec, "the full demo-host workload must remain in the catalog");
 const plan = planBrowserPackage(spec, fixtures);
 assert.ok(plan.modules.length > 1, "memory regression needs multiple modules");
-const lakeTargets = [
-  ...new Set([
-    ...(spec.lakeTargets ?? []),
-    ...plan.modules.map((module) => `+${module}`),
-  ]),
-];
+const lakeTargets = [...new Set([...(spec.lakeTargets ?? [])])];
 
-let generator;
-if (args.includes("--no-build")) {
-  // Resolve the same Lake search path without rebuilding prepared artifacts.
-  const leanPath = spawnSync(
-    "lake",
-    [
-      "env",
-      process.execPath,
-      "-e",
-      "process.stdout.write(process.env.LEAN_PATH ?? '')",
-    ],
-    { cwd: repositoryRoot, encoding: "utf8" },
-  );
-  assert.ifError(leanPath.error);
-  assert.equal(leanPath.status, 0, leanPath.stderr);
-  generator = {
-    path: virIrpkgPath,
-    env: { ...process.env, LEAN_PATH: leanPath.stdout },
-  };
-} else {
-  generator = prepareVirIrpkgSync({ lakeTargets });
-  assert.ok(generator.ok, irpkgGeneratorFailureMessage(generator));
-}
+const generator = prepareVirIrpkgSync({
+  lakeTargets,
+  modules: plan.modules,
+  noBuild: args.includes("--no-build"),
+});
+assert.ok(generator.ok, irpkgGeneratorFailureMessage(generator));
 
 await mkdir(join(repositoryRoot, "build"), { recursive: true });
 const output = await mkdtemp(join(repositoryRoot, "build/generator-memory-"));
@@ -107,6 +84,7 @@ try {
       generator.path,
       packagePath,
       reportPath,
+      ...generator.setupArgs,
       ...plan.targetArgs,
     ],
     {

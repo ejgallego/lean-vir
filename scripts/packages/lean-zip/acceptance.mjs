@@ -14,7 +14,10 @@ import { inflateRawSync } from "node:zlib";
 import { pathExists } from "../../file-utils.mjs";
 import { runSync } from "../../process-utils.mjs";
 import { repositoryRoot } from "../../repository-paths.mjs";
-import { virIrpkgLakeBuildArgs, virIrpkgPath } from "../irpkg-generator.mjs";
+import {
+  virIrpkgLakeBuildArgs,
+  resolveVirIrpkgPathSync,
+} from "../irpkg-generator.mjs";
 import { createVirRuntime } from "../../../web/src/vir-runtime-node.js";
 import {
   acceptanceProfileContract,
@@ -138,7 +141,7 @@ async function generateNativeOracle(project) {
   project.lake(oracleArgs);
 }
 
-function generateVirPackage(project) {
+function generateVirPackage(project, virIrpkgPath) {
   project.lake(["build", `+${exportsModule}`]);
   project.lake([
     "env",
@@ -158,7 +161,7 @@ async function runAcceptance() {
   });
   runSync("lake", virIrpkgLakeBuildArgs(), { cwd: repositoryRoot });
   await generateNativeOracle(project);
-  generateVirPackage(project);
+  generateVirPackage(project, resolveVirIrpkgPathSync());
 
   const manifest = parseAcceptanceManifest(
     await readFile(join(oracleOutput, "manifest.tsv"), "utf8"),

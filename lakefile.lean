@@ -180,6 +180,41 @@ private def fetchVirCompiledSetup
     addPureTrace (Lean.toJson setup).compress "VIR resolved input locations"
     return setup
 
+/-- Internal bridge for repository package producers. Selection and output stay
+with the generator; Lake returns executable and full compiled-artifact paths.
+This is not an additional application build workflow or public module facet. -/
+script virPrepare (args) do
+  let noBuild := args.head? == some "--no-build"
+  let names := (if noBuild then args.drop 1 else args).toArray
+  let pkg ← getRootPackage
+  let result ← runBuild (cfg := { noBuild, verbosity := .quiet }) do
+    let generator ← vir_irpkg.fetch
+    let inputs ← names.mapM fun name => do
+      let some mod ← findModule? name.toName
+        | error s!"VIR compiled input `{name}` is not Lake-registered"
+      (← mod.transImports.fetch).bindM fun imports => fetchVirCompiledSetup mod imports
+    generator.bindM fun generator => (Job.collectArray inputs "VIR producer inputs").mapM fun inputs => do
+      let setup : Lean.ModuleSetup := {
+        name := .anonymous
+        importArts := inputs.foldl (init := {}) fun arts setup =>
+          setup.importArts.foldl (fun arts name paths => arts.insert name paths) arts }
+      let setupPath := pkg.buildDir / "vir/compiled-inputs" /
+        s!"{(Hash.ofString (Lean.toJson names).compress).hex}.setup.json"
+      let inputTrace ← getTrace
+      if !names.isEmpty then
+        buildFileUnlessUpToDate' setupPath do
+          createParentDirs setupPath
+          IO.FS.writeFile setupPath (Lean.toJson setup).compress
+        -- The writer replaces the job trace with its file-content trace. Retain
+        -- implementation identity even when private edits leave the JSON equal.
+        addTrace inputTrace
+      return Lean.Json.mkObj [
+        ("path", Lean.toJson generator.toString),
+        ("setup", if names.isEmpty then .null else Lean.toJson setupPath.toString),
+        ("leanPath", Lean.toJson (← getAugmentedLeanPath).toString)]
+  IO.println result.compress
+  return 0
+
 /-- Internal shared cached result. Public adapters do not repeat IR analysis. -/
 module_facet virProgram (mod : Module) : System.FilePath := do
   let generatorJob ← vir_program.fetch

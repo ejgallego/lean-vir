@@ -192,7 +192,8 @@ npm run test:runtime -- --group pure
 `VIR_RUNTIME_TEST_FILTER` also selects smokes; `VIR_RUNTIME_JOBS` controls worker
 count. The `pure` group reuses demo artifacts and runs in parallel. The `lean`
 group generates packages or checks SDK imports and runs serially to avoid
-concurrent writes to shared `build/lean-lib` and `.lake` outputs. Pure runtime
+concurrent writes to shared `.lake` outputs. `build:lean-lib` uses Lake's ordinary
+library target, not a second hand-ordered compilation tree. Pure runtime
 smokes are distinct from the artifact-free runner unit tests.
 
 ## Browser Smoke

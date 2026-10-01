@@ -44,7 +44,7 @@
     "build:infoview": "node scripts/build-infoview-widget.mjs",
     "generate:boundary-registry": "node scripts/native/check-boundary-registry.mjs --write",
     "build:demo-package": "node scripts/packages/generate-browser-package.mjs --package demo-host --package native-infoview --copy-public",
-    "build:lean-lib": "bash scripts/build-lean-lib.sh",
+    "build:lean-lib": "lake build Vir",
     "install:wasi": "bash scripts/install-wasi-sdk.sh",
     "install:engines": "bash scripts/install-wasm-engines.sh",
     "generate:package": "node scripts/packages/generate-browser-package.mjs",

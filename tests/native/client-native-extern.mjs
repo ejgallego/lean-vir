@@ -11,7 +11,7 @@ import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { virIrpkgLakeBuildArgs, virIrpkgPath } from "../../scripts/packages/irpkg-generator.mjs";
+import { virIrpkgLakeBuildArgs, resolveVirIrpkgPathSync } from "../../scripts/packages/irpkg-generator.mjs";
 import { readIrPackageFile } from "../../scripts/packages/irpkg-format.mjs";
 import {
   repositoryPath,
@@ -56,6 +56,7 @@ async function expectManifestFailure(tempRoot, name, manifest, pattern) {
 }
 
 run("lake", virIrpkgLakeBuildArgs(["vir_native_wrappers"]));
+const virIrpkgPath = resolveVirIrpkgPathSync();
 run("lake", ["-d", fixtureRoot, "build"]);
 
 const tempRoot = await mkdtemp(join(tmpdir(), "vir-client-native-extern-"));

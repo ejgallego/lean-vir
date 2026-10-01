@@ -14,7 +14,7 @@ import { readIrPackageInfo } from "../../web/src/runtime/ir-package.js";
 import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import { createTestModuleProject } from "../support/module-project.mjs";
-import { virIrpkgPath } from "../../scripts/packages/irpkg-generator.mjs";
+import { resolveVirIrpkgPathSync } from "../../scripts/packages/irpkg-generator.mjs";
 
 const moduleName = "ModuleSetFixture.InputSelection";
 const selected = `${moduleName}.selected`;
@@ -38,13 +38,14 @@ function success(result) {
 
 try {
   success(lake(["build", "vir_irpkg", moduleName]));
+  const virIrpkgPath = resolveVirIrpkgPathSync();
   const wasmBytes = await readFile(join(repositoryRoot, "web/public/vir-upstream.wasm"));
   const factory = createVirRuntimeFactory({ wasmBytes });
   async function generate(name, args) {
     const output = join(scratch, `${name}.irpkg`);
     const result = lake([
       "env",
-      ".lake/build/bin/vir_irpkg",
+      virIrpkgPath,
       output,
       join(scratch, `${name}.report.md`),
       ...args,

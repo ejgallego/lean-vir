@@ -15,7 +15,7 @@ import {
   readFile,
   spawnSync,
 } from "./shared.mjs";
-import { virIrpkgPath } from "../../scripts/packages/irpkg-generator.mjs";
+import { resolveVirIrpkgPathSync } from "../../scripts/packages/irpkg-generator.mjs";
 import { readIrPackageInfo } from "../../web/src/runtime/ir-package.js";
 
 const scratch = await mkdtemp(join(tmpdir(), "vir-module-project-"));
@@ -25,6 +25,7 @@ function success(result) {
 }
 try {
   ensureVirIrpkgBuilt();
+  const virIrpkgPath = resolveVirIrpkgPathSync();
   const project = await createTestModuleProject({
     directory: join(scratch, "project with spaces"),
     modules: {

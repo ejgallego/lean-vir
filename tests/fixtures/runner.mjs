@@ -91,7 +91,7 @@ if (skipBuild) {
 const generatorStart = timerStart();
 const moduleBySource = fixtureModuleMap(packageSpecs, fixtures);
 const irpkgGenerator = prepareVirIrpkgSync({
-  lakeTargets: [...new Set(moduleBySource.values())].map((name) => `+${name}`),
+  modules: [...new Set(moduleBySource.values())],
 });
 if (!irpkgGenerator.ok) {
   console.error(`error: ${irpkgGeneratorFailureMessage(irpkgGenerator)}`);

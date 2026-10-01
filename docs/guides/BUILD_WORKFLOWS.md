@@ -148,10 +148,15 @@ and selection remain separate: an SDK release/commit is not a resource content I
 SDK authentication does not enter locked acquisition, and neither adapter adds
 an automatic runtime-build fallback.
 
-Repository npm producers still use conventional search-path resolution in some
-paths. Their migration and shared acquisition are tracked in
-[#205](https://github.com/ejgallego/lean-vir/issues/205); the resource tests do not
-establish cache-only support for those callers.
+Repository npm producers acquire their registered modules through the same
+compiled-input resolver, via the internal `lake run virPrepare` bridge. Lake
+returns the generator executable, full artifact map and matching search path;
+the npm adapter retains selection and output policy. `build:lean-lib` is simply
+`lake build Vir`, not a second hand-maintained library build. External temporary
+test projects still supply their own compilation environment to the standalone
+generator: a map from this repository must not replace their module ownership.
+The cache-only acquisition regression covers this bridge separately from the
+resource adapter; it is not a claim about unexecuted client campaigns.
 
 Resource builds reject `VIR_NATIVE_EXTERN_MANIFEST` before cache lookup, including
 empty values; direct native producer calls reject it too. Their runtime is the

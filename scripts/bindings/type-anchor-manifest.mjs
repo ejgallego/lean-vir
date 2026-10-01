@@ -112,7 +112,7 @@ export async function runTypeAnchorManifestCli(argv) {
   }
 
   const generator = prepareVirIrpkgSync({
-    lakeTargets: [`+${config.module}`],
+    modules: [config.module],
   });
   if (!generator.ok) throw new Error(irpkgGeneratorFailureMessage(generator));
 
@@ -120,7 +120,7 @@ export async function runTypeAnchorManifestCli(argv) {
   await mkdir(dirname(reportPath), { recursive: true });
   const result = spawnSync(
     generator.path,
-    [packagePath, reportPath, ...targetArgs],
+    [packagePath, reportPath, ...generator.setupArgs, ...targetArgs],
     {
       cwd: root,
       env: generator.env,
