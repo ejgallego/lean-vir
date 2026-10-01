@@ -15,6 +15,10 @@ for the exact covered, partial and pending gates; this is still a draft workflow
 
 ## Portable values
 
+The [review assumptions](REVIEW_ASSUMPTIONS.md) define the supported cooperative
+input model. Validation diagnoses ordinary build/compatibility and byte-integrity
+failures; it is not hostile-program admission or a Lean soundness certificate.
+
 `Vir.Resources` imports types and pure validation, not a runtime carrier. A
 `Bundle` contains a descriptor, content identity and every payload as bytes.
 Lookup operations (`file?`, `entryPath?`, `exportName?`) perform no I/O.
@@ -68,7 +72,8 @@ This draft replaces the earlier four-field record; old or mixed records reject
 and must be regenerated. There are no legacy field aliases. Descriptor/pack
 framing stays v1; canonical descriptor identity changes with the new fields.
 
-All resource hashing is pure Lean, without Node, subprocesses or FFI. The SHA-256
+Native package and resource hashing share `Vir.Hash`, without Node, subprocesses
+or FFI. The SHA-256
 implementation follows [FIPS 180-4](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf)
 and is tested against an independent host implementation. This is integrity
 checking, not publisher authentication or a claim of cryptographic certification.

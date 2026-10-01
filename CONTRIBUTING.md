@@ -4,6 +4,11 @@ Lean VIR is experimental, but the review workflow should stay predictable:
 small branches, clear public PR text, and the smallest relevant local check
 before asking CI to do the rest.
 
+Review against the [supported-input assumptions](docs/development/REVIEW_ASSUMPTIONS.md):
+cooperative users following documented workflows, trusted generated artifacts,
+and explicit producer/consumer contracts. Do not infer an adversarial admission
+or Lean kernel-soundness guarantee from artifact validation.
+
 ## Branches
 
 - Use `feat/<slug>` for user-facing or architectural changes.

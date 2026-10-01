@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.Resources.Types
-import Vir.Resources.Sha256
+import Vir.Hash
 import Init.Data.Array.QSort
 import Std.Data.HashMap.Basic
 

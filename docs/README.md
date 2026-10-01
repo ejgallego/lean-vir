@@ -34,6 +34,8 @@ Start with the [overview](../README.md) to choose a workflow, or the
 
 ## Development: contribute and validate
 
+- [Review assumptions](development/REVIEW_ASSUMPTIONS.md): supported inputs,
+  validation boundaries, evidence and cross-project contract changes.
 - [Examples and fixtures](development/EXAMPLES_AND_FIXTURES.md): contribution and oracle
   rules; [Harness](HARNESS.md): checks and their prerequisites.
 - [Performance](development/PERFORMANCE.md) and the

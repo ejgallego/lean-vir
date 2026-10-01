@@ -9,7 +9,7 @@ import Vir.LeanName
 import Vir.Resources.Program
 import Vir.Resources.Build
 import Vir.Resources.Pack
-import Vir.Resources.Sha256
+import Vir.Hash
 
 /-! Native, bounded producer for one independently registered marked module.
 Lake supplies the shared, verified compiled program result to `build`.
@@ -110,7 +110,7 @@ private def plan (recipePath compatibilityPath root : FilePath) : IO Unit := do
 private def addFile (files : Array File) (infos : Array FileInfo)
     (path mediaType : String) (bytes : ByteArray) : Array File × Array FileInfo :=
   (files.push { path, bytes }, infos.push {
-    path, mediaType, byteLength := bytes.size, sha256 := sha256 bytes })
+    path, mediaType, byteLength := bytes.size, sha256 := Vir.sha256 bytes })
 
 private def build (recipePath compatibilityPath programPath root outputPath : FilePath) : IO Unit := do
   let recipe ← readRecipe recipePath

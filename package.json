@@ -111,7 +111,7 @@
     "test:resources:embedding": "lake build Vir.Resources.Embed vir_resource_tests && node tests/resources/embedding.mjs",
     "test:resources:acquisition": "lake build vir_resource_pack vir_resource_tests vir_fetch_sdk Vir.Resources.Embed && node tests/resources/native-payload.mjs && node tests/resources/acquisition.mjs",
     "test:resources:packing": "lake build vir_resource_pack vir_resource_tests && node tests/resources/packing.mjs",
-    "test:resources:program": "lake build vir_resource_program vir_resource_pack +tests.resources.BrowserProgram:vir && node tests/resources/program-packing.mjs",
+    "test:resources:program": "lake build vir_irpkg vir_resource_program vir_resource_pack +tests.resources.BrowserProgram:vir && node tests/resources/native-generation.mjs && node tests/resources/program-packing.mjs",
     "test:resources:client": "lake build vir_resource_program vir_resource_pack && node tests/resources/client.mjs",
     "test:resources:published": "node tests/resources/client.mjs --published",
     "test:resources:cache": "node tests/resources/cache.mjs",

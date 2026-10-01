@@ -7,8 +7,8 @@ module
 
 public import Vir.Resources.Build
 import Vir.Resources.Pack
-import Vir.Resources.Sha256
-import Vir.GeneratePackage.PackageFormat
+import Vir.Hash
+import Vir.GeneratePackage.PackageSet
 import Lean.Data.Json.Printer
 import Lean.Data.Json.FromToJson
 
@@ -65,6 +65,7 @@ structure Member where
   moduleName : String
   role : String
   file : File
+  info : FileInfo
   deriving Inhabited
 
 /-- Validated container plus canonical build-adapter inventory, member ownership and
@@ -127,7 +128,7 @@ private def checkValidatedBundle (bundle : Bundle) (root : String) : Except Stri
     if isRoot then
       exports ← (← (← interface.getObjVal? "exports").getArr?).mapM
         (fun item => item.getObjValAs? String "entry")
-    members := members.push { moduleName, role, file }
+    members := members.push { moduleName, role, file, info }
   return { bundle, members, exports }
 
 /-- Validate an ordinary in-memory bundle before checking its compiled-program
@@ -152,15 +153,13 @@ def fileInfo (file : File) (mediaType : String) : FileInfo :=
 def looseFiles (program : Checked) (rootPath shardDir reportPath : String) : Array File := Id.run do
   let members := program.members.mapIdx fun i member =>
     ({ member.file with path := if member.role == "root" then rootPath else s!"{shardDir}/{i}.irpkg" }, member)
-  -- Keep the canonical generator's field order and newline convention.
-  let quoted (s : String) := (Json.str s).compress
-  let entries := members.map fun (file, member) =>
-    "{\"module\":" ++ quoted member.moduleName ++ ",\"role\":" ++ quoted member.role ++
-    ",\"path\":" ++ quoted file.path ++ ",\"byteLength\":" ++ toString file.bytes.size ++
-    ",\"sha256\":" ++ quoted (sha256 file.bytes) ++ "}"
-  let descriptor := "{\"format\":" ++ quoted packageSetFormat ++
-    ",\"version\":" ++ toString currentPackageSetVersion ++ ",\"packages\":[" ++
-    String.intercalate "," entries.toList ++ "]}\n"
+  let entries : Array PackageSet.Member := members.map fun (file, member) => {
+    moduleName := member.moduleName
+    role := if member.role == "root" then .root else .dependency
+    path := file.path
+    byteLength := member.info.byteLength
+    sha256 := member.info.sha256 }
+  let descriptor := PackageSet.encode entries
   return (members.map (·.1)).push { path := "descriptor", bytes := descriptor.toUTF8 }
     |>.push { path := reportPath, bytes := (program.bundle.file? "report.md").get!.bytes }
 

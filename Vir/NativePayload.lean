@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 module
 
 import Lean
-import Vir.Resources.Sha256
+import Vir.Hash
 
 /-! Native file payload handling shared by the SDK installer and resource tools.
 
@@ -70,7 +70,7 @@ public def readInput (path : FilePath) (limit : Nat) (limitCode : String) : IO B
 public def sha256File (path : FilePath) : IO String := do
   checkFile path
   let bytes ← IO.FS.readBinFile path
-  return Vir.Resources.sha256 bytes
+  return Vir.sha256 bytes
 
 /-! Create a private temporary directory beside a destination so subsequent
 renames stay on the destination filesystem. -/
@@ -79,7 +79,7 @@ public def withSiblingDirectory (nearPath : FilePath) (f : FilePath → IO α) :
   createManagedParents parent
   let mut directory? := none
   for _ in [:8] do
-    let nonce := Vir.Resources.sha256 (← IO.getRandomBytes 32)
+    let nonce := Vir.sha256 (← IO.getRandomBytes 32)
     let directory := parent / s!".vir-payload-{nonce}"
     try
       IO.FS.createDir directory
@@ -131,7 +131,7 @@ public def verifyDirectory (path : FilePath) (validate : FilePath → IO Unit)
 private def freshBackupPath (destination : FilePath) : IO FilePath := do
   let parent := destination.parent.getD "."
   for _ in [:8] do
-    let nonce := Vir.Resources.sha256 (← IO.getRandomBytes 32)
+    let nonce := Vir.sha256 (← IO.getRandomBytes 32)
     let backup := parent / s!".vir-payload-backup-{nonce}"
     if (← metadata? backup).isNone then return backup
   fail "TEMPORARY_PATH_COLLISION" parent.toString

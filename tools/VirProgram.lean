@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 import Vir.GeneratePackage
 import Vir.Resources.Program
 import Vir.Resources.Pack
-import Vir.Resources.Sha256
+import Vir.Hash
 
 open Lean System Vir.Resources
 
@@ -21,7 +21,7 @@ private unsafe def build (setupPath output : FilePath) : IO Unit := do
     let result ← Vir.GeneratePackage.runModuleSet
       #[{ origin := .module setup.name, mode := .marked }] setup.name
       (temporary / "program.irpkg") setPath (temporary / "parts")
-      "program.irpkg" "parts" (temporary / "report.md") setup.importArts #[] (some sha256)
+      "program.irpkg" "parts" (temporary / "report.md") setup.importArts
     unless result == 0 do
       let report := temporary / "report.md"
       if (← Build.metadata? report).isSome then

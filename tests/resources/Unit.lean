@@ -8,15 +8,16 @@ module
 import Lean
 import Vir.Resources
 import Vir.Resources.Pack
-import Vir.Resources.Sha256
+import Vir.Hash
 import Vir.BinaryLiteral
 import Vir.GeneratePackage.PackageFormat
 public meta import Vir.Resources
 public meta import Vir.Resources.Pack
-public meta import Vir.Resources.Sha256
+public meta import Vir.Hash
 public meta import Vir.BinaryLiteral
 
 open Vir.Resources
+open Vir (sha256)
 
 private def check (label : String) (ok : Bool) : IO Unit :=
   unless ok do throw <| IO.userError s!"resource test: {label}"
