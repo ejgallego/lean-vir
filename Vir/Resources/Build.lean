@@ -99,7 +99,7 @@ def withSibling (destination : FilePath) (f : FilePath → IO α) : IO α :=
 def atomicInstall (destination : FilePath) (bytes : ByteArray) : IO Unit :=
   Vir.NativePayload.atomicInstall destination bytes
 
-def verifyIdentity (expected : String) (profile : Compatibility) (bundle : Bundle) : IO Unit := do
+private def verifyIdentity (expected : String) (profile : Compatibility) (bundle : Bundle) : IO Unit := do
   unless bundle.contentId == expected do
     fail "CONTENT_ID_MISMATCH" s!"expected {expected}, got {bundle.contentId}"
   unless bundle.descriptor.compatibility.leanRevision == Lean.githash do
@@ -109,7 +109,7 @@ def verifyIdentity (expected : String) (profile : Compatibility) (bundle : Bundl
     fail "INCOMPATIBLE"
       s!"bundle {bundle.descriptor.logicalId} has {repr bundle.descriptor.compatibility}; expected {repr profile}"
 
-def verify (expected : String) (profile : Compatibility) (bytes : ByteArray) : IO Unit := do
+private def verify (expected : String) (profile : Compatibility) (bytes : ByteArray) : IO Unit := do
   match Pack.decode bytes with
   | .ok bundle => verifyIdentity expected profile bundle
   | .error e => fail e.code (reprStr e)
