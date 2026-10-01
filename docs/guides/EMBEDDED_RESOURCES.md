@@ -5,10 +5,11 @@ without discovering VIR build paths or running package tools itself. Lake prepar
 the resources; compiled Lean values own their bytes; the application writes them
 to its site; JavaScript opens a program by export role.
 
-The current runtime lock is available-only: a maintainer must first supply its
-exact verified pack. A missing pack fails clearly; it never triggers a Wasm build.
-Anonymous cold installation is not yet supported. Use the pinned Lean toolchain
-and the matching runtime; do not substitute another release's Wasm.
+The runtime lock selects an exact prebuilt pack from a public release. The owning
+library acquires and verifies it on a cache miss; warm use needs no runtime
+download. HTTPS acquisition requires `curl`. An unavailable pack fails clearly;
+it never triggers a Wasm build. Use the pinned Lean toolchain and matching runtime;
+do not substitute another release's Wasm.
 Compatibility is one Lean source revision plus one VIR compatibility version;
 the lock's content ID selects the exact runtime bundle. Client libraries inherit
 this profile from VIR rather than independently choosing ABI or package-format

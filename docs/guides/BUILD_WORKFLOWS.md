@@ -100,8 +100,9 @@ pack tool to acquire the exact content identity:
 3. Validate the complete pack and compatibility before installation; restore
    cache/stage without writing through existing hard links.
 
-The current lock uses `source: "-"`: only previously supplied matching bytes are
-allowed. A miss fails. There is no implicit SDK installation, npm invocation,
+The current lock names a public release asset; an empty runtime cache downloads
+and verifies those exact bytes. `source: "-"` remains an available-only selection,
+not a download source. There is no implicit SDK installation, npm invocation,
 GitHub authentication, WASI installation, or local runtime build. HTTPS acquisition
 uses `curl`; packing runtime distributions is a separate maintainer operation.
 

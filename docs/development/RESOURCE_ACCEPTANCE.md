@@ -1,21 +1,59 @@
 # Embedded resources: review and acceptance
 
-This is a draft implementation, not yet the default cold-install client workflow.
-The API uses main's Lean 4.34.0 toolchain. The supplied-pack Slides strict-creation
-checkpoint is qualified on 4.34; its older 4.35 canary remains historical evidence.
-The checked-in runtime lock uses available-only
-selection (`source: "-"`); it does not identify a public download. Publication of
-a durable runtime distribution remains a release prerequisite.
+This is a draft integration using main's Lean 4.34.0 toolchain. The checked-in
+runtime lock selects a publicly downloadable, exact prebuilt pack. Upstream
+anonymous acquisition and downstream ordinary cold-deck qualification are
+separate gates; neither implies a complete product acceptance.
 
-The accepted downstream baseline is Slides `51c6d782` / VIR `47e82e9a`, runtime
+The historical downstream baseline is Slides `51c6d782` / VIR `47e82e9a`, runtime
 `401b115e` and pure Except-v2 program `97b280b7`. Slides reports 101 native,
 11 Node and 30 Chromium/Firefox passing checks; VIR reviewed the retained
 identities and actual exported signature without duplicating those runs.
 VIR's exact-head CI `36720794347` and candidate `36720794235` both passed.
 These are baseline evidence, not qualification of later changes or the newly
-selected runtime pack. The directory-prefix admission fix changes bundled
-JavaScript and therefore the runtime content identity; downstream adoption of
-that successor needs its own exact source/pack handoff.
+selected runtime pack. The current reviewed supplied-pack successor is Slides
+`ea079cd7` (evidence head `3f7dbc93`) / VIR `af3052ca`, runtime `832ab095` and the
+same program `97b280b7`. Slides reports 46 focused Chromium/Firefox checks and
+owning-library root/downstream builds, including the public Embed carrier,
+directory-casing rejection and relocation. VIR independently checked its
+identity ledger and actual inventories, without repeating those campaigns.
+Both exact-source workflows `36784049788` and `36784049804` passed. These results
+remain supplied-pack evidence, not anonymous downstream acceptance.
+
+## Published runtime
+
+The [runtime release](https://github.com/ejgallego/lean-vir/releases/tag/resource-832ab095ad79df0f10f538bcf71272731bb74b90df44f965dac2f086c222897d)
+provides the exact bytes selected by the lock:
+
+- Content ID: `832ab095ad79df0f10f538bcf71272731bb74b90df44f965dac2f086c222897d`.
+- Pack SHA-256: `d06bda0aba96547679093da441cd3d9b2b7a9291d1757f16c5c6fcf6ed081ba1`; 1,120,731 bytes.
+- Compatibility: Lean revision `293d5d0c0c3f3dded4688b3ccd6a33939ac5102b`, VIR version 1.
+- Pack producer: `0f720625`; release tag points to source successor `af3052ca`.
+  That successor changes native embedding, not the runtime payload.
+
+Anonymous public download and native acquisition into empty runtime cache/stage
+passed. Native warm-offline reuse and an independent cold-offline miss passed;
+the miss names the exact required content ID. No different revision, supplied
+pack or source Wasm build was used. The identity is content-addressed and verified;
+GitHub-enforced immutable releases are not enabled in this repository.
+
+The network-dependent three-package campaign is an explicit qualification command,
+not a second broad CI campaign:
+
+```sh
+npm run test:resources:published
+```
+
+It archives the current committed producer source into a fresh owned directory,
+without copying `.lake` or runtime staging. The leaf application's ordinary
+`lake exe generate-site` must acquire the public pack through the intermediary
+library's prerequisites. Logs and source inputs are retained under `build/`,
+including on failure. This does not test a public Git clone or a fresh Slides deck.
+The campaign passed at `3a7c836c430cb13668f3e8c240b65f10f739e876`, including exact
+cached/staged pack checksum, warm offline acquisition without inode/mtime changes,
+cold offline miss, ordinary warm build, stage repair, program edit, carrier-cycle
+rejection and relocated native rendering. See the
+[publication checkpoint](../evidence/runtime-release/README.md).
 
 ## Review order
 
@@ -51,7 +89,7 @@ checks. The downstream Slides tests belong to Slides and are not run by VIR CI.
 | T01 Toolchain agreement | Covered | Native acquisition/program profile mismatch negatives and exact matching demo inputs. |
 | T02 Core-only import | Covered | Core/embed/native producer builds without the optional runtime carrier. |
 | T03 Runtime carrier | Covered locally | Cold runtime-only build prepares selected bytes without building the generator. |
-| T04 Cold three-package build | Partial | Fresh source builds pass; runtime bytes are seeded, not anonymously downloaded. |
+| T04 Cold three-package build | Covered for the upstream fixture | Fresh committed producer snapshot and intermediary/leaf build acquire the real public runtime without seeding; public Git clone and ordinary cold Slides deck remain separate. |
 | T05 Client-owned program | Covered | Intermediary recipe/facet builds the registered marked program. |
 | T06 Source-relative staging | Covered | Isolated dependency copies, build directory with spaces, native execution from another cwd. |
 | T07 Cache restoration | Covered | Full-cache restoration and cache-only packaging pass. With only Lean module artifacts retained, the ordinary leaf build rebuilds native tools/objects and its executable, reproduces every pack, and keeps setup inputs cache-resolved. |
@@ -62,13 +100,13 @@ checks. The downstream Slides tests belong to Slides and are not run by VIR CI.
 | T12 Transitive program edit | Covered for build invalidation | Imported private-body edit changes both dependent packs while public interfaces and setup JSON remain byte-identical at conventional paths; restoration recovers exact original packs. This is a package/build oracle, not an additional browser semantic run. |
 | T13 JS-only runtime edit | Covered for build invalidation | Select new compatible JS bytes: runtime staging changes, program staging inode/mtime and bytes stay unchanged, no program facet rebuild. |
 | T14 Recipe/export change | Covered | Recipe identity repackages from cached inputs; native export/role validation and obsolete recipe rejection pass. Support addition, bytes, destination, media type and removal invalidate the owning pack only. |
-| T15 Offline warm build | Covered locally | Available-only selection, retained cache/stage, no runtime transport needed. |
+| T15 Offline warm build | Covered at acquisition boundary | Published source, verified cache/stage reused with native `--offline`; no runtime transport needed. |
 | T16 Offline cold miss | Covered | Exact selected artifact named; no fallback revision or runtime source build. |
-| T17 Anonymous acquisition | Pending | No durable release URL yet. Synthetic HTTPS fault tests do not satisfy this. |
+| T17 Anonymous acquisition | Covered upstream | Actual public release asset, empty runtime cache/stage and exact identity verified. Fresh ordinary Slides deck remains downstream. |
 | T18 Concurrent/interrupted production | Covered at installer boundary | Concurrent same-identity native installations and interrupted/failed transport checks. |
 | T19 Compiled bytes | Covered | Native generator works with raw program packs unavailable; focused embedding also covers removed raw inputs. |
 | T20 Site relocation | Covered | Actual Slides program executes at root and nested URL prefixes. |
-| T21 Real PrettyM | Covered on supplied-pack 4.34 checkpoint | Slides51c6d782 / VIR47e82e9a native and Chromium/Firefox results use the same pure Except-v2 wrapper. Older 4.35 demo/corpus remains separate historical evidence. |
+| T21 Real PrettyM | Covered on supplied-pack 4.34 checkpoints | Historical Slides51c6d782 / VIR47e82e9a and reviewed successor Slides3f7dbc93 / VIRaf3052ca use the same pure Except-v2 program. Older 4.35 demo/corpus remains separate historical evidence. |
 | T22 Format edges | Covered | Shared corpus includes Unicode, tags, groups and alignment/width cases. |
 | T23 Invalid requests | Covered on supplied-pack 4.34 checkpoint | Slides51c6d782 checks its finite policy, actual identity/signature rejection, pending creation cancellation and cleanup, pagehide during Wasm creation, and same-program recovery. Broader realistic-goal, latency and final product qualification remain downstream. Historical a5b42f8 / VIR4d00dbf bounds evidence is retained, not reused to qualify the 4.34 pair. |
 | T24 Calls/disposal | Partial | Independent runtimes, sequential disposal/remount and deferred client mount races pass. The documented mount example is tested for both completion orders, pending unmount, stale/current rejection and cleanup failure. The resource browser gate measures 300 scalar calls and collection of 14 disposed Wasm memories, including retained facades after normal and throwing cleanup; dynamic PrettyM/callback retention is not inferred. See below. |
@@ -77,7 +115,7 @@ checks. The downstream Slides tests belong to Slides and are not run by VIR CI.
 | T27 Build cycles | Covered | Program importing its owning carrier rejected before compiled jobs wait. |
 | T28 Execution modes | Covered for documented modes | Compiled native and focused interpreted byte access; raw carrier elaboration without prerequisites is unsupported. |
 | T29 Identity vectors | Covered | Cross-language canonical descriptor/hash and mutation/reordering checks. |
-| T30 Semantics disclosure | Covered for the bounded consumer checkpoint | Slides documents width/finite-policy semantics. Lean owns formatting, VIR execution and JS browser measurement/presentation. Mandatory production UI consolidation and removal of the superseded JS formatter remain Slides-owned. |
+| T30 Semantics disclosure | Covered for the bounded consumer checkpoint | Slides documents width/finite-policy semantics. Lean owns formatting, VIR execution and JS browser measurement/presentation. Reviewed Slides successors consolidate the mandatory UI and remove the superseded JS formatter; final visual/product acceptance remains Slides-owned. |
 
 The cache campaign accepts an optional real pack:
 
@@ -124,7 +162,7 @@ on disposal, and linear memory capacity need not shrink while an instance lives.
 ## Before promoting the workflow
 
 Finish the partial/pending build-graph and Wasm-bound cases above; measure resource
-size, compile memory and retained browser memory; publish and qualify a durable
-anonymous runtime source. Keep the native generation pipeline independent of
+size, compile memory and retained browser memory; qualify the published runtime
+through a fresh ordinary Slides build. Keep the native generation pipeline independent of
 that release operation. The host publisher currently assumes a trusted single
 writer and does not provide atomic old-or-new website replacement.

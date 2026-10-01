@@ -7,9 +7,9 @@ invoke a resource preparation command.
 
 **This checkpoint implements data, packing, embedding, native acquisition,
 automatic carriers, the client recipe and browser role loading.** The three-package
-build test passes with a maintainer-seeded, verified runtime. The local Slides
-PrettyM demo has passed its shared native/browser corpus and bounded lifecycle
-review; durable anonymous runtime distribution remains a release gate.
+build test passes with the exact runtime acquired anonymously from its public
+release. Slides' supplied-pack successor has passed its bounded native/browser
+and publication review; its anonymous cold-deck gate remains separate.
 See [review order and acceptance status](RESOURCE_ACCEPTANCE.md)
 for the exact covered, partial and pending gates; this is still a draft workflow.
 
@@ -258,10 +258,11 @@ must not import that carrier.
 The runtime selection is `vir-resources/runtime.json` in VIR. It selects one
 content ID and acquisition source; `vir-resources/compatibility.json` independently
 defines the Lean revision / VIR version pair shared by program production. The
-current lock deliberately uses `source: "-"`: a maintainer must seed the verified
-pack cache until a durable distribution is published. Missing bytes produce an
-acquisition error, never an implicit Wasm build. This is not yet the anonymous
-cold-checkout release experience.
+current lock names a public, content-addressed release asset. Missing local bytes
+are acquired anonymously over HTTPS and verified before installation. A warm
+verified cache or stage needs no runtime download. Missing offline bytes produce
+an acquisition error naming the required identity, never an implicit Wasm build.
+The native tool's `--offline` flag makes that acquisition boundary explicit.
 
 A client library registers an independent program module and a carrier library.
 For example (see `fixtures/resources/client` for the complete three-package test):
@@ -521,8 +522,8 @@ root/nested hosting, corrupt payload/identity, MIME, duplicate JSON keys, depth,
 missing exports, undeclared members, incompatibility and rejected redirects.
 Negative cases assert that no Wasm instance was created.
 
-Next gates are runtime distribution and the remaining cases enumerated in the
-acceptance status. The historical downstream PrettyM demo remains qualified on
+Remaining gates are the downstream anonymous cold-deck qualification and the
+partial cases enumerated in the acceptance status. The historical PrettyM demo remains qualified on
 its frozen Lean 4.35.0-rc3 pair; changing this PR's base does not repin it. The client
 build regression covers cold
 and warm ordinary builds, program edits without runtime replacement, missing and
@@ -530,10 +531,12 @@ corrupt staging repair, carrier-cycle rejection, and native execution with the
 raw program pack removed. The producer tests cover deterministic complete packs,
 required exports, strict recipes/locks, profile mismatches, and atomic replacement
 of larger hardlinked outputs without altering their other names.
-Anonymous cold acquisition needs a durable prebuilt distribution; a local archive
-is not evidence for that requirement. The full T01–T30 campaign and resource
-size/compile-memory/browser measurements remain outstanding. The historical 4.35
+The selected prebuilt distribution is now a public GitHub release asset; a
+supplied local archive alone is still not anonymous acquisition evidence. The
+complete product campaign and resource size/compile-memory/browser measurements
+remain outstanding. The historical 4.35
 column canary remains separate from the supplied-pack 4.34 strict creation and
 Except-v2 consumer qualification recorded in the acceptance status. Slides owns
-formatter policy, measurement and presentation; retiring the superseded production
-JavaScript formatter remains downstream work, not a supported fallback design.
+formatter policy, measurement and presentation. Its reviewed 4.34 successor
+retires the production JavaScript formatter; final product qualification remains
+downstream, with no supported formatter fallback.

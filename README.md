@@ -17,8 +17,8 @@ No local Lean or Wasm build is needed to try the hosted site.
   [embedded-resource workflow](docs/guides/EMBEDDED_RESOURCES.md) is the new
   **draft** integration. A client library prepares resources through Lake;
   applications publish compiled resource values, without discovering build paths.
-  It currently requires a pre-supplied, exact runtime pack; anonymous cold
-  installation is not yet supported.
+  It acquires the exact prebuilt runtime from a public release. Runtime production
+  remains separate; an application build never compiles Wasm implicitly.
 - **Custom browser hosts and package producers:** the supported
   [package workflow](docs/guides/PACKAGES.md) builds a program with
   `+Module:vir` and acquires a matching SDK with `:virSdk`.
