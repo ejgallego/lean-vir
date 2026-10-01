@@ -20,6 +20,15 @@ identity ledger and actual inventories, without repeating those campaigns.
 Both exact-source workflows `36784049788` and `36784049804` passed. These results
 remain supplied-pack evidence, not anonymous downstream acceptance.
 
+Slides subsequently reports ordinary anonymous cold root/downstream builds on
+source `2461cfa7`, selecting VIR `87d7646d`, with retained evidence at
+[Slides `06eb2c1a`](https://github.com/ejgallego/verso-slides/blob/06eb2c1a542d0d858da97fb043138744d5b07438/docs/vir-public-runtime.md).
+Its runtime `832ab095` and program `97b280b7` match the earlier pair. Cold HTTP
+500 retries, warm transport-denied reuse, explicit native offline miss and cold
+ordinary transport failure are distinguished in that report. This is
+consumer-reported build/acquisition evidence, not a new VIR-executed campaign or
+final reduced-renderer browser/geometry/retention qualification.
+
 ## Published runtime
 
 The [runtime release](https://github.com/ejgallego/lean-vir/releases/tag/resource-832ab095ad79df0f10f538bcf71272731bb74b90df44f965dac2f086c222897d)
@@ -89,7 +98,7 @@ checks. The downstream Slides tests belong to Slides and are not run by VIR CI.
 | T01 Toolchain agreement | Covered | Native acquisition/program profile mismatch negatives and exact matching demo inputs. |
 | T02 Core-only import | Covered | Core/embed/native producer builds without the optional runtime carrier. |
 | T03 Runtime carrier | Covered locally | Cold runtime-only build prepares selected bytes without building the generator. |
-| T04 Cold three-package build | Covered for the upstream fixture | Fresh committed producer snapshot and intermediary/leaf build acquire the real public runtime without seeding; public Git clone and ordinary cold Slides deck remain separate. |
+| T04 Cold three-package build | Covered upstream; consumer-reported Slides cold builds | Fresh producer snapshot and intermediary/leaf build acquire the public runtime without seeding. Slides06eb2c1 separately reports ordinary cold root/downstream builds; neither substitutes for final product qualification. |
 | T05 Client-owned program | Covered | Intermediary recipe/facet builds the registered marked program. |
 | T06 Source-relative staging | Covered | Isolated dependency copies, build directory with spaces, native execution from another cwd. |
 | T07 Cache restoration | Covered | Full-cache restoration and cache-only packaging pass. With only Lean module artifacts retained, the ordinary leaf build rebuilds native tools/objects and its executable, reproduces every pack, and keeps setup inputs cache-resolved. |
@@ -102,7 +111,7 @@ checks. The downstream Slides tests belong to Slides and are not run by VIR CI.
 | T14 Recipe/export change | Covered | Recipe identity repackages from cached inputs; native export/role validation and obsolete recipe rejection pass. Support addition, bytes, destination, media type and removal invalidate the owning pack only. |
 | T15 Offline warm build | Covered at acquisition boundary | Published source, verified cache/stage reused with native `--offline`; no runtime transport needed. |
 | T16 Offline cold miss | Covered | Exact selected artifact named; no fallback revision or runtime source build. |
-| T17 Anonymous acquisition | Covered upstream | Actual public release asset, empty runtime cache/stage and exact identity verified. Fresh ordinary Slides deck remains downstream. |
+| T17 Anonymous acquisition | Covered upstream; separately reported downstream | Actual public release asset, empty runtime cache/stage and exact identity verified. Slides06eb2c1 reports the independent ordinary cold-deck acquisition checks described above. |
 | T18 Concurrent/interrupted production | Covered at installer boundary | Concurrent same-identity native installations and interrupted/failed transport checks. |
 | T19 Compiled bytes | Covered | Native generator works with raw program packs unavailable; focused embedding also covers removed raw inputs. |
 | T20 Site relocation | Covered | Actual Slides program executes at root and nested URL prefixes. |

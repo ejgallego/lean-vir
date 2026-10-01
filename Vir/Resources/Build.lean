@@ -41,71 +41,16 @@ def packLimit : Nat := maxPayloadBytes + maxDescriptorBytes + 12
 
 def metadata? (path : FilePath) : IO (Option IO.FS.Metadata) :=
   Vir.NativePayload.metadata? path
-def checkParents (path : FilePath) : IO Unit := Vir.NativePayload.checkParents path
-def checkDirectory (path : FilePath) : IO Unit := Vir.NativePayload.checkDirectory path
+-- These roots are read-only build inputs, not managed installation destinations.
+def checkDirectory (path : FilePath) : IO Unit := do
+  unless (← path.isDir) do fail "MISSING_RESOURCE_DIRECTORY" path.toString
 def checkFile (path : FilePath) : IO Unit := Vir.NativePayload.checkFile path
 def readInput (path : FilePath) (limit : Nat) (limitCode : String) : IO ByteArray :=
   Vir.NativePayload.readInput path limit limitCode
 
-/-! The ordinary Lean JSON parser collapses duplicate keys. Scan only JSON
-object keys before parsing so recipes and compatibility files reject them. -/
-private def jsonPreflight (bytes : ByteArray) : Except String Unit := do
-  let some source := String.fromUTF8? bytes | throw "invalid UTF-8"
-  let chars := source.toList.toArray
-  let mut stack : Array (Array String) := #[]
-  let mut depth := 0
-  let mut digits := 0
-  let mut i := 0
-  while i < chars.size do
-    let c := chars[i]!
-    if c == '"' then
-      let mut token := "\""
-      i := i + 1
-      let mut escaped := false
-      let mut closed := false
-      while i < chars.size do
-        let next := chars[i]!
-        token := token.push next
-        i := i + 1
-        if escaped then escaped := false
-        else if next == '\\' then escaped := true
-        else if next == '"' then
-          closed := true
-          break
-      unless closed do throw "unterminated JSON string"
-      let mut j := i
-      while j < chars.size && chars[j]!.isWhitespace do j := j + 1
-      if j < chars.size && chars[j]! == ':' then
-        let key ← (Json.parse token >>= Json.getStr?).mapError id
-        let some keys := stack.back? | throw "object key outside object"
-        if keys.contains key then throw s!"duplicate JSON key `{key}`"
-        stack := stack.set! (stack.size - 1) (keys.push key)
-      digits := 0
-      continue
-    if c == '{' then
-      stack := stack.push #[]
-      depth := depth + 1
-    else if c == '[' then depth := depth + 1
-    else if c == '}' then
-      if stack.isEmpty then throw "unbalanced JSON object"
-      stack := stack.pop
-      if depth == 0 then throw "unbalanced JSON nesting"
-      depth := depth - 1
-    else if c == ']' then
-      if depth == 0 then throw "unbalanced JSON nesting"
-      depth := depth - 1
-    if depth > 16 then throw "JSON nesting exceeds 16 levels"
-    if '0' ≤ c && c ≤ '9' then
-      digits := digits + 1
-      if digits > 16 then throw "JSON number exceeds 16 digits"
-    else
-      if digits > 0 && (c == 'e' || c == 'E') then throw "JSON exponent is unsupported"
-      digits := 0
-    i := i + 1
-  unless depth == 0 && stack.isEmpty do throw "unbalanced JSON nesting"
-
+/-! Configuration uses ordinary JSON plus the typed field/schema checks below.
+Canonical spelling belongs to persisted packs, not user-authored recipes. -/
 def parseJson (bytes : ByteArray) : Except String Json := do
-  jsonPreflight bytes
   let some source := String.fromUTF8? bytes | throw "invalid UTF-8"
   Json.parse source
 
@@ -144,8 +89,7 @@ def compatibility (path : FilePath) : IO Compatibility := do
 def checkedSupport (root : FilePath) (source : String) : IO FilePath := do
   checkDirectory root
   let path := root / source
-  checkFile path
-  unless (← metadata? path).isSome do fail "MISSING_RESOURCE_FILE" path.toString
+  discard <| Vir.NativePayload.regularInput path
   return path
 
 /-! Write through a fresh sibling and rename. Never truncate or write through a

@@ -54,43 +54,15 @@ private def parseDescriptor (j : Json) : Except String Descriptor := do
     fileEntries := ← (← (← j.getObjVal? "fileEntries").getArr?).mapM parseEntry
     exports := ← (← (← j.getObjVal? "exports").getArr?).mapM parseExport }
 
-/-- Bound nesting and numeric work before entering the general JSON parser.
-Syntax validation is still its responsibility; quoted content is ignored. -/
-private def boundedJson (bytes : ByteArray) : Bool := Id.run do
-  let mut depth := 0
-  let mut quoted := false
-  let mut escaped := false
-  let mut digits := 0
-  for b in bytes do
-    -- Decimal exponent expansion happens inside Lean's JSON parser, before our
-    -- field checks. A short token such as 1e1000000000 can request a huge Nat.
-    -- Canonical descriptors never use exponent notation, including e0/E+0.
-    if !quoted && digits > 0 && (b == 101 || b == 69) then return false
-    -- Do not let a bounded JSON file request construction of an enormous Nat
-    -- before field-level bounds run. v1's largest integer has 16 digits.
-    if !quoted && 48 ≤ b && b ≤ 57 then
-      digits := digits + 1
-      if digits > 16 then return false
-    else digits := 0
-    if quoted then
-      if escaped then escaped := false
-      else if b == 92 then escaped := true
-      else if b == 34 then quoted := false
-    else if b == 34 then quoted := true
-    else if b == 91 || b == 123 then
-      depth := depth + 1
-      if depth > 16 then return false
-    else if b == 93 || b == 125 then
-      if depth == 0 then return false
-      depth := depth - 1
-  return !quoted && depth == 0
-
 /-- Decode a complete canonical v1 descriptor, including schema and size checks.
 Duplicate/unknown keys, alternative number spellings, unsorted inventories and
 lossy UTF-8 decoding cannot be accepted. Producers can call this before reading
 any payload bytes. -/
 public def decodeDescriptor (bytes : ByteArray) : Except ResourceError Descriptor := do
-  unless bytes.size ≤ maxDescriptorBytes && boundedJson bytes do
+  -- Supported packs come from encodeDescriptor. Keep framing/schema/identity
+  -- admission, but use Lean's parser rather than a second defensive JSON scanner.
+  -- Deliberately constructed parser-exhaustion inputs are outside the review model.
+  unless bytes.size ≤ maxDescriptorBytes do
     throw { code := "DESCRIPTOR_LIMIT" }
   let some text := String.fromUTF8? bytes | throw { code := "DESCRIPTOR_UTF8" }
   let d ← (Json.parse text >>= parseDescriptor).mapError fun message =>

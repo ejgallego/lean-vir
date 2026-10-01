@@ -174,8 +174,8 @@ invoke(
   descriptorPath,
   alias,
   output,
-  /UNSAFE_RESOURCE_DIRECTORY/,
 );
+assert.deepEqual(readFileSync(output), pack);
 unlinkSync(join(payloadRoot, "runtime.wasm"));
 symlinkSync(join(payloadRoot, "runtime.js"), join(payloadRoot, "runtime.wasm"));
 invoke(
@@ -183,7 +183,7 @@ invoke(
   descriptorPath,
   payloadRoot,
   output,
-  /UNSAFE_RESOURCE_FILE/,
+  /LENGTH_MISMATCH|HASH_MISMATCH/,
 );
 unlinkSync(join(payloadRoot, "runtime.wasm"));
 writeFileSync(join(payloadRoot, "runtime.wasm"), wasm);
@@ -194,8 +194,8 @@ invoke(
   descriptorAlias,
   payloadRoot,
   output,
-  /UNSAFE_RESOURCE_FILE/,
 );
+assert.deepEqual(readFileSync(output), pack);
 
 writeDescriptor(Buffer.from(` ${descriptorBytes}`));
 invoke(

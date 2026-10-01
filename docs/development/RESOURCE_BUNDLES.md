@@ -9,7 +9,8 @@ invoke a resource preparation command.
 automatic carriers, the client recipe and browser role loading.** The three-package
 build test passes with the exact runtime acquired anonymously from its public
 release. Slides' supplied-pack successor has passed its bounded native/browser
-and publication review; its anonymous cold-deck gate remains separate.
+and publication review. Slides also reports ordinary cold root/downstream builds
+on its reduced branch; final product qualification remains separate.
 See [review order and acceptance status](RESOURCE_ACCEPTANCE.md)
 for the exact covered, partial and pending gates; this is still a draft workflow.
 
@@ -96,10 +97,11 @@ There is no second inventory, extraction utility, or link entry. Decode rejects
 truncation, trailing bytes, duplicate/unknown JSON fields, noncanonical encodings,
 unsafe paths and integrity mismatches before returning a bundle. Limits are 4096
 files or roles, 4096 UTF-8 bytes per metadata string/path, 4 MiB descriptor bytes,
-512 MiB total payload and JSON nesting depth 16. Numeric digit runs are bounded
-and exponent notation is rejected before JSON parsing, preventing the parser
-from expanding a short exponent token into an enormous integer. Quoted metadata
-is unaffected. Version fields are positive
+512 MiB total payload. Lean's ordinary JSON parser owns syntax; the native decoder
+does not maintain a second nesting/numeric-exhaustion scanner. Deliberately
+constructed parser-exhaustion input is outside the supported artifact model.
+Canonical round-trip admission still rejects alternative number spellings in
+persisted descriptors. Version fields are positive
 JavaScript-safe integers. Runtime packages must still contain their full JS/data/
 notice closure; these bounds do not permit missing dependencies.
 The root envelope namespace `bundle.json` is reserved case-insensitively, both
@@ -155,7 +157,7 @@ The path is relative to this source file. This example describes the low-level
 operation, **not** a manual preparation requirement for application
 users. Library prerequisites own preparation, staging and dependency traces.
 The elaborator does not download, spawn processes or run another Lake build.
-Its input must be a regular file without symlink ancestors. The pack limit is
+Its input must resolve to a regular file; read-only aliases are permitted. The pack limit is
 enforced during the read, not only by an earlier file-size observation.
 
 Generated terms contain typed descriptor constructors and binary literals, not
@@ -165,6 +167,11 @@ from Apache-2.0 `VersoUtil.BinFiles`; VIR has no Verso dependency. One internal
 `Vir.BinaryLiteral` primitive owns that checked transport; its separate meta-only
 `ToExpr` helper constructs literals without reading files or knowing resource formats.
 The inclusion wrapper owns bounded file reading and canonical pack validation.
+
+User-authored recipes, locks and compatibility files instead use ordinary Lean
+JSON parsing followed by typed field/schema checks. They do not need canonical
+number or whitespace spelling. Duplicate-key behavior is the parser's behavior,
+not a separate VIR admission promise for manually ambiguous configurations.
 This is adapted infrastructure, not yet a cross-project shared utility package.
 
 Carriers use the single ordinary `public import Vir.Resources.Embed` above. It
@@ -247,8 +254,9 @@ completeness. The public carrier and client facet use the same installation rule
 
 The `pack` operation reads a canonical descriptor and the declared payloads below
 `ROOT`. Paths, size budgets, actual lengths/hashes and exact compiler identity are
-checked before installation. Inputs must be regular files without symlink
-ancestors. This operation uses the same atomic installation as acquisition, so
+checked before installation. Inputs must resolve to regular files; read-only
+directory/file aliases are permitted. Managed outputs still reject symlink aliases.
+This operation uses the same atomic installation as acquisition, so
 valid warm outputs retain their inode/mtime and corrupt hardlinked outputs are
 replaced without modifying their other names. It does not establish provenance
 of a supplied Wasm binary: release producers remain responsible for building and
@@ -514,7 +522,8 @@ literal tests cover all byte values, padding, invalid characters and overflow.
 The embedding fixture uses synthetic integrity payloads; it does not claim a
 browser runtime session. Failed fixture inputs/logs are retained under `build/`.
 Acquisition checks cover warm no-op, missing/corrupt candidates, read-only
-hardlink preservation, symlink rejection, bounded reads, mismatched content and
+hardlink preservation, managed-output symlink rejection, read-only input aliases,
+bounded reads, mismatched content and
 compiler, eight concurrent producers, interrupted/failed transport and retry,
 and a downstream library prerequisite with a custom build directory. Transport
 fault injection uses a test-only curl stub; it is not anonymous HTTPS acceptance.
@@ -531,8 +540,8 @@ root/nested hosting, corrupt payload/identity, MIME, duplicate JSON keys, depth,
 missing exports, undeclared members, incompatibility and rejected redirects.
 Negative cases assert that no Wasm instance was created.
 
-Remaining gates are the downstream anonymous cold-deck qualification and the
-partial cases enumerated in the acceptance status. The historical PrettyM demo remains qualified on
+Remaining gates are the final downstream product qualification and the partial
+cases enumerated in the acceptance status. The historical PrettyM demo remains qualified on
 its frozen Lean 4.35.0-rc3 pair; changing this PR's base does not repin it. The client
 build regression covers cold
 and warm ordinary builds, program edits without runtime replacement, missing and

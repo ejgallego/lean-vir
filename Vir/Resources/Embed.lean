@@ -40,7 +40,8 @@ deriving instance ToExpr for Bundle
 library prerequisite must establish this file and trace all semantic inputs. -/
 elab "include_vir_bundle " path:str : term => do
   let source := System.FilePath.mk (← readThe Lean.Core.Context).fileName
-  let some directory := source.parent | throwError "resource source has no parent: {source}"
+  -- A bare filename passed to `lean` is relative to its working directory.
+  let directory := source.parent.getD "."
   let relative := System.FilePath.mk path.getString
   if relative.isAbsolute then throwError "include_vir_bundle expects a source-relative path"
   let resolved := directory / relative

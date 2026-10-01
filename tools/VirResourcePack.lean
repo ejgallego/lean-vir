@@ -21,9 +21,7 @@ private def fail (code detail : String) : IO α :=
 descriptor determines both the allowed paths and their byte budgets. -/
 private def pack (descriptorPath root destination : FilePath) : IO Unit := do
   Build.checkFile destination
-  Build.checkParents root
-  unless (← Build.metadata? root).isSome do
-    fail "MISSING_RESOURCE_DIRECTORY" root.toString
+  Build.checkDirectory root
   let descriptorBytes ← Build.readInput descriptorPath maxDescriptorBytes "DESCRIPTOR_LIMIT"
   let descriptor ← match Pack.decodeDescriptor descriptorBytes with
     | .ok value => pure value

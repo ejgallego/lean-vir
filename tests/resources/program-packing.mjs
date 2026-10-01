@@ -256,16 +256,15 @@ writeRecipe({ ...recipe, unknown: true });
 run("unknown-field", ["plan", recipePath, compat, repo], /INVALID_RECIPE/);
 writeFileSync(
   recipePath,
-  JSON.stringify(recipe).replace(
-    '"schemaVersion":1',
-    '"schemaVersion":1,"schemaVersion":1',
+  JSON.stringify(recipe, null, 2).replace(
+    '"schemaVersion": 1',
+    '"schemaVersion": 1e0',
   ),
 );
-run(
-  "duplicate-field",
-  ["plan", recipePath, compat, repo],
-  /duplicate JSON key/,
-);
+// Recipes use ordinary JSON, not the canonical persisted-pack spelling. Typed
+// field/schema checks remain authoritative after Lean's parser admits it.
+run("ordinary-json-spelling", ["plan", recipePath, compat, repo]);
+assert.equal(build("ordinary-json-equivalent-pack"), firstId);
 writeRecipe(recipe);
 const linkedSupport = join(evidence, "linked-support.lean");
 symlinkSync(join(repo, recipe.supportFiles[0].source), linkedSupport);
@@ -278,8 +277,8 @@ writeRecipe({
 run(
   "linked-support",
   ["plan", recipePath, compat, repo],
-  /UNSAFE_RESOURCE_FILE/,
 );
+assert.equal(build("linked-support-equivalent-pack"), firstId);
 writeRecipe(recipe);
 
 // Staging replaces a hardlink without mutating the other name, and rejects links.

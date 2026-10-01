@@ -186,13 +186,13 @@ private def unitTests : IO Unit := do
   failure "DESCRIPTOR_JSON" (Pack.decode (rawPack
     (json.replace "\"virVersion\":1" "\"runtimeAbi\":\"4\",\"jsApiVersion\":1,\"irFormatVersion\":11"
       |>.replace "leanRevision" "leanBuildId") "abc".toUTF8))
-  failure "DESCRIPTOR_LIMIT" (Pack.decode (rawPack (String.ofList (List.replicate 17 '['))))
-  failure "DESCRIPTOR_LIMIT" (Pack.decode (rawPack
+  failure "DESCRIPTOR_JSON" (Pack.decode (rawPack (String.ofList (List.replicate 17 '['))))
+  failure "SCHEMA_VERSION" (Pack.decode (rawPack
     (json.replace "\"schemaVersion\":1" "\"schemaVersion\":10000000000000000")))
-  -- Start with a harmless red control; exponent notation must be rejected by
-  -- preflight, before Json.parse can construct 10^exponent as an enormous Nat.
-  for number in #["1e0", "1E+0", "1e-1", "1e1000000000"] do
-    failure "DESCRIPTOR_LIMIT" (Pack.decode (rawPack
+  -- Persisted descriptors retain exact canonical spelling. Deliberately huge
+  -- exponent/depth exhaustion is not a supported-input requirement or test gate.
+  for number in #["1e0", "1E+0"] do
+    failure "NONCANONICAL_DESCRIPTOR" (Pack.decode (rawPack
       (json.replace "\"schemaVersion\":1" s!"\"schemaVersion\":{number}") "abc".toUTF8))
   let quotedExponent := withDescriptor r { d with logicalId := "quoted\"1e1000000000\\still-text" }
   let quotedPack ← success "encode exponent-like metadata" (Pack.encode quotedExponent)

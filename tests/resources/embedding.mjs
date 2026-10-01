@@ -107,11 +107,18 @@ symlinkSync(join(project, "outside"), join(project, "linked-parent"));
 const fifo = spawnSync("mkfifo", [join(project, "pipe.virres")], { encoding: "utf8" });
 assert.ifError(fifo.error);
 assert.equal(fifo.status, 0, fifo.stderr);
+for (const path of ["linked.virres", "linked-parent/pack.virres"]) {
+  writeFileSync(join(project, "InputAlias.lean"), `module
+import Vir.Resources.Embed
+def aliased : Vir.Resources.Bundle := include_vir_bundle ${JSON.stringify(path)}
+#eval IO.println ((aliased.file? "runtime.js").map (·.bytes) == some "abc".toUTF8)
+`);
+  assert.match(run("lake", ["env", "lean", "InputAlias.lean"],
+    `input-alias-${path.includes("/") ? "parent" : "file"}`), /true/);
+}
 for (const [label, path, error] of [
   ["oversize", "oversized.virres", /PACK_LIMIT/],
   ["directory", "directory.virres", /UNSAFE_RESOURCE_FILE/],
-  ["link", "linked.virres", /UNSAFE_RESOURCE_FILE/],
-  ["parent-link", "linked-parent/pack.virres", /UNSAFE_RESOURCE_DIRECTORY/],
   ["fifo", "pipe.virres", /UNSAFE_RESOURCE_FILE/],
   ["corrupt", "corrupt.virres", /invalid resource pack.*HASH_MISMATCH/s],
 ]) {

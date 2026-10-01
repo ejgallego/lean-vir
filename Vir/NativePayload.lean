@@ -53,11 +53,19 @@ private def createManagedParents (path : FilePath) : IO Unit := do
   IO.FS.createDirAll path
   checkParents path
 
-/-! Bound the read itself, not just a racy size observation before
-`readBinFile`. The path must be a regular file with no symlink ancestors. -/
+/-! Read-only inputs may use workspace/file aliases. The resolved target must be
+a regular file. Managed destinations, unlike inputs, retain checkFile/checkParents
+so installation cannot mutate an accidental output alias. Bound the read itself,
+not just the initial size observation. -/
+public def regularInput (path : FilePath) : IO IO.FS.Metadata := do
+  let m ← try path.metadata catch e => match e with
+    | .noFileOrDirectory .. => fail "MISSING_RESOURCE_FILE" path.toString
+    | _ => throw e
+  unless m.type == .file do fail "UNSAFE_RESOURCE_FILE" path.toString
+  return m
+
 public def readInput (path : FilePath) (limit : Nat) (limitCode : String) : IO ByteArray := do
-  checkFile path
-  let some m ← metadata? path | fail "MISSING_RESOURCE_FILE" path.toString
+  let m ← regularInput path
   if m.byteSize.toNat > limit then fail limitCode path.toString
   let handle ← IO.FS.Handle.mk path .read
   let mut bytes := ByteArray.empty
@@ -68,9 +76,13 @@ public def readInput (path : FilePath) (limit : Nat) (limitCode : String) : IO B
     if bytes.size > limit then fail limitCode path.toString
 
 public def sha256File (path : FilePath) : IO String := do
-  checkFile path
+  discard <| regularInput path
   let bytes ← IO.FS.readBinFile path
   return Vir.sha256 bytes
+
+-- Temporary names need uniqueness, not a content digest or authentication.
+private def temporaryNonce : IO String := do
+  return String.intercalate "-" ((← IO.getRandomBytes 16).data.toList.map toString)
 
 /-! Create a private temporary directory beside a destination so subsequent
 renames stay on the destination filesystem. -/
@@ -79,7 +91,7 @@ public def withSiblingDirectory (nearPath : FilePath) (f : FilePath → IO α) :
   createManagedParents parent
   let mut directory? := none
   for _ in [:8] do
-    let nonce := Vir.sha256 (← IO.getRandomBytes 32)
+    let nonce ← temporaryNonce
     let directory := parent / s!".vir-payload-{nonce}"
     try
       IO.FS.createDir directory
@@ -117,6 +129,9 @@ public structure VerifiedPayload where
   private mk ::
   private content : PayloadContent
 
+/-! VerifiedPayload records that the caller's validator completed. It does not
+itself certify a particular identity, compiler provenance or execution safety. -/
+
 public def verifyBytes (bytes : ByteArray) (validate : ByteArray → IO Unit)
     : IO VerifiedPayload := do
   validate bytes
@@ -131,7 +146,7 @@ public def verifyDirectory (path : FilePath) (validate : FilePath → IO Unit)
 private def freshBackupPath (destination : FilePath) : IO FilePath := do
   let parent := destination.parent.getD "."
   for _ in [:8] do
-    let nonce := Vir.sha256 (← IO.getRandomBytes 32)
+    let nonce ← temporaryNonce
     let backup := parent / s!".vir-payload-backup-{nonce}"
     if (← metadata? backup).isNone then return backup
   fail "TEMPORARY_PATH_COLLISION" parent.toString

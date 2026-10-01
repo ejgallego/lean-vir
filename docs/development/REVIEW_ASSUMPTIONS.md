@@ -32,6 +32,12 @@ Atomic installation and avoiding writes through Lake cache hard links address
 ordinary build correctness, not an adversarial filesystem. Preserve these rules
 when simplifying acquisition or publication.
 
+User-authored configuration uses the ordinary JSON parser and typed schema/field
+checks. Canonical JSON spelling is a persisted-pack identity rule, not an extra
+configuration language. Read-only inputs may resolve through file or directory
+aliases; managed output aliases are rejected to avoid modifying a different
+destination accidentally. Neither policy claims protection against hostile races.
+
 ## What checks mean
 
 Validate at a boundary where an actual fact can differ: configuration admission,
@@ -81,3 +87,16 @@ consumers; this is an interoperability choice, not an adversarial-security claim
 Do not silently put a weaker hash in a field specified as `sha256`. Prefer a
 supported upstream digest implementation when available over maintaining local
 algorithm code or adding a configurable hashing framework.
+
+## Small utilities and provenance
+
+- `Vir.BinaryLiteral` is an Apache-2.0 adaptation of Verso's Z85 technique; its
+  source header records the exact upstream revision and authors. It is not a
+  resource-pack parser and does not introduce a Verso dependency.
+- `Vir.Hash` is the local native SHA-256 implementation specified by FIPS 180-4,
+  shared by package/resource producers. Its header identifies the algorithm and
+  replacement constraint. Internal Lake trace keys use the existing Lake hash.
+- `Vir.NativePayload` is project-authored I/O glue shared by native adapters.
+  `VerifiedPayload` records completion of a caller-supplied validator, not an
+  independent semantic or security certificate. Temporary names use random bytes,
+  not a content digest.
