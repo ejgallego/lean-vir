@@ -1,9 +1,14 @@
-# Call Lean From JavaScript
+# Direct runtime calls in the development runner
 
-This guide is for app code that wants to call one or more Lean declarations from
-JavaScript.
+For application setup and JavaScript calls, use the
+[application guide](EMBEDDED_RESOURCES.md). The runtime is acquired automatically
+through the owning library; application builds do not compile Wasm.
 
-The flow is:
+This page is a contributor example for the repository's development runner and
+its lower-level API. It deliberately builds the runtime from source and writes
+compiler output directly. These are not first-release application instructions.
+
+The contributor example proceeds as follows:
 
 1. write and register a Lean module;
 2. generate a `.irpkg` package for the declarations you want to call;

@@ -1,26 +1,29 @@
 # Documentation
 
-Start with the [overview](../README.md) to choose a workflow, or the
-[developer guide](DEVELOPER_GUIDE.md) to change its implementation.
+Start with [the application workflow](guides/EMBEDDED_RESOURCES.md), or the
+[developer guide](DEVELOPER_GUIDE.md) to work on VIR itself.
 
 ## Guides: use VIR
 
-- [Build workflows](guides/BUILD_WORKFLOWS.md): supported entry points by audience,
-  the draft resource workflow, and retained lower-level tools.
-- [Embedded resources (draft)](guides/EMBEDDED_RESOURCES.md): prepare portable
-  browser programs in a client library and publish them from a native application.
-- [Packages](guides/PACKAGES.md): register modules, select exports, build/load packages
-  and install the browser SDK.
+- [Application setup](guides/EMBEDDED_RESOURCES.md): prepare the program and runtime
+  through a client library, publish their files and call Lean from JavaScript.
 - [Lean library](guides/LEAN_VIR_LIBRARY.md): effects, boundary values and API entry points.
-- [Call Lean from JavaScript](guides/CALL_LEAN_FROM_JS.md): an end-to-end example;
-  [JavaScript API](guides/JS_API.md) is the runtime reference.
 - [React](guides/REACT.md): native values, components, hooks, JSX and supported calls.
+
+## Experimental
+
 - [Infoview widgets and RPC](guides/INFOVIEW.md): editor activation, sessions, server
   references and ProofWidgets compatibility; try the
   [RPC tutorial](../examples/tutorials/RpcReferenceWidget.md).
 
 ## Reference: implementation contracts
 
+- [Build internals](guides/BUILD_WORKFLOWS.md): Lake acquisition, generation,
+  runtime distribution and retained contributor tools.
+- [Package tooling](guides/PACKAGES.md): loose compiler outputs and SDK installation.
+  [Direct runtime calls](guides/CALL_LEAN_FROM_JS.md) and the
+  [JavaScript runtime API](guides/JS_API.md) document the lower-level loader.
+  These are not extra application setup steps.
 - [Host bindings](reference/HOST_BINDINGS.md) owns JS identity, foreign-value lifetime,
   rollback, UI cleanup and runtime disposal.
 - [Binding translation](reference/BINDING_MODALITIES.md) and the

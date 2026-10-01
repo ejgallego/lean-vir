@@ -1,17 +1,16 @@
-# Packages
+# Package tooling reference
 
-This guide covers the supported lower-level workflow for custom browser hosts
-and package producers. Lake's module `:vir` facet builds a package set and its
-package `:virSdk` facet installs the matching JavaScript/Wasm SDK. The repository's
-npm commands build focused, single-member packages for local development.
-This is a browser-program workflow, not a general Lean-to-Wasm compiler.
+Applications follow [library-owned setup](EMBEDDED_RESOURCES.md). This page
+documents lower-level tools retained for VIR development and existing
+integrations, not an alternative first-release application workflow.
 
-Native applications publishing client-library resources should instead evaluate
-the [draft embedded-resource workflow](EMBEDDED_RESOURCES.md), with its stated
-runtime-distribution limits. It does not require applications to run these
-package commands. [Build workflows](BUILD_WORKFLOWS.md) separates the audiences.
+The module `:vir` facet writes compiler package files; `:virSdk` installs the
+JavaScript/Wasm distribution used by older hosts. Repository npm commands select
+declarations for demos and tests. Applications do not manually assemble these
+outputs or run the commands below.
 
-For application calls, follow [Call Lean from JavaScript](CALL_LEAN_FROM_JS.md).
+[Direct runtime calls](CALL_LEAN_FROM_JS.md) describes the repository development
+runner, not normal application setup.
 [Generator internals](../reference/GENERATE_PACKAGE.md) owns compiled/live input selection;
 [the format reference](../reference/IRPKG_FORMAT.md) owns binary and manifest schemas.
 

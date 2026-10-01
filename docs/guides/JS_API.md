@@ -5,8 +5,11 @@ manifest-bearing `.irpkg` members, and exposes their aggregate Lean declarations
 through a generic JavaScript call API without requiring callers to manage WASM
 memory. A focused `.irpkg` is loaded as a one-member set.
 
-For the end-to-end "my Lean function from my JavaScript code" workflow, start
-with `docs/guides/CALL_LEAN_FROM_JS.md`.
+Applications use `createProgram` with library-prepared runtime and program
+manifests; start with [application setup](EMBEDDED_RESOURCES.md).
+This page documents the underlying runtime API for contributors and existing
+hosts. [Direct runtime calls](CALL_LEAN_FROM_JS.md) is a repository development
+example, not another application workflow.
 
 The module is also exposed through the package entry point:
 

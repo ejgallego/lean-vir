@@ -1,15 +1,19 @@
-# Embed browser resources in a Lean client library
+# Run Lean in a web application
 
-This **draft workflow** lets a native Lean application publish browser programs
-without discovering VIR build paths or running package tools itself. Lake prepares
-the resources; compiled Lean values own their bytes; the application writes them
-to its site; JavaScript opens a program by export role.
+The client library declares a **program** (compiled Lean code) and prepares the
+matching **runtime** (the JavaScript loader and Wasm interpreter). The application
+builds through Lake, writes their compiled resource values to its site, and calls
+the program from JavaScript. Those are the two things an application deploys.
 
-The runtime lock selects an exact prebuilt pack from a public release. The owning
-library acquires and verifies it on a cache miss; warm use needs no runtime
-download. HTTPS acquisition requires `curl`. An unavailable pack fails clearly;
-it never triggers a Wasm build. Use the pinned Lean toolchain and matching runtime;
-do not substitute another release's Wasm.
+Library setup is described below. Application authors use the library's ordinary
+build and site-generation commands; they do not run VIR packaging tools.
+
+The library acquires the exact prebuilt runtime from a public release on a cache
+miss; warm use needs no runtime download. HTTPS acquisition requires `curl`.
+An unavailable runtime fails clearly; it never triggers a Wasm build. Use the
+pinned Lean toolchain and matching runtime; do not substitute another release's
+Wasm. This integration is under review for the first release; see the
+[acceptance checklist](../development/RESOURCE_ACCEPTANCE.md) for qualification.
 Compatibility is one Lean source revision plus one VIR compatibility version;
 the lock's content ID selects the exact runtime bundle. Client libraries inherit
 this profile from VIR rather than independently choosing ABI or package-format
@@ -18,8 +22,9 @@ Unset `VIR_NATIVE_EXTERN_MANIFEST` when building resources: ambient custom nativ
 profiles are rejected, even on cache hits. Custom-profile packaging remains a
 separate lower-level `:vir` workflow with a matching runtime requirement.
 
-The [build-workflow guide](BUILD_WORKFLOWS.md#how-resource-preparation-builds-its-inputs)
-explains the facet dependencies, cache behavior, and boundary with `:vir` / `:virSdk`.
+The [build internals](BUILD_WORKFLOWS.md#how-resource-preparation-builds-its-inputs)
+describe dependencies and caching. Their low-level commands are not additional
+application setup steps.
 
 ## Client-library setup
 
@@ -74,7 +79,7 @@ The recipe filename matches the carrier library. `module` names one composition
 root. Roles are stable client-facing names;
 `interfaceId` records the call contract, not a generated type check.
 
-In `resources/Client/Resources.lean`, embed the prepared pack:
+In `resources/Client/Resources.lean`, embed the prepared program files:
 
 ```lean
 module
@@ -97,8 +102,8 @@ public def Client.resources : Vir.Resources.ResourceSet := {
 ## Application and browser
 
 The application requires and imports the client library, then runs its ordinary
-native build/generator command. It consumes `Client.resources`, not setup files,
-SDK paths or internal executables. See the complete
+native build/generator command. It consumes `Client.resources`, not internal
+build files or executables. See the complete
 [three-package fixture](../../fixtures/resources/) for a minimal publisher.
 
 A publisher validates `ResourceSet.bundles`, writes each complete bundle under
@@ -239,6 +244,14 @@ even when disposal throws; report that error too. It does not cancel acquisition
 late successful results are disposed when they arrive. Separate components have
 separate generations and program ownership.
 
-The [resource contract](../development/RESOURCE_BUNDLES.md) describes integrity,
-publication and loader rules; the [acceptance checklist](../development/RESOURCE_ACCEPTANCE.md)
-distinguishes tested behavior from remaining release gates.
+## Names in the API and implementation
+
+- `Bundle` is one program or runtime's files and descriptor, held as Lean values.
+- `ResourceSet` groups one runtime with the programs an application publishes.
+- `.virres` is the build-time file used to transport and embed a bundle. The
+  application uses the compiled value, not that file's build path.
+
+The inner compiler output is an `.irpkg` package. The older runtime distribution
+is called an SDK in contributor tooling. Neither is another application concept
+or an extra artifact the author must assemble. The
+[resource reference](../development/RESOURCE_BUNDLES.md) documents these formats.

@@ -1,27 +1,20 @@
-# Build workflows and ownership
+# Application build internals
 
-VIR separates compiling Lean programs, acquiring a browser runtime, publishing
-assets, and executing them. These are not interchangeable build commands.
-Embedded resources are still a draft integration; see their
-[acceptance limits](../development/RESOURCE_ACCEPTANCE.md).
+The first-release application workflow is library-owned preparation through
+Lake, followed by site generation and browser loading. Follow the
+[application guide](EMBEDDED_RESOURCES.md) for setup; this page explains the
+implementation, not a choice of user workflows. Qualification is recorded in
+the [acceptance checklist](../development/RESOURCE_ACCEPTANCE.md).
 
-## Choose an entry point
+The client library declares `CarrierLibrary:virResourcePack` as a `needs`
+dependency. The application imports its compiled `ResourceSet`, containing the
+runtime and programs, and writes their files to the site. It does not invoke
+the native generator, inspect build paths, or install a runtime development kit.
 
-| Audience                               | Entry point                                                        | Contract                                                                                                                           |
-| -------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Lean library user                      | `lake build Vir`                                                   | Core Lean library, without browser-runtime production.                                                                             |
-| Native application author              | Ordinary application build / generator command                     | With the draft resource integration, consume the client library's `ResourceSet` and publish its bytes. No producer-path discovery. |
-| Client-library author                  | `CarrierLibrary:virResourcePack` as a library `needs` dependency   | Prepare one registered browser program, named export roles, and support files for a compiled carrier.                              |
-| Custom browser host / package producer | `+Module:vir` and `:virSdk`                                        | Build a marked program package set and independently acquire the matching SDK. The host owns loading and startup.                  |
-| Editor-widget author                   | `VirInfoview` and widget/RPC APIs                                  | Package the retained live module environment, including unsaved code. Not a disk rebuild.                                          |
-| Advanced producer / developer          | `vir_irpkg`, `generate:irpkg`, `generate:package`, `prepare:irpkg` | Explicit compiled-module selection and repository package tooling. Not the application-author API.                                 |
-| VIR contributor / runtime maintainer   | `build:demo`, `build:sdk-artifact`, `build:site`                   | Produce Wasm, SDK archives, or the repository site. Requires the contributor toolchain.                                            |
-
-The [resource guide](EMBEDDED_RESOURCES.md) owns client setup;
-[Packages](PACKAGES.md) owns the lower-level package/SDK commands;
-[Infoview](INFOVIEW.md) owns live widgets; the [harness](../HARNESS.md) owns
-contributor prerequisites and tests. `lake build VirInfoview` additionally
-prepares its JavaScript bundle and needs npm dependencies.
+Program generation and runtime acquisition are independent Lake dependencies.
+Producing the runtime itself is a separate maintainer operation, never a
+fallback in an application build. Experimental live editor widgets have a
+different input source; see [Infoview](INFOVIEW.md).
 
 ## How resource preparation builds its inputs
 
@@ -134,8 +127,8 @@ be repaired without regeneration. A malformed internal cached result fails
 closed; it is not silently substituted with a conventional-path program.
 
 `+Module:virProgram` and `vir_program` are implementation plumbing, not additional
-application workflows. Applications continue to choose between portable resources
-and explicitly published loose package sets.
+application workflows. Applications use the resource library; loose package
+sets remain compiler outputs for repository tooling and existing integrations.
 
 The general CLI's explicit/unmarked/multiple-target selections still need their
 own request representation. Live snapshots carry authoritative editor environments
@@ -164,17 +157,24 @@ locked bundle, not an ambient provider profile. The lower-level `:vir` path reta
 its traced custom-profile support. Supporting custom resource runtimes later needs
 an explicit matched capability/profile contract, not merely passing this variable.
 
-## Replaced workflows
+## Retained tools and replaced workflows
 
 - The older application staging and public resolved-input proposals, PR161 and
-  PR184, are closed in favor of the resource client direction. This does not mean
-  the draft resource distribution is released or every old producer has migrated.
+  PR184, are closed in favor of library-owned resources. The first release is
+  still under review; existing demo and maintainer tooling has not all migrated.
 - The standalone generator remains compiled-module tooling, not a legacy source
   loader. Non-module developments and source-file package loading are unsupported.
-- Live editor snapshots remain a distinct input contract. No optimization may
+- Experimental live editor snapshots remain a distinct input contract. No optimization may
   replace an unsaved root with a saved artifact or rebuild it behind the editor.
-- `:vir` / `:virSdk` remain supported lower-level interfaces. A resource application
-  should not also invoke them as manual preparation steps.
+- `:vir` / `:virSdk` remain lower-level interfaces for existing integrations and
+  compiler/runtime development, not a second first-release application workflow.
+  Library-owned applications do not invoke them as manual preparation steps.
+
+`generate:irpkg`, `prepare:irpkg` and `generate:package` are repository commands
+for demo/fixture selection. `build:sdk-artifact` and `build:site` serve runtime
+distribution and the hosted demos. Their continued use is not an application
+requirement. See [the tooling inventory](../../scripts/packages/README.md) and
+the [contributor harness](../HARNESS.md) before changing or removing their callers.
 
 See the [generator reference](../reference/GENERATE_PACKAGE.md) for selection modes
 and removed source flags. Closing old proposals does not delete their retained
