@@ -231,12 +231,15 @@ const vir = await createVirRuntime({
 vir.runStartupEntries();
 ```
 
-Startup hooks run in manifest order and are recorded only after success. A
-recoverable retry skips completed hooks and resumes at the failed hook. A fatal
-host failure or Wasm trap retires the runtime; create a fresh runtime instead.
-Each fresh runtime has its own startup state. When selecting another package
-generation, create a new runtime and dispose the previous runtime when its
-callbacks and resources should become invalid.
+Startup runs once per runtime, invoking hooks in manifest order. After success,
+repeated calls do nothing. Failure stops the sequence and throws the error;
+later startup calls report failure without retrying the failed hook or running
+remaining hooks. Effects already performed are not rolled back. Enable the
+application only after startup succeeds. Synchronous host reentry does not invoke hooks
+recursively. Ordinary exported calls can still return recoverable errors;
+a fatal host failure or Wasm trap retires the runtime. When selecting another
+package generation, create a new runtime and dispose the previous runtime when
+its callbacks and resources should become invalid.
 
 The [SlidesCanvas example](../../examples/SlidesCanvas.lean) creates its DOM and
 canvas and schedules animation frames entirely from Lean:

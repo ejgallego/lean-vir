@@ -309,11 +309,13 @@ their existing reference-leased cleanup behavior.
 - `vir.exportsByName.<jsName>(...args)` exposes valid generated JS names as
   methods.
 - `vir.runStartupEntries()` invokes zero-argument exports whose manifest entry
-  has `startup: true`, in manifest order. Successful hooks run once per loaded
-  package. A recoverable failed hook can be retried without repeating earlier
-  hooks; a fatal host failure or Wasm trap retires the runtime and requires a
-  fresh factory runtime. Synchronous reentry from a host callback leaves the
-  active startup traversal in charge; it does not invoke hooks recursively.
+  has `startup: true`, in manifest order, once per runtime. After success,
+  repeated calls do nothing. Failure stops the sequence and throws the error;
+  later startup calls report failure without invoking any hooks. Effects already
+  performed are not rolled back. Ordinary exported calls can still return
+  recoverable errors; a fatal host failure or Wasm trap retires the runtime.
+  Synchronous reentry from a host callback leaves the active startup traversal
+  in charge; it does not invoke hooks recursively.
 - `vir.interfaceManifest.exports[].startup` distinguishes `@[vir_startup]`
   hooks from ordinary `@[vir_export]` calls.
 - `vir.packageInfo.interfaceExports` reports the number of generated exports.

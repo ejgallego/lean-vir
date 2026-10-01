@@ -22,6 +22,10 @@ namespace StartupReentry
   record (← JsValue.ofString "first.exit")
 @[vir_startup] def second : RuntimeM Unit := do
   record (← JsValue.ofString "second")
+@[vir_startup] def third : RuntimeM Unit := do
+  record (← JsValue.ofString "third")
+@[vir_export] def ordinary : RuntimeM Unit := do
+  record (← JsValue.ofString "ordinary")
 end StartupReentry`,
   });
   const built = project.build();
@@ -58,14 +62,16 @@ end StartupReentry`,
     assert.equal(runtime.failure, null, "an IO failure must remain recoverable");
     assert.deepEqual(calls, ["first.enter", "first.exit", "second"]);
     failSecond = false;
-    runtime.runStartupEntries();
-    assert.deepEqual(calls, ["first.enter", "first.exit", "second", "second"]);
-    runtime.runStartupEntries();
-    assert.equal(calls.length, 4, "successful hooks must not run again");
+    assert.throws(() => runtime.runStartupEntries(), error => error === failure);
+    assert.throws(() => runtime.runStartupEntries(), error => error === failure);
+    assert.deepEqual(calls, ["first.enter", "first.exit", "second"],
+      "failed startup must neither retry effects nor run remaining hooks");
+    runtime.call("StartupReentry.ordinary");
+    assert.deepEqual(calls, ["first.enter", "first.exit", "second", "ordinary"]);
   } finally {
     runtime.dispose();
   }
-  console.log("real-Wasm startup host reentry, order and recoverable retry smoke ok");
+  console.log("real-Wasm one-shot startup, host reentry and recoverable ordinary call smoke ok");
 } finally {
   await rm(directory, { recursive: true, force: true });
 }

@@ -26,7 +26,10 @@ function entry(name, startup) {
 const calls = [];
 const runtime = Object.create(VirRuntime.prototype);
 runtime.disposed = false;
-runtime.completedStartupEntries = new Set();
+runtime.startupState = "pending";
+runtime.startupError = null;
+runtime.interfaceManifest = null;
+assert.throws(() => runtime.runStartupEntries(), /before loading an IR package/);
 runtime.interfaceManifest = {
   exports: [
     entry("first", true),
@@ -37,6 +40,7 @@ runtime.interfaceManifest = {
 runtime.callEntry = (candidate, args) => {
   assert.deepEqual(args, []);
   calls.push(candidate.entry);
+  assert.equal(runtime.runStartupEntries(), undefined);
   return candidate.entry;
 };
 
@@ -45,35 +49,46 @@ assert.deepEqual(calls, ["first", "second"]);
 assert.equal(runtime.runStartupEntries(), undefined);
 assert.deepEqual(calls, ["first", "second"]);
 
-runtime.completedStartupEntries = new Set();
-runtime.interfaceManifest = {
+const failedRuntime = new VirRuntime({ memory: new WebAssembly.Memory({ initial: 1 }) });
+failedRuntime.interfaceManifest = {
   exports: [
     entry("beforeFailure", true),
     entry("failsOnce", true),
     entry("afterFailure", true),
+    entry("ordinary", false),
   ],
 };
 let shouldFail = true;
-runtime.callEntry = (candidate) => {
+const startupFailure = new Error("startup failed");
+failedRuntime.callEntry = (candidate) => {
   calls.push(candidate.entry);
   if (candidate.entry === "failsOnce" && shouldFail) {
     shouldFail = false;
-    throw new Error("startup failed");
+    throw startupFailure;
   }
 };
-assert.throws(() => runtime.runStartupEntries(), /startup failed/);
-assert.deepEqual([...runtime.completedStartupEntries], ["beforeFailure"]);
-assert.equal(runtime.runStartupEntries(), undefined);
-assert.deepEqual(
-  [...runtime.completedStartupEntries],
-  ["beforeFailure", "failsOnce", "afterFailure"],
-);
-assert.deepEqual(calls.slice(-4), [
+assert.throws(() => failedRuntime.runStartupEntries(), error => error === startupFailure);
+assert.throws(() => failedRuntime.runStartupEntries(), error => error === startupFailure);
+assert.throws(() => failedRuntime.runStartupEntries(), error => error === startupFailure);
+assert.deepEqual(calls, [
+  "first",
+  "second",
   "beforeFailure",
   "failsOnce",
-  "failsOnce",
-  "afterFailure",
 ]);
+// A recoverable startup error does not turn ordinary calls into fatal errors.
+assert.equal(failedRuntime.failure, null);
+failedRuntime.rebuildManifestExports();
+assert.equal(failedRuntime.call("ordinary"), undefined);
+assert.equal(calls.at(-1), "ordinary");
+
+const freshRuntime = new VirRuntime({ memory: new WebAssembly.Memory({ initial: 1 }) });
+freshRuntime.interfaceManifest = failedRuntime.interfaceManifest;
+freshRuntime.callEntry = failedRuntime.callEntry;
+freshRuntime.runStartupEntries();
+assert.deepEqual(calls.slice(-3), ["beforeFailure", "failsOnce", "afterFailure"]);
+freshRuntime.runStartupEntries();
+assert.equal(calls.length, 8);
 
 const installCalls = [];
 const invalidManifestText = JSON.stringify({
