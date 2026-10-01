@@ -12,6 +12,7 @@ for (const kind of ["named", "closure"]) {
     const hostState = new VirHostState({ defaultHostBindings: {} });
     const failure = new Error("original exception");
     let cleanups = 0;
+    let rootClears = 0;
     let entries = 0;
     const fail = () => {
       entries++;
@@ -25,6 +26,7 @@ for (const kind of ["named", "closure"]) {
       vir_obj_dec: () => cleanups++,
       vir_closure_release: () => cleanups++,
       vir_abort_ir_package_set: () => cleanups++,
+      vir_resource_roots_clear: () => rootClears++,
       vir_call_resolved_objects: fail,
       vir_closure_call_objects: fail,
     }, { hostState });
@@ -45,6 +47,7 @@ for (const kind of ["named", "closure"]) {
     runtime.dispose();
     assert.equal(entries, 1);
     assert.equal(cleanups, 0, "abandoned Wasm stack and allocator must not be touched");
+    assert.equal(rootClears, 1, "terminal table clearing is allowed after failure and disposal is idempotent");
     assert.equal(hostState.disposed, true);
   });
 }

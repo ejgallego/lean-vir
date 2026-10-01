@@ -101,11 +101,6 @@ export function createVirImports(module, overrides = {}, hostState = null) {
         return 0;
       }
     };
-    imports.env.vir_resource_root = (value) => hostState.rootResource(value);
-    imports.env.vir_resource_get = (rootId) =>
-      hostState.getRootedResource(rootId);
-    imports.env.vir_resource_release = (rootId) =>
-      hostState.releaseRootedResourceFromFinalizer(rootId);
   }
 
   for (const spec of specs) {
@@ -136,9 +131,6 @@ const wasiBadDescriptor = () => 8; // __WASI_ERRNO_BADF
 const VIR_DEFAULT_IMPORTS = Object.freeze({
   env: Object.freeze({
     vir_js_call_objects: requireHostState,
-    vir_resource_root: requireHostState,
-    vir_resource_get: requireHostState,
-    vir_resource_release: requireHostState,
   }),
   wasi_snapshot_preview1: Object.freeze({
     args_get: wasiUnavailable,

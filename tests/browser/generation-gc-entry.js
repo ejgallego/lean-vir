@@ -76,7 +76,7 @@ async function runFatalRecovery(wasmModule, irPackageSet) {
       check(rejected, "trapped generation rejects callback, handle and installation");
     }
     bad.dispose(); bad.dispose();
-    check(state.resourceRoots.debugCounts().active === 0 &&
+    check(state.resourceRootCounts().active === 0 &&
       state.leanObjectHandleCells.size === 0 && bad.liveCallbacks.size === 0,
       "browser disposal releases JavaScript roots after trap");
     for (const runtime of [good, recovered = await factory.createRuntime({ irPackageSet })]) {
@@ -164,7 +164,7 @@ async function runReactChurn(createRuntime) {
       "React render foreign-root recovery",
     );
     check(
-      runtime.hostState.resourceRoots.debugCounts().active === 0,
+      runtime.hostState.resourceRootCounts().active === 0,
       "React externrefs return to zero",
     );
     return counts;

@@ -79,7 +79,16 @@ export const OBJECT_VALUE_EXPORTS = [
   "vir_obj_usize_decimal",
 ];
 
+// These operations do not enter the Lean heap and remain callable on retirement.
+export const RESOURCE_ROOT_EXPORTS = [
+  "vir_resource_roots_clear",
+  "vir_resource_roots_active",
+  "vir_resource_roots_capacity",
+  "vir_resource_roots_reusable",
+];
+
 export const OBJECT_ABI_EXPORTS = [
   ...OBJECT_ABI_CALL_EXPORTS,
   ...OBJECT_VALUE_EXPORTS,
+  ...RESOURCE_ROOT_EXPORTS,
 ];

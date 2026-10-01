@@ -10,7 +10,6 @@ import {
   abortHostCallTransaction,
   beginHostCallTransaction,
   commitHostCallTransaction,
-  ExternrefRoots,
   registerHostCallRollback,
 } from "../../web/src/host-boundary.js";
 import {
@@ -25,26 +24,6 @@ import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collec
 import { VirHostState } from "../../web/src/runtime/host-state.js";
 import { HOST_IMPORT_BOUNDARY } from "../../web/src/runtime/interface-manifest.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
-
-{
-  const roots = new ExternrefRoots({ initial: 3 });
-  const object = { name: "same object" };
-  const values = [null, undefined, false, 0, -0, 3n, "text", object];
-  const ids = values.map((value) => roots.root(value));
-  values.forEach((value, index) => {
-    assert.equal(roots.has(ids[index]), true);
-    assert.equal(Object.is(roots.get(ids[index]), value), true);
-  });
-  assert.equal(roots.get(0), undefined);
-  assert.equal(roots.has(0), false);
-  roots.release(ids[0]);
-  assert.equal(roots.has(ids[0]), false);
-  const reused = roots.root("reused");
-  assert.equal(reused, ids[0]);
-  assert.equal(roots.get(reused), "reused");
-  roots.clear();
-  assert.equal(roots.debugCounts().active, 0);
-}
 
 {
   const events = [];

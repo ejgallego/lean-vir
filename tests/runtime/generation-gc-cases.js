@@ -72,7 +72,7 @@ function observations({ runtime, callback, jsl }) {
     callback: new WeakRef(callback),
     jsl: new WeakRef(jsl),
     memory: new WeakRef(runtime.exports.memory),
-    table: new WeakRef(runtime.hostState.resourceRoots.table),
+    rootAccess: new WeakRef(runtime.exports.vir_obj_resource),
   };
 }
 
@@ -95,7 +95,7 @@ export async function runGenerationGcCases(createRuntime) {
     "acyclic values collected",
   );
   check(
-    owned.hostState.resourceRoots.debugCounts().active === 0,
+    owned.hostState.resourceRootCounts().active === 0,
     "acyclic externrefs released",
   );
   owned.dispose();
@@ -156,12 +156,11 @@ export async function runGenerationGcCases(createRuntime) {
   let cyclic = await makeGeneration(createRuntime);
   const weakCycle = observations(cyclic);
   const liveCycleOwner = cyclic.runtime;
-  const table = liveCycleOwner.hostState.resourceRoots;
-  const callbackId = table.root(cyclic.callback);
-  const jslId = table.root(cyclic.jsl);
+  const callbackBox = liveCycleOwner.exports.vir_obj_resource(cyclic.callback);
+  const jslBox = liveCycleOwner.exports.vir_obj_resource(cyclic.jsl);
   check(
-    table.get(callbackId) === cyclic.callback &&
-      table.get(jslId) === cyclic.jsl,
+    liveCycleOwner.exports.vir_obj_resource_externref(callbackBox) === cyclic.callback &&
+      liveCycleOwner.exports.vir_obj_resource_externref(jslBox) === cyclic.jsl,
     "externref transport preserves exact target identity",
   );
   cyclic = null;
@@ -169,11 +168,12 @@ export async function runGenerationGcCases(createRuntime) {
   check(
     typeof weakCycle.callback.deref() === "function" &&
       weakCycle.jsl.deref() !== undefined &&
-      table.get(callbackId) === weakCycle.callback.deref() &&
-      table.get(jslId) === weakCycle.jsl.deref(),
+      liveCycleOwner.exports.vir_obj_resource_externref(callbackBox) === weakCycle.callback.deref() &&
+      liveCycleOwner.exports.vir_obj_resource_externref(jslBox) === weakCycle.jsl.deref(),
     "live generation retains table targets",
   );
-  // Use a separate function so no retained table local can invalidate the test.
+  liveCycleOwner.exports.vir_obj_dec(callbackBox);
+  liveCycleOwner.exports.vir_obj_dec(jslBox);
   liveCycleOwner.dispose();
 
   const interval = await makeIntervalGraph(createRuntime);
@@ -282,7 +282,7 @@ async function failedHostCallbacks(createRuntime) {
       capture.strong = null;
       await collectUntil(() => capture.weak.deref() === undefined && runtime.liveCallbacks.size === 0,
         "failed host callback eligible for collection while runtime remains live");
-      check(runtime.hostState.resourceRoots.debugCounts().active === 0,
+      check(runtime.hostState.resourceRootCounts().active === 0,
         "failed host call releases temporary externref roots");
     }
     // Inject a later lifting failure after a real Lean closure was rooted but
@@ -307,7 +307,7 @@ async function failedHostCallbacks(createRuntime) {
     }
     await collectUntil(() => partial.deref() === undefined && runtime.liveCallbacks.size === 0,
       "partial lifting callback eligible for collection");
-    check(runtime.hostState.resourceRoots.debugCounts().active === 0,
+    check(runtime.hostState.resourceRootCounts().active === 0,
       "partial lifting failure releases temporary externref roots");
   } finally {
     capture.strong = null;
@@ -318,9 +318,9 @@ async function failedHostCallbacks(createRuntime) {
 async function makeAbandonedGraph(createRuntime, kind) {
   const values = await makeGeneration(createRuntime);
   if (kind !== "jsl")
-    values.runtime.hostState.resourceRoots.root(values.callback);
+    values.runtime.exports.vir_obj_resource(values.callback);
   if (kind !== "callback")
-    values.runtime.hostState.resourceRoots.root(values.jsl);
+    values.runtime.exports.vir_obj_resource(values.jsl);
   return observations(values);
 }
 

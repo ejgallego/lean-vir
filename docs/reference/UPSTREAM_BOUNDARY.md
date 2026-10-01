@@ -325,8 +325,11 @@ non-stringifiable objects and proxies are retained as raw error causes. The
 private latch publishes its first transition through `runtime.onFailure`, with
 asynchronous, isolated listener delivery even when the exception was caught.
 
-Disposal after a fatal failure runs JavaScript cleanup and clears host roots,
-but does not call Wasm decrements, frees, closure releases or package abort.
+Disposal after a fatal failure runs JavaScript cleanup and invokes the narrow
+Wasm resource-table clear operation. Clearing uses table operations and fixed
+globals without entering the interpreter, touching Lean heap objects, allocating
+or calling host functions. It does not call decrements, frees, closure releases
+or package abort; the guard also permits the three resource-count diagnostics.
 Those allocations remain with the abandoned instance until it is collectible.
 This makes no claim that traps unwind C++ frames or release every Lean object.
 Recovery creates a fresh factory runtime. Raw Wasm callers must likewise discard

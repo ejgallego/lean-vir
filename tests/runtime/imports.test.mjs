@@ -94,7 +94,7 @@ test("WASI overrides take precedence over unavailable defaults", () => {
 });
 
 test("hostless linking remains available but VIR hooks require host state", () => {
-  for (const name of ["vir_js_call_objects", "vir_resource_root", "vir_resource_get", "vir_resource_release"]) {
+  for (const name of ["vir_js_call_objects"]) {
     const module = importModule("env", name);
     const instance = new WebAssembly.Instance(module, createVirImports(module));
     assert.throws(() => instance.exports.call(), /without an attached host state/);

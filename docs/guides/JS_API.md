@@ -706,8 +706,11 @@ including ordinary Lean IO errors: initialization can publish persistent values
 and opaque handles before failing. The factory can reuse its compiled Wasm
 module while creating a fresh instance.
 
-`dispose()` remains idempotent after failure. It releases JavaScript-owned host
-resources and invalidates callbacks/handles without re-entering failed Wasm.
+`dispose()` remains idempotent after failure. It disposes runtime-owned fresh host
+providers, invalidates callbacks/handles, and terminally clears the Wasm-owned
+resource table through a narrow operation that does not enter the interpreter
+or inspect Lean heap objects. All ordinary execution and Lean heap cleanup stay
+blocked in a failed instance.
 Traps do not unwind the interpreter's C++ frames: its remaining allocations are
 reclaimed with the Wasm instance when no references retain it. Keep the
 runtime-owned `exports` facade intact; replacing it bypasses these guards.

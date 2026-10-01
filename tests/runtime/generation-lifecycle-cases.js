@@ -96,7 +96,7 @@ export async function runGenerationLifecycleCases(
     "failed shutdown clears tracked foreign roots",
   );
   check(
-    failedState.resourceRoots.debugCounts().active === 0,
+    failedState.resourceRootCounts().active === 0,
     "failed shutdown clears externrefs",
   );
   failures.runtime.dispose();
@@ -216,7 +216,7 @@ export async function runSharedBindingGcCases(
 async function makeSharedGraph(factory, packageBytes, bindings = null) {
   const runtime = await factory.createRuntime({ irPackageSet: [packageBytes] });
   const jsl = makeJsl(runtime, "shared");
-  runtime.hostState.resourceRoots.root(jsl);
+  runtime.exports.vir_obj_resource(jsl);
   if (bindings !== null) bindings.retained = jsl;
   return new WeakRef(runtime);
 }

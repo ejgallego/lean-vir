@@ -120,9 +120,13 @@ semantics require the separate Chromium checks below.
 - Constructor providers: after `npm run build:demo`, run
   `npm run test:constructor-providers`. This links the same Wasm objects used
   by the probe and compares constructor metadata and reference counts with
-  the pinned native Lean library. The Wasm runner additionally checks that a
-  foreign external class is rejected without invoking the resource-release
-  hook. Set `WASI_SDK_PATH` for a non-default SDK.
+  the pinned native Lean library. The Wasm runner additionally checks rejection
+  of a foreign external class. Set `WASI_SDK_PATH` for a non-default SDK.
+- Resource root allocator: `npm run test:resource-roots` compiles the actual
+  allocator with test-only allocation/growth failure injection and checks
+  identity, rollback/retry, release, slot reuse and terminal clearing after a
+  trap. The `resource-roots` pure runtime suite checks integration and collection
+  of retired payloads while their runtime remains reachable.
 - Native declarations: `npm run check:native-externs`. Add
   `npm run check:client-native-externs` for client manifest selection, wrapper
   imports or provider handoff. Pure registry tooling uses
