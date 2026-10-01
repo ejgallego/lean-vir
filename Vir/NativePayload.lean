@@ -188,21 +188,4 @@ public def checkAnonymousHttps (url : String) : Except String Unit := do
     throw "HTTPS source must have a host and no whitespace/control characters"
   if authority.contains '@' then throw "anonymous HTTPS source must not contain URL credentials"
 
-/-! Resource-runtime transport is always anonymous and ignores user curl
-configuration, including any credentials in a personal curl config. -/
-public def fetchAnonymousHttps (url : String) (destination : FilePath) (maxBytes : Nat)
-    : IO Unit := do
-  match checkAnonymousHttps url with
-  | .error detail => fail "INVALID_RESOURCE_URL" detail
-  | .ok _ => pure ()
-  checkFile destination
-  createManagedParents (destination.parent.getD ".")
-  let args := #["-q", "--fail", "--silent", "--show-error", "--location",
-    "--proto", "=https", "--proto-redir", "=https", "--connect-timeout", "20",
-    "--max-time", "120", "--max-filesize", toString maxBytes,
-    "--output", destination.toString, "--url", url]
-  let result ← IO.Process.output { cmd := "curl", args := args }
-  unless result.exitCode == 0 do
-    fail "RESOURCE_DOWNLOAD_FAILED" s!"{result.stderr.trimAscii}"
-
 end Vir.NativePayload

@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Lean
+import Lake
 import Vir.NativePayload
 import Vir.GeneratePackage.PackageFormat
 
@@ -151,21 +151,14 @@ def needsGitHubAuthentication (url : String) : Bool :=
   url.startsWith "https://api.github.com/"
 
 def fetchUrl (url : String) (dest : FilePath) : IO Unit := do
-  if let some parent := dest.parent then
-    IO.FS.createDirAll parent
-  let mut args := #[
-    "--fail",
-    "--location",
-    "--show-error",
-    "--silent",
-    "-H", "Accept: application/vnd.github+json",
-    "-H", "X-GitHub-Api-Version: 2022-11-28"
-  ]
+  let mut headers := #["Accept: application/vnd.github+json",
+    "X-GitHub-Api-Version: 2022-11-28"]
   if needsGitHubAuthentication url then
     if let some token ← githubToken? then
-      args := (args.push "-H").push s!"Authorization: Bearer {token}"
-  args := ((args.push "--output").push dest.toString).push url
-  discard <| run "curl" args
+      headers := headers.push s!"Authorization: Bearer {token}"
+  let downloaded ← (Lake.download url dest headers).toBaseIO
+  if downloaded.isNone then
+    throw <| IO.userError s!"failed to download SDK from {url}"
 
 def findCommitArtifactUrl (json : Json) (artifactName : String) (commit : String) : IO String := do
   let artifacts ← jsonField json "artifacts" Json.getArr?

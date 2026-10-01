@@ -76,6 +76,7 @@
     "build:site": "npm run build:demo:release && npm run prepare:pages && npm run package:sdk-artifact && npm run package:local-artifact && vite build --base /lean-vir/ && npm run build:analysis-site",
     "package:local-artifact": "node scripts/packages/package-local-artifact.mjs",
     "package:sdk-artifact": "node scripts/packages/package-sdk-artifact.mjs",
+    "package:runtime": "node scripts/resources/pack-runtime.mjs web/public/vir-upstream.wasm build/upstream-probe/wasm-build-identity.json build/artifacts/runtime",
     "size:wasm": "node scripts/analysis/wasm-size-report.mjs",
     "analyze:frontier-size": "node scripts/analysis/frontier-size-costs.mjs",
     "analyze:surface": "lake exe vir_surface",

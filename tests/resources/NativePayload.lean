@@ -23,14 +23,15 @@ def main (args : List String) : IO Unit := do
   rejected "directory staging" "UNSAFE_RESOURCE_DIRECTORY"
     (withSiblingDirectory destination fun _ => pure ())
   rejected "directory promotion" "UNSAFE_RESOURCE_DIRECTORY" (promote destination payload)
-  rejected "download destination" "UNSAFE_RESOURCE_DIRECTORY"
-    (fetchAnonymousHttps "https://example.invalid/pack" destination 10)
+  rejected "managed file destination" "UNSAFE_RESOURCE_DIRECTORY"
+    (checkFile destination)
   unless !(← outside.pathExists) do
     throw <| IO.userError "rejected managed path created an outside directory"
   unless (← IO.FS.readBinFile (root / "source/retained")) == "source bytes".toUTF8 do
     throw <| IO.userError "rejected promotion changed source bytes"
-  rejected "direct anonymous transport" "INVALID_RESOURCE_URL"
-    (fetchAnonymousHttps "https://user:pass@example.invalid/pack" (root / "download") 10)
+  match checkAnonymousHttps "https://user:pass@example.invalid/pack" with
+  | .error _ => pure ()
+  | .ok _ => throw <| IO.userError "credential-bearing URL accepted"
   unless !(← (root / "download").pathExists) do
     throw <| IO.userError "rejected URL created an output"
   -- Missing ordinary ancestors remain supported, with the staged directory

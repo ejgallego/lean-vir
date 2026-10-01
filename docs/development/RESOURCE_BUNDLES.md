@@ -212,8 +212,12 @@ an anonymous HTTPS URL, or `-` for already-available bytes only. Cache and stagi
 are checked against that identity and the complete compatibility profile before installation;
 a transport override cannot change either. The content identity also binds all
 compatibility fields. Source-distributed packs need no external host tool;
-HTTPS uses `curl`, with user curl configuration disabled, HTTPS-only redirects,
-size/time limits, and no GitHub authentication or source-build fallback. URL
+HTTPS uses the pinned `Lake.download` operation and its normal host `curl`
+configuration; VIR does not implement separate redirect/timeout settings or
+supply authentication headers. This is public acquisition, not credential
+isolation from host configuration. Pack reads are bounded after download and
+before installation; Lake does not impose VIR's pack-size limit on transport.
+There is no source-build fallback. URL
 userinfo is rejected by both runtime-lock admission and transport, even when
 verified cache bytes are already available.
 
@@ -374,6 +378,14 @@ Runtime production is a separate maintainer operation:
 ```sh
 node scripts/resources/pack-runtime.mjs RELEASE_WASM BUILD_IDENTITY NEW_OUTPUT_DIR
 ```
+
+`npm run package:runtime` uses the repository's release Wasm and build identity
+to write `build/artifacts/runtime/`. CI packages and retains this output after
+the runtime checks. The tagged release workflow publishes its content-named
+pack without overwriting it; maintainers select a verified public asset in
+`vir-resources/runtime.json` separately. Actions artifacts alone are not a
+durable consumer source, and a new producer commit does not silently change
+the runtime selected by applications.
 
 It bundles the JS import closure, Wasm and notices, verifies the compiler/profile
 metadata and emits a native-validated pack plus provenance. Qualification of the
