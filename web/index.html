@@ -54,7 +54,7 @@ Author: Emilio J. Gallego Arias
           <nav class="intro-links" aria-label="Project links">
             <a href="#try">Try it</a>
             <a
-              href="https://github.com/ejgallego/lean-vir/blob/main/docs/guides/PACKAGES.md"
+              href="https://github.com/ejgallego/lean-vir/blob/main/docs/guides/EMBEDDED_RESOURCES.md"
               >Integration guide</a
             >
             <a href="https://github.com/ejgallego/lean-vir">Source</a>
@@ -129,7 +129,7 @@ Author: Emilio J. Gallego Arias
             <div>
               <h2 id="use-heading">Use from a Lean project</h2>
               <p>
-                Mark an export, build its package, and call it by Lean name.
+                Mark a Lean function, publish its files, and call it from JavaScript.
               </p>
             </div>
           </div>
@@ -141,23 +141,23 @@ Author: Emilio J. Gallego Arias
             <li>
               <span>2</span>
               <div>
-                <strong>Build</strong><code>lake build +MyApp:vir</code>
+                <strong>Publish</strong><code>lake exe generate-site site</code>
               </div>
             </li>
             <li>
               <span>3</span>
               <div>
-                <strong>Call</strong><code>vir.call("MyApp.answer")</code>
+                <strong>Call</strong><code>program.call("greet", "world")</code>
               </div>
             </li>
           </ol>
           <nav class="section-links" aria-label="Integration resources">
             <a
-              href="https://github.com/ejgallego/lean-vir/blob/main/docs/guides/PACKAGES.md"
+              href="https://github.com/ejgallego/lean-vir/blob/main/docs/guides/EMBEDDED_RESOURCES.md"
               >Integration guide</a
             >
-            <a href="downloads/lean-vir-sdk.tar.gz" download>SDK archive</a>
-            <a href="downloads/lean-vir-local.tar.gz" download>Local bundle</a>
+            <a href="downloads/lean-vir-sdk.tar.gz" download>Developer SDK archive</a>
+            <a href="downloads/lean-vir-local.tar.gz" download>Local demo bundle</a>
           </nav>
         </section>
 

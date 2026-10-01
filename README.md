@@ -26,7 +26,7 @@ module
 meta import Vir.Attributes
 
 @[vir_export]
-public def answer : Nat := 42
+public def Client.Program.greet (name : String) : String := "Hello, " ++ name
 ```
 
 The application's client library declares that program and prepares its browser
@@ -38,9 +38,10 @@ writes the prepared files, and the browser calls the program's exported function
 Applications do not locate VIR build directories, invoke packaging scripts, or
 build Wasm. Program compilation and runtime acquisition remain independent.
 
-Follow [the application setup guide](docs/guides/EMBEDDED_RESOURCES.md) for the
-library declaration, publication and JavaScript call. Use the Lean toolchain
-selected by your VIR dependency; HTTPS runtime acquisition needs `curl`.
+Follow [the application setup guide](docs/guides/EMBEDDED_RESOURCES.md) for a
+complete greeting project, its Lake command, publication and JavaScript call.
+Use the Lean toolchain selected by your VIR dependency; HTTPS runtime acquisition
+needs `curl`.
 The integration is under review for the first release; current qualification
 and limits are recorded in [the acceptance checklist](docs/development/RESOURCE_ACCEPTANCE.md).
 

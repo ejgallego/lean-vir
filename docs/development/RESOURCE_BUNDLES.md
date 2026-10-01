@@ -495,7 +495,7 @@ change calls, recoverable IO, fatal state or quarantine.
 The host still owns mount ordering: both a new mount and unmount invalidate
 older pending results. Stale successful instances must be disposed; stale failures
 must not replace the current view. See the
-[tested single-component example](../guides/EMBEDDED_RESOURCES.md#overlapping-loads).
+[tested single-component example](../guides/RESOURCE_LIFETIME.md#overlapping-loads).
 
 ## Validation and remaining work
 
