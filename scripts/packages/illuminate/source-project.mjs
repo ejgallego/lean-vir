@@ -10,14 +10,17 @@ import {
 import { join } from "node:path";
 
 import { runSync } from "../../process-utils.mjs";
+import { readToolchain } from "../vir-client-package-lib.mjs";
 
 export const rootModule = "VirIlluminateAcceptance.Exports";
 const adapterSource =
   "fixtures/illuminate/VirIlluminateAcceptance/Exports.lean";
 
-// Preserve the client's Lake configuration and dependency pins. Only the
-// caller-owned archived view gets VIR's package adapter and library target.
+// Preserve the client's Lake configuration and dependency pins. The archived
+// view uses VIR's pinned toolchain, while the returned client pin records what
+// the selected upstream source declared before this local build.
 export async function createSourceView(client, producer, parent) {
+  const toolchain = await readToolchain(producer);
   const workspace = await mkdtemp(join(parent, ".illuminate-source-view-"));
   try {
     const sourceView = join(workspace, "source");
@@ -32,6 +35,8 @@ export async function createSourceView(client, producer, parent) {
       "HEAD",
     ]);
     runSync("tar", ["-xf", archive, "-C", sourceView]);
+    const clientToolchain = await readToolchain(sourceView);
+    await writeFile(join(sourceView, "lean-toolchain"), `${toolchain}\n`);
     await symlink(producer, join(sourceView, "vir"), "dir");
     await mkdir(join(sourceView, "VirIlluminateAcceptance"));
     await copyFile(
@@ -47,7 +52,7 @@ export async function createSourceView(client, producer, parent) {
         rootModule +
         "]\n",
     );
-    return { workspace, sourceView };
+    return { workspace, sourceView, toolchain, clientToolchain };
   } catch (error) {
     await rm(workspace, { recursive: true, force: true });
     throw error;

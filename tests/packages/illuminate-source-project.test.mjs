@@ -19,7 +19,7 @@ import {
 } from "../../scripts/packages/illuminate/source-project.mjs";
 import { repositoryRoot } from "../../scripts/repository-paths.mjs";
 
-test("Illuminate adapter preserves pinned sources and isolates Lake configuration", async () => {
+test("Illuminate source view uses VIR's pin and preserves original sources", async () => {
   const directory = await mkdtemp(join(tmpdir(), "vir-illuminate-project-"));
   try {
     const client = join(directory, "client");
@@ -50,8 +50,14 @@ test("Illuminate adapter preserves pinned sources and isolates Lake configuratio
       "fixture",
     );
     await writeFile(join(client, "lakefile.lean"), "uncommitted client edit\n");
+    await writeFile(join(client, "lean-toolchain"), "uncommitted-toolchain\n");
 
-    const project = await createSourceView(client, repositoryRoot, outputs);
+    const virToolchain = (await readFile(join(repositoryRoot, "lean-toolchain"), "utf8")).trim();
+    const project = await createSourceView(
+      client,
+      repositoryRoot,
+      outputs,
+    );
     const config = await readFile(
       join(project.sourceView, "lakefile.lean"),
       "utf8",
@@ -60,12 +66,20 @@ test("Illuminate adapter preserves pinned sources and isolates Lake configuratio
       config,
       `${lakefile}\nlean_lib VirIlluminateAcceptance where\n  roots := #[\`${rootModule}]\n`,
     );
-    for (const file of ["lean-toolchain", "lake-manifest.json"]) {
-      assert.deepEqual(
-        await readFile(join(project.sourceView, file)),
-        await readFile(join(client, file)),
-      );
-    }
+    assert.equal(project.toolchain, virToolchain);
+    assert.equal(project.clientToolchain, "pinned-toolchain");
+    assert.equal(
+      await readFile(join(project.sourceView, "lean-toolchain"), "utf8"),
+      `${virToolchain}\n`,
+    );
+    assert.deepEqual(
+      await readFile(join(project.sourceView, "lake-manifest.json")),
+      await readFile(join(client, "lake-manifest.json")),
+    );
+    assert.equal(
+      await readFile(join(client, "lean-toolchain"), "utf8"),
+      "uncommitted-toolchain\n",
+    );
     assert.deepEqual(
       await readFile(
         join(project.sourceView, "VirIlluminateAcceptance/Exports.lean"),
@@ -89,7 +103,11 @@ test("Illuminate adapter preserves pinned sources and isolates Lake configuratio
     // A missing adapter must remove only its own partially prepared workspace.
     const before = await readdir(outputs);
     await assert.rejects(
-      createSourceView(client, directory, outputs),
+      createSourceView(
+        client,
+        directory,
+        outputs,
+      ),
       /ENOENT/,
     );
     assert.deepEqual(await readdir(outputs), before);
