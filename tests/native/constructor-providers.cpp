@@ -4,8 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-// Run the same cases against pinned native Lean and the actual Wasm link inputs.
+// Shared cases compare pinned native Lean with the actual Wasm link inputs.
 // Printed metadata is pointer-size independent; ownership checks run in both.
+// The Wasm build additionally checks rejection of a foreign external class.
 #include <lean/lean.h>
 #include <cstdio>
 #include <cstdlib>

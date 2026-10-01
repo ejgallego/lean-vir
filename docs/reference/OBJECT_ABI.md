@@ -32,6 +32,21 @@ remains the explicit resource lane for host-owned objects.
 
 The [externref table](HOST_BINDINGS.md#interpreter-transport) roots the exact
 JavaScript payload; a Lean external object stores only its private root ID.
+The shim encodes the unsigned 32-bit ID directly in the external object's
+opaque `void *` payload through `uintptr_t`. It never dereferences that payload
+and allocates no separate root-ID record. The Lean external wrapper still
+allocates normally; its finalizer releases the JavaScript root once the last
+Lean reference is dropped. Root ID `0` is reserved for failure. External-class
+registration precedes root acquisition, and Lean wrapper allocation follows
+Lean's fatal out-of-memory policy.
+
+The current build is explicitly guarded to wasm32. The encoding itself also
+fits a wasm64 payload: widening the unsigned ID preserves all 32 bits and
+decoding recovers them. Root IDs are handles, not linear-memory addresses, so
+64-bit memory does not require 64-bit IDs. Enabling wasm64 must separately
+qualify the Lean/JavaScript pointer ABI and relax the target guard; the width
+requirement is that `uintptr_t` can hold the root ID.
+
 Reference types remove serialization for these values, but do not construct
 ordinary Lean structures, arrays or inductives. Those still need this ABI's
 manifest-driven lowering/inspection API.
@@ -127,7 +142,7 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_name_string_size`    | Return the byte length of `vir_obj_name_string`.                                                  | No object ownership.                                                                                                |
 | `vir_obj_resource`            | Represent an exact JavaScript `externref` value as a Lean object.                                 | Returns an owned Lean external object whose finalizer releases its externref-table slot.                            |
 | `vir_obj_resource_externref`  | Recover the exact JavaScript value from a Lean resource object.                                   | No ownership change; JavaScript identity is preserved.                                                              |
-| `vir_obj_resource_is_valid`   | Check whether a Lean object is a live JavaScript-value external object.                           | No ownership change.                                                                                                |
+| `vir_obj_resource_is_valid`   | Check whether a Lean object has the resource external class and a nonzero root ID.                | No allocation or ownership change; does not independently check root-table or generation liveness.                  |
 | `vir_obj_closure_root`        | Root a Lean function object so JavaScript can call it later.                                      | Retains the function through the closure root table; input object ownership is unchanged.                           |
 | `vir_closure_call_objects`    | Call a rooted Lean closure with owned Lean object arguments.                                      | Consumes all argument objects after accepting a non-null `argv`; returns one owned result object or `0` on failure. |
 | `vir_closure_call_error`      | Return a borrowed pointer to the last closure-call diagnostic.                                    | Borrowed until the next closure call or runtime teardown.                                                           |
@@ -161,6 +176,12 @@ pointer into the live Lean object; JavaScript must read it before releasing the
 object.
 
 ## Ownership
+
+Resource inspection requires a valid, live Lean object reference. A boxed
+JavaScript `null` is a valid resource and unboxes to `null`; a non-resource
+object also unboxes to `null`. Use `vir_obj_resource_is_valid` to distinguish
+them. That predicate checks the external class and nonzero ID, while the
+runtime's root table and generation lifecycle govern root availability.
 
 Object constructors return an owned Lean object pointer. JavaScript owns
 that reference and must release it with `vir_obj_dec` unless a call helper
