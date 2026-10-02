@@ -7,5 +7,7 @@ module
 
 public import Vir.Resources.Types
 public import Vir.Resources.Validate
+public import Vir.Resources.Site
 
-/-! Resource values and validation only. Runtime acquisition/embedding is opt-in. -/
+/-! Resource values, validation and pure site preparation.
+Runtime acquisition/embedding is opt-in. -/

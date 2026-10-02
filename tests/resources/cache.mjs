@@ -132,13 +132,20 @@ writeFileSync(
     '\n[[require]]\nname = "peer_fixture"\npath = "../peer"\n',
 );
 const leafMain = join(leaf, "Main.lean");
+const leafSource = readFileSync(leafMain, "utf8");
+const siteInput = '  let site ← IO.ofExcept <| (Client.resources.forSite "").mapError reprStr';
+assert.equal(
+  leafSource.split(siteInput).length,
+  2,
+  "shared-producer fixture must replace exactly one publisher resource input",
+);
 writeFileSync(
   leafMain,
-  readFileSync(leafMain, "utf8")
+  leafSource
     .replace("import Client", "import Client\nimport Peer")
     .replace(
-      "  let bundles ← IO.ofExcept <| Client.resources.bundles.mapError reprStr",
-      '  unless Client.resources.runtime.contentId == Peer.resources.runtime.contentId do\n    throw <| IO.userError "intermediaries selected different runtimes"\n  let resources : Vir.Resources.ResourceSet := { runtime := Client.resources.runtime, programs := Client.resources.programs ++ Peer.resources.programs }\n  let bundles ← IO.ofExcept <| resources.bundles.mapError reprStr',
+      siteInput,
+      '  unless Client.resources.runtime.contentId == Peer.resources.runtime.contentId do\n    throw <| IO.userError "intermediaries selected different runtimes"\n  let resources : Vir.Resources.ResourceSet := { runtime := Client.resources.runtime, programs := Client.resources.programs ++ Peer.resources.programs }\n  let site ← IO.ofExcept <| (resources.forSite "").mapError reprStr',
     ),
 );
 const lock = JSON.parse(
