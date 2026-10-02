@@ -223,7 +223,7 @@ writeFileSync(curl, `#!${process.execPath}
 import fs from "node:fs";
 const args = process.argv.slice(2);
 fs.writeFileSync(process.env.TEST_CURL_LOG, JSON.stringify(args));
-const out = args[args.indexOf("--output") + 1];
+const out = args[args.indexOf(args.includes("-o") ? "-o" : "--output") + 1];
 if (process.env.TEST_CURL_MODE === "success") {
   fs.copyFileSync(process.env.TEST_CURL_PACK, out);
 } else {
@@ -273,10 +273,26 @@ acquire("retry-interrupted-transport", "https://test.invalid/pack", {
 assert.deepEqual(readFileSync(cache), bytes);
 assert.deepEqual(readFileSync(stage), bytes);
 const curlArgs = JSON.parse(readFileSync(curlLog));
-assert.equal(curlArgs[0], "-q");
-assert.equal(curlArgs[curlArgs.indexOf("--proto-redir") + 1], "=https");
-assert.ok(curlArgs.includes("--max-filesize"));
+// Transport belongs to pinned Lake.download, not another VIR curl policy.
+for (const flag of ["-s", "-S", "-f", "-o", "-L"]) assert.ok(curlArgs.includes(flag));
+assert.ok(curlArgs.includes("https://test.invalid/pack"));
+assert.equal(typeof curlArgs[curlArgs.indexOf("-o") + 1], "string");
 assert.ok(!curlArgs.includes("--user") && !curlArgs.includes("-H"));
+
+// The retained SDK contributor adapter uses the same Lake transport, not a
+// second curl implementation. It keeps its GitHub API headers/policy separate.
+run(join(root, ".lake/build/bin/vir_fetch_sdk"), [
+  "--url", "https://test.invalid/sdk.tar.gz", "--out", join(evidence, "sdk"),
+], "sdk-transport-failure", {
+  env: { ...transportEnv, TEST_CURL_MODE: "fail" }, error: /curl|download/i,
+});
+const sdkCurlArgs = JSON.parse(readFileSync(curlLog));
+for (const flag of ["-s", "-S", "-f", "-o", "-L"]) assert.ok(sdkCurlArgs.includes(flag));
+assert.ok(sdkCurlArgs.includes("https://test.invalid/sdk.tar.gz"));
+assert.ok(sdkCurlArgs.includes("Accept: application/vnd.github+json"));
+assert.ok(sdkCurlArgs.includes("X-GitHub-Api-Version: 2022-11-28"));
+assert.ok(!sdkCurlArgs.some((arg) => arg.startsWith("Authorization:")));
+assert.ok(!existsSync(join(evidence, "sdk")));
 
 // Real downstream library prerequisites, using source-distributed synthetic bytes.
 // The native executable is fetched through Lake; no nested Lake process or Node

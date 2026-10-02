@@ -176,9 +176,9 @@ public def promote (destination : FilePath) (payload : VerifiedPayload) : IO Uni
   | .bytes bytes => atomicInstall destination bytes
   | .directory path => promoteDirectory path destination
 
-/-! Explicit URL credentials must not bypass the anonymous transport policy.
-Keep this pure check shared with lock admission; never echo credential-bearing
-input in its diagnostics. -/
+/-! Resource locks admit public HTTPS URLs without embedded credentials.
+This pure check is URL admission, not isolation from host curl configuration.
+Keep it shared with lock admission; never echo credential-bearing input. -/
 public def checkAnonymousHttps (url : String) : Except String Unit := do
   unless url.startsWith "https://" do throw "source must use HTTPS"
   let authority := (url.drop "https://".length).toString.toList.takeWhile
@@ -187,22 +187,5 @@ public def checkAnonymousHttps (url : String) : Except String Unit := do
       c.isWhitespace || c.toNat < 33 || c.toNat == 127) do
     throw "HTTPS source must have a host and no whitespace/control characters"
   if authority.contains '@' then throw "anonymous HTTPS source must not contain URL credentials"
-
-/-! Resource-runtime transport is always anonymous and ignores user curl
-configuration, including any credentials in a personal curl config. -/
-public def fetchAnonymousHttps (url : String) (destination : FilePath) (maxBytes : Nat)
-    : IO Unit := do
-  match checkAnonymousHttps url with
-  | .error detail => fail "INVALID_RESOURCE_URL" detail
-  | .ok _ => pure ()
-  checkFile destination
-  createManagedParents (destination.parent.getD ".")
-  let args := #["-q", "--fail", "--silent", "--show-error", "--location",
-    "--proto", "=https", "--proto-redir", "=https", "--connect-timeout", "20",
-    "--max-time", "120", "--max-filesize", toString maxBytes,
-    "--output", destination.toString, "--url", url]
-  let result ← IO.Process.output { cmd := "curl", args := args }
-  unless result.exitCode == 0 do
-    fail "RESOURCE_DOWNLOAD_FAILED" s!"{result.stderr.trimAscii}"
 
 end Vir.NativePayload

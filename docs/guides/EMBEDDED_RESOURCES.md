@@ -9,7 +9,11 @@ Library setup is described below. Application authors use the library's ordinary
 build and site-generation commands; they do not run VIR packaging tools.
 
 The library acquires the exact prebuilt runtime from a public release on a cache
-miss; warm use needs no runtime download. HTTPS acquisition requires `curl`.
+miss; warm use needs no runtime download. The native preparation tool uses
+Lake's standard download operation, which requires `curl` and uses its normal
+host configuration. VIR supplies no authentication headers; the selected public
+source must be usable without credentials. The complete downloaded pack is
+checked before replacing either the cache or the carrier's prepared input.
 An unavailable runtime fails clearly; it never triggers a Wasm build. Use the
 pinned Lean toolchain and matching runtime; do not substitute another release's
 Wasm. This integration is under review for the first release; see the

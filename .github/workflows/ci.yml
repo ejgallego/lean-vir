@@ -50,6 +50,7 @@ jobs:
             .tools/wasi-sdk-33.0-x86_64-linux
           key: ${{ runner.os }}-${{ runner.arch }}-wasi-sdk-${{ hashFiles('scripts/install-wasi-sdk.sh') }}
       - run: npm run fetch:lean
+      - run: npm run test:resources:production
       - run: npm run test:package-ir-builders
       - run: npm run check:client-native-externs
       - run: npm run install:wasi
@@ -69,6 +70,15 @@ jobs:
           path: build/resources-browser/
           if-no-files-found: ignore
       - run: npm run test:upstream:no-build
+      - run: npm run package:runtime
+      - name: Upload runtime pack and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: lean-vir-runtime
+          path: |
+            build/artifacts/runtime/*.virres
+            build/artifacts/runtime/provenance.json
+          if-no-files-found: error
       - name: Upload SDK artifact
         uses: actions/upload-artifact@v4
         with:

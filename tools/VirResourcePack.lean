@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Lean
+import Lake
 import Vir.Resources.Build
 import Vir.Resources.Pack
 
@@ -61,7 +61,12 @@ private def acquire (compatibilityPath : FilePath) (expected source : String)
           fail "RESOURCE_OFFLINE_MISS" s!"required bundle {expected}; cache {cache}"
         let bytes ← if source.startsWith "https://" then
           Build.withSibling cache fun temporary => do
-            Vir.NativePayload.fetchAnonymousHttps source temporary Build.packLimit
+            -- Lake owns download mechanics. Its destructive file download only
+            -- sees a fresh sibling, never a verified cache or staged hardlink.
+            -- Resource identity and bounded reads remain VIR's responsibility.
+            let downloaded ← (Lake.download source temporary).toBaseIO
+            if downloaded.isNone then
+              fail "RESOURCE_DOWNLOAD_FAILED" s!"required bundle {expected} from {source}"
             Build.readInput temporary Build.packLimit "PACK_LIMIT"
         else
           if (source.splitOn "://").length > 1 then
