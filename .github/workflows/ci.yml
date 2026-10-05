@@ -151,10 +151,10 @@ jobs:
             /tmp/vir-resource-cache-*/producer/vir-resources/*.json
             /tmp/vir-resource-cache-*/client/vir-resources/*.json
             /tmp/vir-resource-cache-*/client/build with spaces/vir/resources/programs/*
-            /tmp/vir-resource-cache-*/client/.vir-generated/*
+            /tmp/vir-resource-cache-*/client/resources/.vir-generated/*
             /tmp/vir-resource-cache-*/peer/vir-resources/*.json
             /tmp/vir-resource-cache-*/peer/build with spaces/vir/resources/programs/*
-            /tmp/vir-resource-cache-*/peer/.vir-generated/*
+            /tmp/vir-resource-cache-*/peer/resources/.vir-generated/*
           if-no-files-found: ignore
       - run: npm run test:resources:descriptor
       - name: Retain resource diagnostics

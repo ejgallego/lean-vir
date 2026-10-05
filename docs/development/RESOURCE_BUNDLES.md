@@ -329,10 +329,15 @@ Optional support entries contain `source`, `path`, and `mediaType`: sources are
 portable paths relative to the owning package, destinations relative to the
 bundle, and neither may traverse links or escape their root.
 
-The facet stages `.vir-generated/ClientResources.virres` in the owning package.
-`resources/Client/Resources.lean` embeds it with
-`include_vir_bundle "../../.vir-generated/ClientResources.virres"`. The path is
-source-relative, not relative to the caller or build directory. An umbrella
+The facet stages `.vir-generated/ClientResources.virres` under the owning
+library's `srcDir` (here `resources`). `resources/Client/Resources.lean` embeds it
+with `include_vir_library ClientResources`, using the literal registered library
+name. The include strips the complete canonical module suffix from the actual
+source filename to derive that same source root; mismatches reject without an
+ancestor search, working-directory guess or alternate-path fallback.
+The library's ordinary prerequisite owns preparation and tracing. Explicit
+source-relative `include_vir_bundle` remains a low-level prepared-input tool,
+not another application setup workflow. An umbrella
 client module constructs a `ResourceSet` from that bundle and `Runtime.bundle`.
 The leaf depends only on the client and runs its normal native generator.
 

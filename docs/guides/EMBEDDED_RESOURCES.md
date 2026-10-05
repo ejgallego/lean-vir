@@ -117,11 +117,14 @@ module
 public import Vir.Resources.Embed
 
 public def Client.Resources.bundle : Vir.Resources.Bundle :=
-  include_vir_bundle "../../.vir-generated/ClientResources.virres"
+  include_vir_library ClientResources
 ```
 
-That include path is relative to the carrier source file. In `Client.lean`,
-combine it with the precompiled runtime:
+The key is the registered owning library's literal name, not a Lean declaration
+or the carrier module name. Its `virResourcePack` prerequisite prepares the
+bytes before elaboration; the include never downloads or builds anything.
+Custom source/build directories require no generated-path changes. In
+`Client.lean`, combine it with the precompiled runtime:
 
 ```lean
 module

@@ -72,7 +72,7 @@ const originalCarrier = readFileSync(
 );
 const renamedCarrier = replaceFixture(originalCarrier, "Client.Resources", "Client.OtherResources");
 const carrier = replaceFixture(renamedCarrier,
-  "ClientResources.virres", "OtherResources.virres");
+  "include_vir_library ClientResources", "include_vir_library OtherResources");
 writeFileSync(join(client, "resources/Client/OtherResources.lean"), carrier);
 const recipe = JSON.parse(
   readFileSync(join(client, "vir-resources/ClientResources.json")),
@@ -234,10 +234,10 @@ assert.equal(
 const stages = [
   join(producer, ".vir-generated/VirResourceRuntime.virres"),
   ...["ClientResources", "OtherResources"].map((n) =>
-    join(client, ".vir-generated", `${n}.virres`),
+    join(client, "resources/.vir-generated", `${n}.virres`),
   ),
   ...["PeerResources", "OtherResources"].map((n) =>
-    join(peer, ".vir-generated", `${n}.virres`),
+    join(peer, "resources/.vir-generated", `${n}.virres`),
   ),
 ];
 const signature = (path) => {

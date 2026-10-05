@@ -4,8 +4,10 @@ import { replaceFixture } from "./fixture-edit.mjs";
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   statSync,
   writeFileSync,
 } from "node:fs";
@@ -20,6 +22,8 @@ for (const [index, [name, stem]] of [
   ["«Client-Resources»", "«Client-Resources»"],
   ["Client.Resources", "Client.Resources"],
   ["ClientRessourcesÉ", "ClientRessourcesÉ"],
+  ["«Library space»", "«Library space»"],
+  ["VersoSlidesVirPrettyMResources", "VersoSlidesVirPrettyMResources"],
   ["«Client\\Resources»", null],
 ].entries()) {
   const client = join(evidence, String(index));
@@ -30,17 +34,40 @@ for (const [index, [name, stem]] of [
   const configPath = join(client, "lakefile.lean");
   const providerConfig = replaceFixture(readFileSync(configPath, "utf8"),
     '"../../../.."', JSON.stringify(repositoryRoot));
-  const namedConfig = replaceFixture(providerConfig,
-    "lean_lib ClientResources where", `lean_lib ${name} where`);
-  const config = replaceFixture(namedConfig,
-    "  needs := #[`@client_fixture/ClientResources:virResourcePack]\n", "");
+  let config = replaceFixture(providerConfig,
+    "ClientResources", name, "all");
+  let sourceRoot = client;
+  if (index === 1) {
+    // Compose package and library source roots; leave recipes package-relative.
+    config = replaceFixture(config, "package client_fixture where",
+      'package client_fixture where\n  srcDir := "base source"');
+    sourceRoot = join(client, "base source");
+    mkdirSync(sourceRoot);
+    for (const source of ["program", "resources", "Client.lean"])
+      renameSync(join(client, source), join(sourceRoot, source));
+  }
+  let carrierPath = join(sourceRoot, "resources/Client/Resources.lean");
+  if (name === "VersoSlidesVirPrettyMResources") {
+    config = replaceFixture(config, ".one `Client.Resources",
+      ".one `VersoSlides.VirPrettyMResources");
+    const migrated = join(sourceRoot, "resources/VersoSlides");
+    mkdirSync(migrated);
+    const destination = join(migrated, "VirPrettyMResources.lean");
+    writeFileSync(destination, replaceFixture(readFileSync(carrierPath, "utf8"),
+      "Client.Resources", "VersoSlides.VirPrettyMResources"));
+    carrierPath = destination;
+  }
   writeFileSync(configPath, config);
+  writeFileSync(carrierPath, replaceFixture(readFileSync(carrierPath, "utf8"),
+    "include_vir_library ClientResources", `include_vir_library ${name}`));
   const recipe = readFileSync(join(client, "vir-resources/ClientResources.json"));
   if (stem) writeFileSync(join(client, `vir-resources/${stem}.json`), recipe);
   let previous;
   for (const phase of ["cold", "warm"]) {
-    const result = spawnSync("lake", ["build", `${name}:virResourcePack`], {
-      cwd: client,
+    const result = spawnSync("elan", ["run",
+      readFileSync(join(repositoryRoot, "lean-toolchain"), "utf8").trim(),
+      "lake", "--dir", client, "build", name], {
+      cwd: evidence,
       encoding: "utf8",
       timeout: 180000,
       maxBuffer: 8 * 1024 * 1024,
@@ -54,7 +81,7 @@ for (const [index, [name, stem]] of [
       break;
     }
     assert.equal(result.status, 0, `${name} ${phase}: ${log}`);
-    const stage = join(client, `.vir-generated/${stem}.virres`);
+    const stage = join(sourceRoot, `resources/.vir-generated/${stem}.virres`);
     const bytes = readFileSync(stage);
     const stat = statSync(stage, { bigint: true });
     if (previous) {

@@ -70,14 +70,17 @@ in [lakefile.lean](../../lakefile.lean), not commands the application must run.
    another generator or recompile sources. The diagnostic report stays internal.
 6. **Stage even on a hit.** Use the artifact path returned by Lake, which may be in
    its cache rather than the conventional output directory. Validate and repair
-   `.vir-generated/<Library>.virres` in the owning package. Preserve the semantic
-   input trace and add the stage's content trace before returning the artifact
-   path. The include expression uses the stable source-relative stage instead.
-7. **Embed.** `include_vir_bundle` validates the prepared pack and generates owned
-   Lean values. It performs no acquisition or subprocess build. The compiled
+   `.vir-generated/<Library>.virres` under the owning library's source directory.
+   Preserve the semantic input trace and add the stage's content trace before returning the artifact
+   path. The library-key include derives the same source root from the complete
+   module-relative source filename, not the caller's working directory.
+7. **Embed.** `include_vir_library LibraryName` validates the prepared pack and
+   generates owned Lean values. It performs no acquisition or subprocess build. The compiled
    native application can run without reopening the pack or producer checkout.
 
-The source-relative stage is an elaboration prerequisite, not the published
+Explicit source-relative `include_vir_bundle` remains available to low-level
+prepared-input tools. Neither include performs acquisition or triggers a build.
+The private stage is an elaboration prerequisite, not the published
 asset API. The setup map and report are build-local; only portable bundle members
 and metadata reach the application. Output preflight rejects symlink aliases
 before Lake can mutate owned output/trace/hash paths.

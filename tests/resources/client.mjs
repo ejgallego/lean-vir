@@ -138,7 +138,7 @@ if (published) {
   assert.ok(!existsSync(join(evidence, "absent-cache.virres")));
   assert.ok(!existsSync(join(evidence, "absent-stage.virres")));
 }
-const programStage = join(client, ".vir-generated/ClientResources.virres");
+const programStage = join(client, "resources/.vir-generated/ClientResources.virres");
 const programFirst = readFileSync(programStage);
 const first = [snapshot(programStage), snapshot(runtimeStage)];
 build("warm");
@@ -186,7 +186,7 @@ writeFileSync(programSource, initialSource);
 build("restored");
 
 // Native publication now needs only compiled/link prerequisites, not raw packs.
-renameSync(programStage, join(client, ".vir-generated/retained.virres"));
+renameSync(programStage, join(client, "resources/.vir-generated/retained.virres"));
 const destination = join(evidence, "relocated-site");
 run(
   "/tmp",

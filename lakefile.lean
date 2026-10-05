@@ -376,7 +376,7 @@ target virRuntimePack (pkg) : System.FilePath := do
         addTrace (← computeTrace (System.FilePath.mk source))
       addLeanTrace
       let cache := pkg.buildDir / "vir/resources/runtime" / s!"{contentId}.virres"
-      let stage := pkg.dir / ".vir-generated/VirResourceRuntime.virres"
+      let stage := pkg.srcDir / ".vir-generated/VirResourceRuntime.virres"
       -- Check the full profile before installation, in the same acquisition pass.
       proc { cmd := tool.toString, args := #["acquire", profile.toString, contentId, source,
         cache.toString, stage.toString] }
@@ -447,7 +447,7 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
             cmd := tool.toString
             args := #["build", recipe.toString, profile.toString, program.toString,
               lib.pkg.dir.toString, output.toString], env := ← getAugmentedEnv }
-        let stage := lib.pkg.dir / ".vir-generated" / s!"{stem}.virres"
+        let stage := lib.srcDir / ".vir-generated" / s!"{stem}.virres"
         -- Always repair/verify staging, even when Lake returns a cached artifact
         -- somewhere other than output. No restoration of conventional IR paths.
         discard <| captureProc {

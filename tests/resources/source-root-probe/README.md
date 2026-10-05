@@ -21,9 +21,10 @@ compile observation is obtained in its own package context. The mismatch control
 reuses Lake's actual setup and changes only the module name, preserving the
 basename while making its full suffix wrong.
 
-The reported `.vir-generated/<key>.virres` path is the **proposed** source-root
-stage, not a pack this fixture builds. The existing production facet still
-stages at the package root. Moving it requires a separate implementation and
-acceptance checkpoint. No resource acquisition, runtime/program packing,
+The reported `.vir-generated/<key>.virres` path is the source-root stage,
+not a pack this fixture builds. This diagnostic established the correspondence
+before production staging changed; the actual carrier behavior is qualified
+separately by the embedding, owning-library and resource-cache tests.
+No resource acquisition, runtime/program packing,
 embedding, artifact-cache restoration, filesystem relocation or downstream
 browser behavior is qualified here. Executed filesystem cases are Linux only.
