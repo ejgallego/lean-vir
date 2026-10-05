@@ -55,15 +55,68 @@ asks for that machinery.
 
 ## Agent Coordination
 
+- When present, read `WORKBOARD.md` in the primary checkout before choosing or
+  resuming work. It is the single private queue; do not create worktree copies.
+  The coordinator maintains priorities, next actions, and review readiness;
+  mailbox threads retain supporting evidence and ownership handoffs. Give new
+  or older sessions the canonical board path in their assignment.
+- Report discoveries with a proposed next action. The coordinator must put
+  deferred work on the board with an owner and revisit trigger, or explicitly
+  decline it; a mailbox mention of "after the PR" is not a queued task.
+- Choose the tools, models, and degree of delegation that best fit the task.
+  Work directly or use independent agents/subagents as useful; routine choices
+  need no additional permission. Consider correctness, context, latency, cost,
+  and coordination overhead, and adapt when the evidence changes.
+- Keep ownership clear and progress understandable. Existing active sessions
+  retain their lanes until an agreed handoff; delegation does not grant
+  ownership of their work.
 - Use the canonical mailbox at `.agents/mailbox/` in the primary/root
   checkout. Linked implementation worktrees must not create separate
   mailboxes.
 - Follow `docs/development/MAILBOX_PROTOCOL.md` for same-project and cross-project
   messages. A cross-project thread belongs to the project that owns the
   requested code change.
-- Read the mailbox and `git worktree list` before creating a lane. An explicit
-  claim records ownership; for implementation work, agents should
-  record the project-relative worktree, branch, base commit, and write scope.
+- Read the relevant mailbox threads and run `npm run mailbox:list -- --brief`
+  before creating or resuming a lane. Git reports current paths, heads, and
+  dirty work; messages report intent and checkpoints, not whether an agent is
+  still running. Use the full list or an individual message only when the brief
+  index identifies a relevant lane.
+- Give each implementation lane one accountable writer, a concrete agent
+  address, an explicit base commit, write scope, acceptance checks, and
+  publication boundary. Check for overlapping work before recording the claim.
+- For parallel work, the coordinating agent owns task decomposition,
+  dependencies, integration order, and final validation. Keep overlapping edits
+  sequential. Review agents may inspect a lane without acquiring write ownership.
+- Scale coordination to the work. Use explicit assignments, inspectable agent
+  IDs, and durable checkpoints for long or overlapping lanes; keep independent
+  work independent. Do not poll or message other lanes for routine status.
+- Be quiet by default. Owners update the board/evidence at meaningful state
+  changes; do not send chat or queue messages for each commit, build start, CI
+  start, or ordinary progress. The board is the status surface, not a trigger
+  for a notification.
+- Send one consolidated handoff only when a specific recipient needs to act:
+  request review/decision, take a dependency, wake an idle owner, or resolve a
+  blocker. `codex queue` is targeted wake-up/assignment, not a broadcast or
+  receipt mechanism. Do not send acknowledgments, receipt echoes, duplicate
+  completion reports, or unchanged CI updates. For PR checks, record the final
+  exact-head result once; report an earlier failure only if it changes scope or
+  blocks the next action.
+- Notify the human when their review/decision is needed, or promptly for a
+  material blocker or scope/ownership conflict. Otherwise keep the board current
+  and batch independent lane updates into one short digest when useful; do not
+  fan out routine status. Keep hashes, logs, and test inventories in evidence.
+  Default actionable handoffs to four lines: outcome, exact head/PR, decision
+  needed, and one evidence link.
+- For long non-interactive builds/tests, prefer `npm run quiet -- -- COMMAND`:
+  it stores full stdout/stderr under ignored `build/logs/`, prints one success
+  line, and prints a short tail only on failure. Do not use it for interactive
+  servers or when live progress is itself the diagnostic.
+- Continue approved work without another permission loop, but surface real
+  blockers and decisions promptly. Do not reply merely to acknowledge this rule.
+- Treat an agent's completion as a handoff for review. Verify the actual head,
+  diff, dirty state, and remaining work before consuming it. Transfer ownership
+  explicitly before another agent writes to the same lane. Use the protocol's
+  restart and handoff procedure after an interruption or model switch.
 - The validated envelope is deliberately small. Kinds, states, ownership, and
   lane metadata are recommended coordination conventions, not a requirement
   for free-form agent messages.

@@ -231,6 +231,32 @@ A thread can be archived only when **every** branch ends in `closed` or
 in the active mailbox. Archiving a thread does not remove its source worktree.
 Archived messages are deletable only after their outcome is retained durably.
 
+## Concise Checkpoints
+
+Use the mailbox for durable evidence, not a copy of every command transcript.
+At a meaningful handoff, the notification and the top of the evidence record
+should normally answer only:
+
+```text
+Outcome: ready, blocked, landed, or no-action
+Head/PR: exact commit and public review surface when applicable
+Decision: one action needed, or none
+Evidence: one durable file or report
+```
+
+Keep logs, hash inventories, repeated test output, and detailed rationale in
+the linked evidence. Do not send acknowledgement-only messages, unchanged CI
+updates, or duplicate completion reports. A real blocker or a decision that
+changes scope remains worth an immediate message.
+
+The board is the current status surface; a board/mailbox update does not by
+itself require a separate notification. Work quietly between action boundaries:
+do not announce routine claims, build/CI starts, or unchanged progress. Use
+`codex queue` only to wake or assign a specific owner, or to deliver a handoff
+that needs that owner's action. Batch independent status into one coordinator
+digest; notify the human when review/decision is needed or a material blocker
+changes the plan.
+
 ## Commands
 
 Validate and atomically publish a complete draft message:
@@ -272,6 +298,13 @@ Include terminal threads or emit JSON:
 ```bash
 npm run mailbox:list -- --all
 npm run mailbox:list -- --json
+```
+
+For routine lane selection, prefer the compact one-line index rather than the
+full human-readable checkpoint report:
+
+```bash
+npm run mailbox:list -- --brief
 ```
 
 Archive a wholly closed or cancelled thread:
