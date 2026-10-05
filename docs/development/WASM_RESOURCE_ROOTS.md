@@ -41,9 +41,13 @@ ownership/churn, Promise and two-instance checks, real trap retirement, payload
 collection while the runtime remains owned, and whole-generation GC. Existing
 fatal/host-error and Node/Chromium lifetime suites remain integration gates.
 
-This changes the low-level Wasm import/export surface and requires a matching
-runtime/artifact pair. It does not change the package wire format or enable
-wasm64. The compiled clear-path claim applies to the inspected optimized build;
+This changes the low-level Wasm import/export surface. Users must refresh their
+build setup and deploy matching JavaScript/Wasm assets from the same VIR
+revision/build; see [matching runtime assets](../guides/JS_API.md#matching-runtime-assets).
+Mixing revisions is unsupported and has undefined behavior, even if resources
+appear to work before disposal. For now, this unsupported combination is not a
+compatibility bug or merge blocker. This change does not alter the package wire
+format or enable wasm64. The compiled clear-path claim applies to the inspected optimized build;
 other compiler/profile configurations need the same inspection and tests.
 
 The allocator failure/reuse suite runs in both `npm test` and CI. The integrated

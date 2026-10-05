@@ -174,7 +174,10 @@ before initialization. Failure after initialization begins retires the instance.
 Manifest checksums detect corruption but do not prove agreement with binary call
 tables; the contract comparison is separately required. Runtime ABI 4 rejects
 Wasm without `vir_validate_package_contract`, rather than skipping validation.
-Use matching JavaScript and Wasm revisions. The check does not authenticate a
+Use JavaScript and Wasm from the same VIR revision/build. Users must refresh their
+build setup and deployed assets after updating VIR; mixed revisions are unsupported
+even when instantiation succeeds. See [matching runtime assets](../guides/JS_API.md#matching-runtime-assets).
+The check does not authenticate a
 package or prove that its IR implements its interface types; see the
 [format contract](IRPKG_FORMAT.md#section-directory).
 

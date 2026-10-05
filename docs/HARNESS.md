@@ -18,6 +18,19 @@ npm run doctor
 `third_party/lean4-src/`. `doctor` fails for missing required commands/artifacts
 and warns when Chromium is unavailable for browser checks.
 
+**After updating VIR, users must refresh their build setup and deployed assets.**
+Rerun setup for the current checkout, then `npm run build:site` when serving the
+site or producing its SDK archives. JavaScript runtime modules and both Wasm
+profiles must come from the same revision/build; replace them together and
+refresh stale browser/deployment caches. Client applications should reacquire
+the matching runtime/SDK and rerun their own normal build, rather than run VIR's
+contributor setup commands.
+
+Mixed-revision JavaScript/Wasm assets are unsupported and have undefined
+behavior, even if instantiation succeeds. For now, refreshing them is the
+user's responsibility; mixed-revision failures are outside the supported
+contract. See [matching runtime assets](guides/JS_API.md#matching-runtime-assets).
+
 The Wasm build defaults to 4 MiB initial memory and a 1 MiB stack. Set
 `VIR_WASM_INITIAL_MEMORY` and `VIR_WASM_STACK_SIZE` in bytes to change them.
 The size explorer additionally requires GNU `objdump`, `readelf` and `c++filt`

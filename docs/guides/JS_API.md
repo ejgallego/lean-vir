@@ -74,6 +74,23 @@ When `debugWasm` is true, the runtime derives `*.dev.wasm` from `wasmUrl`.
 Pass `wasmDebugUrl` when the debug artifact lives at a different URL. If no
 `wasmUrl` is supplied, the factory defaults to `vir-upstream.wasm`.
 
+### Matching runtime assets
+
+**Use JavaScript runtime modules and Wasm binaries from the same VIR
+revision/build. Users must refresh their build setup after updating VIR.**
+Rebuild or acquire the matching SDK/runtime, rerun the application's normal
+build to refresh its deployed assets, and replace the JavaScript modules and
+both Wasm profiles together. Refresh stale browser/deployment caches so they
+serve that same build. VIR contributors should follow the
+[repository setup and artifact commands](../HARNESS.md).
+
+Mixing old JavaScript with new Wasm, or the reverse, is unsupported and has
+undefined behavior. Instantiation may succeed without establishing compatible
+execution or disposal. An unchanged runtime ABI version number does not make
+different revisions interchangeable. For now, VIR provides no compatibility
+guarantee for mixed runtime revisions; refreshing the build and deployed assets
+is the user's responsibility.
+
 ## Runtime Module Map
 
 The browser app, Node wrapper, and SDK artifact share these JavaScript modules:

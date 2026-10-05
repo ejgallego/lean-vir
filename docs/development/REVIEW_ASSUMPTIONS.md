@@ -9,6 +9,26 @@ This is the shared review baseline for VIR and its integrations. Consumer-specif
 policies belong to the consumer; changing a shared contract requires an explicit
 handoff and agreement before either project implements against it.
 
+## Matching build revisions
+
+**Users are responsible for refreshing their build setup when updating VIR.**
+JavaScript runtime modules and Wasm binaries must come from the same VIR
+revision/build. Rebuild or acquire the matching SDK/runtime, regenerate the
+application's deployed assets with its normal build, and replace the JavaScript
+and both Wasm profiles together. Refresh stale browser/deployment caches too.
+VIR contributors should rerun the [repository setup and artifact commands](../HARNESS.md).
+
+Mixing old JavaScript with new Wasm, or new JavaScript with old Wasm, is
+unsupported and has undefined behavior. Successful instantiation or an unchanged
+ABI version number does not establish compatibility between revisions. For now,
+failures caused by such mixing are outside the supported contract and are not
+product bugs or merge blockers. Do not add compatibility adapters, version gates,
+or automatic deployment machinery solely to support mixed revisions.
+
+The requirement applies to runtime assets. It does not waive the documented
+checks for supported program packages, acquisition, corruption or ownership.
+See [matching runtime assets](../guides/JS_API.md#matching-runtime-assets).
+
 ## What must work
 
 Following the instructions must produce a compatible, usable program. Review
