@@ -490,8 +490,8 @@ callers can use `BigInt(result)` when they need a JavaScript integer.
 See the [fixed-width ABI](../reference/OBJECT_ABI.md#fixed-width-integers)
 for the underlying transport and low-level exports.
 
-ByteArray results are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript
-numbers. Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them
+ByteArray results are returned as `Uint8Array`; `Float` and `Float32` values are
+JavaScript numbers. Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them
 use generated Lean `_boxed` declarations automatically.
 
 `Lean.Vir.JsValue.ofFloat` and `Lean.Vir.JsValue.toFloat` also accept every

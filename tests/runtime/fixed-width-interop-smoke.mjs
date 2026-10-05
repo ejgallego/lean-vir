@@ -60,9 +60,9 @@ try {
     assert.throws(() => wide(0), /disposed runtime/);
 
     const input = { wide: [0n, 1n << 63n, max64], indices: [0n, 1n << 31n, max32] };
-    const roots = runtime.hostState.resourceRoots.debugCounts().active;
+    const roots = runtime.hostState.resourceRootCounts().active;
     assert.deepEqual(runtime.call("payloadRoundtrip", input), expected);
-    assert.equal(runtime.hostState.resourceRoots.debugCounts().active, roots);
+    assert.equal(runtime.hostState.resourceRootCounts().active, roots);
     for (const [field, constructor, typeName] of [
       ["wide", "vir_obj_uint64_scalar", "UInt64"],
       ["indices", "vir_obj_usize_scalar", "USize"],
@@ -90,7 +90,7 @@ try {
         runtime.exports = original;
       }
       assert.equal(runtime.failure, null);
-      assert.equal(runtime.hostState.resourceRoots.debugCounts().active, roots);
+      assert.equal(runtime.hostState.resourceRootCounts().active, roots);
     }
     rejectHostResult = null;
     assert.deepEqual(runtime.call("payloadRoundtrip", input), expected);
