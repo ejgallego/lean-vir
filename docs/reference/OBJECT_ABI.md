@@ -4,8 +4,8 @@ This guide describes the JavaScript-driven construction and inspection path for
 Lean runtime objects.
 
 Object construction, inspection and ownership belong to the official
-[support scope](../SUPPORT.md). DOM/React examples and broad automatic structural
-conversion described below remain experimental conveniences above that API.
+[support scope](../SUPPORT.md). DOM/React examples and automatic conversion of
+records and custom inductives remain experimental conveniences above that API.
 
 The object ABI is the JavaScript runtime call surface for package
 entrypoints, host imports, callbacks, and resources. Interface descriptors

@@ -2,8 +2,9 @@
 
 The [support scope](../SUPPORT.md) covers runtime loading, object ownership and
 minimal two-way interop. This reference also describes experimental DOM/UI
-providers and broad automatic structural conversion. The default browser entry
-includes experimental providers; using that entry does not expand official support.
+providers and automatic conversion of records and custom inductives. The default
+browser entry includes experimental providers; using that entry does not expand
+official support.
 
 `web/src/vir-runtime.js` loads `vir-upstream.wasm`, loads a non-empty set of
 manifest-bearing `.irpkg` members, and exposes their aggregate Lean declarations

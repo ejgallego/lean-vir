@@ -106,8 +106,9 @@ applications with the complete resource example:
 https://github.com/ejgallego/lean-vir/blob/main/docs/guides/EMBEDDED_RESOURCES.md
 
 Official support covers the runtime, packages, object API and minimal JS/Lean
-interop. DOM, React/JSX, widgets and broad generated or automatic conversion
-conveniences are experimental, including when shipped in this archive.
+interop. DOM, React/JSX, widgets, broad generated bindings and automatic conversion
+of records and custom inductives are experimental, including when shipped in this
+archive. Arrays inherit the support status of their element representations.
 See the support scope for details and the planned 0.1.1 JSON converter API:
 https://github.com/ejgallego/lean-vir/blob/main/docs/SUPPORT.md
 
