@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 #include "resource_abi.h"
+#include "resource_roots.h"
 
 #include <stdint.h>
 
@@ -15,10 +16,6 @@ Author: Emilio J. Gallego Arias
 #endif
 
 static_assert(sizeof(uintptr_t) >= sizeof(uint32_t), "resource root ID must fit in the opaque payload");
-
-extern "C" uint32_t vir_resource_root(__externref_t value);
-extern "C" __externref_t vir_resource_get(uint32_t root_id);
-extern "C" void vir_resource_release(uint32_t root_id);
 
 namespace lean {
 namespace {

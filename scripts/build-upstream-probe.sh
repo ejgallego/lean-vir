@@ -114,9 +114,6 @@ npm run --silent generate:boundary-registry
 
 cat > "$allowed_undefined" <<'EOF'
 vir_js_call_objects
-vir_resource_get
-vir_resource_release
-vir_resource_root
 EOF
 
 package_start=$SECONDS
@@ -284,6 +281,7 @@ constructor_support_sources=(
 
 shim_sources=(
   "wasm/upstream_shim/abi/resource_abi.cpp"
+  "wasm/upstream_shim/abi/resource_roots.cpp"
   "wasm/upstream_shim/interpreter/interpreter_bridge.cpp"
   "wasm/upstream_shim/abi/call_abi.cpp"
   "wasm/upstream_shim/runtime/name_utils.cpp"

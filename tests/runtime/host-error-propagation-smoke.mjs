@@ -59,7 +59,7 @@ try {
   });
   const counter = runtime.call(prefix + "newCounter");
   try {
-    const rootedValues = runtime.hostState.resourceRoots.debugCounts().active;
+    const rootedValues = runtime.hostState.resourceRootCounts().active;
     for (const method of ["call", "callTimed"]) {
       assert.throws(() => runtime[method](prefix + "failThenWork", counter), error => error === failure);
       assert.equal(runtime.call(prefix + "readCounter", counter), "0", "Lean continuation must not mutate its reference");
@@ -67,13 +67,13 @@ try {
       assert.equal(hostCalls, 0, "later native effects must not run");
       assert.equal(runtime.hostState.callError, null);
       assert.equal(runtime.hostState.callTimings.length, 0);
-      assert.equal(runtime.hostState.resourceRoots.debugCounts().active, rootedValues,
+      assert.equal(runtime.hostState.resourceRootCounts().active, rootedValues,
         "failed calls must release their temporary argument roots");
     }
     const callback = runtime.call(prefix + "failureCallback", counter);
     const invokeCallback = runtime.call(prefix + "invocationCallback", callback);
     const roots = runtime.liveCallbacks.size;
-    const resourceRoots = runtime.hostState.resourceRoots.debugCounts().active;
+    const resourceRoots = runtime.hostState.resourceRootCounts().active;
     assert.throws(() => callback(undefined), error => error === failure);
     for (nestedMethod of ["call", "callTimed", "closure"]) {
       for (const [outer, invoke] of [
@@ -93,7 +93,7 @@ try {
           assert.equal(runtime.hostState.callError, null);
           assert.equal(runtime.hostState.callTimings.length, 0);
           assert.equal(runtime.liveCallbacks.size, roots);
-          assert.equal(runtime.hostState.resourceRoots.debugCounts().active, resourceRoots,
+          assert.equal(runtime.hostState.resourceRootCounts().active, resourceRoots,
             "nested calls must release their temporary argument roots");
           assert.equal(runtime.call(prefix + "readCounter", counter), "0");
           assert.equal(hostCalls, 0, "caught errors must still stop the failed Lean continuation");

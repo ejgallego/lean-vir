@@ -84,6 +84,11 @@ export async function runGenerationLifecycleCases(
     throw new Error("host cleanup sentinel");
   };
   const failedState = failures.runtime.hostState;
+  const exports = failures.runtime.exports;
+  check(exports.vir_obj_resource({ label: "retained during cleanup failure" }) !== 0,
+    "cleanup-failure payload acquires a Wasm root");
+  check(exports.vir_resource_roots_active() > 0,
+    "table has live roots before failed shutdown");
   const counts = injectReleaseFailures(failures.runtime);
   rejects(() => failures.runtime.dispose(), /cleanup|teardown/i);
   check(
@@ -96,7 +101,8 @@ export async function runGenerationLifecycleCases(
     "failed shutdown clears tracked foreign roots",
   );
   check(
-    failedState.resourceRoots.debugCounts().active === 0,
+    exports.vir_resource_roots_active() === 0 &&
+      exports.vir_resource_roots_reusable() === 0,
     "failed shutdown clears externrefs",
   );
   failures.runtime.dispose();
@@ -216,7 +222,7 @@ export async function runSharedBindingGcCases(
 async function makeSharedGraph(factory, packageBytes, bindings = null) {
   const runtime = await factory.createRuntime({ irPackageSet: [packageBytes] });
   const jsl = makeJsl(runtime, "shared");
-  runtime.hostState.resourceRoots.root(jsl);
+  runtime.exports.vir_obj_resource(jsl);
   if (bindings !== null) bindings.retained = jsl;
   return new WeakRef(runtime);
 }

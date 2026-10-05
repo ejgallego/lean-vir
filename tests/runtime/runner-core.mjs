@@ -63,6 +63,7 @@ export const runtimeTests = Object.freeze(
       file: "custom-inductive-normalization-smoke.mjs",
       group: "pure",
     },
+    { id: "resource-roots", file: "resource-roots-smoke.mjs", group: "pure", nodeArgs: ["--expose-gc"] },
     { id: "object-abi", file: "object-abi-smoke.mjs", group: "pure" },
     {
       id: "object-abi-structural",

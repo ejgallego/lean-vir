@@ -74,6 +74,23 @@ When `debugWasm` is true, the runtime derives `*.dev.wasm` from `wasmUrl`.
 Pass `wasmDebugUrl` when the debug artifact lives at a different URL. If no
 `wasmUrl` is supplied, the factory defaults to `vir-upstream.wasm`.
 
+### Matching runtime assets
+
+**Use JavaScript runtime modules and Wasm binaries from the same VIR
+revision/build. Users must refresh their build setup after updating VIR.**
+Rebuild or acquire the matching SDK/runtime, rerun the application's normal
+build to refresh its deployed assets, and replace the JavaScript modules and
+both Wasm profiles together. Refresh stale browser/deployment caches so they
+serve that same build. VIR contributors should follow the
+[repository setup and artifact commands](../HARNESS.md).
+
+Mixing old JavaScript with new Wasm, or the reverse, is unsupported and has
+undefined behavior. Instantiation may succeed without establishing compatible
+execution or disposal. An unchanged runtime ABI version number does not make
+different revisions interchangeable. For now, VIR provides no compatibility
+guarantee for mixed runtime revisions; refreshing the build and deployed assets
+is the user's responsibility.
+
 ## Runtime Module Map
 
 The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
@@ -90,12 +107,12 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `runtime/core.js`                    | Package loading, manifest export tables, call resolution, memory helpers, and runtime/callback lifecycle. |
 | `runtime/object-values.js`           | Object ABI lowering and lifting between JavaScript values and owned Lean objects.                         |
 | `runtime/vir-codec.js`               | Byte normalization, contract writer and live descriptor accessors.                                                 |
-| `runtime/host-state.js`              | Host import dispatch, exact-value externref roots, binding lookup, and disposal.                          |
+| `runtime/host-state.js`              | Host import dispatch, binding lookup, Wasm root diagnostics/terminal clearing, and disposal.              |
 | `runtime/object-abi.js`              | Object ABI support checks, layout planning, scalar packing, and unpacking helpers.                        |
 | `runtime/object-abi-exports.js`      | Shared object ABI export-name manifest used by runtime checks and Wasm linker tooling.                    |
 | `runtime/vir-value-normalizers.js`   | Input normalization helpers used by object ABI lowering.                                                  |
 | `vir-host-bindings.js`               | Public common/browser host binding factories and stable re-exports.                                       |
-| `host-boundary.js`                   | Exact-value externref roots and host-call rollback transactions.                                          |
+| `host-boundary.js`                   | Host-call rollback transactions for unpublished resources.                                               |
 | `host/vir-active-host-bindings.js`   | Shared active lifecycle plus schedule and frame teardown.                                                 |
 | `host/vir-infoview-host-bindings.js` | Repository-owned infoview/ProofWidgets command protocol and validation.                                   |
 | `react/vir-react-root.js`            | Exact React root creation, rendering, and teardown forwarding.                                            |
@@ -112,6 +129,13 @@ The SDK archive also contains the nested `runtime/`, `host/`, and `react/`
 modules because those public entry files use relative imports. Treat those
 nested modules as revision-locked internals unless this document explicitly
 names an entry point above.
+
+Create managed runtimes through `createVirRuntime`, `createVirRuntimeFactory`,
+or the public `VirRuntimeFactory`. All these paths attach an internal host state,
+including in Node or when binding maps are null/empty. Direct construction of
+`runtime/core.js`'s `VirRuntime` is an internal harness operation, not a supported
+application creation API; its optional fields permit focused ABI test fixtures,
+not arbitrary combinations with the full factory lifecycle contract.
 
 ## Host Bindings
 
@@ -577,15 +601,18 @@ awaited. Object-style `imports` factory options are treated as
 overrides on top of the generated import table. If you provide a custom
 `imports` function to `createVirRuntimeFactory`, call
 `createVirImports(module, overrides, hostState)` or otherwise install
-`env.vir_js_call_objects` plus the `env.vir_resource_*` root-table imports.
+`env.vir_js_call_objects` when the module requires it. Resource root/get/release
+operations are local to Wasm and no longer require JavaScript imports.
 
 The default import table recognizes the VIR hooks and the Preview 1 imports
 linked by the shipped reactor. It provides no WASI process arguments,
 environment, clock, file descriptors or polling service: these calls return
 `NOSYS` or `BADF`; `sched_yield` succeeds and `proc_exit` throws. Supply explicit
 overrides when an extension needs these services. Any other unresolved import
-is rejected by name before instantiation. Hostless low-level linking is allowed,
-but calling a VIR hook without an attached host state throws.
+is rejected by name before instantiation. Low-level `createVirImports` can link a
+module without an attached host state, but invoking its host-dispatch hook throws.
+This linking utility does not provide managed runtime construction or disposal;
+use the factory for that lifecycle.
 
 Custom imports can be declared directly:
 
@@ -706,8 +733,11 @@ including ordinary Lean IO errors: initialization can publish persistent values
 and opaque handles before failing. The factory can reuse its compiled Wasm
 module while creating a fresh instance.
 
-`dispose()` remains idempotent after failure. It releases JavaScript-owned host
-resources and invalidates callbacks/handles without re-entering failed Wasm.
+`dispose()` remains idempotent after failure. It disposes runtime-owned fresh host
+providers, invalidates callbacks/handles, and terminally clears the Wasm-owned
+resource table through a narrow operation that does not enter the interpreter
+or inspect Lean heap objects. All ordinary execution and Lean heap cleanup stay
+blocked in a failed instance.
 Traps do not unwind the interpreter's C++ frames: its remaining allocations are
 reclaimed with the Wasm instance when no references retain it. Keep the
 runtime-owned `exports` facade intact; replacing it bypasses these guards.

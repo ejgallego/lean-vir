@@ -9,6 +9,49 @@ This is the shared review baseline for VIR and its integrations. Consumer-specif
 policies belong to the consumer; changing a shared contract requires an explicit
 handoff and agreement before either project implements against it.
 
+## Matching build revisions
+
+**Users are responsible for refreshing their build setup when updating VIR.**
+JavaScript runtime modules and Wasm binaries must come from the same VIR
+revision/build. Rebuild or acquire the matching SDK/runtime, regenerate the
+application's deployed assets with its normal build, and replace the JavaScript
+and both Wasm profiles together. Refresh stale browser/deployment caches too.
+VIR contributors should rerun the [repository setup and artifact commands](../HARNESS.md).
+
+Mixing old JavaScript with new Wasm, or new JavaScript with old Wasm, is
+unsupported and has undefined behavior. Successful instantiation or an unchanged
+ABI version number does not establish compatibility between revisions. For now,
+failures caused by such mixing are outside the supported contract and are not
+product bugs or merge blockers. Do not add compatibility adapters, version gates,
+or automatic deployment machinery solely to support mixed revisions.
+
+The requirement applies to runtime assets. It does not waive the documented
+checks for supported program packages, acquisition, corruption or ownership.
+See [matching runtime assets](../guides/JS_API.md#matching-runtime-assets).
+
+## Supported runtime construction
+
+Applications create runtimes through `createVirRuntime`,
+`createVirRuntimeFactory` or the public `VirRuntimeFactory`. These paths always
+attach a `VirHostState`, including in Node and with null/empty binding maps.
+No application bindings does not mean no internal host state.
+
+The SDK ships nested modules to resolve its public entry points' relative imports;
+this does not make their constructors an application API. Tests and the upstream
+harness directly construct `runtime/core.js`'s `VirRuntime`, sometimes with
+partial exports or no host state, to exercise individual ABI operations. These
+fixtures do not establish a supported managed runtime lifecycle for every such
+combination. Low-level `createVirImports` without host state supports linking;
+it does not supply the factory's instance ownership and disposal contract.
+
+In particular, roots retained after disposing a directly constructed
+`new VirRuntime(exports)` with no host state are a known internal consistency
+limitation, not a demonstrated supported-application defect or a merge blocker.
+Revisit if a documented public creation path reproduces it, or the maintainer
+explicitly selects broader constructor support. Raw loader exports likewise
+require their documented caller preconditions; private resource IDs are not a
+public reusable-handle API.
+
 ## What must work
 
 Following the instructions must produce a compatible, usable program. Review
@@ -66,9 +109,12 @@ application work budgets belong at the application boundary.
 
 ## How to review and change behavior
 
-1. Identify the supported workflow and authoritative input for the finding. If it
-   requires unsupported artifact manipulation, label it as such rather than
-   treating it as a product blocker.
+1. Identify the documented public entry point, supported configuration, caller
+   preconditions and concrete wrong behavior. A test importing an internal class
+   is not sufficient evidence of application support. Label internal consistency,
+   unsupported use and preventive hardening separately from supported-path bugs;
+   do not treat them as automatic product blockers. New supported-caller evidence
+   can change the classification.
 2. Reproduce an inferred defect before changing behavior. Prefer a small real
    producer/consumer case over a new harness or broad validation framework.
 3. Keep entry points thin over canonical acquisition, analysis and encoding.

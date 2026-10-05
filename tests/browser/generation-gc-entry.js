@@ -61,6 +61,11 @@ async function runFatalRecovery(wasmModule, irPackageSet) {
     const oldCallback = captured;
     const state = bad.hostState;
     const held = makeJsl(bad, "retained across trap");
+    const exports = bad.exports;
+    check(exports.vir_obj_resource({ label: "retained browser payload" }) !== 0,
+      "browser payload acquires a Wasm root");
+    check(exports.vir_resource_roots_active() > 0,
+      "browser table has live roots before trap");
     let failure;
     try { bad.exports.vir_obj_nat(0xfffffff0, 32); }
     catch (error) { failure = error; }
@@ -76,8 +81,10 @@ async function runFatalRecovery(wasmModule, irPackageSet) {
       check(rejected, "trapped generation rejects callback, handle and installation");
     }
     bad.dispose(); bad.dispose();
-    check(state.resourceRoots.debugCounts().active === 0 &&
-      state.leanObjectHandleCells.size === 0 && bad.liveCallbacks.size === 0,
+    check(exports.vir_resource_roots_active() === 0 &&
+      exports.vir_resource_roots_reusable() === 0,
+      "browser disposal clears the Wasm table after trap");
+    check(state.leanObjectHandleCells.size === 0 && bad.liveCallbacks.size === 0,
       "browser disposal releases JavaScript roots after trap");
     for (const runtime of [good, recovered = await factory.createRuntime({ irPackageSet })]) {
       runtime.call("HostInterop.callbackRoundTrip", 3);
@@ -164,7 +171,7 @@ async function runReactChurn(createRuntime) {
       "React render foreign-root recovery",
     );
     check(
-      runtime.hostState.resourceRoots.debugCounts().active === 0,
+      runtime.hostState.resourceRootCounts().active === 0,
       "React externrefs return to zero",
     );
     return counts;

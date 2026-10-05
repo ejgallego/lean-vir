@@ -84,11 +84,25 @@ asks for that machinery.
 
 ## Development Notes
 
+- JavaScript runtime modules and Wasm binaries must come from the same VIR
+  revision/build. Users are responsible for refreshing their build setup,
+  replacing deployed assets together, and refreshing stale browser/deployment
+  caches after updating VIR. Mixing revisions is unsupported and has undefined
+  behavior, even when instantiation succeeds. For now, do not treat mixed-revision
+  failures as product bugs or merge blockers, or add compatibility adapters,
+  version gates, or deployment machinery solely to support that combination.
+  See [matching runtime assets](docs/guides/JS_API.md#matching-runtime-assets).
+
 - Follow [the review assumptions](docs/development/REVIEW_ASSUMPTIONS.md).
   Supported workflows assume cooperative users/developers; unsupported artifact
   manipulation has undefined behavior. Justify checks by ordinary configuration,
   acquisition, compatibility, portability or ownership failures, not an implicit
   hostile-input threat model. Reproduce inferred defects before changing behavior.
+  For runtime findings, identify the documented public caller and its required
+  preconditions. Internal constructors, partial test fixtures and shipped helper
+  modules do not establish support for every combination of optional arguments.
+  Separate supported-path defects from internal consistency and optional hardening;
+  do not expand the API contract merely to make an unsupported reproducer work.
 
 - Keep generated `build/` outputs out of Git.
 - Keep generated `web/dist/` outputs out of Git.

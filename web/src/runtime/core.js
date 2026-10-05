@@ -11,6 +11,7 @@ import { releaseCallbackRoots } from "./callbacks.js";
 import { RuntimeCallTiming } from "./call-timing.js";
 import { asError, collectCleanupError, throwCollectedErrors } from "./cleanup.js";
 import { ObjectValueRuntime } from "./object-values.js";
+import { RESOURCE_ROOT_EXPORTS } from "./object-abi-exports.js";
 import {
   asBytes,
   requireFunctionArgs,
@@ -26,6 +27,10 @@ const textDecoder = new TextDecoder();
 const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
 
+// Internal runtime implementation; applications construct it through the public
+// factory, which always supplies hostState and owns instance setup/retirement.
+// Omitted state/partial exports support focused ABI harness fixtures, not the
+// factory's complete lifecycle contract for arbitrary constructor combinations.
 export class VirRuntime extends ObjectValueRuntime {
   constructor(
     exports,
@@ -645,6 +650,10 @@ const abandonedCleanupExports = new Set([
   "vir_obj_dec", "vir_free_bytes", "vir_closure_release", "vir_abort_ir_package_set",
 ]);
 
+// These operations touch only the externref table and fixed root-manager
+// globals. They do not enter the abandoned Lean heap or interpreter.
+const retirementSafeExports = new Set(RESOURCE_ROOT_EXPORTS);
+
 function guardWasmExports(exports, hostState) {
   const listeners = new Set();
   const schedule = (subscription) => {
@@ -683,7 +692,7 @@ function guardWasmExports(exports, hostState) {
   };
   for (const [name, value] of Object.entries(exports)) {
     boundary.exports[name] = typeof value !== "function" ? value : (...args) => {
-      if (boundary.failure !== null) {
+      if (boundary.failure !== null && !retirementSafeExports.has(name)) {
         if (abandonedCleanupExports.has(name)) return 0;
         throw new Error("VirRuntime failed during Wasm execution; create a fresh runtime", { cause: boundary.failure });
       }
@@ -691,7 +700,7 @@ function guardWasmExports(exports, hostState) {
         const result = value(...args);
         // A host binding may have caught a nested fatal call. It cannot revive
         // the shared instance by returning an apparently successful result.
-        if (boundary.failure !== null) throw boundary.failure;
+        if (boundary.failure !== null && !retirementSafeExports.has(name)) throw boundary.failure;
         return result;
       } catch (error) {
         throw boundary.fail(error);
