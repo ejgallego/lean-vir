@@ -9,6 +9,8 @@ interop:
 - Generation and client loading of `.irpkg` programs and package sets.
 - Explicit host bindings, calling Lean from JavaScript, JavaScript values with
   preserved identity, Lean-backed `JSL` values, and Lean callbacks.
+- Automatic conversion of arrays whose elements use supported representations,
+  such as `Array Nat`. Arrays inherit the support status of their elements.
 - Downstream Lake setup and acquisition of an exact compatible precompiled
   runtime, without building Wasm in an application.
 
@@ -30,8 +32,9 @@ contracts from automatic structural conversion.
 
 DOM, canvas, React, JSX, ProofWidgets, Infoview, editor/RPC integration and UI
 lifecycle adapters are experimental. Broad generated JavaScript convenience
-bindings and automatic structural marshaling are also outside the minimal
-supported interop contract. Their guides and tests remain useful for trying them.
+bindings and automatic conversion of records and custom inductives are also
+outside the minimal supported interop contract. Their guides and tests remain
+useful for trying them.
 
 The `Vir` umbrella import and default browser host providers currently include
 experimental helpers. An API being shipped, tested, or available through those

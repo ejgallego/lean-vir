@@ -28,9 +28,10 @@ There are two distinct lanes:
   JavaScript identity handles.
 
 Low-level object construction and ownership stay within the supported scope.
-Automatic descriptor-guided conversion of structures and other aggregate values
-is an experimental convenience above that contract. An accepted manifest shape
-does not extend official support to its automatic conversion. See
+Automatic array conversion is supported when its element representation is
+supported. Automatic conversion of structures and custom inductives remains
+experimental; accepting their manifest shapes does not extend official support
+to their automatic conversion. See
 [choosing a representation](../guides/LEAN_VIR_LIBRARY.md#choose-a-boundary-representation)
 for explicit JS values, opaque Lean carriers and callbacks.
 

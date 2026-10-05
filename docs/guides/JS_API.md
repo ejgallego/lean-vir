@@ -406,9 +406,11 @@ and reporting UI remain consumer-owned and should be timed outside this API.
 This is a JavaScript runtime API addition; it requires no Wasm ABI, `.irpkg`
 package-format, or Lean toolchain version change.
 
-The types below describe what the current marshaller accepts. Broad automatic
-structural conversion remains experimental even when package generation accepts
-its descriptor. See [choosing a representation](LEAN_VIR_LIBRARY.md#choose-a-boundary-representation)
+The types below describe what the current marshaller accepts. Automatic array
+conversion is supported when its element representation is supported, such as
+`Array Nat`. Automatic conversion of records and custom inductives remains
+experimental even when package generation accepts its descriptor. See
+[choosing a representation](LEAN_VIR_LIBRARY.md#choose-a-boundary-representation)
 for minimal reference interop.
 
 Implemented interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,

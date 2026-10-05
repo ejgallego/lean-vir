@@ -33,9 +33,10 @@ a Lean string, a native JavaScript string, and an opaque carrier holding a Lean
 string. `JsValue.ofString` / `toString` explicitly convert between the first two;
 `LeanRef.toJSL` keeps the Lean value opaque instead. Their details are below.
 
-The runtime also implements automatic structural conversion for records,
-inductives and other aggregate values. That convenience remains experimental;
-see the [implemented call representations](JS_API.md#calls-and-manifest).
+Automatic array conversion is supported when the element representation is
+supported, for example `Array Nat`. Automatic conversion of records and custom
+inductives remains experimental; see the
+[implemented call representations](JS_API.md#calls-and-manifest).
 Explicit host-value conversions and opaque carriers do not encode JSON. The
 [planned 0.1.1 JSON converters](../SUPPORT.md#planned-for-011) are a separate API.
 
@@ -261,7 +262,8 @@ for its restrictions and ownership rules.
 
 Exported Lean functions may use the implemented
 [structural interface types](../reference/IRPKG_FORMAT.md#interface-descriptors).
-Automatic structural conversion remains experimental as described above.
+Automatic conversion of records and custom inductives remains experimental as
+described above; arrays inherit the support status of their elements.
 Ordinary `@[vir_js "target.name"]` host imports have a narrower boundary:
 `Unit`, exact `Js`/nullable values, and top-level Lean callback arguments
 whose own arguments and result are `Unit` or JS values. Nested callbacks
