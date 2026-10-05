@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { BinaryWriter } from "./vir-codec.js";
-import { objectTypeNeedsBoxedBoundary } from "./object-abi.js";
+import { objectTypeNeedsBoxedBoundary } from "./object-boundary.js";
 
 const encoder = new TextEncoder();
 

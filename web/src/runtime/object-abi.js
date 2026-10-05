@@ -7,8 +7,6 @@ Author: Emilio J. Gallego Arias
 import {
   normalizeUint32,
   requireCustomInductiveConstructors,
-  requireFunctionArgs,
-  requireFunctionResult,
   requireStructureFields,
   requireTaggedUnionConstructors,
   requireTypeField,
@@ -22,6 +20,15 @@ import {
   normalizeInteger,
 } from "./vir-value-normalizers.js";
 export { OBJECT_VALUE_EXPORTS } from "./object-abi-exports.js";
+import { trivialStructureField } from "./object-boundary.js";
+export {
+  objectTypeNeedsBoxedBoundary,
+  trivialStructureField,
+} from "./object-boundary.js";
+export {
+  directJsArgumentSupported,
+  directJsResultSupported,
+} from "./js-value-support.js";
 
 const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
@@ -108,48 +115,6 @@ export function objectResultSupported(type, selfType = null) {
   }
 }
 
-export function directJsArgumentSupported(type) {
-  if (directJsValueSupported(type)) {
-    return true;
-  }
-  if (type?.interfaceTag !== INTERFACE_TAG.FUNCTION) {
-    return false;
-  }
-  const args = requireFunctionArgs(type, "host resource callback");
-  return args.every((arg) => directJsValueSupported(arg.type)) &&
-    directJsValueSupported(requireFunctionResult(type, "host resource callback"));
-}
-
-export function directJsResultSupported(type) {
-  return directJsValueSupported(type);
-}
-
-function directJsValueSupported(type) {
-  switch (type?.interfaceTag) {
-    case INTERFACE_TAG.UNIT:
-    case INTERFACE_TAG.RESOURCE:
-      return true;
-    default:
-      return false;
-  }
-}
-
-export function objectTypeNeedsBoxedBoundary(type) {
-  switch (type?.interfaceTag) {
-    case INTERFACE_TAG.FLOAT:
-    case INTERFACE_TAG.FLOAT32:
-    case INTERFACE_TAG.UINT64:
-      return true;
-    case INTERFACE_TAG.STRUCTURE: {
-      const fields = requireStructureFields(type, "object boundary");
-      const trivial = trivialStructureField(type, fields);
-      return trivial !== null && objectTypeNeedsBoxedBoundary(trivial.type);
-    }
-    default:
-      return false;
-  }
-}
-
 function objectStructureSupported(type, fieldSupported) {
   const fields = requireStructureFields(type, "object structure");
   const trivial = trivialStructureField(type, fields);
@@ -196,17 +161,6 @@ function objectFieldPlanSupported(fieldPlan, fieldSupported, selfType) {
     default:
       return false;
   }
-}
-
-export function trivialStructureField(type, fields) {
-  const index = type?.trivialFieldIndex;
-  if (!Number.isInteger(index)) {
-    return null;
-  }
-  if (index < 0 || index >= fields.length) {
-    throw new Error(`${type?.type ?? "structure"} has invalid trivial field index`);
-  }
-  return fields[index];
 }
 
 export function taggedUnionField(ctor) {

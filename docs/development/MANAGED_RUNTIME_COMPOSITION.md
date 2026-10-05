@@ -1,0 +1,70 @@
+# Managed runtime composition
+
+The public browser and Node factories use the full runtime composition. Their
+construction, ownership, conversion and retirement contracts remain unchanged.
+The internal primitive composition serves clients that keep large
+Lean values opaque through `JSL`, including Lean functions that capture those
+values. It is not an additional public package entry.
+
+Both compositions share these modules:
+
+| Module | Responsibility |
+| --- | --- |
+| `factory-core.js` | Wasm acquisition, one host state per instance, package-set creation and construction-failure cleanup |
+| `managed-core.js` | Package admission, startup, calls, argument transfer, failed-generation quarantine and retirement |
+| `object-core.js` | Object transport and consuming calls, exact JavaScript resources and the single JSL ownership registry |
+| `primitive-values.js` | Unit, resources, booleans, numeric values, strings and byte-array conversion |
+| `object-boundary.js` | Boxed-boundary requirements used by package admission |
+| `host-state.js` | Host-call transactions, JSL cell tracking and binding-provider cleanup |
+
+The full `core.js` composition adds `object-values.js`: arrays, lists, options,
+pairs, structures, inductives, `Lean.Expr` and automatic Lean-function conversion
+to JavaScript callables. Its primitive cases delegate to the shared implementation.
+Owned collection and constructor builders also stay in this optional layer.
+The internal `primitive-factory.js` imports none of those structural converters
+or their layout/normalization modules. It uses the same factory and lifecycle;
+it does not establish a separate raw construction or retirement protocol.
+
+A primitive client supplies host bindings through the existing factory options,
+including a fresh default builder when required. Public browser and Node entries
+continue selecting their usual providers. Imports remain declarative: there is
+no mutable codec registry or runtime feature flag.
+
+For example, a thin Lean boundary can expose:
+
+```lean
+buildHeld : Nat → RuntimeM (JSL (Array Nat))
+advanceHeld : JSL (Array Nat) → Nat → RuntimeM (JSL (Array Nat))
+summarizeHeld : JSL (Array Nat) → RuntimeM String
+makeSummaryHeld : JSL (Array Nat) → RuntimeM (JSL (Unit → String))
+invokeSummaryHeld : JSL (Unit → String) → RuntimeM String
+```
+
+JavaScript transports opaque carriers between these calls. Lean owns traversal
+and function application; JavaScript only converts the small primitive inputs
+and summary results. The existing JSL identity, liveness and instance checks
+apply to state and function carriers alike.
+
+An unsupported structural entry is rejected before argument lowering or native
+execution. Package admission still validates the complete binary contract and
+metadata; omitting converters does not relax it. Ordinary managed callbacks
+retain their existing invocation metadata and closure-root protocol in the full
+composition. This extraction does not unify or remove that protocol.
+Host imports that receive Lean callbacks as ordinary JavaScript functions also
+need the full callable converter. A primitive JSL client can instead schedule a
+JavaScript closure that calls its explicit Lean `invoke...` boundary with the
+opaque function carrier.
+
+JavaScript reachability and terminal runtime disposal retain their current
+meaning. Canceling a timeout does not release a separately reachable carrier or
+interrupt a synchronous Lean call. This split adds no per-value public disposal,
+cycle collection or post-trap interpreter re-entry. The existing four permitted
+retirement-safe Wasm exports and native-cleanup quarantine are unchanged.
+
+`tests/runtime/entry-composition.test.mjs` checks that the primitive import graph
+omits optional conversion modules and retains shared admission/lifecycle modules.
+The existing unit and Wasm smoke suites exercise the full composition. SDK
+payloads must include every extracted module needed by the existing entries.
+`tests/runtime/managed-core-smoke.mjs` compiles a small Lean fixture and exercises
+the primitive composition against both Wasm profiles, including function captures,
+reentry and terminal retirement.
