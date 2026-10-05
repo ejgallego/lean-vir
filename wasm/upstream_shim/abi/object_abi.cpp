@@ -259,6 +259,22 @@ extern "C" uint32_t vir_obj_uint32_value(lean::object * value) {
     return lean_unbox_uint32(value);
 }
 
+extern "C" lean::object * vir_obj_uint64_scalar(uint64_t value) {
+    return lean_box_uint64(value);
+}
+
+extern "C" uint64_t vir_obj_uint64_value(lean::object * value) {
+    return lean_unbox_uint64(value);
+}
+
+extern "C" lean::object * vir_obj_usize_scalar(size_t value) {
+    return lean_box_usize(value);
+}
+
+extern "C" size_t vir_obj_usize_value(lean::object * value) {
+    return lean_unbox_usize(value);
+}
+
 extern "C" lean::object * vir_obj_uint64(char const * text, uint32_t len) {
     uint64_t value = 0;
     if (!parse_u64(text, len, value)) {

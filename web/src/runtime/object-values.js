@@ -47,6 +47,7 @@ import {
 
 const textEncoder = new TextEncoder();
 const MAX_UINT64 = 0xffffffffffffffffn;
+const MAX_WASM32_USIZE = 0xffffffffn;
 // The pinned kernel stores index + 1 in a 20-bit loose-bound-variable range.
 const MAX_EXPR_BVAR_INDEX = 1048574n;
 // A JSL value is an ordinary JavaScript object. Its Lean root lives only in
@@ -182,22 +183,9 @@ export class ObjectValueRuntime {
       case INTERFACE_TAG.UINT32:
         return this.makeObjectUint32(value, label);
       case INTERFACE_TAG.UINT64:
-        return this.makeObjectDecimal(
-          "vir_obj_uint64",
-          normalizeBoundedUnsignedDecimal(value, label, MAX_UINT64, "UInt64"),
-          label,
-        );
+        return this.makeObjectUint64(value, label);
       case INTERFACE_TAG.USIZE:
-        return this.makeObjectDecimal(
-          "vir_obj_usize",
-          normalizeBoundedUnsignedDecimal(
-            value,
-            label,
-            this.usizeMaxValue(),
-            "USize",
-          ),
-          label,
-        );
+        return this.makeObjectUSize(value, label);
       case INTERFACE_TAG.BYTE_ARRAY:
         return this.makeObjectByteArray(value, label);
       case INTERFACE_TAG.FLOAT:
@@ -493,6 +481,33 @@ export class ObjectValueRuntime {
     const argObj = this.exports.vir_obj_uint32(normalizeUint32(value, label));
     if (argObj === 0) {
       throw new Error(`${label} could not be lowered to a Lean UInt32 object`);
+    }
+    return argObj;
+  }
+
+  makeObjectUint64(value, label) {
+    const argObj = this.exports.vir_obj_uint64_scalar(
+      normalizeBoundedUnsignedBigInt(value, label, MAX_UINT64, "UInt64"),
+    );
+    if (argObj === 0) {
+      throw new Error(`${label} could not be lowered to a Lean UInt64 object`);
+    }
+    return argObj;
+  }
+
+  requireWasm32USize() {
+    if (this.targetPointerBytes() !== 4) {
+      throw new Error("direct USize transport requires a wasm32 runtime");
+    }
+  }
+
+  makeObjectUSize(value, label) {
+    this.requireWasm32USize();
+    const argObj = this.exports.vir_obj_usize_scalar(Number(
+      normalizeBoundedUnsignedBigInt(value, label, MAX_WASM32_USIZE, "USize"),
+    ));
+    if (argObj === 0) {
+      throw new Error(`${label} could not be lowered to a Lean USize object`);
     }
     return argObj;
   }
@@ -1455,9 +1470,10 @@ export class ObjectValueRuntime {
       case INTERFACE_TAG.UINT32:
         return this.exports.vir_obj_uint32_value(obj) >>> 0;
       case INTERFACE_TAG.UINT64:
-        return this.readObjectDecimal(obj, "vir_obj_uint64_decimal");
+        return BigInt.asUintN(64, this.exports.vir_obj_uint64_value(obj)).toString();
       case INTERFACE_TAG.USIZE:
-        return this.readObjectDecimal(obj, "vir_obj_usize_decimal");
+        this.requireWasm32USize();
+        return String(this.exports.vir_obj_usize_value(obj) >>> 0);
       case INTERFACE_TAG.BYTE_ARRAY:
         return this.readObjectByteArray(obj);
       case INTERFACE_TAG.FLOAT:

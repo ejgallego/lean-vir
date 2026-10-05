@@ -121,6 +121,10 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_int_decimal`         | Inspect a Lean `Int` as signed decimal text.                                                      | Returns a borrowed pointer into shim-owned decimal scratch storage.                                                 |
 | `vir_obj_uint32`              | Build a Lean `UInt32`.                                                                            | Returns an owned boxed `UInt32` object.                                                                             |
 | `vir_obj_uint32_value`        | Inspect a Lean `UInt32`.                                                                          | No object ownership.                                                                                                |
+| `vir_obj_uint64_scalar`       | Build a Lean `UInt64` from an unsigned 64-bit Wasm scalar (JS BigInt).                              | Returns an owned boxed `UInt64` object, including for zero.                                                          |
+| `vir_obj_uint64_value`        | Inspect a Lean `UInt64` as a 64-bit Wasm scalar.                                                   | Borrows the object; JS must interpret the signed i64 result as unsigned.                                             |
+| `vir_obj_usize_scalar`        | Build a Lean `USize` from a pointer-width Wasm scalar (i32 on wasm32).                              | Returns an owned boxed `USize` object, including for zero.                                                           |
+| `vir_obj_usize_value`         | Inspect a Lean `USize` as a pointer-width Wasm scalar.                                             | Borrows the object; JS must interpret the signed i32 result as unsigned on wasm32.                                  |
 | `vir_obj_uint64`              | Build a Lean `UInt64` from decimal text.                                                          | Returns an owned boxed `UInt64` object.                                                                             |
 | `vir_obj_uint64_decimal`      | Inspect a Lean `UInt64` as decimal text.                                                          | Returns a borrowed pointer into shim-owned decimal scratch storage.                                                 |
 | `vir_obj_usize`               | Build a Lean `USize` from decimal text.                                                           | Returns an owned boxed `USize` object.                                                                              |
@@ -191,6 +195,30 @@ the scalar decimal helpers. `vir_obj_ctor_scalar_data` returns a borrowed
 pointer into the live Lean object; JavaScript must read it before releasing the
 object.
 
+### Fixed-width integers
+
+The ordinary boxed `UInt64` codec uses `vir_obj_uint64_scalar` and
+`vir_obj_uint64_value`: an i64 parameter/result crosses the Wasm boundary as
+JavaScript BigInt. The wasm32 `USize` codec uses `vir_obj_usize_scalar` and
+`vir_obj_usize_value` with an exact 32-bit Number. Wasm results are signed;
+the codec recovers unsigned values with `BigInt.asUintN(64, result)` and
+`result >>> 0`, respectively, before returning decimal **String** results.
+
+Both codecs still accept safe integer Number, BigInt and unsigned decimal
+String inputs, including surrounding whitespace and leading zeros. Validation
+rejects negatives, unsafe or fractional Numbers, malformed strings and values
+above the type's maximum before calling the scalar constructor. The scalar ABI
+itself carries integer bits; raw callers must validate their inputs before Wasm
+coercion. Direct USize lowering and lifting require a wasm32 runtime, rather than
+truncating a wider target through i32. Accessors borrow correctly typed live Lean
+objects; constructors return owned heap boxes even for numeric zero.
+
+The documented decimal constructors and getters retain their signatures and
+ownership for low-level callers. Ordinary boxed fixed-width codecs no longer
+use them. Nat/Int text transport and `vir_obj_ctor_usize_decimal` inspection of
+constructor slots remain unchanged. Use matching JavaScript/Wasm assets with
+the new scalar exports; rebuild the runtime and generated SDK together.
+
 ## Ownership
 
 Resource inspection requires a valid, live Lean object reference. A boxed
@@ -253,11 +281,13 @@ including recursive references through supported fields. `Lean.Expr` uses
 constructor-backed `vir_obj_expr_*` and `vir_obj_level_*`
 helpers; the public Lean type remains `Lean.Expr`, but the helpers call Lean's
 real constructors so cached expression data is preserved. Resources, callbacks,
-host imports, and effectful calls also use object arguments/results. Decimal
-scalar calls lower through the corresponding `vir_obj_*` constructor, call
+host imports, and effectful calls also use object arguments/results. `Nat` and
+`Int` calls lower through the corresponding decimal `vir_obj_*` constructor, call
 `vir_call_resolved_objects`, lift the result with the matching decimal
 inspection helper plus
 `vir_obj_decimal_size`, and release the owned result with `vir_obj_dec`.
+`UInt64` and `USize` calls use [fixed-width scalar transport](#fixed-width-integers)
+while preserving decimal-string JavaScript results.
 Byte-array calls use `vir_obj_byte_array` and lift the result with
 `vir_obj_byte_array_data` / `vir_obj_byte_array_size`. Sequence calls lower each
 supported element to an owned object. Arrays pack those objects with

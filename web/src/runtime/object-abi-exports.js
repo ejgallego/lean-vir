@@ -75,8 +75,12 @@ export const OBJECT_VALUE_EXPORTS = [
   "vir_obj_uint32_value",
   "vir_obj_uint64",
   "vir_obj_uint64_decimal",
+  "vir_obj_uint64_scalar",
+  "vir_obj_uint64_value",
   "vir_obj_usize",
   "vir_obj_usize_decimal",
+  "vir_obj_usize_scalar",
+  "vir_obj_usize_value",
 ];
 
 // These operations do not enter the Lean heap and remain callable on retirement.
