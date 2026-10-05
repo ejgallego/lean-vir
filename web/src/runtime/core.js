@@ -27,6 +27,10 @@ const textDecoder = new TextDecoder();
 const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
 
+// Internal runtime implementation; applications construct it through the public
+// factory, which always supplies hostState and owns instance setup/retirement.
+// Omitted state/partial exports support focused ABI harness fixtures, not the
+// factory's complete lifecycle contract for arbitrary constructor combinations.
 export class VirRuntime extends ObjectValueRuntime {
   constructor(
     exports,

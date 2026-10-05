@@ -50,6 +50,23 @@ compatibility bug or merge blocker. This change does not alter the package wire
 format or enable wasm64. The compiled clear-path claim applies to the inspected optimized build;
 other compiler/profile configurations need the same inspection and tests.
 
+Post-trap safety has a narrow requirement: these four permitted exports must
+remain independent of the abandoned interpreter's C stack, allocator, Lean heap
+and host callbacks. A trap can bypass normal C-stack restoration; a later call
+that uses that stack or abandoned heap state would not have the same safety
+argument as the current table operation and fixed-counter accesses. This is a
+maintenance constraint, not a demonstrated failure in the qualified artifacts.
+When these functions, their dependencies, the compiler or build profile change,
+inspect their final compiled bodies for calls, C-stack access and pointer-based
+heap/allocator dependencies, and rerun the existing trap/retirement tests.
+The current workflow uses focused inspection and integration tests; no general
+bytecode verifier or new automated artifact gate is required by this change.
+
+Terminal clearing takes time proportional to historical table capacity, even
+when all roots were already released. Using the actual table size avoids reliance
+on allocator metadata after a trap; do not replace it with a metadata walk merely
+to optimize sparse retirement.
+
 The allocator failure/reuse suite runs in both `npm test` and CI. The integrated
 runtime suite also verifies that the production module imports none of the
 three former root-management functions and exports no mutable table. These

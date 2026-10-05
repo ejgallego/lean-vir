@@ -98,6 +98,11 @@ asks for that machinery.
   manipulation has undefined behavior. Justify checks by ordinary configuration,
   acquisition, compatibility, portability or ownership failures, not an implicit
   hostile-input threat model. Reproduce inferred defects before changing behavior.
+  For runtime findings, identify the documented public caller and its required
+  preconditions. Internal constructors, partial test fixtures and shipped helper
+  modules do not establish support for every combination of optional arguments.
+  Separate supported-path defects from internal consistency and optional hardening;
+  do not expand the API contract merely to make an unsupported reproducer work.
 
 - Keep generated `build/` outputs out of Git.
 - Keep generated `web/dist/` outputs out of Git.
