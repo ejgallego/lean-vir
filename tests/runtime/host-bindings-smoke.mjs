@@ -177,14 +177,15 @@ assert.equal(throwingBindingRuntime.liveCallbacks.size, 0);
 assert.throws(() => throwingCallback(1n), /disposed runtime/);
 
 let bindingDisposals = 0;
+const sharedBindings = {
+  ...createCallbackHostBindings(),
+  [VIR_HOST_DISPOSE]() {
+    bindingDisposals += 1;
+  },
+};
 const hostFactory = createVirRuntimeFactory({
   wasmBytes,
-  hostBindings: {
-    ...createCallbackHostBindings(),
-    [VIR_HOST_DISPOSE]() {
-      bindingDisposals += 1;
-    },
-  },
+  hostBindings: sharedBindings,
 });
 const firstRuntime = await hostFactory.createRuntime({
   irPackageSet: [hostPackageBytes],
@@ -208,7 +209,7 @@ assert.equal(nextRuntime.call("fib", 12), "144");
 firstRuntime.dispose();
 nextRuntime.dispose();
 assert.equal(bindingDisposals, 0);
-hostFactory.hostBindings[VIR_HOST_DISPOSE]();
+sharedBindings[VIR_HOST_DISPOSE]();
 assert.equal(bindingDisposals, 1, "the application disposes its shared bindings");
 
 assert.throws(

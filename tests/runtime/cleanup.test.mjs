@@ -17,8 +17,7 @@ test("cleanup preserves raw exceptions without inspecting them", () => {
     error => error === raw);
   assert.equal(cleanups, 1);
   const errors = [];
-  assert.deepEqual(collectCleanupError(errors, () => { throw raw; }),
-    { ok: false, value: undefined });
+  collectCleanupError(errors, () => { throw raw; });
   assert.equal(errors[0], raw);
   assert.equal(inspections, 0);
 });

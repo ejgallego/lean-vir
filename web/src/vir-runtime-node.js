@@ -32,10 +32,10 @@ export function createVirRuntimeFactory(options = {}) {
   const { hostBindings = null, ...factoryOptions } = options;
   return createRuntimeFactory({
     ...factoryOptions,
-    defaultHostBindings: () => ({
+    defaultHostBindings: options.defaultHostBindings ?? (() => ({
       ...createCommonHostBindings(),
       ...createConsoleHostBindings(),
-    }),
+    })),
     hostBindings,
   });
 }

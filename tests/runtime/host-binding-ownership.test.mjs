@@ -2,6 +2,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { VirRuntimeFactory } from "../../web/src/runtime/factory.js";
+import { createVirRuntimeFactory as createNodeFactory } from "../../web/src/vir-runtime-node.js";
+import { createVirRuntimeFactory as createBrowserFactory } from "../../web/src/vir-runtime.js";
 import { VirHostState } from "../../web/src/runtime/host-state.js";
 import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
 import {
@@ -29,6 +31,63 @@ function activeBindings() {
   };
   bindings["browser.timer.setInterval"](() => {}, 60_000);
   return { bindings, lifecycle, get disposals() { return disposals; } };
+}
+
+for (const [entry, createFactory] of [["Node", createNodeFactory], ["browser", createBrowserFactory]]) {
+  for (const map of [false, true]) {
+    test(`${entry} entry honors an application-owned default ${map ? "Map" : "object"}`, async () => {
+      const service = activeBindings();
+      const bindings = map ? new Map(Object.entries(service.bindings)) : service.bindings;
+      bindings[VIR_HOST_DISPOSE] = service.bindings[VIR_HOST_DISPOSE];
+      const factory = createFactory({ wasmModule: module, defaultHostBindings: bindings });
+      const runtime = await factory.createRuntime();
+      try {
+        assert.equal(runtime.hostState.defaultBindings, bindings);
+        runtime.dispose();
+        assert.equal(service.disposals, 0);
+        assert.equal(service.lifecycle.phase, "active");
+      } finally {
+        runtime.dispose();
+        bindings[VIR_HOST_DISPOSE]();
+      }
+    });
+  }
+
+  test(`${entry} entry owns fresh default results on disposal and failed creation`, async () => {
+    const services = [];
+    let fail = false;
+    const factory = createFactory({
+      wasmModule: module,
+      defaultHostBindings: () => {
+        const service = activeBindings();
+        services.push(service);
+        return service.bindings;
+      },
+      imports: () => {
+        if (fail) throw new Error("import sentinel");
+        return {};
+      },
+    });
+    const first = await factory.createRuntime();
+    const second = await factory.createRuntime();
+    try {
+      assert.equal(services.length, 2);
+      first.dispose();
+      assert.equal(services[0].disposals, 1);
+      assert.equal(services[1].lifecycle.phase, "active");
+      fail = true;
+      await assert.rejects(factory.createRuntime(), /import sentinel/);
+      assert.equal(services.length, 3);
+      assert.equal(services[2].disposals, 1);
+      assert.equal(services[2].lifecycle.debugResourceCounts().active, 0);
+      assert.equal(services[1].disposals, 0);
+    } finally {
+      first.dispose();
+      second.dispose();
+      for (const service of services) service.lifecycle.dispose();
+    }
+    assert.equal(services[1].disposals, 1);
+  });
 }
 
 for (const option of ["hostBindings", "defaultHostBindings"]) {

@@ -257,6 +257,9 @@ runtimes or factories does not transfer ownership. The application calls
 rule replaces the previous reference counting and automatic last-runtime disposal.
 Use a preconstructed map for shared services; returning the same map from multiple
 per-runtime builders violates the fresh-result ownership contract.
+Freshness includes the cleanup scope: returning new maps that wrap one shared
+`HostLifecycle` still shares teardown. A per-runtime builder must provide an
+independent cleanup scope for the resources it transfers to VIR.
 
 The Infoview hover provider registers its `ResizeObserver` and viewport
 listeners in this same lifecycle. Its returned cleanup removes that

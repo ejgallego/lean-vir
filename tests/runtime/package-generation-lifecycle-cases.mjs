@@ -69,6 +69,11 @@ export async function runIrPackageLifecycleSmoke({
   const bindingGenerations = [];
   let failNextInstantiation = false;
   let sharedBindingDisposals = 0;
+  const sharedBindings = {
+    [VIR_HOST_DISPOSE]: () => {
+      sharedBindingDisposals += 1;
+    },
+  };
   const hostFactory = createVirRuntimeFactory({
     wasmBytes,
     imports: (module, hostState) => {
@@ -78,11 +83,7 @@ export async function runIrPackageLifecycleSmoke({
       }
       return createVirImports(module, {}, hostState);
     },
-    hostBindings: {
-      [VIR_HOST_DISPOSE]: () => {
-        sharedBindingDisposals += 1;
-      },
-    },
+    hostBindings: sharedBindings,
     defaultHostBindings: () => {
       const lifecycle = createHostLifecycle();
       const documentValue = { title: "" };
@@ -178,7 +179,7 @@ export async function runIrPackageLifecycleSmoke({
   secondRuntime.dispose();
   assert.equal(secondGenerationLifecycle.phase, "disposed");
   assert.equal(sharedBindingDisposals, 0);
-  hostFactory.hostBindings[VIR_HOST_DISPOSE]();
+  sharedBindings[VIR_HOST_DISPOSE]();
   assert.equal(sharedBindingDisposals, 1);
 
   const initializerFactory = createVirRuntimeFactory({

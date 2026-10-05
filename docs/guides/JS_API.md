@@ -117,21 +117,13 @@ names an entry point above.
 
 The browser runtime installs the built-in JavaScript value, browser and Infoview
 host bindings by default. The complete target map, factory list, custom binding
-rules, and cleanup behavior are documented in
-`docs/reference/HOST_BINDINGS.md`.
+rules, and cleanup behavior are documented in the
+[host bindings reference](../reference/HOST_BINDINGS.md#active-resources).
 
-`defaultHostBindings` may be either a binding map or a function returning a
-fresh binding map for each runtime. Preconstructed `hostBindings` and
-`defaultHostBindings` maps remain application-owned: runtime disposal and failed
-creation release the runtime's bridge references without invoking those maps'
-`[VIR_HOST_DISPOSE]()` hooks. The application calls their disposer when its shared
-services are no longer needed. This replaces automatic last-runtime disposal.
-
-A `defaultHostBindings` function transfers ownership of each fresh result to VIR.
-VIR invokes that result's disposer on runtime disposal or failed creation. Use the
-object form for shared services; do not return one shared map from that function.
-The built-in browser/Node defaults and Infoview/React integrations create fresh
-providers for each runtime.
+Preconstructed `hostBindings` and `defaultHostBindings` maps are application-owned.
+A `defaultHostBindings` function transfers ownership of each fresh provider and
+its cleanup scope to VIR. Use a map for shared services and a builder for
+per-runtime providers; the browser and Node entry points accept both forms.
 
 To enable browser React roots while keeping non-React imports free
 of React dependencies, compose the React binding group explicitly:
