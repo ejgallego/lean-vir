@@ -74,8 +74,8 @@ extern "C" void vir_resource_release(uint32_t id) {
 }
 
 extern "C" void vir_resource_roots_clear() {
-    // Works even after an interpreter trap: table operations and fixed globals
-    // only, with no Lean heap access, allocation, callbacks or metadata walk.
+    // Works even after an interpreter trap: table operations and fixed
+    // linear-memory addresses, with no heap access, allocation or callbacks.
     closed = true;
     __builtin_wasm_table_fill(roots, 0, __builtin_wasm_ref_null_extern(),
                              __builtin_wasm_table_size(roots));

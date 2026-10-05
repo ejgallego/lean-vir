@@ -22,10 +22,10 @@ private: a reused ID is not a public generation-tagged handle.
 
 Four new low-level exports provide terminal clearing and active/capacity/reusable
 counts. Clearing sets the manager closed, fills the table with null, and resets
-fixed counters. It does not traverse/free metadata, release Lean objects, call
-host functions or enter the interpreter. The current wasm32 optimized object
-contains no calls or stack-pointer access in this function. Metadata and table
-capacity remain with the abandoned instance until its collection.
+fixed counters in linear memory. It does not traverse/free metadata, release Lean
+objects, call host functions or enter the interpreter. The current wasm32
+optimized object contains no calls or stack-pointer access in this function.
+Metadata and table capacity remain with the abandoned instance until its collection.
 
 The runtime failure guard permits these four narrow operations after a trap.
 Other failed-generation entry remains blocked and Lean heap cleanup remains a

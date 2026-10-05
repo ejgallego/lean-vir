@@ -117,7 +117,7 @@ for (const option of ["hostBindings", "defaultHostBindings"]) {
         assert.equal(service.lifecycle.debugResourceCounts().active, 1);
         service.bindings["browser.timer.setInterval"](() => {}, 60_000);
         assert.equal(service.lifecycle.debugResourceCounts().active, 2);
-        assert.equal(state.resourceRootCounts().active, 0);
+        assert.equal(state.exports, null);
         assert.equal(state.userBindings, null);
         assert.equal(state.defaultBindings, null);
       } finally {
@@ -144,7 +144,7 @@ test("supplied disposers are never inspected, including direct host-state dispos
   state.dispose();
   state.dispose();
   assert.equal(reads, 0);
-  assert.equal(state.resourceRootCounts().active, 0);
+  assert.equal(state.exports, null);
   assert.equal(state.userBindings, null);
   assert.equal(state.defaultBindings, null);
 });
@@ -216,7 +216,7 @@ test("owned-provider cleanup failure still drops map references in a hostless ru
   const state = runtime.hostState;
   assert.throws(() => runtime.dispose(), error => error === failure);
   assert.equal(disposals, 1);
-  assert.equal(state.resourceRootCounts().active, 0);
+  assert.equal(state.exports, null);
   assert.equal(state.userBindings, null);
   assert.equal(state.defaultBindings, null);
   runtime.dispose();
@@ -254,7 +254,7 @@ test("failed creation retains both the original and owned-provider cleanup error
     assert.deepEqual(error.errors, [failure, cleanup]);
     return true;
   });
-  assert.equal(state.resourceRootCounts().active, 0);
+  assert.equal(state.exports, null);
   assert.equal(state.defaultBindings, null);
   state.dispose();
   assert.equal(disposals, 1);

@@ -78,6 +78,9 @@ end Fatal`,
       const hostState = runtime.hostState;
       const callback = runtime.call("Fatal.callback");
       const held = runtime.makeLeanObjectHandleResource(9 /* boxed Nat 4 */, "retained root");
+      const exports = runtime.exports;
+      assert.notEqual(exports.vir_obj_resource({ mode }), 0);
+      assert.ok(exports.vir_resource_roots_active() > 0);
       const operation = mode === "named" ? () => runtime.call("Fatal.afterPure", {})
         : mode === "timed" ? () => runtime.callTimed("Fatal.afterPure", {})
         : mode === "closure" ? () => callback({}) : () => runtime.call("Fatal.invoke", callback);
@@ -90,7 +93,8 @@ end Fatal`,
       assert.throws(() => runtime.runStartupEntries(), /fresh runtime/);
       assert.throws(() => runtime.retainLeanObjectHandleValue(held, "old root"), /fresh runtime/);
       runtime.dispose(); runtime.dispose();
-      assert.equal(hostState.resourceRootCounts().active, 0);
+      assert.equal(exports.vir_resource_roots_active(), 0);
+      assert.equal(exports.vir_resource_roots_reusable(), 0);
       assert.equal(hostState.leanObjectHandleCells.size, 0);
       assert.equal(runtime.liveCallbacks.size, 0);
       assert.equal(hostState.callTimings.length, 0);
