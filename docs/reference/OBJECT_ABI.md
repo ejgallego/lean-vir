@@ -3,6 +3,10 @@
 This guide describes the JavaScript-driven construction and inspection path for
 Lean runtime objects.
 
+Object construction, inspection and ownership belong to the official
+[support scope](../SUPPORT.md). DOM/React examples and automatic conversion of
+records and custom inductives remain experimental conveniences above that API.
+
 The object ABI is the JavaScript runtime call surface for package
 entrypoints, host imports, callbacks, and resources. Interface descriptors
 remain in the embedded JSON manifest and JavaScript runtime helpers; the C++
@@ -20,12 +24,20 @@ There are two distinct lanes:
   rejected by package generation.
 - Plain Lean values cross as ordinary manifest value types. This includes
   scalars, strings, byte arrays, arrays, options, structures, and custom
-  inductives over supported fields. They are copied/lowered/lifted values, not
+  inductives over accepted fields. They are copied/lowered/lifted values, not
   JavaScript identity handles.
+
+Low-level object construction and ownership stay within the supported scope.
+Automatic array conversion is supported when its element representation is
+supported. Automatic conversion of structures and custom inductives remains
+experimental; accepting their manifest shapes does not extend official support
+to their automatic conversion. See
+[choosing a representation](../guides/LEAN_VIR_LIBRARY.md#choose-a-boundary-representation)
+for explicit JS values, opaque Lean carriers and callbacks.
 
 The object ABI does not change the public Lean signature policy. It is the
 runtime implementation path for the plain-value lane: JavaScript constructs
-Lean objects directly for supported manifest value types. `Lean.Vir.Js α`
+Lean objects directly for implemented manifest value types. `Lean.Vir.Js α`
 remains the explicit resource lane for host-owned objects.
 
 ### Externref and foreign values
@@ -235,7 +247,7 @@ heap objects; see the [allocator design](../development/WASM_RESOURCE_ROOTS.md).
 The runtime value path uses owned Lean objects, including immediate scalar
 objects. There is no separate primitive call lane or value-byte fallback.
 `VirRuntime.call` lowers and lifts the
-[supported manifest value types](../guides/JS_API.md#calls-and-manifest).
+[implemented manifest value types](../guides/JS_API.md#calls-and-manifest).
 Constructors may mix object fields, raw `USize` slots and packed scalar fields,
 including recursive references through supported fields. `Lean.Expr` uses
 constructor-backed `vir_obj_expr_*` and `vir_obj_level_*`

@@ -3,6 +3,8 @@
 Applications follow [library-owned setup](EMBEDDED_RESOURCES.md). This page
 documents lower-level tools retained for VIR development and existing
 integrations, not an alternative first-release application workflow.
+Program generation and loading are part of the [support scope](../SUPPORT.md);
+the DOM examples below use experimental bindings.
 
 The module `:vir` facet writes compiler package files; `:virSdk` installs the
 JavaScript/Wasm distribution used by older hosts. Repository npm commands select
@@ -198,6 +200,13 @@ directories. The diagnostic report retains its generation timestamp.
 
 ## Install the browser SDK
 
+The SDK supplies the [direct runtime API](JS_API.md#entry-points-and-distribution)
+for custom hosts and existing integrations. Its archive includes the `js/`
+module tree and release/debug Wasm files. The runtime resource pack acquired by
+the [application workflow](EMBEDDED_RESOURCES.md) instead contains a bundled
+`createProgram` loader, its selected release Wasm and license notices. That
+resource release does not provide an SDK archive for this command.
+
 ```bash
 lake build :virSdk
 ```
@@ -210,6 +219,11 @@ revision, select the exact dependency commit:
 VIR_SDK_COMMIT=<lean-vir-revision> lake build :virSdk
 ```
 
+Commit selection requires an existing, unexpired `lean-vir-sdk` Actions artifact
+for that exact commit. It does not create an archive or fall back to a different
+revision. If the matching release or artifact is unavailable, use a matching
+archive supplied by the maintainer through `VIR_SDK_ARCHIVE`.
+
 The installer verifies the selected commit, SDK version, runtime ABI, non-empty
 source commit and every manifest checksum. Actions artifact downloads require
 `GITHUB_TOKEN` or authenticated `gh`. Set
@@ -218,8 +232,10 @@ network access. Lake tracks the selected source and local archive contents;
 cached SDK manifests recheck every payload checksum and reinstall missing or
 modified payloads from the configured source.
 
-Publish the SDK, descriptor and every referenced `.irpkg`, preserving the
-descriptor's relative layout. Member URLs resolve relative to its served URL:
+Publish the SDK's complete `js/` tree, the selected Wasm, descriptor and every
+referenced `.irpkg`, preserving their relative layout. Keep the SDK's license
+notices with the deployment. Member URLs resolve relative to the descriptor's
+served URL:
 
 ```js
 import { createVirRuntime } from "./vir/sdk/js/vir-runtime.js";

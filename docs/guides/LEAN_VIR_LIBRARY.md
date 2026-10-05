@@ -1,5 +1,9 @@
 # Vir Library
 
+This guide covers core interop and experimental conveniences. DOM, React/JSX,
+widgets and broad generated JS bindings are outside the official
+[support scope](../SUPPORT.md), even when included by `import Vir`.
+
 Import `Vir.*` modules to use APIs in the `Lean.Vir.*` namespace. These APIs
 call JavaScript while Lean runs through VIR's Wasm interpreter. This guide
 helps choose modules, effects and value representations; use the
@@ -12,18 +16,46 @@ Change the binding configuration when changing a generated declaration; the
 [binding translation contract](../reference/BINDING_MODALITIES.md) explains conversions,
 effects and reviewed protocol operations.
 
+## Choose a boundary representation
+
+Minimal interop lets you choose where a value lives and when to convert it:
+
+| Need | Use | What crosses the boundary |
+| --- | --- | --- |
+| Call a basic Lean function from JavaScript | An exported `String` or `Nat` function, as in the [application example](EMBEDDED_RESOURCES.md) | The runtime constructs Lean arguments and reads the result using the manifest's representation. |
+| Pass a JavaScript value to Lean and back | `Js α` | The exact JavaScript value; object identity is preserved. The phantom `α` describes the expected shape. |
+| Store a Lean value in JavaScript without decoding its contents | `JSL α`, using `LeanRef.toJSL` / `LeanRef.fromJSL` | An opaque JavaScript carrier retaining the Lean value. |
+| Let JavaScript invoke a Lean closure | Explicit `Js.Function.ofLean` / `ofLeanVoid` conversions and their arity variants | A JavaScript function backed by the Lean closure, within the [callback signature limits](#packages-and-host-imports). |
+| Construct or inspect Lean objects in a custom host | The [object API](../reference/OBJECT_ABI.md) | Lean objects with explicit construction, inspection and ownership rules. |
+
+For example, `String`, `Js String` and `JSL String` are different contracts:
+a Lean string, a native JavaScript string, and an opaque carrier holding a Lean
+string. `JsValue.ofString` / `toString` explicitly convert between the first two;
+`LeanRef.toJSL` keeps the Lean value opaque instead. Their details are below.
+
+Automatic array conversion is supported when the element representation is
+supported, for example `Array Nat`. Automatic conversion of records and custom
+inductives remains experimental; see the
+[implemented call representations](JS_API.md#calls-and-manifest).
+Explicit host-value conversions and opaque carriers do not encode JSON. The
+[planned 0.1.1 JSON converters](../SUPPORT.md#planned-for-011) are a separate API.
+
+Passing a DOM or React value through `Js` uses core reference interop; the DOM or
+React operation itself remains experimental. Choose focused imports below when
+useful; the umbrella import is a convenience, not a support classification.
+
 ## Modules And Effects
 
 | Import | Use it for |
 | --- | --- |
-| `Vir` | The common library, browser/React helpers, ProofWidgets notation and package markers. |
+| `Vir` | Convenience umbrella for core interop, package markers and experimental browser/React/ProofWidgets helpers. |
 | `Vir.Runtime` | `RuntimeM` and Lean-owned mutable `RuntimeRef` cells. |
 | `Vir.Js` | Exact JavaScript values, collections, functions, Promises and explicit conversions. |
-| `Vir.Browser` | DOM receivers, events, timers, animation and canvas. |
-| `Vir.React.Core` | Native React nodes, roots, components and hooks. |
-| `Vir.React` | Convenience import for native React bindings. |
-| `Vir.ProofWidgets` | Optional HTML/JSX notation over native React values. |
-| `Vir.Infoview` | The optional widget shell, native panel props, RPC and local editor capabilities. |
+| `Vir.Browser` | Experimental DOM receivers, events, timers, animation and canvas. |
+| `Vir.React.Core` | Experimental native React nodes, roots, components and hooks. |
+| `Vir.React` | Convenience import for experimental native React bindings. |
+| `Vir.ProofWidgets` | Experimental HTML/JSX notation over native React values. |
+| `Vir.Infoview` | Experimental widget shell, native panel props, RPC and local editor capabilities. |
 | `Vir.Attributes` / `Vir.ExternFallback` | Package markers / explicit use of a Lean extern reference body. |
 
 Choose the effect according to the operation:
@@ -43,7 +75,7 @@ hook ordering, and requires no separate monad implementation.
 `new`, `get`, `set`, `modify` and `modifyGet` operations run in
 `RuntimeM`; replacing the contents follows Lean reference counting.
 
-Repository package commands build the core library automatically.
+Repository package commands build the library automatically.
 The optional infoview integration requires `lake build VirInfoview` and the
 repository npm dependencies because it generates a JavaScript bundle. For a
 downstream project, follow [Lake integration](PACKAGES.md).
@@ -228,8 +260,10 @@ a transparent extern's Lean reference body without changing native compilation.
 Use the [fallback workflow](PACKAGES.md#use-a-lean-extern-reference-body)
 for its restrictions and ownership rules.
 
-Exported Lean functions may use the supported
+Exported Lean functions may use the implemented
 [structural interface types](../reference/IRPKG_FORMAT.md#interface-descriptors).
+Automatic conversion of records and custom inductives remains experimental as
+described above; arrays inherit the support status of their elements.
 Ordinary `@[vir_js "target.name"]` host imports have a narrower boundary:
 `Unit`, exact `Js`/nullable values, and top-level Lean callback arguments
 whose own arguments and result are `Unit` or JS values. Nested callbacks

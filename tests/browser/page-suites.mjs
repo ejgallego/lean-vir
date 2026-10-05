@@ -42,7 +42,7 @@ export async function smokeLanding(cdp, origin) {
   assert.equal(state.heading, "Lean VIR");
   assert.equal(state.hasRuntimeStatus, false);
   assert.deepEqual(state.journeys, ["try", "run", "use", "inspect"]);
-  assert.deepEqual(state.integrationSteps, ["Mark", "Build", "Call"]);
+  assert.deepEqual(state.integrationSteps, ["Mark", "Publish", "Call"]);
   for (const href of [
     "demo.html",
     "dev.html",

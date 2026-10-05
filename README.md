@@ -4,10 +4,16 @@ Lean VIR runs selected [Lean 4](https://github.com/leanprover/lean4) declaration
 in the browser through Lean's real IR interpreter compiled to `wasm32-wasip1`.
 It packages compiled module IR; it is not a general Lean-to-Wasm compiler.
 
+VIR officially supports the runtime, package workflow, low-level object API and
+minimal two-way JS/Lean interop. DOM, React/JSX and editor/widget integrations are
+experimental conveniences, including when available through default imports.
+See [support scope](docs/SUPPORT.md) for the boundary and the planned 0.1.1 JSON
+converters.
+
 ## Try it
 
 Open the [hosted demos](https://ejgallego.github.io/lean-vir/), including
-[React Tamagotchi](https://ejgallego.github.io/lean-vir/react.html) and
+[experimental React Tamagotchi](https://ejgallego.github.io/lean-vir/react.html) and
 [`Format.pretty`](https://ejgallego.github.io/lean-vir/format.html).
 No local Lean or Wasm build is needed to try the hosted site.
 
@@ -20,7 +26,7 @@ module
 meta import Vir.Attributes
 
 @[vir_export]
-public def answer : Nat := 42
+public def Client.Program.greet (name : String) : String := "Hello, " ++ name
 ```
 
 The application's client library declares that program and prepares its browser
@@ -32,21 +38,24 @@ writes the prepared files, and the browser calls the program's exported function
 Applications do not locate VIR build directories, invoke packaging scripts, or
 build Wasm. Program compilation and runtime acquisition remain independent.
 
-Follow [the application setup guide](docs/guides/EMBEDDED_RESOURCES.md) for the
-library declaration, publication and JavaScript call. Use the Lean toolchain
-selected by your VIR dependency; HTTPS runtime acquisition needs `curl`.
+Follow [the application setup guide](docs/guides/EMBEDDED_RESOURCES.md) for a
+complete greeting project, its Lake command, publication and JavaScript call.
+Use the Lean toolchain selected by your VIR dependency; HTTPS runtime acquisition
+needs `curl`.
 The integration is under review for the first release; current qualification
 and limits are recorded in [the acceptance checklist](docs/development/RESOURCE_ACCEPTANCE.md).
 
 ## Experimental
 
-[Editor widgets and RPC](docs/guides/INFOVIEW.md) use live editor environments,
-including unsaved code. They are experimental and outside the first-release
-application workflow.
+[DOM helpers](docs/guides/LEAN_VIR_LIBRARY.md),
+[React and JSX](docs/guides/REACT.md), and
+[editor widgets and RPC](docs/guides/INFOVIEW.md) are available to try outside the
+official support scope. Editor widgets use live environments, including unsaved
+code. Their presence in the library or demos does not extend the support promise.
 
 ## Develop VIR
 
-The default `lake build` builds the core Lean library. To work on VIR itself:
+The default `lake build` builds the Lean library. To work on VIR itself:
 
 ```bash
 npm install

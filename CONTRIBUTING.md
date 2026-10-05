@@ -1,6 +1,7 @@
 # Contributing
 
-Lean VIR is experimental, but the review workflow should stay predictable:
+Lean VIR is a proof of concept with a defined [support scope](docs/SUPPORT.md)
+and experimental integrations. The review workflow should stay predictable:
 small branches, clear public PR text, and the smallest relevant local check
 before asking CI to do the rest.
 

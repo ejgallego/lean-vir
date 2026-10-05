@@ -1,6 +1,7 @@
 # Experimental Infoview widgets and RPC
 
-Editor widgets are experimental and outside the first-release
+Editor widgets, ProofWidgets and RPC integration are experimental and outside the
+official [support scope](../SUPPORT.md) and first-release
 [application workflow](EMBEDDED_RESOURCES.md). They retain live editor inputs
 rather than rebuilding the saved application program.
 

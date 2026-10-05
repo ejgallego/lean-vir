@@ -35,7 +35,7 @@ Author: Emilio J. Gallego Arias
 
       <main>
         <section class="intro" aria-labelledby="project-heading">
-          <p class="kicker">Experimental Lean 4 runtime</p>
+          <p class="kicker">Lean 4 IR runtime</p>
           <h1 id="project-heading">Lean VIR</h1>
           <p class="intro-copy">
             Lean VIR packages selected executable Lean declarations as focused
@@ -47,13 +47,20 @@ Author: Emilio J. Gallego Arias
             browser target. Unsupported dependencies and JavaScript boundary
             types are reported during packaging.
           </p>
+          <p class="intro-note">
+            Official support covers the runtime, packages, object API and minimal
+            JS/Lean interop. DOM, React/JSX and editor widgets are experimental conveniences.
+          </p>
           <nav class="intro-links" aria-label="Project links">
             <a href="#try">Try it</a>
             <a
-              href="https://github.com/ejgallego/lean-vir/blob/main/docs/guides/PACKAGES.md"
+              href="https://github.com/ejgallego/lean-vir/blob/main/docs/guides/EMBEDDED_RESOURCES.md"
               >Integration guide</a
             >
             <a href="https://github.com/ejgallego/lean-vir">Source</a>
+            <a href="https://github.com/ejgallego/lean-vir/blob/main/docs/SUPPORT.md"
+              >Support scope</a
+            >
           </nav>
         </section>
 
@@ -62,7 +69,9 @@ Author: Emilio J. Gallego Arias
             <p class="section-number">01</p>
             <div>
               <h2 id="try-heading">Try Lean in the browser</h2>
-              <p>Edit an array. Lean’s merge sort produces the result through VIR.</p>
+              <p>
+                Edit an array. Lean’s merge sort produces the result through VIR.
+              </p>
             </div>
           </div>
           <form id="sort-demo" class="sort-demo">
@@ -97,7 +106,7 @@ Author: Emilio J. Gallego Arias
               <span
                 ><strong>React Tamagotchi</strong
                 ><small
-                  >A stateful Lean application reused in the browser and infoview</small
+                  >Experimental React and infoview integration</small
                 ></span
               >
               <span aria-hidden="true">→</span>
@@ -122,7 +131,7 @@ Author: Emilio J. Gallego Arias
             <div>
               <h2 id="use-heading">Use from a Lean project</h2>
               <p>
-                Mark an export, build its package, and call it by Lean name.
+                Mark a Lean function, publish its files, and call it from JavaScript.
               </p>
             </div>
           </div>
@@ -134,23 +143,23 @@ Author: Emilio J. Gallego Arias
             <li>
               <span>2</span>
               <div>
-                <strong>Build</strong><code>lake build +MyApp:vir</code>
+                <strong>Publish</strong><code>lake exe generate-site site</code>
               </div>
             </li>
             <li>
               <span>3</span>
               <div>
-                <strong>Call</strong><code>vir.call("MyApp.answer")</code>
+                <strong>Call</strong><code>program.call("greet", "world")</code>
               </div>
             </li>
           </ol>
           <nav class="section-links" aria-label="Integration resources">
             <a
-              href="https://github.com/ejgallego/lean-vir/blob/main/docs/guides/PACKAGES.md"
+              href="https://github.com/ejgallego/lean-vir/blob/main/docs/guides/EMBEDDED_RESOURCES.md"
               >Integration guide</a
             >
-            <a href="downloads/lean-vir-sdk.tar.gz" download>SDK archive</a>
-            <a href="downloads/lean-vir-local.tar.gz" download>Local bundle</a>
+            <a href="downloads/lean-vir-sdk.tar.gz" download>Developer SDK archive</a>
+            <a href="downloads/lean-vir-local.tar.gz" download>Local demo bundle</a>
           </nav>
         </section>
 

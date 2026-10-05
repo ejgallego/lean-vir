@@ -10,6 +10,9 @@ multiline fields.
 This table records whether an API is implemented and available through the
 runtime; it is not a type-fidelity audit. A `supported` row can still contain
 individual bindings awaiting semantic review against their upstream contract.
+Here `supported` is an inventory status for implemented runtime coverage, not
+VIR's official [support scope](SUPPORT.md). DOM, React and widget rows remain
+experimental regardless of their coverage status.
 Use the generated binding explorer for reviewed types, unmapped members, and
 binding findings.
 

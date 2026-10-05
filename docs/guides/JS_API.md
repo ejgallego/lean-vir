@@ -1,5 +1,11 @@
 # JavaScript Runtime API
 
+The [support scope](../SUPPORT.md) covers runtime loading, object ownership and
+minimal two-way interop. This reference also describes experimental DOM/UI
+providers and automatic conversion of records and custom inductives. The default
+browser entry includes experimental providers; using that entry does not expand
+official support.
+
 `web/src/vir-runtime.js` loads `vir-upstream.wasm`, loads a non-empty set of
 manifest-bearing `.irpkg` members, and exposes their aggregate Lean declarations
 through a generic JavaScript call API without requiring callers to manage WASM
@@ -11,7 +17,29 @@ This page documents the underlying runtime API for contributors and existing
 hosts. [Direct runtime calls](CALL_LEAN_FROM_JS.md) is a repository development
 example, not another application workflow.
 
-The module is also exposed through the package entry point:
+## Entry points and distribution
+
+The resource loader and the SDK expose different interfaces to the same
+interpreter:
+
+| Distribution | JavaScript entry | Available interface |
+| --- | --- | --- |
+| Library-prepared application resources | The runtime bundle's `runtime.js` | `createProgram` loads runtime/program manifests and returns `status`, `call` and `dispose`. |
+| SDK archive for custom hosts and existing integrations | `js/vir-runtime.js` or `js/vir-runtime-node.js` | `createVirRuntime` and `createVirRuntimeFactory`, with the direct call, host-binding and object APIs documented below. |
+
+The current `createProgram` facade does not expose the underlying runtime or
+accept custom `hostBindings`. A host needing those APIs uses the SDK entry
+points and supplies a matching Wasm and package set. See
+[SDK acquisition](PACKAGES.md#install-the-browser-sdk) for its prerequisites.
+Official support still follows the [support scope](../SUPPORT.md) within each
+interface; experimental providers remain experimental in either distribution.
+
+### Imports from the checkout or SDK
+
+The module is also exposed through this checkout's package entry point. The
+repository npm package is private; the specifiers below assume a local package
+or a host-configured mapping, not an `npm install lean-vir` distribution. Prepared
+application assets use the loader described in the application guide.
 
 ```js
 import { createVirRuntime, VIR_HOST_DISPOSE } from "lean-vir";
@@ -53,13 +81,17 @@ Passive JavaScript values need no shared store.
 
 ## WASM Artifact Selection
 
-Distribution builds ship two interpreter artifacts:
+SDK archives ship two interpreter artifacts under `wasm/`:
 
 - `vir-upstream.wasm`: stripped release artifact, used by default.
 - `vir-upstream.dev.wasm`: optimized, unstripped companion artifact for
   debugging. It is not an `-O0` build.
 
-Applications that serve both files beside each other can opt into the debug
+The application resource pack contains its selected release interpreter as
+`runtime.wasm`. Its `createProgram` loader has no `debugWasm` option; the debug
+selection below belongs to the SDK API.
+
+Hosts that serve both SDK files beside each other can opt into the debug
 artifact by setting `debugWasm: true`:
 
 ```js
@@ -399,10 +431,17 @@ and reporting UI remain consumer-owned and should be timed outside this API.
 This is a JavaScript runtime API addition; it requires no Wasm ABI, `.irpkg`
 package-format, or Lean toolchain version change.
 
-Supported interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
+The types below describe what the current marshaller accepts. Automatic array
+conversion is supported when its element representation is supported, such as
+`Array Nat`. Automatic conversion of records and custom inductives remains
+experimental even when package generation accepts its descriptor. See
+[choosing a representation](LEAN_VIR_LIBRARY.md#choose-a-boundary-representation)
+for minimal reference interop.
+
+Implemented interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
 `Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,
 recursive `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α`
-shapes over supported types, non-indexed user-defined structures including
+shapes over accepted types, non-indexed user-defined structures including
 parameterized instances, nullary inductive enums, non-indexed custom inductives
 with nullary or runtime-payload constructors, opaque host resources, and
 `Lean.Expr`. `Lean.Vir.Js α` is an opaque `Js` resource for JavaScript-owned
@@ -411,7 +450,10 @@ object lane. DOM and React object markers such as `Lean.Vir.Browser.Element`
 and `Lean.Vir.React.Root` must therefore appear as `Lean.Vir.Js ...` at the
 boundary.
 
-The broad structural surface above is the descriptor-guided object lowering
+The explicitly invoked [JSON converter API](../SUPPORT.md#planned-for-011) is
+planned for 0.1.1; it is separate from this automatic marshaling.
+
+This surface is the descriptor-guided object lowering
 surface for JavaScript-to-Lean export calls. Host imports are narrower than exports:
 low-level JavaScript imports use `Unit`, `Lean.Vir.Js α` resources,
 `Lean.Vir.Js.Nullable α` resources for JavaScript `null`, callback arguments
