@@ -69,24 +69,30 @@ private def withDescriptor (bundle : Bundle) (descriptor : Descriptor) : Bundle 
 private def siteTests : IO Unit := do
   let second := withDescriptor program { program.descriptor with logicalId := "test/second" }
   let resources : ResourceSet := ⟨runtime, #[program, second, program]⟩
-  -- Independent comparison with the former client-side publication recipe.
-  let expectedFiles := (#[runtime, program, second]).foldl (init := #[]) fun files bundle =>
-    let base := "lib/vir/" ++ bundle.contentId
-    let envelope := ("{\"contentId\":\"" ++ bundle.contentId ++ "\",\"descriptor\":" ++
-      String.fromUTF8! (encodeDescriptor bundle.descriptor) ++ "}").toUTF8
-    (files.push { path := base ++ "/bundle.json", bytes := envelope : File }) ++
-      bundle.files.map (fun file => { file with path := base ++ "/" ++ file.path })
   let site ← success "prepare nested site" (resources.forSite "lib/vir")
-  check "site inventory paths" (site.files.map (·.path) == expectedFiles.map (·.path))
-  check "site inventory bytes" (site.files.map (·.bytes) == expectedFiles.map (·.bytes))
+  let uniqueBundles := #[runtime, program, second]
+  check "deduplicated complete inventory" (site.files.size ==
+    uniqueBundles.foldl (fun n b => n + b.files.size + 1) 0)
+  for bundle in uniqueBundles do
+    let base := "lib/vir/" ++ bundle.contentId
+    for payload in bundle.files do
+      check "unique unchanged payload" ((site.files.filter fun f =>
+        f.path == base ++ "/" ++ payload.path && f.bytes == payload.bytes).size == 1)
+    let manifests := site.files.filter (·.path == base ++ "/bundle.json")
+    check "one manifest per bundle" (manifests.size == 1)
+    let envelope ← IO.ofExcept <| Lean.Json.parse (String.fromUTF8! manifests[0]!.bytes)
+    let id ← IO.ofExcept <| envelope.getObjValAs? String "contentId"
+    let descriptor ← IO.ofExcept <| envelope.getObjVal? "descriptor"
+    let expected ← IO.ofExcept <| Lean.Json.parse (String.fromUTF8! (encodeDescriptor bundle.descriptor))
+    check "manifest retains identity and descriptor" (id == bundle.contentId && descriptor == expected)
   check "runtime module path" (site.runtimeModule == "lib/vir/" ++ runtime.contentId ++ "/runtime.js")
   check "runtime manifest path" (site.runtimeManifest == "lib/vir/" ++ runtime.contentId ++ "/bundle.json")
   check "program order and duplicate references" (site.programManifests ==
     #[program, second, program].map (fun b => "lib/vir/" ++ b.contentId ++ "/bundle.json"))
   let root ← success "prepare site root" (resources.forSite "")
-  check "root inventory paths" (root.files.map (·.path) ==
-    site.files.map (fun file => String.intercalate "/" ((file.path.splitOn "/").drop 2)))
-  check "prefix does not change bytes" (root.files.map (·.bytes) == site.files.map (·.bytes))
+  check "prefix preserves inventory and bytes" (root.files.size == site.files.size &&
+    root.files.all fun f => site.files.any fun prefixed =>
+      prefixed.path == "lib/vir/" ++ f.path && prefixed.bytes == f.bytes)
   check "root runtime manifest" (root.runtimeManifest == runtime.contentId ++ "/bundle.json")
   check "root runtime module" (root.runtimeModule == runtime.contentId ++ "/runtime.js")
   check "root program manifests" (root.programManifests ==
@@ -108,22 +114,21 @@ private def siteTests : IO Unit := do
   check "runtime entry uses declared role" (moved.runtimeModule == "lib/vir/" ++ relocated.contentId ++ "/" ++ entryPath)
   check "runtime entry names an emitted payload" (moved.files.any fun f =>
     f.path == moved.runtimeModule && f.bytes == "abc".toUTF8)
-  for outputPrefix in #["../vir", "/vir", "vir/", "a//b", "a\\b", "https://site", "CON", "a/../b", "bundle.json"] do
+  for outputPrefix in #["bundle.json", "bundle.json/vir", "BUNDLE.JSON/vir", "assets/bundle.json"] do
+    let prepared ← success "host directory is not a bundle member" (resources.forSite outputPrefix)
+    check "host directory spelling preserved" (prepared.runtimeManifest == outputPrefix ++ "/" ++ runtime.contentId ++ "/bundle.json")
+  for outputPrefix in #["../vir", "/vir", "vir/", "a//b", "a\\b", "https://site", "CON", "a/../b"] do
     failure "INVALID_PATH" (resources.forSite outputPrefix)
   let incompatible := withDescriptor program { program.descriptor with
     compatibility := { compatibility with leanRevision := "other" } }
   failure "INCOMPATIBLE" ({ resources with programs := #[incompatible] }.forSite "")
-  failure "EXPECTED_PROGRAM" ({ resources with programs := #[runtime] }.forSite "")
-  failure "EXPECTED_RUNTIME" ({ resources with runtime := program }.forSite "")
-  let conflict := withDescriptor program { program.descriptor with exports := #[] }
-  failure "LOGICAL_ID_CONFLICT" ({ resources with programs := #[program, conflict] }.forSite "")
-  failure "HASH_MISMATCH" ({ resources with runtime :=
-    { runtime with files := runtime.files.set! 0 ⟨"runtime.js", "abd".toUTF8⟩ } }.forSite "")
+  -- Delegation checks only; the validator's full rejection matrix lives below.
   failure "INVENTORY_MISMATCH" ({ resources with runtime :=
     { runtime with files := runtime.files.pop } }.forSite "")
-  IO.println "resource site: canonical envelopes, unchanged bytes, prefixes, ordering and dedup passed"
+  IO.println "resource site: manifest identity, unchanged payloads, prefixes, reference order and dedup passed"
 
--- Read-only real-pack comparison against the former client publication recipe.
+-- One migration oracle: exact historical output, not a permanent ordering/JSON
+-- spelling contract for all publishers.
 private def sitePackTests (runtimePath programPath : String) : IO Unit := do
   let r ← success "read runtime pack" (Pack.decode (← IO.FS.readBinFile runtimePath))
   let p ← success "read program pack" (Pack.decode (← IO.FS.readBinFile programPath))
@@ -241,6 +246,7 @@ private def unitTests : IO Unit := do
   let conflict := withDescriptor program { program.descriptor with exports := #[] }
   failure "LOGICAL_ID_CONFLICT" { set with programs := #[program, conflict] }.validate
   failure "EXPECTED_PROGRAM" { set with programs := #[r] }.validate
+  failure "EXPECTED_RUNTIME" { set with runtime := program }.validate
   let encoded ← success "pack encode" (Pack.encode r)
   let reorderedPack ← success "reordered encode" (Pack.encode reordered)
   check "deterministic pack" (encoded == reorderedPack)

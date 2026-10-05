@@ -13,6 +13,7 @@ namespace Vir.Resources
 /-- Complete site files and output-relative loader paths. The host owns writing
 these files and resolving paths relative to its generated page. -/
 structure SiteFiles where
+  /-- Complete inventory; enumeration order is not part of the site contract. -/
   files : Array File
   runtimeModule : String
   runtimeManifest : String
@@ -23,13 +24,15 @@ private def manifestBytes (bundle : Bundle) : ByteArray :=
   ("{\"contentId\":\"" ++ bundle.contentId ++ "\",\"descriptor\":" ++
     String.fromUTF8! (encodeDescriptor bundle.descriptor) ++ "}").toUTF8
 
-/-- Prepare canonical manifests and complete payloads, validating/deduplicating
+/-- Prepare manifests and complete payloads, validating/deduplicating
 the resource set once. `outputPrefix` is a portable output-relative directory;
 empty means the output root. Spellings are preserved, never normalized.
+Payload bytes, identities and bundle-relative paths are preserved. Outer JSON
+spelling and file enumeration order are not part of the contract.
 This performs no IO or runtime acquisition and does not make publication atomic. -/
 def ResourceSet.forSite (resources : ResourceSet) (outputPrefix : String) :
     Except ResourceError SiteFiles := do
-  unless outputPrefix.isEmpty || validPath outputPrefix do
+  unless outputPrefix.isEmpty || validRelativePath outputPrefix do
     throw { code := "INVALID_PATH", path := some outputPrefix }
   let bundles ← resources.bundles
   let base (bundle : Bundle) :=

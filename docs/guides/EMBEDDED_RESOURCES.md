@@ -116,19 +116,23 @@ build files or executables. See the complete
 A publisher calls `Client.resources.forSite "lib/vir"` and writes the returned
 `SiteFiles.files` through its ordinary asset writer. An empty prefix selects the
 output root. The helper validates the resource set once, deduplicates bundles,
-and prepares complete payloads and canonical `bundle.json` envelopes under their
+and prepares complete payloads and `bundle.json` envelopes under their
 content IDs. It does no IO, downloading or producer-path discovery. Returned paths
 are output-relative; spelling is preserved, not normalized. The host owns writing,
 namespace conflicts with its other assets, stale files and publication failures;
-the helper does not make the output transactional.
+the helper does not make the output transactional. Payload bytes, descriptor/content
+identity and bundle-relative paths are preserved. File enumeration order and the
+outer envelope's JSON whitespace/key spelling are not API guarantees.
 
 `runtimeModule`, `runtimeManifest` and `programManifests` give the corresponding
 loader paths. Program manifests retain the input program order, including repeated
 references; the file inventory contains each bundle once. Hosts that need one
 program check that policy themselves. The resulting site is movable and needs no
 Lean build directory. Keep paths relative to each manifest and all members intact.
-The root `bundle.json` name is reserved, including descendants such as
-`bundle.json/child`; a nested payload such as `assets/bundle.json` is allowed.
+Within each bundle, the root `bundle.json` name is reserved, including descendants
+such as `bundle.json/child`; a nested payload such as `assets/bundle.json` is allowed.
+That reservation does not apply to the host's output prefix: `bundle.json/vir` is
+a valid destination directory because bundle files live below their content IDs.
 
 The returned paths are relative to the site's output root, not necessarily the
 current page. The publisher rebases them for nested pages or supplies the output
