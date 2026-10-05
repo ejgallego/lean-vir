@@ -4,6 +4,9 @@ This is the implementation map for Lean VIR contributors. User setup lives in
 [README.md](../README.md), command details in [HARNESS.md](HARNESS.md), and the
 JavaScript boundary contract in [HOST_BINDINGS.md](reference/HOST_BINDINGS.md).
 
+The map includes experimental browser, React and editor integrations. The
+[support scope](SUPPORT.md) defines the official commitment for these APIs.
+
 Bindings preserve upstream JavaScript values and TypeScript type relationships.
 The [binding translation reference](reference/BINDING_MODALITIES.md#type-parameter-fidelity)
 describes supported mappings and gaps.
@@ -20,7 +23,7 @@ describes supported mappings and gaps.
 | JS boundary           | `web/src/host-boundary.js`                                                   | Host-call rollback transactions and reference-type capability checks.                       |
 | Active host lifecycle | `web/src/host/vir-active-host-bindings.js`                                   | Shared lifecycle plus timer and frame teardown.                                             |
 | Browser providers     | `web/src/vir-host-bindings.js`, `web/src/host/vir-infoview-host-bindings.js` | Browser targets and the repository-owned infoview protocol.                                 |
-| React providers       | `web/src/vir-react-host-bindings.js`, `web/src/react/`                       | Official browser React host.                                                               |
+| React providers       | `web/src/vir-react-host-bindings.js`, `web/src/react/`                       | Experimental browser React host.                                                           |
 
 ## Top-Level Call Flow
 
@@ -61,7 +64,7 @@ remain caller-managed; ordinary JS object graphs use JavaScript reachability.
 
 ## React Boundary
 
-The browser binding uses official React 19 and ReactDOM with exact JavaScript
+The experimental browser binding uses React 19 and ReactDOM with exact JavaScript
 values. React owns hook state and scheduling; component purity, hook ordering
 and effect discipline remain application responsibilities. The [React guide](guides/REACT.md)
 describes native calls, explicit conversions and optional Lean builders.
