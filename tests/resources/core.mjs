@@ -37,6 +37,11 @@ function canonical(value) {
   return `{${Object.keys(value).sort().map(key => `${quote(key)}:${canonical(value[key])}`).join(",")}}`;
 }
 
+// Check Lake's actual library collection, not just successful executable imports.
+const coreModules = execFileSync("lake", ["query", "VirResourceCore:modules"],
+  { cwd: root, encoding: "utf8" }).trim().split("\n");
+assert.ok(coreModules.includes("Vir.Resources.Site"), "Site must belong to the lightweight resource core");
+assert.ok(!coreModules.includes("Vir.Resources.Runtime"), "core must not collect the acquired runtime carrier");
 console.log(run([]).trim());
 const encoded = run(["descriptor"]).replace(/\n$/, "");
 const descriptor = JSON.parse(encoded);

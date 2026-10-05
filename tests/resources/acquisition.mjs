@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 // Synthetic pack integrity and native preparation tests, not browser acceptance.
 import assert from "node:assert/strict";
+import { replaceFixture } from "./fixture-edit.mjs";
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import {
@@ -129,8 +130,9 @@ unlinkSync(stage);
 // A transport replacement cannot change either selected content or Lean revision.
 const descriptorSize = bytes.readUInt32LE(8);
 const originalJson = bytes.subarray(12, 12 + descriptorSize).toString("utf8");
-const json = Buffer.from(originalJson.replace(
-  /"leanRevision":"[^"]+"/, '"leanRevision":"wrong-revision"'));
+const originalRevision = JSON.parse(originalJson).compatibility.leanRevision;
+const json = Buffer.from(replaceFixture(originalJson,
+  `"leanRevision":${JSON.stringify(originalRevision)}`, '"leanRevision":"wrong-revision"'));
 const header = Buffer.from(bytes.subarray(0, 12));
 header.writeUInt32LE(json.length, 8);
 const other = join(evidence, "other-compiler");

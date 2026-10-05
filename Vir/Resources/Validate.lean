@@ -71,13 +71,17 @@ private def deviceComponent (s : String) : Bool :=
     ((stem.startsWith "com" || stem.startsWith "lpt") && stem.length == 4 &&
       ('1' ≤ stem.toList[3]! && stem.toList[3]! ≤ '9'))
 
-/-- No normalization: unsafe spellings are rejected, not reinterpreted. -/
-def validPath (path : String) : Bool :=
+/-- Portable nonempty relative path spelling. No bundle-specific reservations;
+unsafe spellings are rejected, not normalized. -/
+def validRelativePath (path : String) : Bool :=
   path.utf8ByteSize ≤ maxMetadataBytes &&
-  (path.toLower.splitOn "/").head! != "bundle.json" &&
   (path.splitOn "/").all fun part =>
     !part.isEmpty && part != "." && part != ".." && !part.endsWith "." &&
     part.toList.all pathChar && !deviceComponent part
+
+/-- Bundle-member paths additionally reserve the publisher's root manifest. -/
+def validPath (path : String) : Bool :=
+  validRelativePath path && (path.toLower.splitOn "/").head! != "bundle.json"
 
 private def validHash (s : String) : Bool :=
   s.utf8ByteSize == 64 && s.toList.all ("0123456789abcdef".contains ·)

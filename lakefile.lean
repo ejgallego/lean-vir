@@ -40,7 +40,7 @@ lean_lib Vir where
 lean_lib VirResourceCore where
   roots := #[]
   globs := #[.one `Vir.BinaryLiteral, .one `Vir.Resources, .one `Vir.Resources.Types,
-    .one `Vir.Hash, .one `Vir.Resources.Validate, .one `Vir.Resources.Pack,
+    .one `Vir.Hash, .one `Vir.Resources.Validate, .one `Vir.Resources.Site, .one `Vir.Resources.Pack,
     .one `Vir.Resources.Build, .one `Vir.Resources.Program, .one `Vir.NativePayload]
 
 lean_lib VirResourceEmbed where

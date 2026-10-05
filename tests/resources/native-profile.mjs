@@ -1,5 +1,6 @@
 // Resource programs have a locked runtime profile, not ambient native providers.
 import assert from "node:assert/strict";
+import { replaceFixture } from "./fixture-edit.mjs";
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
@@ -28,10 +29,12 @@ export function checkNativeProfileRejection({
     "lean-toolchain",
   ])
     cpSync(join(client, name), join(cold, name), { recursive: true });
+  const config = readFileSync(join(client, "lakefile.lean"), "utf8");
+  const requirements = config.match(/require lean_vir from "[^"]+"/g) ?? [];
+  assert.equal(requirements.length, 1, "native-profile fixture requires one VIR dependency");
   writeFileSync(
     join(cold, "lakefile.lean"),
-    readFileSync(join(client, "lakefile.lean"), "utf8").replace(
-      /require lean_vir from "[^"]+"/,
+    replaceFixture(config, requirements[0],
       `require lean_vir from ${JSON.stringify(producer)}`,
     ),
   );

@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 // Native producer: descriptor bytes and payloads are real independent inputs.
 import assert from "node:assert/strict";
+import { replaceFixture } from "./fixture-edit.mjs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
@@ -215,9 +216,8 @@ invoke(
 );
 writeDescriptor(
   Buffer.from(
-    descriptorBytes
-      .toString("utf8")
-      .replace('"schemaVersion":1}', '"schemaVersion":1,"schemaVersion":1}'),
+    replaceFixture(descriptorBytes.toString("utf8"),
+      '"schemaVersion":1}', '"schemaVersion":1,"schemaVersion":1}'),
   ),
 );
 invoke(

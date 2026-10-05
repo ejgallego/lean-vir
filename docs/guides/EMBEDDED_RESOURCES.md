@@ -113,22 +113,41 @@ native build/generator command. It consumes `Client.resources`, not internal
 build files or executables. See the complete
 [three-package fixture](../../fixtures/resources/) for a minimal publisher.
 
-A publisher validates `ResourceSet.bundles`, writes each complete bundle under
-its content ID, and writes a `bundle.json` envelope containing `contentId` and
-`descriptor`. Keep file paths relative to that manifest and all program members
-intact. The resulting site is movable and needs no Lean build directory.
-The root `bundle.json` name is reserved, including descendants such as
-`bundle.json/child`; a nested payload such as `assets/bundle.json` is allowed.
+A publisher calls `Client.resources.forSite "lib/vir"` and writes the returned
+`SiteFiles.files` through its ordinary asset writer. An empty prefix selects the
+output root. The helper validates the resource set once, deduplicates bundles,
+and prepares complete payloads and `bundle.json` envelopes under their
+content IDs. It does no IO, downloading or producer-path discovery. Returned paths
+are output-relative; spelling is preserved, not normalized. The host owns writing,
+namespace conflicts with its other assets, stale files and publication failures;
+the helper does not make the output transactional. Payload bytes, descriptor/content
+identity and bundle-relative paths are preserved. File enumeration order and the
+outer envelope's JSON whitespace/key spelling are not API guarantees.
 
-The publisher supplies site-relative URLs for the runtime module and the two
-manifests. Resolve them relative to the generated page (including its deployment
-prefix), not to a Lean build directory:
+`runtimeModule`, `runtimeManifest` and `programManifests` give the corresponding
+loader paths. Program manifests retain the input program order, including repeated
+references; the file inventory contains each bundle once. Hosts that need one
+program check that policy themselves. The resulting site is movable and needs no
+Lean build directory. Keep paths relative to each manifest and all members intact.
+Within each bundle, the root `bundle.json` name is reserved, including descendants
+such as `bundle.json/child`; a nested payload such as `assets/bundle.json` is allowed.
+That reservation does not apply to the host's output prefix: `bundle.json/vir` is
+a valid destination directory because bundle files live below their content IDs.
+
+The returned paths are relative to the site's output root, not necessarily the
+current page. The publisher rebases them for nested pages or supplies the output
+root's URL (including any deployment prefix). They are not Lean build paths.
+For this one-program example:
 
 ```js
-// These paths come from the publisher's verified bundle plan.
-const runtimeModuleUrl = new URL(published.runtimeModule, document.baseURI);
-const runtimeManifestUrl = new URL(published.runtimeManifest, document.baseURI);
-const programManifestUrl = new URL(published.programManifest, document.baseURI);
+// The host supplies siteRootUrl: the output-root URL, ending in '/'.
+// document.baseURI suffices only when it denotes that root, not a nested page.
+if (published.programManifests.length !== 1) {
+  throw new Error("This application requires exactly one program");
+}
+const runtimeModuleUrl = new URL(published.runtimeModule, siteRootUrl);
+const runtimeManifestUrl = new URL(published.runtimeManifest, siteRootUrl);
+const programManifestUrl = new URL(published.programManifests[0], siteRootUrl);
 const { createProgram } = await import(runtimeModuleUrl.href);
 const program = await createProgram({ runtimeManifestUrl, programManifestUrl });
 try {
