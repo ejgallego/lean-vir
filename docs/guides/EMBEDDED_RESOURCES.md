@@ -50,7 +50,7 @@ import Lake
 open Lake DSL
 
 require lean_vir from git
-  "https://github.com/ejgallego/lean-vir" @ "5a912308f2fa1647c349be429bf30da356d6ad3d"
+  "https://github.com/ejgallego/lean-vir" @ "77dd14b652eeb91f173ab023dcfdaabb653b8327"
 
 package greeting_app
 
