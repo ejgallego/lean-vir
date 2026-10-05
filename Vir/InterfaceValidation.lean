@@ -20,7 +20,7 @@ attribute-time feedback and final package validation. It deliberately stops
 before runtime-layout and JavaScript-interface classification.
 -/
 
-/-- Module-safe identity of a supported exported effect constructor. -/
+/-- Module-safe identity of an accepted exported effect constructor. -/
 public inductive EffectKind where
   | runtime
   | io
@@ -28,7 +28,7 @@ public inductive EffectKind where
   | react
   deriving BEq, Repr
 
-/-- User-facing name of a supported VIR effect. -/
+/-- User-facing name of an accepted VIR effect. -/
 public def EffectKind.label : EffectKind → String
   | .runtime => "RuntimeM"
   | .io => "IO"
@@ -81,7 +81,7 @@ public inductive StartupSignatureError where
   | malformedEffect (kind : EffectKind) (argumentCount : Nat)
   deriving BEq, Repr
 
-/-- Classify a type constructor as one of VIR's supported exported effects. -/
+/-- Classify a type constructor as one of VIR's accepted exported effects. -/
 public def effectKind? : Lean.Name → Option EffectKind
   | `Lean.Vir.RuntimeM => some .runtime
   | `IO => some .io
@@ -102,7 +102,7 @@ public def StartupSignatureError.toMessageData : StartupSignatureError → Lean.
   | .nonUnitResult (some effect) result =>
       m!"VIR startup hooks using `{effect.label}` must return `Unit`; got `{result}`"
   | .unsupportedEffect head =>
-      m!"`{head}` is not a supported VIR startup effect; use `RuntimeM`, `IO`, `DomM`, \
+      m!"`{head}` is not an accepted VIR startup effect; use `RuntimeM`, `IO`, `DomM`, \
         or `ReactM`, each returning `Unit`"
   | .malformedEffect effect argumentCount =>
       m!"VIR startup effect `{effect.label}` expects one result type, got {argumentCount}"

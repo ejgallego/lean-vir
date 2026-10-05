@@ -751,7 +751,7 @@ try {
   );
   assert.match(
     badStartupOutput,
-    /invalid `@\[vir_startup\]` declaration `unsupportedStartupEffect`: `Option` is not a supported VIR startup effect; use `RuntimeM`, `IO`, `DomM`, or `ReactM`, each returning `Unit`/,
+    /invalid `@\[vir_startup\]` declaration `unsupportedStartupEffect`: `Option` is not an accepted VIR startup effect; use `RuntimeM`, `IO`, `DomM`, or `ReactM`, each returning `Unit`/,
   );
   assert.match(
     badStartupOutput,
