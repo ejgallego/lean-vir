@@ -15,34 +15,44 @@ import { INTERFACE_TAG } from "./interface-tags.js";
 const customInductiveNormalizationPlanCache = new WeakMap();
 
 export function normalizeDecimal(value, label, { signed }) {
+  return String(normalizeIntegerInput(value, label, { signed }));
+}
+
+function normalizeIntegerInput(value, label, { signed }) {
   if (typeof value === "bigint") {
     if (!signed && value < 0n) throw new Error(`${label} must be non-negative`);
-    return value.toString();
+    return value;
   }
   if (typeof value === "number") {
     if (!Number.isSafeInteger(value)) throw new Error(`${label} must be a safe integer or decimal string`);
     if (!signed && value < 0) throw new Error(`${label} must be non-negative`);
-    return String(value);
+    return value;
   }
   if (typeof value === "string") {
+    const decimal = value.trim();
     const pattern = signed ? /^-?\d+$/ : /^\d+$/;
-    if (!pattern.test(value.trim())) throw new Error(`${label} must be a decimal string`);
-    return value.trim();
+    if (!pattern.test(decimal)) throw new Error(`${label} must be a decimal string`);
+    return decimal;
   }
   throw new Error(`${label} must be an integer, BigInt, or decimal string`);
 }
 
 export function normalizeBoundedUnsignedDecimal(value, label, max, typeName) {
   const decimal = normalizeDecimal(value, label, { signed: false });
-  const normalized = BigInt(decimal);
-  if (normalized > max) {
-    throw new Error(`${label} is out of range for ${typeName}`);
-  }
+  requireUnsignedBound(BigInt(decimal), label, max, typeName);
   return decimal;
 }
 
 export function normalizeBoundedUnsignedBigInt(value, label, max, typeName) {
-  return BigInt(normalizeBoundedUnsignedDecimal(value, label, max, typeName));
+  const normalized = BigInt(normalizeIntegerInput(value, label, { signed: false }));
+  return requireUnsignedBound(normalized, label, max, typeName);
+}
+
+function requireUnsignedBound(value, label, max, typeName) {
+  if (value > max) {
+    throw new Error(`${label} is out of range for ${typeName}`);
+  }
+  return value;
 }
 
 export function normalizeFloat(value, label) {

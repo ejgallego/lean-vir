@@ -314,8 +314,9 @@ Common Lean values map to JavaScript values like this:
   `{ kind, fields }` depending on field count.
 - `ByteArray` uses `Uint8Array` in both directions.
 
-See `docs/guides/JS_API.md` for the complete type surface, including `Sum`, `Except`,
-`Lean.Expr`, nested structures, and host imports.
+See the [JavaScript API guide](JS_API.md#calls-and-manifest) for integer bounds
+and the complete type surface, including `Sum`, `Except`, `Lean.Expr`, nested
+structures, and host imports.
 
 ## Export Types Vs Host Import Types
 

@@ -65,6 +65,8 @@ export const runtimeTests = Object.freeze(
     },
     { id: "resource-roots", file: "resource-roots-smoke.mjs", group: "pure", nodeArgs: ["--expose-gc"] },
     { id: "object-abi", file: "object-abi-smoke.mjs", group: "pure" },
+    { id: "fixed-width", file: "fixed-width-smoke.mjs", group: "pure" },
+    { id: "fixed-width-interop", file: "fixed-width-interop-smoke.mjs", group: "lean" },
     {
       id: "object-abi-structural",
       file: "object-abi-structural-smoke.mjs",

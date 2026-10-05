@@ -114,6 +114,25 @@ try {
     interfaceTags.SUPPORTED_INTERFACE_TAGS.has(interfaceTags.INTERFACE_TAG.NAT),
     true,
   );
+  const packagedRuntime = await nodeRuntime.createVirRuntime({
+    wasmBytes: await readFile(join(jsDir, "..", "wasm", "vir-upstream.wasm")),
+  });
+  try {
+    for (const [interfaceTag, value] of [
+      [interfaceTags.INTERFACE_TAG.UINT64, "18446744073709551615"],
+      [interfaceTags.INTERFACE_TAG.USIZE, "4294967295"],
+    ]) {
+      const type = { interfaceTag };
+      const object = packagedRuntime.makeObjectValue(type, value, "SDK scalar");
+      try {
+        assert.equal(packagedRuntime.liftObjectValue(type, object, "SDK scalar"), value);
+      } finally {
+        packagedRuntime.exports.vir_obj_dec(object);
+      }
+    }
+  } finally {
+    packagedRuntime.dispose();
+  }
 } finally {
   await rm(isolatedDir, { recursive: true, force: true });
 }
