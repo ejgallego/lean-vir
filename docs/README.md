@@ -9,7 +9,8 @@ experimental conveniences; shipped coverage is not a support commitment.
 
 - [Application setup](guides/EMBEDDED_RESOURCES.md): a complete plain greeting
   project, its Lake build, site publication and JavaScript call.
-- [Lean library](guides/LEAN_VIR_LIBRARY.md): core effects and boundary values,
+- [Lean library](guides/LEAN_VIR_LIBRARY.md#choose-a-boundary-representation): choose
+  value representations for core interop,
   alongside explicitly identified experimental helpers.
 
 ## Experimental

@@ -16,6 +16,33 @@ Change the binding configuration when changing a generated declaration; the
 [binding translation contract](../reference/BINDING_MODALITIES.md) explains conversions,
 effects and reviewed protocol operations.
 
+## Choose a boundary representation
+
+Minimal interop lets you choose where a value lives and when to convert it:
+
+| Need | Use | What crosses the boundary |
+| --- | --- | --- |
+| Call a basic Lean function from JavaScript | An exported `String` or `Nat` function, as in the [application example](EMBEDDED_RESOURCES.md) | The runtime constructs Lean arguments and reads the result using the manifest's representation. |
+| Pass a JavaScript value to Lean and back | `Js α` | The exact JavaScript value; object identity is preserved. The phantom `α` describes the expected shape. |
+| Store a Lean value in JavaScript without decoding its contents | `JSL α`, using `LeanRef.toJSL` / `LeanRef.fromJSL` | An opaque JavaScript carrier retaining the Lean value. |
+| Let JavaScript invoke a Lean closure | Explicit `Js.Function.ofLean` / `ofLeanVoid` conversions and their arity variants | A JavaScript function backed by the Lean closure, within the [callback signature limits](#packages-and-host-imports). |
+| Construct or inspect Lean objects in a custom host | The [object API](../reference/OBJECT_ABI.md) | Lean objects with explicit construction, inspection and ownership rules. |
+
+For example, `String`, `Js String` and `JSL String` are different contracts:
+a Lean string, a native JavaScript string, and an opaque carrier holding a Lean
+string. `JsValue.ofString` / `toString` explicitly convert between the first two;
+`LeanRef.toJSL` keeps the Lean value opaque instead. Their details are below.
+
+The runtime also implements automatic structural conversion for records,
+inductives and other aggregate values. That convenience remains experimental;
+see the [implemented call representations](JS_API.md#calls-and-manifest).
+Explicit host-value conversions and opaque carriers do not encode JSON. The
+[planned 0.1.1 JSON converters](../SUPPORT.md#planned-for-011) are a separate API.
+
+Passing a DOM or React value through `Js` uses core reference interop; the DOM or
+React operation itself remains experimental. Choose focused imports below when
+useful; the umbrella import is a convenience, not a support classification.
+
 ## Modules And Effects
 
 | Import | Use it for |
@@ -232,8 +259,9 @@ a transparent extern's Lean reference body without changing native compilation.
 Use the [fallback workflow](PACKAGES.md#use-a-lean-extern-reference-body)
 for its restrictions and ownership rules.
 
-Exported Lean functions may use the supported
+Exported Lean functions may use the implemented
 [structural interface types](../reference/IRPKG_FORMAT.md#interface-descriptors).
+Automatic structural conversion remains experimental as described above.
 Ordinary `@[vir_js "target.name"]` host imports have a narrower boundary:
 `Unit`, exact `Js`/nullable values, and top-level Lean callback arguments
 whose own arguments and result are `Unit` or JS values. Nested callbacks

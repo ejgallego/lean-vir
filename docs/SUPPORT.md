@@ -22,6 +22,10 @@ Start with [application setup](guides/EMBEDDED_RESOURCES.md). The underlying
 access; the current `createProgram` resource facade exposes only
 `status`, `call` and `dispose`.
 
+For two-way interop, [choose a boundary representation](guides/LEAN_VIR_LIBRARY.md#choose-a-boundary-representation):
+exact JavaScript values, opaque Lean-owned values and callbacks have different
+contracts from automatic structural conversion.
+
 ## Experimental conveniences
 
 DOM, canvas, React, JSX, ProofWidgets, Infoview, editor/RPC integration and UI

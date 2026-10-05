@@ -406,10 +406,15 @@ and reporting UI remain consumer-owned and should be timed outside this API.
 This is a JavaScript runtime API addition; it requires no Wasm ABI, `.irpkg`
 package-format, or Lean toolchain version change.
 
-Supported interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
+The types below describe what the current marshaller accepts. Broad automatic
+structural conversion remains experimental even when package generation accepts
+its descriptor. See [choosing a representation](LEAN_VIR_LIBRARY.md#choose-a-boundary-representation)
+for minimal reference interop.
+
+Implemented interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
 `Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,
 recursive `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α`
-shapes over supported types, non-indexed user-defined structures including
+shapes over accepted types, non-indexed user-defined structures including
 parameterized instances, nullary inductive enums, non-indexed custom inductives
 with nullary or runtime-payload constructors, opaque host resources, and
 `Lean.Expr`. `Lean.Vir.Js α` is an opaque `Js` resource for JavaScript-owned
@@ -418,9 +423,8 @@ object lane. DOM and React object markers such as `Lean.Vir.Browser.Element`
 and `Lean.Vir.React.Root` must therefore appear as `Lean.Vir.Js ...` at the
 boundary.
 
-The broad structural surface above is experimental automatic marshaling, not the
-planned explicitly invoked JSON converter API for 0.1.1. It remains available
-with the limits described here.
+The explicitly invoked [JSON converter API](../SUPPORT.md#planned-for-011) is
+planned for 0.1.1; it is separate from this automatic marshaling.
 
 This surface is the descriptor-guided object lowering
 surface for JavaScript-to-Lean export calls. Host imports are narrower than exports:
