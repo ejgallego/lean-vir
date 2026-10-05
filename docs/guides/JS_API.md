@@ -16,6 +16,25 @@ This page documents the underlying runtime API for contributors and existing
 hosts. [Direct runtime calls](CALL_LEAN_FROM_JS.md) is a repository development
 example, not another application workflow.
 
+## Entry points and distribution
+
+The resource loader and the SDK expose different interfaces to the same
+interpreter:
+
+| Distribution | JavaScript entry | Available interface |
+| --- | --- | --- |
+| Library-prepared application resources | The runtime bundle's `runtime.js` | `createProgram` loads runtime/program manifests and returns `status`, `call` and `dispose`. |
+| SDK archive for custom hosts and existing integrations | `js/vir-runtime.js` or `js/vir-runtime-node.js` | `createVirRuntime` and `createVirRuntimeFactory`, with the direct call, host-binding and object APIs documented below. |
+
+The current `createProgram` facade does not expose the underlying runtime or
+accept custom `hostBindings`. A host needing those APIs uses the SDK entry
+points and supplies a matching Wasm and package set. See
+[SDK acquisition](PACKAGES.md#install-the-browser-sdk) for its prerequisites.
+Official support still follows the [support scope](../SUPPORT.md) within each
+interface; experimental providers remain experimental in either distribution.
+
+### Imports from the checkout or SDK
+
 The module is also exposed through this checkout's package entry point. The
 repository npm package is private; the specifiers below assume a local package
 or a host-configured mapping, not an `npm install lean-vir` distribution. Prepared
@@ -61,13 +80,17 @@ Passive JavaScript values need no shared store.
 
 ## WASM Artifact Selection
 
-Distribution builds ship two interpreter artifacts:
+SDK archives ship two interpreter artifacts under `wasm/`:
 
 - `vir-upstream.wasm`: stripped release artifact, used by default.
 - `vir-upstream.dev.wasm`: optimized, unstripped companion artifact for
   debugging. It is not an `-O0` build.
 
-Applications that serve both files beside each other can opt into the debug
+The application resource pack contains its selected release interpreter as
+`runtime.wasm`. Its `createProgram` loader has no `debugWasm` option; the debug
+selection below belongs to the SDK API.
+
+Hosts that serve both SDK files beside each other can opt into the debug
 artifact by setting `debugWasm: true`:
 
 ```js

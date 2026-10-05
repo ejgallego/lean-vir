@@ -9,10 +9,11 @@ An application deploys two things: its **program** (compiled Lean declarations)
 and the matching **runtime** (the JavaScript loader and Wasm interpreter). Lake
 builds the program and acquires the exact precompiled runtime independently.
 It can compile native Lean producer tools; it never builds Wasm on an application
-cache miss. HTTPS runtime acquisition needs `curl`.
+cache miss. HTTPS runtime acquisition uses Lake's standard download operation,
+which needs `curl` and uses its normal host configuration.
 
-The first release is still under review. This example pins the reviewed Lean
-4.34.0/PR207 source; [qualification and limits](../development/RESOURCE_ACCEPTANCE.md)
+The first release is still under review. This example pins landed VIR source for
+Lean 4.34.0; [qualification and limits](../development/RESOURCE_ACCEPTANCE.md)
 are recorded separately. When changing the VIR revision, use its `lean-toolchain`
 and runtime lock together.
 
@@ -49,7 +50,7 @@ import Lake
 open Lake DSL
 
 require lean_vir from git
-  "https://github.com/ejgallego/lean-vir" @ "e794d5bdf70c0e674a4af234a1dc62f5fa3f224b"
+  "https://github.com/ejgallego/lean-vir" @ "e92d95db62b14db88669394791f6f981161d5674"
 
 package greeting_app
 
