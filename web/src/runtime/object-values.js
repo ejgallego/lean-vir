@@ -1788,7 +1788,7 @@ export class ObjectValueRuntime {
         }
       }
       case "usize":
-        return this.readObjectUSizeField(obj, field.layout.index, label);
+        return this.readObjectUSizeField(owner, obj, fieldPlan.index, label);
       case "scalar":
         return this.readObjectScalarField(
           owner,
@@ -1803,12 +1803,14 @@ export class ObjectValueRuntime {
     }
   }
 
-  readObjectUSizeField(obj, index, label) {
-    const data = this.exports.vir_obj_ctor_usize_decimal(obj, index);
+  readObjectUSizeField(owner, obj, index, label) {
+    this.requireWasm32USize();
+    const data = this.exports.vir_obj_ctor_scalar_data(obj, 0);
     if (data === 0) {
-      throw new Error(`${label} USize field ${index} is unavailable`);
+      throw new Error(`${label} USize field ${owner.objectFieldCount + index} is unavailable`);
     }
-    return this.readWasmString(data, this.exports.vir_obj_decimal_size());
+    const fields = new DataView(this.exports.memory.buffer, data, owner.usizeFieldCount * 4);
+    return String(fields.getUint32(index * 4, true));
   }
 
   readObjectScalarField(owner, obj, type, layout, label, offset = null) {

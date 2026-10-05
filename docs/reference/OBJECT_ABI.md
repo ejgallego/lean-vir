@@ -109,7 +109,7 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_ctor`                | Allocate a constructor with object fields only.                                                   | Consumes all field objects on success; returns an owned constructor object.                                         |
 | `vir_obj_ctor_layout`         | Allocate a constructor with object fields, `USize` slots, and packed scalar bytes.                | Consumes object fields on success; returns an owned constructor object.                                             |
 | `vir_obj_ctor_usize_decimal`  | Inspect one constructor `USize` slot as decimal text.                                             | Returns a borrowed pointer into shim-owned decimal scratch storage.                                                 |
-| `vir_obj_ctor_scalar_data`    | Inspect the packed scalar byte area of a constructor.                                             | Returns a borrowed pointer into the live constructor object.                                                        |
+| `vir_obj_ctor_scalar_data`    | Inspect constructor scalar data after skipping the supplied number of `USize` slots.              | Returns a borrowed pointer into the live constructor object.                                                        |
 | `vir_obj_scalar`              | Build an immediate scalar constructor value.                                                      | Returns a non-null Lean scalar object value; refcount operations are no-ops.                                        |
 | `vir_obj_is_scalar`           | Test whether an object is an immediate scalar.                                                    | No object ownership.                                                                                                |
 | `vir_obj_scalar_value`        | Read an immediate scalar value.                                                                   | No object ownership.                                                                                                |
@@ -191,9 +191,12 @@ fails before consuming object fields, JavaScript still owns those field
 references. `vir_obj_field` returns a new owned reference to the requested
 object field, so JavaScript must release it. `vir_obj_ctor_usize_decimal`
 returns a borrowed pointer into the same shim-owned decimal scratch buffer as
-the scalar decimal helpers. `vir_obj_ctor_scalar_data` returns a borrowed
-pointer into the live Lean object; JavaScript must read it before releasing the
-object.
+the scalar decimal helpers. `vir_obj_ctor_scalar_data(object, usize_field_count)`
+returns a borrowed pointer into the live Lean object after skipping that many
+pointer-width `USize` slots. Pass the constructor's full `USize` field count to
+reach packed scalar bytes, or zero to read the `USize` slots themselves.
+JavaScript must read the data before releasing the object and create memory views
+after the accessor returns, so they use the current buffer after memory growth.
 
 ### Fixed-width integers
 
@@ -213,11 +216,18 @@ coercion. Direct USize lowering and lifting require a wasm32 runtime, rather tha
 truncating a wider target through i32. Accessors borrow correctly typed live Lean
 objects; constructors return owned heap boxes even for numeric zero.
 
-The documented decimal constructors and getters retain their signatures and
-ownership for low-level callers. Ordinary boxed fixed-width codecs no longer
-use them. Nat/Int text transport and `vir_obj_ctor_usize_decimal` inspection of
-constructor slots remain unchanged. Use matching JavaScript/Wasm assets with
-the new scalar exports; rebuild the runtime and generated SDK together.
+Manifest-guided constructor `USize` fields also use binary transport: the codec
+borrows `vir_obj_ctor_scalar_data(object, 0)` and reads each validated dense slot
+index as an unsigned little-endian 32-bit value before returning a decimal String.
+This borrows the parent object without acquiring or releasing a field reference.
+A null data pointer signals an unavailable field; a field containing zero remains
+valid data.
+
+The documented decimal constructors and getters, including
+`vir_obj_ctor_usize_decimal`, retain their signatures and ownership for low-level
+callers. Ordinary fixed-width codecs no longer use them. Nat/Int text transport
+remains unchanged. Use matching JavaScript/Wasm assets with the scalar exports;
+rebuild the runtime and generated SDK together when adopting those exports.
 
 ## Ownership
 

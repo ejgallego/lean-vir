@@ -130,6 +130,23 @@ try {
         packagedRuntime.exports.vir_obj_dec(object);
       }
     }
+    const type = {
+      interfaceTag: interfaceTags.INTERFACE_TAG.STRUCTURE,
+      typeName: "Sdk.USizeFields",
+      objectFieldCount: 0, usizeFieldCount: 2, scalarByteSize: 4,
+      fields: [
+        { name: "first", type: { interfaceTag: interfaceTags.INTERFACE_TAG.USIZE }, layout: { kind: "usize", index: 0 } },
+        { name: "second", type: { interfaceTag: interfaceTags.INTERFACE_TAG.USIZE }, layout: { kind: "usize", index: 1 } },
+        { name: "word", type: { interfaceTag: interfaceTags.INTERFACE_TAG.UINT32 }, layout: { kind: "scalar", offset: 0, size: 4 } },
+      ],
+    };
+    const value = { first: "4294967295", second: "0", word: 0xfffffffe };
+    const object = packagedRuntime.makeObjectValue(type, value, "SDK fields");
+    try {
+      assert.deepEqual(packagedRuntime.liftObjectValue(type, object, "SDK fields"), value);
+    } finally {
+      packagedRuntime.exports.vir_obj_dec(object);
+    }
   } finally {
     packagedRuntime.dispose();
   }
