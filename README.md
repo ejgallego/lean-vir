@@ -1,25 +1,24 @@
 # Lean VIR
 
-Lean VIR runs selected [Lean 4](https://github.com/leanprover/lean4) declarations
-in the browser through Lean's real IR interpreter compiled to `wasm32-wasip1`.
-It packages compiled module IR; it is not a general Lean-to-Wasm compiler.
-
-VIR officially supports the runtime, package workflow, low-level object API and
-minimal two-way JS/Lean interop. DOM, React/JSX and editor/widget integrations are
-experimental conveniences, including when available through default imports.
-See [support scope](docs/SUPPORT.md) for the boundary and the planned 0.1.1 JSON
-converters.
+VIR lets JavaScript applications run selected [Lean 4](https://github.com/leanprover/lean4)
+functions and lets Lean call JavaScript through explicit host bindings. It uses
+Lean's IR interpreter compiled to WebAssembly. Lake compiles the Lean modules;
+VIR packages their IR and supplies a prebuilt runtime.
 
 ## Try it
 
-Open the [hosted demos](https://ejgallego.github.io/lean-vir/), including
-[experimental React Tamagotchi](https://ejgallego.github.io/lean-vir/react.html) and
-[`Format.pretty`](https://ejgallego.github.io/lean-vir/format.html).
-No local Lean or Wasm build is needed to try the hosted site.
+Open the [hosted demos](https://ejgallego.github.io/lean-vir/), including the
+merge-sort example, [`Format.pretty`](https://ejgallego.github.io/lean-vir/format.html),
+and the [experimental React Tamagotchi](https://ejgallego.github.io/lean-vir/react.html).
+There is nothing to install or compile to try them.
 
-## Use VIR in an application
+## Use VIR in a Lean project
 
-Write your browser program in a Lean module and mark its public entry points:
+### Prepare a browser application
+
+The [application guide](docs/guides/EMBEDDED_RESOURCES.md) walks through a complete,
+independent Lake project: a Lean program, runtime acquisition, publication, and a
+browser call. Its greeting function lives in `program/Client/Program.lean`:
 
 ```lean
 module
@@ -29,49 +28,54 @@ meta import Vir.Attributes
 public def Client.Program.greet (name : String) : String := "Hello, " ++ name
 ```
 
-The application's client library declares that program and prepares its browser
-files through Lake. It also acquires the matching prebuilt **runtime**: the
-JavaScript loader and Wasm interpreter that execute the program.
+The module must belong to a `lean_lib` in your Lake configuration. The guide gives
+that registration, the pinned VIR dependency and its matching Lean toolchain.
 
-Build the application with its ordinary Lake command. Its native site generator
-writes the prepared files, and the browser calls the program's exported functions.
-Applications do not locate VIR build directories, invoke packaging scripts, or
-build Wasm. Program compilation and runtime acquisition remain independent.
+After completing the project setup, publish its browser files:
 
-Follow [the application setup guide](docs/guides/EMBEDDED_RESOURCES.md) for a
-complete greeting project, its Lake command, publication and JavaScript call.
-Use the Lean toolchain selected by your VIR dependency; HTTPS runtime acquisition
-needs `curl`.
-The integration is under review for the first release; current qualification
-and limits are recorded in [the acceptance checklist](docs/development/RESOURCE_ACCEPTANCE.md).
+```sh
+lake exe generate-site site
+```
 
-## Experimental
+Lake builds the Lean program and native publisher and acquires the exact prebuilt
+JavaScript/Wasm runtime. The publisher writes the program and runtime assets
+under `site/`.
+The guide's browser code loads their manifests with `createProgram`, then calls
+`program.call("greet", "world")` to obtain `Hello, world`.
 
-[DOM helpers](docs/guides/LEAN_VIR_LIBRARY.md),
-[React and JSX](docs/guides/REACT.md), and
-[editor widgets and RPC](docs/guides/INFOVIEW.md) are available to try outside the
-official support scope. Editor widgets use live environments, including unsaved
-code. Their presence in the library or demos does not extend the support promise.
+### Use a custom JavaScript host
+
+For caller-supplied `hostBindings`, direct runtime control or low-level Lean
+object access, use the SDK's [JavaScript runtime API](docs/guides/JS_API.md#entry-points-and-distribution).
+The application loader above exposes `status`, `call` and `dispose`; the SDK
+provides the underlying runtime and object APIs.
+
+This route needs an SDK archive matching your pinned VIR revision. The
+[SDK acquisition guide](docs/guides/PACKAGES.md#install-the-browser-sdk) explains
+its release, CI-artifact and local-archive prerequisites. Application package
+compilation and runtime acquisition remain separate in both workflows.
+
+## Support scope
+
+Official support covers the runtime, packages, low-level object API and minimal
+two-way JS/Lean interop for documented workflows and pinned Lean/VIR versions.
+[DOM and canvas helpers](docs/guides/LEAN_VIR_LIBRARY.md),
+[React/JSX and ProofWidgets](docs/guides/REACT.md), and
+[editor widgets and RPC](docs/guides/INFOVIEW.md) are experimental, including
+when shipped through default imports or host providers.
+
+See [support scope](docs/SUPPORT.md) for the full boundary and planned JSON
+converters. The first release remains under review; see its
+[qualification status](docs/development/RESOURCE_ACCEPTANCE.md). More
+[guides and references](docs/README.md) and [Lean examples](examples/) are
+available to explore the APIs.
 
 ## Develop VIR
 
-The default `lake build` builds the Lean library. To work on VIR itself:
-
-```bash
-npm install
-npm run setup
-npm run doctor
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [the harness](docs/HARNESS.md)
-before running broader builds or tests. Ordinary client applications should not
-run this setup sequence.
-
-[Build internals](docs/guides/BUILD_WORKFLOWS.md) documents the compiler, runtime
-distribution and repository tooling behind the application workflow.
-
-[Documentation](docs/README.md) links the API guides, implementation references,
-examples, and validation instructions.
+To build or change VIR itself, start with [CONTRIBUTING.md](CONTRIBUTING.md) and
+[development setup](docs/HARNESS.md) for the toolchain, npm dependencies, local
+Wasm builds and tests. The [developer guide](docs/DEVELOPER_GUIDE.md) maps the
+implementation.
 
 ## License
 
