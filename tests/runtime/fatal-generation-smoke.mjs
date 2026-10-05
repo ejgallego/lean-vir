@@ -58,7 +58,7 @@ end Fatal`,
   let failure = new Error("fatal original host error");
   let pureCalls = 0;
   let fail = true, effects = 0, caughtNested = false, releases = 0, rollbacks = 0;
-  const factory = createVirRuntimeFactory({ wasmBytes, hostBindings: {
+  const sharedBindings = {
     "fatal.pure": value => { pureCalls++; if (fail) throw failure; return value; },
     "fatal.io": value => { if (fail) throw failure; return value; },
     "fatal.init": () => { throw failure; },
@@ -69,7 +69,8 @@ end Fatal`,
       catch (error) { assert.equal(error, failure); caughtNested = true; }
     },
     [VIR_HOST_DISPOSE]: () => { releases++; },
-  } });
+  };
+  const factory = createVirRuntimeFactory({ wasmBytes, hostBindings: sharedBindings });
   const fresh = () => factory.createRuntime({ irPackageSet: [bytes] });
   await test("pure failures retire named, timed, closure and caught nested entries", async () => {
     for (const mode of ["named", "timed", "closure", "nested"]) {
@@ -96,7 +97,7 @@ end Fatal`,
     }
     assert.equal(caughtNested, true);
     assert.equal(rollbacks, 1, "a binding cannot commit resources after catching a nested fatal call");
-    assert.equal(releases, 4);
+    assert.equal(releases, 0, "retired runtimes preserve application-owned bindings");
   });
   await test("hostile thrown values cannot reopen a real Lean/Wasm generation", async () => {
     const originalFailure = failure;
@@ -155,6 +156,9 @@ end Fatal`,
     } finally { runtime.dispose(); runtime.dispose(); }
     await assert.rejects(() => factory.createRuntime({ irPackageSet: [initBytes] }), error => error === failure);
   });
+  assert.equal(releases, 0, "failed creation and disposal preserve supplied bindings");
+  sharedBindings[VIR_HOST_DISPOSE]();
+  assert.equal(releases, 1, "the application disposes its shared services");
 } finally { await rm(dir, { recursive: true, force: true }); }
 
 function u32(n) {

@@ -6,10 +6,9 @@ Author: Emilio J. Gallego Arias
 
 export function collectCleanupError(errors, cleanup) {
   try {
-    return { ok: true, value: cleanup() };
+    cleanup();
   } catch (error) {
     errors.push(error);
-    return { ok: false, value: undefined };
   }
 }
 

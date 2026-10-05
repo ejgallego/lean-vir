@@ -53,7 +53,7 @@ try {
   const runtime = await createVirRuntime({
     wasmBytes,
     irPackageSet: [await readFile(packagePath)],
-    defaultHostBindings: createBrowserHostBindings({ infoviewUseRpcSession: () => hookSession }),
+    defaultHostBindings: () => createBrowserHostBindings({ infoviewUseRpcSession: () => hookSession }),
   });
   try {
     const controller = runtime.call(

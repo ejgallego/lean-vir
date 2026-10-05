@@ -188,11 +188,10 @@ callbacks and therefore a generation. Their owners remain responsible for
 cancellation, removal and reference release. GC timing, released foreign roots
 and Wasm memory/table capacity are different observations.
 
-The shared binding-map lease counter is decremented by explicit teardown, not
-by collection of an undisposed runtime. A retained factory/shared map can keep
-an outstanding lease count and defer its last-owner disposer. Use explicit
-disposal when deterministic shared-resource cleanup is needed; collection alone
-does not establish that those resources were released.
+Supplied binding maps and their services remain application-owned, even after
+every runtime is disposed or collected. The application terminates those services
+and drops retained callbacks when it no longer needs them. Runtime collection is
+not a substitute for explicit cleanup of runtime-owned fresh providers either.
 
 ## UI Cleanup Versus Runtime Disposal
 
@@ -236,19 +235,31 @@ termination operation:
 - Infoview hover observers and their viewport listeners.
 
 The shared `HostLifecycle` registers each active value together with its exact
-cleanup function. Runtime disposal invokes those functions without inspecting
+cleanup function. Lifecycle disposal invokes those functions without inspecting
 or guessing methods on the value. Timer and frame completion remove their
 registration before invoking user code. Cancellation of a registered timer or
 frame deactivates and detaches it before calling the platform cancellation
 function. Explicit React-root unmount removes
 its registration only after the platform unmount succeeds, so a failed unmount
-remains visible to runtime teardown.
+remains visible to lifecycle teardown.
 
 Each browser binding-factory invocation owns a fresh lifecycle unless the
-caller explicitly supplies one. A factory-created runtime generation can
-therefore be disposed without invalidating another live generation.
-Preconstructed binding maps are reference-counted only so intentional sharing
-across generations remains safe.
+caller explicitly supplies one. A function-valued `defaultHostBindings` must
+return a fresh map for each runtime and transfers ownership of that result to
+VIR. Disposal and failed runtime creation invoke its `[VIR_HOST_DISPOSE]()` hook.
+The built-in defaults and Infoview/React integrations use this per-runtime form.
+
+Preconstructed `hostBindings` and `defaultHostBindings` maps remain
+application-owned. Runtime disposal releases its bridge references and owned
+registrations without invoking a supplied map's disposer. Sharing a map across
+runtimes or factories does not transfer ownership. The application calls
+`bindings[VIR_HOST_DISPOSE]()` when the service is no longer needed. This ownership
+rule replaces the previous reference counting and automatic last-runtime disposal.
+Use a preconstructed map for shared services; returning the same map from multiple
+per-runtime builders violates the fresh-result ownership contract.
+Freshness includes the cleanup scope: returning new maps that wrap one shared
+`HostLifecycle` still shares teardown. A per-runtime builder must provide an
+independent cleanup scope for the resources it transfers to VIR.
 
 The Infoview hover provider registers its `ResizeObserver` and viewport
 listeners in this same lifecycle. Its returned cleanup removes that
@@ -256,9 +267,8 @@ registration before disconnecting the observer and listeners, so normal Lean
 effect cleanup and hard lifecycle disposal are both idempotent. The lifecycle
 gate applies to this provider-owned activity only; generic DOM event listeners
 remain application-owned. When a preconstructed binding map is intentionally
-shared, its lifecycle remains active until the final binding-map lease is
-released, so an earlier runtime disposal does not close admission for the
-other owners.
+shared, its lifecycle remains active until the application disposes it. Runtime
+shutdown does not close admission for another runtime using that supplied map.
 
 New lifecycle-managed resources are published transactionally. Before invoking a
 binding, the runtime opens a private transaction. An active resource created by
@@ -283,8 +293,10 @@ A synchronous host exception is rethrown by the owning export or callback call
 before any placeholder interpreter result is treated as success.
 
 Custom binding maps may expose `[VIR_HOST_DISPOSE]()` for their own active
-resources. Runtime disposal attempts every binding hook, active resource, Lean
-handle, JSL cell and callback even if cleanup throws. One failure is rethrown
+resources. VIR calls it only for runtime-owned fresh provider results; the
+application calls it for supplied maps. Runtime disposal attempts its owned
+provider hook, active resources, Lean handles, JSL cells and callbacks even if
+cleanup throws. One failure is rethrown
 directly; multiple failures become an `AggregateError` in cleanup order.
 Disposal is terminal and subsequent `dispose()` calls are no-ops.
 

@@ -46,7 +46,9 @@ import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
 ```
 
 When composing groups that create active registrations, pass the same
-`createHostLifecycle()` so runtime disposal can terminate them together.
+`createHostLifecycle()` so their owner can terminate them together. Return the
+composed map from a per-runtime `defaultHostBindings` function to transfer its
+cleanup to VIR; an application that supplies a preconstructed map owns its cleanup.
 Passive JavaScript values need no shared store.
 
 ## WASM Artifact Selection
@@ -115,11 +117,15 @@ names an entry point above.
 
 The browser runtime installs the built-in JavaScript value, browser and Infoview
 host bindings by default. The complete target map, factory list, custom binding
-rules, and cleanup behavior are documented in
-`docs/reference/HOST_BINDINGS.md`.
+rules, and cleanup behavior are documented in the
+[host bindings reference](../reference/HOST_BINDINGS.md#active-resources).
 
-`defaultHostBindings` may be either a binding map or a function returning a
-binding map. To enable browser React roots while keeping non-React imports free
+Preconstructed `hostBindings` and `defaultHostBindings` maps are application-owned.
+A `defaultHostBindings` function transfers ownership of each fresh provider and
+its cleanup scope to VIR. Use a map for shared services and a builder for
+per-runtime providers; the browser and Node entry points accept both forms.
+
+To enable browser React roots while keeping non-React imports free
 of React dependencies, compose the React binding group explicitly:
 
 ```js
@@ -266,7 +272,8 @@ const second = await factory.createRuntime({
 
 Use a factory to create a fresh runtime for each package generation. The
 compiled `WebAssembly.Module` is reused, while interpreter state, callbacks,
-handles, host resources and package-local caches remain generation-local:
+handles, runtime-created host resources and package-local caches remain
+generation-local:
 
 ```js
 const factory = createVirRuntimeFactory({ wasmUrl: "vir-upstream.wasm" });
@@ -285,10 +292,10 @@ console.log(vir.call("SecondPackage.entry"));
 
 If creation of `next` fails, the existing `vir` remains usable because it has
 not been disposed. Dispose a generation only when its callbacks, handles and
-host resources should become invalid. The new generation is selected before
-disposing the previous one, so a cleanup error propagates while the caller
+runtime-owned host resources should become invalid. Select the new generation
+before disposing the previous one, so a cleanup error propagates while the caller
 still owns `vir`. User-supplied binding maps shared by multiple runtimes retain
-their existing reference-leased cleanup behavior.
+application ownership: VIR does not dispose supplied maps when runtimes shut down.
 
 ## Calls And Manifest
 
