@@ -32,11 +32,7 @@ for (const name of Object.keys(transport)) {
 
 try {
   assert.equal(runtime.targetPointerBytes(), 4);
-  // Keep legacy exports callable, but forbid their use by the ordinary codec.
   runtime.exports = { ...originalExports };
-  for (const name of ["vir_obj_uint64", "vir_obj_uint64_decimal", "vir_obj_usize", "vir_obj_usize_decimal"]) {
-    runtime.exports[name] = () => assert.fail(`ordinary codec called ${name}`);
-  }
   for (const [name, interfaceTag, max, values, entry] of cases) {
     const type = { type: name, interfaceTag };
     const inputs = values.flatMap(n => n <= BigInt(Number.MAX_SAFE_INTEGER)
@@ -103,25 +99,6 @@ try {
     }
   }
 
-  // Legacy text entrypoints retain their signatures, range errors and ownership.
-  runtime.exports = originalExports;
-  for (const [name, _tag, max] of cases) {
-    const prefix = name === "UInt64" ? "vir_obj_uint64" : "vir_obj_usize";
-    for (const input of ["0", String(max), String(max + 1n), "-1", "invalid"]) {
-      const bytes = new TextEncoder().encode(input);
-      const ptr = runtime.allocBytes(bytes);
-      try {
-        const object = originalExports[prefix](ptr, bytes.length);
-        if (input === "0" || input === String(max)) {
-          assert.notEqual(object, 0);
-          try { assert.equal(runtime.readObjectDecimal(object, `${prefix}_decimal`), input); }
-          finally { originalExports.vir_obj_dec(object); }
-        } else {
-          assert.equal(object, 0);
-        }
-      } finally { runtime.freeBytes(ptr); }
-    }
-  }
   const huge = (1n << 256n) + 3n;
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", huge), String(huge + 1n));
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseIntNegate", -huge), String(huge));
@@ -131,4 +108,4 @@ try {
   runtime.dispose();
 }
 
-console.log("fixed-width smoke ok: exact String results, direct scalars, legacy text ABI and cleanup");
+console.log("fixed-width smoke ok: exact String results, direct scalars and cleanup");

@@ -118,6 +118,12 @@ try {
     wasmBytes: await readFile(join(jsDir, "..", "wasm", "vir-upstream.wasm")),
   });
   try {
+    for (const name of [
+      "vir_obj_uint64", "vir_obj_uint64_decimal",
+      "vir_obj_usize", "vir_obj_usize_decimal", "vir_obj_ctor_usize_decimal",
+    ]) {
+      assert.equal(Object.hasOwn(packagedRuntime.exports, name), false, `${name} must not ship in the SDK`);
+    }
     for (const [interfaceTag, value] of [
       [interfaceTags.INTERFACE_TAG.UINT64, "18446744073709551615"],
       [interfaceTags.INTERFACE_TAG.USIZE, "4294967295"],

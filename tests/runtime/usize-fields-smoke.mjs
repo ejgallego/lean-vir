@@ -36,10 +36,6 @@ const nested = {
   fields: [{ name: "inner", type: mixed, layout: { kind: "object", index: 0 } }],
 };
 const entry = "Vir.Fixtures.InterfaceShapes.profileStatsBump";
-const profile = manifestEntry(runtime.interfaceManifest, entry).args[0].type;
-assert.equal(profile.objectFieldCount, 1);
-assert.equal(profile.usizeFieldCount, 1);
-assert.equal(profile.scalarByteSize, 17);
 
 function roundtrip(type, input, expected) {
   const object = runtime.makeObjectValue(type, input, "fields");
@@ -53,8 +49,11 @@ function roundtrip(type, input, expected) {
 }
 
 try {
+  const profile = manifestEntry(runtime.interfaceManifest, entry).args[0].type;
+  assert.equal(profile.objectFieldCount, 1);
+  assert.equal(profile.usizeFieldCount, 1);
+  assert.equal(profile.scalarByteSize, 17);
   runtime.exports = { ...originalExports,
-    vir_obj_ctor_usize_decimal() { assert.fail("ordinary USize field codec used decimal transport"); },
     vir_obj_ctor_scalar_data(object, skipCount) {
       const data = originalExports.vir_obj_ctor_scalar_data(object, skipCount);
       if (skipCount === 0 && growOnSlotRead) {
@@ -94,23 +93,10 @@ try {
   assert.throws(() => runtime.readObjectUSizeField(mixed, absent, 0, "absent"),
     /USize field 1 is unavailable/);
   assert.equal(runtime.failure, null);
-
-  // The documented decimal accessor remains callable by low-level consumers.
-  const legacy = runtime.makeObjectValue(mixed,
-    { note: "legacy", first: 0n, second: max, enabled: true }, "legacy");
-  try {
-    for (const [index, expected] of [[1, "0"], [2, String(max)]]) {
-      const data = originalExports.vir_obj_ctor_usize_decimal(legacy, index);
-      assert.notEqual(data, 0);
-      assert.equal(originalTextRead.call(runtime, data, originalExports.vir_obj_decimal_size()), expected);
-    }
-  } finally {
-    originalExports.vir_obj_dec(legacy);
-  }
 } finally {
   runtime.exports = originalExports;
   runtime.readWasmString = originalTextRead;
   runtime.dispose();
 }
 
-console.log("USize fields smoke ok: mixed/nested layouts, exact strings, memory growth and legacy ABI");
+console.log("USize fields smoke ok: mixed/nested layouts, exact strings and memory growth");

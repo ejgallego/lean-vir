@@ -108,7 +108,6 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_array_get`           | Read one Lean `Array` element.                                                                    | Returns a new owned reference to the element.                                                                       |
 | `vir_obj_ctor`                | Allocate a constructor with object fields only.                                                   | Consumes all field objects on success; returns an owned constructor object.                                         |
 | `vir_obj_ctor_layout`         | Allocate a constructor with object fields, `USize` slots, and packed scalar bytes.                | Consumes object fields on success; returns an owned constructor object.                                             |
-| `vir_obj_ctor_usize_decimal`  | Inspect one constructor `USize` slot as decimal text.                                             | Returns a borrowed pointer into shim-owned decimal scratch storage.                                                 |
 | `vir_obj_ctor_scalar_data`    | Inspect constructor scalar data after skipping the supplied number of `USize` slots.              | Returns a borrowed pointer into the live constructor object.                                                        |
 | `vir_obj_scalar`              | Build an immediate scalar constructor value.                                                      | Returns a non-null Lean scalar object value; refcount operations are no-ops.                                        |
 | `vir_obj_is_scalar`           | Test whether an object is an immediate scalar.                                                    | No object ownership.                                                                                                |
@@ -125,10 +124,6 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_uint64_value`        | Inspect a Lean `UInt64` as a 64-bit Wasm scalar.                                                   | Borrows the object; JS must interpret the signed i64 result as unsigned.                                             |
 | `vir_obj_usize_scalar`        | Build a Lean `USize` from a pointer-width Wasm scalar (i32 on wasm32).                              | Returns an owned boxed `USize` object, including for zero.                                                           |
 | `vir_obj_usize_value`         | Inspect a Lean `USize` as a pointer-width Wasm scalar.                                             | Borrows the object; JS must interpret the signed i32 result as unsigned on wasm32.                                  |
-| `vir_obj_uint64`              | Build a Lean `UInt64` from decimal text.                                                          | Returns an owned boxed `UInt64` object.                                                                             |
-| `vir_obj_uint64_decimal`      | Inspect a Lean `UInt64` as decimal text.                                                          | Returns a borrowed pointer into shim-owned decimal scratch storage.                                                 |
-| `vir_obj_usize`               | Build a Lean `USize` from decimal text.                                                           | Returns an owned boxed `USize` object.                                                                              |
-| `vir_obj_usize_decimal`       | Inspect a Lean `USize` as decimal text.                                                           | Returns a borrowed pointer into shim-owned decimal scratch storage.                                                 |
 | `vir_obj_float`               | Build a Lean `Float`.                                                                             | Returns an owned boxed float object.                                                                                |
 | `vir_obj_float_value`         | Inspect a Lean `Float`.                                                                           | No object ownership.                                                                                                |
 | `vir_obj_float32`             | Build a Lean `Float32`.                                                                           | Returns an owned boxed float32 object.                                                                              |
@@ -189,14 +184,17 @@ variant: JavaScript supplies dense object fields, dense `USize` slots, and the
 packed scalar-byte area described by the interface manifest. If construction
 fails before consuming object fields, JavaScript still owns those field
 references. `vir_obj_field` returns a new owned reference to the requested
-object field, so JavaScript must release it. `vir_obj_ctor_usize_decimal`
-returns a borrowed pointer into the same shim-owned decimal scratch buffer as
-the scalar decimal helpers. `vir_obj_ctor_scalar_data(object, usize_field_count)`
+object field, so JavaScript must release it.
+`vir_obj_ctor_scalar_data(object, usize_field_count)`
 returns a borrowed pointer into the live Lean object after skipping that many
 pointer-width `USize` slots. Pass the constructor's full `USize` field count to
 reach packed scalar bytes, or zero to read the `USize` slots themselves.
 JavaScript must read the data before releasing the object and create memory views
 after the accessor returns, so they use the current buffer after memory growth.
+The caller must supply a live constructor with a matching layout. This accessor
+returns zero for an immediate scalar; it does not validate slot counts or the
+constructor's allocation size. A nonzero pointer does not establish that an
+arbitrary requested field exists.
 
 ### Fixed-width integers
 
@@ -223,11 +221,10 @@ This borrows the parent object without acquiring or releasing a field reference.
 A null data pointer signals an unavailable field; a field containing zero remains
 valid data.
 
-The documented decimal constructors and getters, including
-`vir_obj_ctor_usize_decimal`, retain their signatures and ownership for low-level
-callers. Ordinary fixed-width codecs no longer use them. Nat/Int text transport
-remains unchanged. Use matching JavaScript/Wasm assets with the scalar exports;
-rebuild the runtime and generated SDK together when adopting those exports.
+Low-level fixed-width callers use the scalar constructors/getters and borrowed
+constructor data above. Decimal text transport remains in use for Nat/Int.
+Use [matching JavaScript/Wasm assets](../guides/JS_API.md#matching-runtime-assets)
+and refresh the runtime and generated SDK together after updating VIR.
 
 ## Ownership
 

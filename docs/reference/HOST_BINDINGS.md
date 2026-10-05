@@ -122,9 +122,8 @@ fail with `TypeError`. It does not coerce or decode/re-encode. In a native Promi
 fulfillment callback, this check's failure rejects the resulting chain.
 
 The package manifest currently calls the raw JavaScript-value lane
-`hostResource`. That is a legacy ABI classification name, not a JavaScript
-wrapper or public lifetime model. At runtime the lane transports the value
-itself.
+`hostResource`. This is the current ABI classification for transporting the
+JavaScript value itself; it does not introduce a wrapper or lifetime model.
 
 ## Interpreter Transport
 

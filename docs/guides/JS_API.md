@@ -119,9 +119,10 @@ serve that same build. VIR contributors should follow the
 Mixing old JavaScript with new Wasm, or the reverse, is unsupported and has
 undefined behavior. Instantiation may succeed without establishing compatible
 execution or disposal. An unchanged runtime ABI version number does not make
-different revisions interchangeable. For now, VIR provides no compatibility
-guarantee for mixed runtime revisions; refreshing the build and deployed assets
-is the user's responsibility.
+different revisions interchangeable. VIR provides no compatibility guarantee or
+adapter for mixed runtime revisions; refreshing the build and deployed assets is
+the user's responsibility. Retired interfaces are removed under the
+[API change policy](../../CONTRIBUTING.md#api-changes).
 
 ## Runtime Module Map
 

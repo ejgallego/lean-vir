@@ -41,7 +41,6 @@ const requiredFunctionExports = [
   "vir_obj_array_get",
   "vir_obj_ctor",
   "vir_obj_ctor_layout",
-  "vir_obj_ctor_usize_decimal",
   "vir_obj_ctor_scalar_data",
   "vir_obj_closure_root",
   "vir_obj_expr_app",
@@ -80,12 +79,8 @@ const requiredFunctionExports = [
   "vir_obj_int_decimal",
   "vir_obj_uint32",
   "vir_obj_uint32_value",
-  "vir_obj_uint64",
-  "vir_obj_uint64_decimal",
   "vir_obj_uint64_scalar",
   "vir_obj_uint64_value",
-  "vir_obj_usize",
-  "vir_obj_usize_decimal",
   "vir_obj_usize_scalar",
   "vir_obj_usize_value",
   "vir_obj_float",
@@ -154,6 +149,14 @@ function assertRequiredExports(exports) {
   for (const name of requiredFunctionExports) {
     if (typeof exports[name] !== "function") {
       throw new Error(`${name} export is missing`);
+    }
+  }
+  for (const name of [
+    "vir_obj_uint64", "vir_obj_uint64_decimal",
+    "vir_obj_usize", "vir_obj_usize_decimal", "vir_obj_ctor_usize_decimal",
+  ]) {
+    if (exports[name] !== undefined) {
+      throw new Error(`removed ${name} export is still present`);
     }
   }
   if (exports.vir_resolve_call !== undefined) {

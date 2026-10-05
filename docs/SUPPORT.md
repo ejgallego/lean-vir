@@ -19,6 +19,12 @@ pinned Lean/VIR versions. It does not promise arbitrary Lean programs, every hos
 environment, or compatibility across revisions. The first release remains under
 review; see [current qualification](development/RESOURCE_ACCEPTANCE.md).
 
+VIR maintains the current contracts without legacy APIs or backward compatibility
+layers. Retired interfaces are removed when the contract changes. Applications
+must refresh their build setup and deploy
+[matching JavaScript/Wasm assets](guides/JS_API.md#matching-runtime-assets) together.
+Contributors follow the [API change policy](../CONTRIBUTING.md#api-changes).
+
 Start with [application setup](guides/EMBEDDED_RESOURCES.md). The underlying
 [JavaScript API](guides/JS_API.md) documents custom host bindings and direct runtime
 access; the current `createProgram` resource facade exposes only

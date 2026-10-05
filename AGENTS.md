@@ -84,6 +84,10 @@ asks for that machinery.
 
 ## Development Notes
 
+- Follow the [API change policy](CONTRIBUTING.md#api-changes): remove retired
+  interfaces and their compatibility code, and update callers, docs and tests
+  together. Do not retain legacy aliases or fallbacks for previous VIR revisions.
+
 - JavaScript runtime modules and Wasm binaries must come from the same VIR
   revision/build. Users are responsible for refreshing their build setup,
   replacing deployed assets together, and refreshing stale browser/deployment
