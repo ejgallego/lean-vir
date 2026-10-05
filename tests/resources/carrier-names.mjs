@@ -1,5 +1,6 @@
 // Exercise real Lake library names, not an independent filename predicate.
 import assert from "node:assert/strict";
+import { replaceFixture } from "./fixture-edit.mjs";
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
@@ -27,10 +28,12 @@ for (const [index, [name, stem]] of [
   });
   cpSync(join(repositoryRoot, "lean-toolchain"), join(client, "lean-toolchain"));
   const configPath = join(client, "lakefile.lean");
-  const config = readFileSync(configPath, "utf8")
-    .replace('"../../../.."', JSON.stringify(repositoryRoot))
-    .replace("lean_lib ClientResources where", `lean_lib ${name} where`)
-    .replace("  needs := #[`@client_fixture/ClientResources:virResourcePack]\n", "");
+  const providerConfig = replaceFixture(readFileSync(configPath, "utf8"),
+    '"../../../.."', JSON.stringify(repositoryRoot));
+  const namedConfig = replaceFixture(providerConfig,
+    "lean_lib ClientResources where", `lean_lib ${name} where`);
+  const config = replaceFixture(namedConfig,
+    "  needs := #[`@client_fixture/ClientResources:virResourcePack]\n", "");
   writeFileSync(configPath, config);
   const recipe = readFileSync(join(client, "vir-resources/ClientResources.json"));
   if (stem) writeFileSync(join(client, `vir-resources/${stem}.json`), recipe);

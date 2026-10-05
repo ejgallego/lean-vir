@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
+import { replaceFixture } from "./fixture-edit.mjs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
@@ -256,7 +257,7 @@ writeRecipe({ ...recipe, unknown: true });
 run("unknown-field", ["plan", recipePath, compat, repo], /INVALID_RECIPE/);
 writeFileSync(
   recipePath,
-  JSON.stringify(recipe, null, 2).replace(
+  replaceFixture(JSON.stringify(recipe, null, 2),
     '"schemaVersion": 1',
     '"schemaVersion": 1e0',
   ),
@@ -311,7 +312,7 @@ const altered = Buffer.from(first);
 const descriptorText = first
   .subarray(12, 12 + descriptorLength)
   .toString("utf8");
-const changedText = descriptorText.replace(
+const changedText = replaceFixture(descriptorText,
   `"virVersion":${descriptor.compatibility.virVersion}`,
   `"virVersion":2`,
 );
@@ -435,8 +436,7 @@ for (const role of ["root", "dependency"]) {
       const owner = manifest.metadata.packageSetMember;
       const before = `"packageSetMember":${JSON.stringify(owner)}`;
       const after = `"packageSetMember":${JSON.stringify({ ...owner, module: `X${owner.module.slice(1)}` })}`;
-      assert.ok(text.includes(before), "mutation must target embedded ownership, not diagnostic module fields");
-      return text.replace(before, after);
+      return replaceFixture(text, before, after);
     }));
   run(`${name}-verify`, ["verify", candidate, recipe.module], /INVALID_COMPILED_PROGRAM/);
   build(`${name}-build`, /INVALID_COMPILED_PROGRAM/, candidate);
@@ -444,12 +444,13 @@ for (const role of ["root", "dependency"]) {
 }
 for (const role of ["root", "dependency"]) {
   for (const [label, transform] of [
-    ["obsolete-interface", (text) => text.replace('"version":9', '"version":8')],
-    ["wrong-manifest-metadata", (text) => text.replace('"manifestVersion":9', '"manifestVersion":8')],
-    ["wrong-package-metadata", (text) => text.replace('"packageFormatVersion":11', '"packageFormatVersion":10')],
-    ["wrong-lean-revision", (text, manifest) => text.replace(
-      manifest.metadata.leanGithash, "0".repeat(manifest.metadata.leanGithash.length))],
-    ["missing-manifest-metadata", (text) => text.replace('"manifestVersion"', '"manifestVersioX"')],
+    ["obsolete-interface", (text) => replaceFixture(text, '"version":9', '"version":8')],
+    ["wrong-manifest-metadata", (text) => replaceFixture(text, '"manifestVersion":9', '"manifestVersion":8')],
+    ["wrong-package-metadata", (text) => replaceFixture(text, '"packageFormatVersion":11', '"packageFormatVersion":10')],
+    ["wrong-lean-revision", (text, manifest) => replaceFixture(text,
+      `"leanGithash":${JSON.stringify(manifest.metadata.leanGithash)}`,
+      `"leanGithash":${JSON.stringify("0".repeat(manifest.metadata.leanGithash.length))}`)],
+    ["missing-manifest-metadata", (text) => replaceFixture(text, '"manifestVersion"', '"manifestVersioX"')],
   ]) {
     const name = `${role}-${label}`;
     const candidate = writeCanonical(name, (_descriptor, files) =>

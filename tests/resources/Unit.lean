@@ -95,6 +95,19 @@ private def siteTests : IO Unit := do
   check "runtime-only programs" empty.programManifests.isEmpty
   check "runtime-only inventory" (empty.files.size == runtime.files.size + 1)
   check "prefix spelling preserved" (empty.runtimeModule == "Assets/VIR/" ++ runtime.contentId ++ "/runtime.js")
+  let entryPath := "assets/runtime-entry.js"
+  let relocated := withDescriptor
+    { runtime with files := runtime.files.map fun f =>
+      if f.path == "runtime.js" then { f with path := entryPath } else f }
+    { runtime.descriptor with
+      files := runtime.descriptor.files.map fun f =>
+        if f.path == "runtime.js" then { f with path := entryPath } else f
+      fileEntries := runtime.descriptor.fileEntries.map fun e =>
+        if e.role == "runtimeModule" then { e with path := entryPath } else e }
+  let moved ← success "declared runtime entry" ((ResourceSet.mk relocated #[program]).forSite "lib/vir")
+  check "runtime entry uses declared role" (moved.runtimeModule == "lib/vir/" ++ relocated.contentId ++ "/" ++ entryPath)
+  check "runtime entry names an emitted payload" (moved.files.any fun f =>
+    f.path == moved.runtimeModule && f.bytes == "abc".toUTF8)
   for outputPrefix in #["../vir", "/vir", "vir/", "a//b", "a\\b", "https://site", "CON", "a/../b", "bundle.json"] do
     failure "INVALID_PATH" (resources.forSite outputPrefix)
   let incompatible := withDescriptor program { program.descriptor with

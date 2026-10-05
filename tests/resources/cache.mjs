@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { checkFacetOutputSafety } from "./output-safety.mjs";
 import { checkNativeProfileRejection } from "./native-profile.mjs";
+import { replaceFixture } from "./fixture-edit.mjs";
 import {
   encodeDescriptor,
   descriptorContentId,
@@ -54,7 +55,7 @@ for (const dir of [client, leaf])
 const config = join(client, "lakefile.lean");
 writeFileSync(
   config,
-  readFileSync(config, "utf8").replace('"../../../.."', '"../producer"') +
+  replaceFixture(readFileSync(config, "utf8"), '"../../../.."', '"../producer"') +
     [
       "",
       "lean_lib OtherResources where",
@@ -65,12 +66,13 @@ writeFileSync(
       "",
     ].join("\n"),
 );
-const carrier = readFileSync(
+const originalCarrier = readFileSync(
   join(client, "resources/Client/Resources.lean"),
   "utf8",
-)
-  .replaceAll("Client.Resources", "Client.OtherResources")
-  .replaceAll("ClientResources.virres", "OtherResources.virres");
+);
+const renamedCarrier = replaceFixture(originalCarrier, "Client.Resources", "Client.OtherResources");
+const carrier = replaceFixture(renamedCarrier,
+  "ClientResources.virres", "OtherResources.virres");
 writeFileSync(join(client, "resources/Client/OtherResources.lean"), carrier);
 const recipe = JSON.parse(
   readFileSync(join(client, "vir-resources/ClientResources.json")),
@@ -83,18 +85,12 @@ writeFileSync(
   }),
 );
 const umbrella = join(client, "Client.lean");
-writeFileSync(
-  umbrella,
-  readFileSync(umbrella, "utf8")
-    .replace(
-      "public import Client.Resources",
-      "public import Client.Resources\npublic import Client.OtherResources",
-    )
-    .replace(
-      "#[Client.Resources.bundle]",
-      "#[Client.Resources.bundle, Client.OtherResources.bundle]",
-    ),
-);
+const withImport = replaceFixture(readFileSync(umbrella, "utf8"),
+  "public import Client.Resources",
+  "public import Client.Resources\npublic import Client.OtherResources");
+writeFileSync(umbrella, replaceFixture(withImport,
+  "#[Client.Resources.bundle]",
+  "#[Client.Resources.bundle, Client.OtherResources.bundle]"));
 // A second intermediary uses the same producer and runtime, but owns separate
 // program/carrier modules and resource identities.
 cpSync(client, peer, { recursive: true });
@@ -116,14 +112,14 @@ for (const path of [
   "vir-resources/OtherResources.json",
 ]) {
   const file = join(peer, path);
-  writeFileSync(
-    file,
-    readFileSync(file, "utf8")
-      .replaceAll("client_fixture", "peer_fixture")
-      .replaceAll("client-fixture", "peer-fixture")
-      .replaceAll("other-client", "other-peer")
-      .replaceAll("Client", "Peer"),
-  );
+  let contents = readFileSync(file, "utf8");
+  // Only these files contain the additional package/logical-ID spellings.
+  for (const [before, after, applies] of [
+    ["client_fixture", "peer_fixture", path === "lakefile.lean"],
+    ["client-fixture", "peer-fixture", path === "vir-resources/PeerResources.json"],
+    ["other-client", "other-peer", path === "vir-resources/OtherResources.json"],
+  ]) if (applies) contents = replaceFixture(contents, before, after, "all");
+  writeFileSync(file, replaceFixture(contents, "Client", "Peer", "all"));
 }
 const leafConfig = join(leaf, "lakefile.toml");
 writeFileSync(
@@ -131,23 +127,7 @@ writeFileSync(
   readFileSync(leafConfig, "utf8") +
     '\n[[require]]\nname = "peer_fixture"\npath = "../peer"\n',
 );
-const leafMain = join(leaf, "Main.lean");
-const leafSource = readFileSync(leafMain, "utf8");
-const siteInput = '  let site ← IO.ofExcept <| (Client.resources.forSite "").mapError reprStr';
-assert.equal(
-  leafSource.split(siteInput).length,
-  2,
-  "shared-producer fixture must replace exactly one publisher resource input",
-);
-writeFileSync(
-  leafMain,
-  leafSource
-    .replace("import Client", "import Client\nimport Peer")
-    .replace(
-      siteInput,
-      '  unless Client.resources.runtime.contentId == Peer.resources.runtime.contentId do\n    throw <| IO.userError "intermediaries selected different runtimes"\n  let resources : Vir.Resources.ResourceSet := { runtime := Client.resources.runtime, programs := Client.resources.programs ++ Peer.resources.programs }\n  let site ← IO.ofExcept <| (resources.forSite "").mapError reprStr',
-    ),
-);
+cpSync(join(root, "fixtures/resources/shared-user/Main.lean"), join(leaf, "Main.lean"));
 const lock = JSON.parse(
   readFileSync(join(producer, "vir-resources/runtime.json")),
 );
@@ -319,7 +299,7 @@ const publicPaths = ["Helper", "Program"].map((name) =>
 );
 const publicBytes = publicPaths.map((path) => readFileSync(path));
 const canonicalBefore = readFileSync(canonical);
-writeFileSync(helper, helperSource.replace('"Hello, "', '"Welcome, "'));
+writeFileSync(helper, replaceFixture(helperSource, '"Hello, "', '"Welcome, "'));
 build("private-transitive-edit", conventionalEnv);
 assert.notDeepEqual(readFileSync(canonical), canonicalBefore);
 runLake(

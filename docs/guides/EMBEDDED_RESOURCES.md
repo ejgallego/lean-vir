@@ -130,15 +130,20 @@ Lean build directory. Keep paths relative to each manifest and all members intac
 The root `bundle.json` name is reserved, including descendants such as
 `bundle.json/child`; a nested payload such as `assets/bundle.json` is allowed.
 
-The publisher supplies site-relative URLs for the runtime module and the two
-manifests. Resolve them relative to the generated page (including its deployment
-prefix), not to a Lean build directory:
+The returned paths are relative to the site's output root, not necessarily the
+current page. The publisher rebases them for nested pages or supplies the output
+root's URL (including any deployment prefix). They are not Lean build paths.
+For this one-program example:
 
 ```js
-// These paths come from the publisher's verified bundle plan.
-const runtimeModuleUrl = new URL(published.runtimeModule, document.baseURI);
-const runtimeManifestUrl = new URL(published.runtimeManifest, document.baseURI);
-const programManifestUrl = new URL(published.programManifests[0], document.baseURI);
+// The host supplies siteRootUrl: the output-root URL, ending in '/'.
+// document.baseURI suffices only when it denotes that root, not a nested page.
+if (published.programManifests.length !== 1) {
+  throw new Error("This application requires exactly one program");
+}
+const runtimeModuleUrl = new URL(published.runtimeModule, siteRootUrl);
+const runtimeManifestUrl = new URL(published.runtimeManifest, siteRootUrl);
+const programManifestUrl = new URL(published.programManifests[0], siteRootUrl);
 const { createProgram } = await import(runtimeModuleUrl.href);
 const program = await createProgram({ runtimeManifestUrl, programManifestUrl });
 try {

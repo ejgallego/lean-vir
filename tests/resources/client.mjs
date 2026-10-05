@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 // Supplied-pack or anonymous published-pack acceptance. In both modes the leaf
 // application's only command and dependency are the normal client ones.
 import assert from "node:assert/strict";
+import { replaceFixture } from "./fixture-edit.mjs";
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
@@ -57,7 +58,7 @@ cpSync(join(root, "fixtures/resources/client"), client, { recursive: true });
 cpSync(join(root, "fixtures/resources/user"), leaf, { recursive: true });
 for (const dir of [client, leaf])
   cpSync(join(root, "lean-toolchain"), join(dir, "lean-toolchain"));
-const config = readFileSync(join(client, "lakefile.lean"), "utf8").replace(
+const config = replaceFixture(readFileSync(join(client, "lakefile.lean"), "utf8"),
   '"../../../.."',
   JSON.stringify(root),
 );
@@ -157,7 +158,7 @@ const programSource = join(client, "program/Client/Program.lean");
 const initialSource = readFileSync(programSource, "utf8");
 writeFileSync(
   programSource,
-  initialSource.replace(" ++ name", ' ++ name ++ "!"'),
+  replaceFixture(initialSource, " ++ name", ' ++ name ++ "!"'),
 );
 build("program-edit");
 assert.notDeepEqual(readFileSync(programStage), programFirst);
@@ -166,7 +167,7 @@ assert.deepEqual(snapshot(runtimeStage), first[1]);
 // Reject a prerequisite cycle using the header graph, before compiled jobs wait.
 writeFileSync(
   programSource,
-  initialSource.replace(
+  replaceFixture(initialSource,
     "meta import Vir.Attributes",
     "meta import Vir.Attributes\nimport Client.Resources",
   ),
