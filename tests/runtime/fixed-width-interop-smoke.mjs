@@ -83,7 +83,9 @@ try {
         assert.throws(() => runtime.call("payloadRoundtrip", input), new RegExp(`out of range for ${typeName}`));
         // The last valid zero box in the rejected host array is released directly.
         // Earlier argument boxes are consumed by the interpreter, not by JS.
-        assert.ok(released.includes(created.at(-1)));
+        const lastBox = created.at(-1);
+        assert.ok(lastBox > 0);
+        assert.equal(released.filter(object => object === lastBox).length, 1);
       } finally {
         runtime.exports = original;
       }

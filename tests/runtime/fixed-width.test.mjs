@@ -10,12 +10,11 @@ import { ObjectValueRuntime } from "../../web/src/runtime/object-values.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { normalizeDecimal, normalizeBoundedUnsignedDecimal } from "../../web/src/runtime/vir-value-normalizers.js";
 
-test("direct fixed-width boxing distinguishes allocation failure from numeric zero", () => {
+test("direct fixed-width boxing reports null constructor results as lowering failures", () => {
   const runtime = Object.create(ObjectValueRuntime.prototype);
   let calls = 0;
   Object.assign(runtime, {
     targetPointerBytes: () => 4,
-    usizeMaxValue: () => 0xffffffffn,
     exports: {
       vir_obj_uint64_scalar(value) { assert.equal(value, 0n); calls++; return 0; },
       vir_obj_usize_scalar(value) { assert.equal(value, 0); calls++; return 0; },

@@ -480,8 +480,17 @@ The JSON manifest records those as `effect: "pure"`, `"runtime"`, `"io"`,
 `"dom"`, or `"react"` for tooling and documentation. The wasm call payload
 still lowers them to pure versus effectful execution.
 
-Large exact integer values are returned as decimal strings. ByteArray results
-are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript
+`Nat`, `Int`, `UInt64`, and `USize` inputs accept a safe integer JavaScript
+number, `BigInt`, or decimal string. Only `Int` accepts negative values.
+`UInt64` inputs must be in `0..2^64 - 1`; `USize` inputs must be in
+`0..2^32 - 1` for the supported wasm32 runtime. `USize` follows the Wasm
+execution target, regardless of the JavaScript host's pointer width.
+Results of all four types are decimal strings, including zero and small values;
+callers can use `BigInt(result)` when they need a JavaScript integer.
+See the [fixed-width ABI](../reference/OBJECT_ABI.md#fixed-width-integers)
+for the underlying transport and low-level exports.
+
+ByteArray results are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript
 numbers. Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them
 use generated Lean `_boxed` declarations automatically.
 

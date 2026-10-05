@@ -47,6 +47,7 @@ import {
 
 const textEncoder = new TextEncoder();
 const MAX_UINT64 = 0xffffffffffffffffn;
+const MAX_WASM32_USIZE = 0xffffffffn;
 // The pinned kernel stores index + 1 in a 20-bit loose-bound-variable range.
 const MAX_EXPR_BVAR_INDEX = 1048574n;
 // A JSL value is an ordinary JavaScript object. Its Lean root lives only in
@@ -503,7 +504,7 @@ export class ObjectValueRuntime {
   makeObjectUSize(value, label) {
     this.requireWasm32USize();
     const argObj = this.exports.vir_obj_usize_scalar(Number(
-      normalizeBoundedUnsignedBigInt(value, label, this.usizeMaxValue(), "USize"),
+      normalizeBoundedUnsignedBigInt(value, label, MAX_WASM32_USIZE, "USize"),
     ));
     if (argObj === 0) {
       throw new Error(`${label} could not be lowered to a Lean USize object`);

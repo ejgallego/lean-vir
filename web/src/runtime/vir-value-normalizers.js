@@ -29,9 +29,10 @@ function normalizeIntegerInput(value, label, { signed }) {
     return value;
   }
   if (typeof value === "string") {
+    const decimal = value.trim();
     const pattern = signed ? /^-?\d+$/ : /^\d+$/;
-    if (!pattern.test(value.trim())) throw new Error(`${label} must be a decimal string`);
-    return value.trim();
+    if (!pattern.test(decimal)) throw new Error(`${label} must be a decimal string`);
+    return decimal;
   }
   throw new Error(`${label} must be an integer, BigInt, or decimal string`);
 }

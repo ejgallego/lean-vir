@@ -281,11 +281,13 @@ including recursive references through supported fields. `Lean.Expr` uses
 constructor-backed `vir_obj_expr_*` and `vir_obj_level_*`
 helpers; the public Lean type remains `Lean.Expr`, but the helpers call Lean's
 real constructors so cached expression data is preserved. Resources, callbacks,
-host imports, and effectful calls also use object arguments/results. Decimal
-scalar calls lower through the corresponding `vir_obj_*` constructor, call
+host imports, and effectful calls also use object arguments/results. `Nat` and
+`Int` calls lower through the corresponding decimal `vir_obj_*` constructor, call
 `vir_call_resolved_objects`, lift the result with the matching decimal
 inspection helper plus
 `vir_obj_decimal_size`, and release the owned result with `vir_obj_dec`.
+`UInt64` and `USize` calls use [fixed-width scalar transport](#fixed-width-integers)
+while preserving decimal-string JavaScript results.
 Byte-array calls use `vir_obj_byte_array` and lift the result with
 `vir_obj_byte_array_data` / `vir_obj_byte_array_size`. Sequence calls lower each
 supported element to an owned object. Arrays pack those objects with
