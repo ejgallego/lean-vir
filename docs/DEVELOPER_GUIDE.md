@@ -18,19 +18,23 @@ describes supported mappings and gaps.
 | Lean library          | `Vir/`                                                                       | Runtime monads, JavaScript phantom types, browser/React APIs, and interface classification. |
 | Package tools         | `tools/`                                                                     | IR package construction, manifests, closure discovery, and reports.                         |
 | Interpreter shim      | `wasm/upstream_shim/`                                                        | Upstream interpreter integration, package provider, object ABI, and resource table/boxing/finalization. |
-| Runtime facade        | `web/src/vir-runtime.js`, `web/src/runtime/core.js`                          | Instantiation, one-generation package loading, calls, and disposal.                         |
-| Object ABI            | `web/src/runtime/object-values.js`, `web/src/runtime/host-state.js`          | Lean object lowering/lifting and host-import dispatch.                                      |
+| Managed runtime       | `web/src/runtime/factory-core.js`, `web/src/runtime/managed-core.js`        | Instantiation, one-generation package loading, calls, and disposal.                         |
+| Object transport      | `web/src/runtime/object-core.js`, `web/src/runtime/primitive-values.js`     | Shared ownership, opaque Js/JSL transport and primitive conversion.                         |
+| Optional conversion   | `web/src/runtime/object-values.js`, `web/src/runtime/host-state.js`         | Structural/syntax/callable conversion and host-import dispatch.                             |
 | JS boundary           | `web/src/host-boundary.js`                                                   | Host-call rollback transactions and reference-type capability checks.                       |
 | Active host lifecycle | `web/src/host/vir-active-host-bindings.js`                                   | Shared lifecycle plus timer and frame teardown.                                             |
 | Browser providers     | `web/src/vir-host-bindings.js`, `web/src/host/vir-infoview-host-bindings.js` | Browser targets and the repository-owned infoview protocol.                                 |
 | React providers       | `web/src/vir-react-host-bindings.js`, `web/src/react/`                       | Experimental browser React host.                                                           |
+
+The [managed runtime composition](development/MANAGED_RUNTIME_COMPOSITION.md)
+describes how the existing public factories select the full conversion layer.
 
 ## Top-Level Call Flow
 
 For a JavaScript-to-Lean call:
 
 1. The runtime resolves the export descriptor from the loaded package set.
-2. `object-values.js` lowers JavaScript inputs into real Lean objects.
+2. The selected primitive or optional converter lowers inputs into real Lean objects.
 3. The upstream IR interpreter executes the declaration.
 4. The object ABI lifts the Lean result back to JavaScript.
 5. Temporary Lean objects are decremented on both success and failure paths.
