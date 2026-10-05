@@ -14,6 +14,7 @@ import { createPrimitiveRuntimeFactory } from "../../web/src/runtime/primitive-f
 import { VIR_HOST_DISPOSE } from "../../web/src/runtime/factory.js";
 import { createCommonHostBindings } from "../../web/src/host/vir-common-host-bindings.js";
 import { generateIrPackage } from "./shared.mjs";
+import { collectUntil } from "./generation-gc-cases.js";
 
 assert.equal(typeof globalThis.gc, "function", "run with --expose-gc");
 const directory = await mkdtemp(join(tmpdir(), "vir-managed-core-"));
@@ -101,6 +102,7 @@ try {
           () =>
             weakState.deref() === undefined &&
             runtime.hostState.leanObjectHandleCells.size === 1,
+          "state carrier released while captured function remains live",
         );
         assert.equal(
           runtime.call("ManagedCore.invokeSummaryHeld", fn),
@@ -112,6 +114,7 @@ try {
           () =>
             weakFn.deref() === undefined &&
             runtime.hostState.leanObjectHandleCells.size === 0,
+          "function carrier and its capture released",
         );
       } finally {
         runtime.dispose();
@@ -223,14 +226,4 @@ try {
   }
 } finally {
   await rm(directory, { recursive: true, force: true });
-}
-
-async function collectUntil(predicate) {
-  for (let n = 0; n < 150; n++) {
-    await wait(0);
-    globalThis.gc();
-    await wait(0);
-    if (predicate()) return;
-  }
-  throw new Error("controlled GC observation budget exhausted");
 }

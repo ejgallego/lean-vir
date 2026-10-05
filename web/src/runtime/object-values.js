@@ -40,7 +40,6 @@ import {
   normalizeTaggedUnion,
 } from "./vir-value-normalizers.js";
 import { requireString } from "./object-core.js";
-import { PrimitiveObjectRuntime } from "./primitive-values.js";
 
 // The pinned kernel stores index + 1 in a 20-bit loose-bound-variable range.
 const MAX_EXPR_BVAR_INDEX = 1048574n;
@@ -49,6 +48,56 @@ const MAX_EXPR_BVAR_INDEX = 1048574n;
 // runtime. Primitive conversions and opaque Js/JSL ownership stay inherited.
 export function withObjectValues(Base) {
   return class extends Base {
+    makeObjectStringConstructor(
+      constructorName,
+      value,
+      stringLabel,
+      objectLabel,
+    ) {
+      return this.withWasmString(
+        requireString(value, stringLabel),
+        stringLabel,
+        (inputPtr, inputLen) => {
+          const obj = this.exports[constructorName](inputPtr, inputLen);
+          if (obj === 0) {
+            throw new Error(
+              `${objectLabel} could not be lowered to a Lean object`,
+            );
+          }
+          return obj;
+        },
+      );
+    }
+
+    ownedObjectField(obj, index, label) {
+      const field = this.exports.vir_obj_field(obj, index);
+      if (field === 0) {
+        throw new Error(`${label} field ${index} is unavailable`);
+      }
+      return field;
+    }
+
+    withOwnedObjectField(obj, index, label, callback) {
+      const field = this.ownedObjectField(obj, index, label);
+      try {
+        return callback(field);
+      } finally {
+        this.exports.vir_obj_dec(field);
+      }
+    }
+
+    withOwnedObjectFields(obj, indexes, label, callback) {
+      const fields = [];
+      try {
+        for (const index of indexes) {
+          fields.push(this.ownedObjectField(obj, index, label));
+        }
+        return callback(fields);
+      } finally {
+        this.releaseOwnedObjects(fields);
+      }
+    }
+
     objectArgumentSupported(type) {
       return objectArgumentSupported(type);
     }
@@ -1357,10 +1406,6 @@ export function withObjectValues(Base) {
     }
   };
 }
-
-export class ObjectValueRuntime extends withObjectValues(
-  PrimitiveObjectRuntime,
-) {}
 
 function normalizeBinderInfo(value, label) {
   if (

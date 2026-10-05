@@ -2,9 +2,11 @@
 
 The public browser and Node factories use the full runtime composition. Their
 construction, ownership, conversion and retirement contracts remain unchanged.
-The internal primitive composition serves clients that keep large
-Lean values opaque through `JSL`, including Lean functions that capture those
-values. It is not an additional public package entry.
+Applications can already keep Lean values and functions opaque through `JSL`
+using the public factories. This extraction separates that existing ownership
+and invocation machinery from optional structural conversion. The internal
+primitive composition qualifies this dependency boundary; it is excluded from
+public package exports and the SDK.
 
 Both compositions share these modules:
 
@@ -25,12 +27,13 @@ The internal `primitive-factory.js` imports none of those structural converters
 or their layout/normalization modules. It uses the same factory and lifecycle;
 it does not establish a separate raw construction or retirement protocol.
 
-A primitive client supplies host bindings through the existing factory options,
+The internal primitive composition uses the existing host-binding factory options,
 including a fresh default builder when required. Public browser and Node entries
 continue selecting their usual providers. Imports remain declarative: there is
 no mutable codec registry or runtime feature flag.
 
-For example, a thin Lean boundary can expose:
+The compiled [ManagedCore fixture](../../fixtures/runtime/ManagedCore.lean)
+exercises a thin Lean boundary:
 
 ```lean
 buildHeld : Nat → RuntimeM (JSL (Array Nat))

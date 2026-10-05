@@ -120,27 +120,6 @@ export class ObjectRuntime {
     }
   }
 
-  makeObjectStringConstructor(
-    constructorName,
-    value,
-    stringLabel,
-    objectLabel,
-  ) {
-    return this.withWasmString(
-      requireString(value, stringLabel),
-      stringLabel,
-      (inputPtr, inputLen) => {
-        const obj = this.exports[constructorName](inputPtr, inputLen);
-        if (obj === 0) {
-          throw new Error(
-            `${objectLabel} could not be lowered to a Lean object`,
-          );
-        }
-        return obj;
-      },
-    );
-  }
-
   withWasmString(value, label, callback) {
     const bytes = textEncoder.encode(requireString(value, label));
     const inputPtr = this.allocBytes(bytes);
@@ -295,35 +274,6 @@ export class ObjectRuntime {
       throw new Error(`${label} is not a Lean scalar object`);
     }
     return this.exports.vir_obj_scalar_value(obj) >>> 0;
-  }
-
-  ownedObjectField(obj, index, label) {
-    const field = this.exports.vir_obj_field(obj, index);
-    if (field === 0) {
-      throw new Error(`${label} field ${index} is unavailable`);
-    }
-    return field;
-  }
-
-  withOwnedObjectField(obj, index, label, callback) {
-    const field = this.ownedObjectField(obj, index, label);
-    try {
-      return callback(field);
-    } finally {
-      this.exports.vir_obj_dec(field);
-    }
-  }
-
-  withOwnedObjectFields(obj, indexes, label, callback) {
-    const fields = [];
-    try {
-      for (const index of indexes) {
-        fields.push(this.ownedObjectField(obj, index, label));
-      }
-      return callback(fields);
-    } finally {
-      this.releaseOwnedObjects(fields);
-    }
   }
 
   liftJsObjectValue(type, obj, label) {

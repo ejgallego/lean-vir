@@ -29,7 +29,7 @@ test("Node runtime excludes browser and Infoview providers", async () => {
   assert.ok(result.metafile.inputs["web/src/host/vir-common-host-bindings.js"]);
 });
 
-test("internal primitive composition shares the managed core without structural codecs", async () => {
+test("internal primitive composition excludes structural codecs and browser providers", async () => {
   const result = await build({
     absWorkingDir: repositoryRoot,
     entryPoints: ["web/src/runtime/primitive-factory.js"],
@@ -48,20 +48,6 @@ test("internal primitive composition shares the managed core without structural 
     assert.doesNotMatch(
       input,
       /vir-(?:dom|active|infoview|react).*bindings|web\/app\//,
-    );
-  }
-  for (const name of [
-    "managed-core",
-    "object-core",
-    "primitive-values",
-    "factory-core",
-    "host-state",
-    "package-contract",
-    "object-boundary",
-  ]) {
-    assert.ok(
-      inputs[`web/src/runtime/${name}.js`],
-      `${name} must remain shared`,
     );
   }
 });

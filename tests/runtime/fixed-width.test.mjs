@@ -6,12 +6,12 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ObjectValueRuntime } from "../../web/src/runtime/object-values.js";
+import { VirRuntime } from "../../web/src/runtime/core.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { normalizeDecimal, normalizeBoundedUnsignedDecimal } from "../../web/src/runtime/vir-value-normalizers.js";
 
 test("direct fixed-width boxing reports null constructor results as lowering failures", () => {
-  const runtime = Object.create(ObjectValueRuntime.prototype);
+  const runtime = Object.create(VirRuntime.prototype);
   let calls = 0;
   Object.assign(runtime, {
     targetPointerBytes: () => 4,
@@ -28,7 +28,7 @@ test("direct fixed-width boxing reports null constructor results as lowering fai
 });
 
 test("direct USize transport rejects wider targets before calling the ABI", () => {
-  const runtime = Object.create(ObjectValueRuntime.prototype);
+  const runtime = Object.create(VirRuntime.prototype);
   Object.assign(runtime, {
     targetPointerBytes: () => 8,
     exports: {
