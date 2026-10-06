@@ -21,7 +21,7 @@ def currentRuntimeAbiVersion : Nat := 4
 
 /-- Resource contract covering the client API, runtime ABI and accepted program formats.
 Advance on a breaking change to any constituent contract; not an alias for runtime ABI. -/
-def currentVirCompatibilityVersion : Nat := 1
+def currentVirCompatibilityVersion : Nat := 2
 
 def packageSetFormat : String := "lean-vir-ir-package-set"
 

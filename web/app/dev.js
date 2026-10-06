@@ -234,6 +234,14 @@ function renderInputFields(entry) {
       field.value = inputOverride(entry, input, index) ?? inputDefault(input);
     }
     label.append(caption, field);
+    if (isJsonInputTag(input.type?.interfaceTag)) {
+      const hint = document.createElement("small");
+      hint.id = `dev-entry-input-${index}-hint`;
+      hint.className = "dev-field-hint";
+      hint.textContent = 'For large integers, use quoted decimal strings, e.g. ["9007199254740993"].';
+      field.setAttribute("aria-describedby", hint.id);
+      label.append(hint);
+    }
     inputFields.append(label);
   }
 }

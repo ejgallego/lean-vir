@@ -169,7 +169,7 @@ vir.call("MyApp.classify", 0);
 // { kind: "inl", value: "zero" }
 
 vir.call("MyApp.classify", 4);
-// { kind: "inr", value: "5" }
+// { kind: "inr", value: 5n }
 
 vir.call("MyApp.validateName", "");
 // { kind: "error", value: "empty name" }

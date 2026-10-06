@@ -1288,6 +1288,13 @@ h2 {
   line-height: 1.45;
 }
 
+.dev-field-hint {
+  display: block;
+  margin-top: 6px;
+  color: #5f6f64;
+  font-size: 0.76rem;
+}
+
 .dev-input-fields {
   min-width: 0;
 }
