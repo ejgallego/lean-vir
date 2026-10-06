@@ -11,19 +11,25 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { repositoryRoot } from "../../scripts/repository-paths.mjs";
 
 const evidence = mkdtempSync(
   join(repositoryRoot, "build/resource-carrier-names-"),
 );
 console.log(`carrier-name evidence: ${evidence}`);
-for (const [index, [name, stem]] of [
+// Optional module/path pairs exercise semantic components through the real
+// include macro, including quoted dots/spaces, not a second source-root locator.
+for (const [index, [name, stem,
+  carrierModule = "Client.Resources", carrierFile = "Client/Resources.lean"]] of [
   ["«Client-Resources»", "«Client-Resources»"],
-  ["Client.Resources", "Client.Resources"],
+  ["Client.Resources", "Client.Resources",
+    "Quoted.«component.with.dots».Leaf", "Quoted/component.with.dots/Leaf.lean"],
   ["ClientRessourcesÉ", "ClientRessourcesÉ"],
-  ["«Library space»", "«Library space»"],
-  ["VersoSlidesVirPrettyMResources", "VersoSlidesVirPrettyMResources"],
+  ["«Library space»", "«Library space»",
+    "Quoted.«component space».Leaf", "Quoted/component space/Leaf.lean"],
+  ["VersoSlidesVirPrettyMResources", "VersoSlidesVirPrettyMResources",
+    "VersoSlides.VirPrettyMResources", "VersoSlides/VirPrettyMResources.lean"],
   ["«Client\\Resources»", null],
 ].entries()) {
   const client = join(evidence, String(index));
@@ -47,14 +53,13 @@ for (const [index, [name, stem]] of [
       renameSync(join(client, source), join(sourceRoot, source));
   }
   let carrierPath = join(sourceRoot, "resources/Client/Resources.lean");
-  if (name === "VersoSlidesVirPrettyMResources") {
+  if (carrierModule !== "Client.Resources") {
     config = replaceFixture(config, ".one `Client.Resources",
-      ".one `VersoSlides.VirPrettyMResources");
-    const migrated = join(sourceRoot, "resources/VersoSlides");
-    mkdirSync(migrated);
-    const destination = join(migrated, "VirPrettyMResources.lean");
+      `.one \`${carrierModule}`);
+    const destination = join(sourceRoot, "resources", carrierFile);
+    mkdirSync(dirname(destination), { recursive: true });
     writeFileSync(destination, replaceFixture(readFileSync(carrierPath, "utf8"),
-      "Client.Resources", "VersoSlides.VirPrettyMResources"));
+      "Client.Resources", carrierModule));
     carrierPath = destination;
   }
   writeFileSync(configPath, config);
@@ -92,4 +97,4 @@ for (const [index, [name, stem]] of [
     previous = { bytes, stat };
   }
 }
-console.log("carrier names: hyphen, dotted and Unicode library facets; warm staging unchanged");
+console.log("carrier names: real includes with quoted module components and library names; warm staging unchanged");
