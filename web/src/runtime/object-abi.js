@@ -458,7 +458,7 @@ export function readObjectScalarField(view, type, layout, label, offset = null) 
       return view.getUint32(offset, true);
     case INTERFACE_TAG.UINT64:
       requireScalarSize(layout, 8, label);
-      return view.getBigUint64(offset, true).toString();
+      return view.getBigUint64(offset, true);
     case INTERFACE_TAG.FLOAT:
       requireScalarSize(layout, 8, label);
       return view.getFloat64(offset, true);

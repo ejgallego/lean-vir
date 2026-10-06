@@ -124,14 +124,17 @@ try {
     ]) {
       assert.equal(Object.hasOwn(packagedRuntime.exports, name), false, `${name} must not ship in the SDK`);
     }
-    for (const [interfaceTag, value] of [
-      [interfaceTags.INTERFACE_TAG.UINT64, "18446744073709551615"],
-      [interfaceTags.INTERFACE_TAG.USIZE, "4294967295"],
+    for (const [interfaceTag, value, expected] of [
+      [interfaceTags.INTERFACE_TAG.UINT64, "18446744073709551615", 18446744073709551615n],
+      [interfaceTags.INTERFACE_TAG.USIZE, "4294967295", 4294967295],
+      [interfaceTags.INTERFACE_TAG.NAT, "0", 0n],
+      [interfaceTags.INTERFACE_TAG.NAT, (1n << 256n).toString(), 1n << 256n],
+      [interfaceTags.INTERFACE_TAG.INT, (-1n << 256n).toString(), -1n << 256n],
     ]) {
       const type = { interfaceTag };
       const object = packagedRuntime.makeObjectValue(type, value, "SDK scalar");
       try {
-        assert.equal(packagedRuntime.liftObjectValue(type, object, "SDK scalar"), value);
+        assert.equal(packagedRuntime.liftObjectValue(type, object, "SDK scalar"), expected);
       } finally {
         packagedRuntime.exports.vir_obj_dec(object);
       }
@@ -149,7 +152,8 @@ try {
     const value = { first: "4294967295", second: "0", word: 0xfffffffe };
     const object = packagedRuntime.makeObjectValue(type, value, "SDK fields");
     try {
-      assert.deepEqual(packagedRuntime.liftObjectValue(type, object, "SDK fields"), value);
+      assert.deepEqual(packagedRuntime.liftObjectValue(type, object, "SDK fields"),
+        { first: 4294967295, second: 0, word: 0xfffffffe });
     } finally {
       packagedRuntime.exports.vir_obj_dec(object);
     }

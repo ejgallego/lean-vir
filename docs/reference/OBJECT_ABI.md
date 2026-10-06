@@ -203,7 +203,8 @@ The ordinary boxed `UInt64` codec uses `vir_obj_uint64_scalar` and
 JavaScript BigInt. The wasm32 `USize` codec uses `vir_obj_usize_scalar` and
 `vir_obj_usize_value` with an exact 32-bit Number. Wasm results are signed;
 the codec recovers unsigned values with `BigInt.asUintN(64, result)` and
-`result >>> 0`, respectively, before returning decimal **String** results.
+`result >>> 0`, respectively. UInt64 results are unsigned JavaScript bigint;
+wasm32 USize results are Numbers, whose entire 32-bit range is exact.
 
 Both codecs still accept safe integer Number, BigInt and unsigned decimal
 String inputs, including surrounding whitespace and leading zeros. Validation
@@ -216,7 +217,7 @@ objects; constructors return owned heap boxes even for numeric zero.
 
 Manifest-guided constructor `USize` fields also use binary transport: the codec
 borrows `vir_obj_ctor_scalar_data(object, 0)` and reads each validated dense slot
-index as an unsigned little-endian 32-bit value before returning a decimal String.
+index as an unsigned little-endian 32-bit Number.
 This borrows the parent object without acquiring or releasing a field reference.
 A null data pointer signals an unavailable field; a field containing zero remains
 valid data.
@@ -291,10 +292,11 @@ real constructors so cached expression data is preserved. Resources, callbacks,
 host imports, and effectful calls also use object arguments/results. `Nat` and
 `Int` calls lower through the corresponding decimal `vir_obj_*` constructor, call
 `vir_call_resolved_objects`, lift the result with the matching decimal
-inspection helper plus
-`vir_obj_decimal_size`, and release the owned result with `vir_obj_dec`.
+inspection helper plus `vir_obj_decimal_size`, convert that text to JavaScript
+bigint in the shared primitive codec, and release the owned result with
+`vir_obj_dec`. Specialized Expr Nat indices and literals use the same Nat codec.
 `UInt64` and `USize` calls use [fixed-width scalar transport](#fixed-width-integers)
-while preserving decimal-string JavaScript results.
+and return bigint and Number respectively, including nested scalar/USize fields.
 Byte-array calls use `vir_obj_byte_array` and lift the result with
 `vir_obj_byte_array_data` / `vir_obj_byte_array_size`. Sequence calls lower each
 supported element to an owned object. Arrays pack those objects with

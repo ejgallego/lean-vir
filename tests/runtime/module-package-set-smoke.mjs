@@ -99,7 +99,7 @@ assert.ok(
   initSectionSize(packageInfoByModule.get("ModuleSetFixture.Root")) > 4,
 );
 const wasmBytes = await readFile(wasmPath);
-const expectedAnswer = "62";
+const expectedAnswer = 62n;
 
 const runtime = await createVirRuntime({
   wasmBytes,

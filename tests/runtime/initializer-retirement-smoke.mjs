@@ -111,13 +111,13 @@ end InitializerRetirement`,
         "a fresh interpreter can complete the initializer sequence");
       assert.equal(freshRuntime.liveCallbacks.size, 0,
         "the retained value is a JSL handle rather than a converted JS callback");
-      assert.equal(freshRuntime.call("InitializerRetirement.consume", retainedHandles[1]), "17");
+      assert.equal(freshRuntime.call("InitializerRetirement.consume", retainedHandles[1]), 17n);
       assert.throws(
         () => freshRuntime.call("InitializerRetirement.consume", escapedHandle),
         /live Lean object handle resource/,
         "a new interpreter cannot revalidate the retired interpreter's JSL handle",
       );
-      assert.equal(freshRuntime.call("InitializerRetirement.consume", retainedHandles[1]), "17",
+      assert.equal(freshRuntime.call("InitializerRetirement.consume", retainedHandles[1]), 17n,
         "rejecting the stale handle leaves the fresh interpreter usable");
     } finally {
       freshRuntime.dispose();

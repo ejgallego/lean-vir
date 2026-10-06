@@ -119,7 +119,7 @@ const timedCallbackRoundTrip = retainedCallbackRuntime.callTimed(
   "HostInterop.callbackRoundTrip",
   3,
 );
-assert.equal(timedCallbackRoundTrip.value, "10");
+assert.equal(timedCallbackRoundTrip.value, 10n);
 assert.equal(timedCallbackRoundTrip.timings.hostMs >= 0, true);
 assert.equal(
   timedCallbackRoundTrip.timings.hostMs <=
@@ -148,7 +148,7 @@ const extraArgumentRuntime = await createVirRuntime({
 });
 assert.equal(
   extraArgumentRuntime.call("HostInterop.callbackRoundTrip", 1),
-  "8",
+  8n,
 );
 assert.equal(extraArgumentRuntime.liveCallbacks.size, 1);
 extraArgumentRuntime.dispose();
@@ -190,7 +190,7 @@ const hostFactory = createVirRuntimeFactory({
 const firstRuntime = await hostFactory.createRuntime({
   irPackageSet: [hostPackageBytes],
 });
-assert.equal(firstRuntime.call("HostInterop.callbackRoundTrip", 3), "10");
+assert.equal(firstRuntime.call("HostInterop.callbackRoundTrip", 3), 10n);
 assert.equal(firstRuntime.liveCallbacks.size, 1);
 const badPackage = Uint8Array.from(hostPackageBytes);
 badPackage[4] ^= 1;
@@ -205,7 +205,7 @@ assert.equal(firstRuntime.liveCallbacks.size, 1);
 const nextRuntime = await hostFactory.createRuntime({
   irPackageSet: [defaultPackageBytes],
 });
-assert.equal(nextRuntime.call("fib", 12), "144");
+assert.equal(nextRuntime.call("fib", 12), 144n);
 firstRuntime.dispose();
 nextRuntime.dispose();
 assert.equal(bindingDisposals, 0);

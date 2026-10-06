@@ -52,7 +52,7 @@ try {
         if (!catchNested) return invokeNested();
         assert.throws(invokeNested, error => error === failure);
         if (callAfterCatch) {
-          assert.equal(runtime.call(prefix + "readCounter", counter), "0");
+          assert.equal(runtime.call(prefix + "readCounter", counter), 0n);
         }
       },
     },
@@ -62,7 +62,7 @@ try {
     const rootedValues = runtime.hostState.resourceRootCounts().active;
     for (const method of ["call", "callTimed"]) {
       assert.throws(() => runtime[method](prefix + "failThenWork", counter), error => error === failure);
-      assert.equal(runtime.call(prefix + "readCounter", counter), "0", "Lean continuation must not mutate its reference");
+      assert.equal(runtime.call(prefix + "readCounter", counter), 0n, "Lean continuation must not mutate its reference");
       assert.equal(runtime.liveCallbacks.size, 0, "later callback allocation must not run");
       assert.equal(hostCalls, 0, "later native effects must not run");
       assert.equal(runtime.hostState.callError, null);
@@ -95,7 +95,7 @@ try {
           assert.equal(runtime.liveCallbacks.size, roots);
           assert.equal(runtime.hostState.resourceRootCounts().active, resourceRoots,
             "nested calls must release their temporary argument roots");
-          assert.equal(runtime.call(prefix + "readCounter", counter), "0");
+          assert.equal(runtime.call(prefix + "readCounter", counter), 0n);
           assert.equal(hostCalls, 0, "caught errors must still stop the failed Lean continuation");
         }
       }
@@ -103,7 +103,7 @@ try {
     for (const method of ["call", "callTimed"]) {
       assert.throws(() => runtime[method](prefix + "failLean"), /IO action failed:.*Lean IO failure/,
         "a null result must still report the Lean call error");
-      assert.equal(runtime.call(prefix + "readCounter", counter), "0");
+      assert.equal(runtime.call(prefix + "readCounter", counter), 0n);
     }
     const ioFailureCallback = runtime.call(prefix + "makeIoFailureCallback");
     assert.throws(
@@ -140,12 +140,12 @@ try {
       assert.equal(nestedFailures.length, inspections.length);
       assert.ok(nestedFailures.every(Boolean), "nested calls reject with the active quarantine error");
       assert.equal(hostCalls, 0, "diagnostic inspection cannot perform host effects");
-      assert.equal(runtime.call(prefix + "readCounter", counter), "0");
+      assert.equal(runtime.call(prefix + "readCounter", counter), 0n);
       assert.equal(runtime.failure, null, "an effectful exception without Wasm unwind stays recoverable");
     }
     shouldThrow = false;
     runtime.call(prefix + "failThenWork", counter);
-    assert.equal(runtime.call(prefix + "readCounter", counter), "1");
+    assert.equal(runtime.call(prefix + "readCounter", counter), 1n);
     assert.equal(hostCalls, 1, "successful imports still permit ordinary continuation");
   } finally {
     runtime.dispose();

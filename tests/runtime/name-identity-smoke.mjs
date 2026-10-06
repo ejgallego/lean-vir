@@ -47,7 +47,7 @@ try {
     try {
       for (const [entry, parts, increment] of cases) {
         assert.equal(info.manifest.exports.find(value => value.entry === entry)?.nameKey, key(parts), entry);
-        assert.equal(runtime.call(entry, 10), String(10 + increment));
+        assert.equal(runtime.call(entry, 10), BigInt(10 + increment));
       }
     } finally { runtime.dispose(); }
     const renamed = structuredClone(info.manifest);
@@ -55,8 +55,8 @@ try {
     renamed.exports.find(value => value.entry === "boxedIdentity").entry = "boxed alias";
     const aliased = await factory.createRuntime({ irPackageSet: [replaceIrPackageManifest(bytes, renamed)] });
     try {
-      assert.equal(aliased.call("a client-selected alias", 10), "13");
-      assert.equal(aliased.call("boxed alias", "18446744073709551615"), "18446744073709551615");
+      assert.equal(aliased.call("a client-selected alias", 10), 13n);
+      assert.equal(aliased.call("boxed alias", "18446744073709551615"), 18446744073709551615n);
     }
     finally { aliased.dispose(); }
   });
@@ -72,7 +72,7 @@ try {
       assert.equal(finishes, 0);
       assert.equal(runtime.packageDeclCount(), 0);
       runtime.loadIrPackageSetBytes([bytes]);
-      assert.equal(runtime.call("café", 10), "13");
+      assert.equal(runtime.call("café", 10), 13n);
     } finally { runtime.dispose(); }
   });
   await test("cross-field aliases reject before initialization and same-export aliases agree", async () => {
@@ -105,10 +105,10 @@ try {
       runtime.loadIrPackageSetBytes([validPackage]);
       assert.equal(begins, 1);
       assert.equal(finishes, 1);
-      assert.equal(runtime.call("sharedName", 10), "13");
-      assert.equal(runtime.exportsByName.sharedName(10), "13");
-      assert.equal(runtime.call("otherName_", 10), "14");
-      assert.equal(runtime.exportsByName.otherName_(10), "14");
+      assert.equal(runtime.call("sharedName", 10), 13n);
+      assert.equal(runtime.exportsByName.sharedName(10), 13n);
+      assert.equal(runtime.call("otherName_", 10), 14n);
+      assert.equal(runtime.exportsByName.otherName_(10), 14n);
     } finally { runtime.dispose(); }
   });
   await test("old manifests reject before initialization and permit a current-package retry", async () => {
@@ -137,7 +137,7 @@ try {
         assert.equal(runtime.failure, null);
         runtime.loadIrPackageSetBytes([bytes]);
         assert.equal(finishes, 1);
-        assert.equal(runtime.call("café", 10), "13");
+        assert.equal(runtime.call("café", 10), 13n);
       } finally { runtime.dispose(); }
     }
   });

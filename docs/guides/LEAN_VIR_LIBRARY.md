@@ -159,7 +159,8 @@ safe-integer range.
 
 These host-value conversions are distinct from the
 [structural export representation](JS_API.md#calls-and-manifest) used when
-JavaScript calls a Lean entrypoint.
+JavaScript calls a Lean entrypoint. Automatic Nat export results also use bigint,
+including values nested in records and collections and returned from callbacks.
 
 For values whose shape is unknown, `Js.erase` forgets only the phantom type
 and returns the same value as `Js.Any`, including JS primitives, `null` and

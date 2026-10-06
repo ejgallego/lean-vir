@@ -71,13 +71,13 @@ try {
     for (const inputValue of [value, Number(value), String(value)]) {
       const input = { enabled: true, level: 2, score16: 30, visits: 400,
         quota: inputValue, checksum: 6000n, tier: "pro", note: "ok" };
-      roundtrip(profile, input, { ...input, quota: String(value), checksum: "6000" });
+      roundtrip(profile, input, { ...input, quota: Number(value), checksum: 6000n });
       assert.deepEqual(runtime.call(entry, input),
         { enabled: false, level: 3, score16: 32, visits: 403,
-          quota: String((value + 4n) & max), checksum: "6005", tier: "elite", note: "ok!" });
+          quota: Number((value + 4n) & max), checksum: 6005n, tier: "elite", note: "ok!" });
     }
     const input = { note: "mixed", first: value, second: max - value, enabled: true };
-    const expected = { ...input, first: String(value), second: String(max - value) };
+    const expected = { ...input, first: Number(value), second: Number(max - value) };
     roundtrip(mixed, input, expected);
     roundtrip(nested, { inner: input }, { inner: expected });
   }
@@ -86,7 +86,7 @@ try {
   // A view captured before the call would fail even though the pointer is live.
   growOnSlotRead = true;
   roundtrip(mixed, { note: "growth", first: max, second: 0n, enabled: false },
-    { note: "growth", first: String(max), second: "0", enabled: false });
+    { note: "growth", first: Number(max), second: 0, enabled: false });
   assert.equal(growOnSlotRead, false);
 
   const absent = originalExports.vir_obj_scalar(0);
@@ -99,4 +99,4 @@ try {
   runtime.dispose();
 }
 
-console.log("USize fields smoke ok: mixed/nested layouts, exact strings and memory growth");
+console.log("USize fields smoke ok: mixed/nested layouts, exact Numbers and memory growth");

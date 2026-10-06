@@ -33,6 +33,7 @@ import {
   assetPathFor,
   errorMessage,
   formatBytes,
+  formatResult,
   setReadyState,
 } from "./pages/page-utils.js";
 import { createLatestLoadGate } from "./pages/latest-load.js";
@@ -369,13 +370,6 @@ function parseInputValue(input, field) {
     default:
       throw new Error(`unsupported input type: ${input.type?.type ?? "?"}`);
   }
-}
-
-function formatResult(value) {
-  if (value instanceof Uint8Array) return Array.from(value).join(", ");
-  if (value !== null && typeof value === "object")
-    return JSON.stringify(value, null, 2);
-  return String(value);
 }
 
 function renderResult(value) {

@@ -124,9 +124,9 @@ const greeting = vir.call("MyApp.greeting", "Lean");
 const classified = vir.call("MyApp.classify", 4);
 const validated = vir.call("MyApp.validateName", "Lean");
 
-console.log(total); // "18"
+console.log(total); // 18n
 console.log(greeting); // "Hello, Lean"
-console.log(classified); // { kind: "inr", value: "5" }
+console.log(classified); // { kind: "inr", value: 5n }
 console.log(validated); // { kind: "ok", value: "Hello, Lean" }
 ```
 
@@ -207,8 +207,8 @@ vir.call("MyApp.treeRootScore", {
 });
 ```
 
-Results use the same constructor shape. Large exact numeric payloads, such as
-`Nat`, still come back as decimal strings inside the returned object.
+Results use the same constructor shape. `Nat`, `Int`, and `UInt64` payloads
+come back as bigint inside the returned object; wasm32 `USize` uses Number.
 
 A lambda-calculus AST follows the same convention:
 
@@ -299,8 +299,9 @@ it.
 Common Lean values map to JavaScript values like this:
 
 - `Nat`, `Int`, `UInt64`, and `USize` inputs accept a safe integer, `BigInt`, or
-  decimal string. Results are decimal strings so large exact values do not lose
-  precision in JavaScript.
+  decimal string. `Nat`, `Int`, and `UInt64` results are bigint. wasm32 `USize`
+  results are Numbers; their entire range is exact in JavaScript. This mapping
+  also applies to nested fields and callback results.
 - `Bool`, `String`, `Float`, `Float32`, `UInt8`, `UInt16`, and `UInt32` use the
   corresponding JavaScript boolean, string, or number values.
 - `Array alpha` and `List alpha` use JavaScript arrays.
@@ -377,7 +378,7 @@ const vir = await createVirRuntime({
   },
 });
 
-console.log(vir.call("MyApp.bumpViaJavaScript", 41)); // "42"
+console.log(vir.call("MyApp.bumpViaJavaScript", 41)); // 42n
 ```
 
 Host imports are synchronous in the current prototype.
@@ -395,8 +396,10 @@ low-level binding factory reference.
   interface exports.
 - The browser runner does not show an entry: the declaration was not listed as a
   root, or its type is not supported by the manifest interface yet.
-- A result is a string instead of a number: exact integer results intentionally
-  use decimal strings to avoid JavaScript precision loss.
+- A result is bigint instead of Number: `Nat`, `Int`, and `UInt64` always return
+  bigint to preserve their full range. Use bigint arithmetic or `String(result)`
+  for text display. Plain JSON serialization needs an explicit format for bigint;
+  see the [numeric value reference](JS_API.md#calls-and-manifest).
 - A package loads in `/dev.html` but not your app: confirm both
   `vir-upstream.wasm` and the `.irpkg` are served at the URLs passed to
   `createVirRuntime`.

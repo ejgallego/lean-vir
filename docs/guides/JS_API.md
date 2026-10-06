@@ -486,10 +486,35 @@ number, `BigInt`, or decimal string. Only `Int` accepts negative values.
 `UInt64` inputs must be in `0..2^64 - 1`; `USize` inputs must be in
 `0..2^32 - 1` for the supported wasm32 runtime. `USize` follows the Wasm
 execution target, regardless of the JavaScript host's pointer width.
-Results of all four types are decimal strings, including zero and small values;
-callers can use `BigInt(result)` when they need a JavaScript integer.
+`Nat`, `Int`, and `UInt64` results are JavaScript `bigint`, including zero and
+small values. `USize` results are Numbers: the supported wasm32 type's entire
+range is exact in JavaScript. `UInt8`, `UInt16`, and `UInt32` also return Numbers.
+The result type depends on the Lean type, never the value. This mapping applies
+to ordinary calls, callback results, explicit object conversions and numeric
+fields nested in structures, inductives and collections.
 See the [fixed-width ABI](../reference/OBJECT_ABI.md#fixed-width-integers)
 for the underlying transport and low-level exports.
+
+Arithmetic uses native JavaScript values:
+
+```js
+const result = vir.call("fib", 12); // 144n
+console.log(result + 1n); // 145n
+```
+
+Plain `JSON.stringify` rejects bigint, including inside records and arrays.
+Choose an explicit wire format when serializing results; for example, preserve
+exact integers as decimal strings:
+
+```js
+const json = JSON.stringify({ result }, (_key, value) =>
+  typeof value === "bigint" ? value.toString() : value);
+// {"result":"144"}
+```
+
+`JSON.parse` then returns strings for those fields. A caller with the result
+schema can recover `BigInt(parsed.result)`; ordinary text fields stay strings.
+The runtime returns values directly and does not serialize call results.
 
 ByteArray results are returned as `Uint8Array`; `Float` and `Float32` values are
 JavaScript numbers. Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them
@@ -561,6 +586,8 @@ inner expression; metadata results preserve a structural `mdata` wrapper.
 Bound-variable indices must be in `0..1048574`: the pinned kernel stores
 `index + 1` in a 20-bit range. Larger indices reject before Wasm execution.
 This limit does not restrict arbitrary-precision Nat literals or projection indices.
+Expr results use bigint for these Nat-valued indices and literals, following
+the same mapping as other Nat results.
 
 Names inside these structural expression and level values use a restricted
 text spelling: non-empty Lean identifier components separated by single dots.
@@ -692,7 +719,7 @@ const vir = await createVirRuntime({
   },
 });
 
-console.log(vir.call("bumpFromJs", 41)); // "42"
+console.log(vir.call("bumpFromJs", 41)); // 42n
 ```
 
 For callback ownership, failed-call rollback and exception propagation, see
