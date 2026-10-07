@@ -9,14 +9,38 @@ import test from "node:test";
 
 import {
   enumValue,
+  normalizeCustomInductive,
   normalizeEnum,
+  normalizeTaggedUnion,
 } from "../../web/src/runtime/vir-value-normalizers.js";
+import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+import {
+  defaultValueForType,
+  interfaceInputTag,
+} from "../../web/app/pages/interface-inputs.js";
 
 const type = {
+  type: "Example.Color",
+  interfaceTag: INTERFACE_TAG.SIMPLE_ENUM,
+  kind: "simpleEnum",
   constructors: [
     { name: "Example.Color.red", jsName: "red", tag: 0 },
     { name: "Example.Color.constructor", jsName: "constructor", tag: 1 },
   ],
+};
+
+const stringType = { type: "String", interfaceTag: INTERFACE_TAG.STRING };
+const taggedType = {
+  type: "Example.Choice",
+  name: "Example.Choice",
+  interfaceTag: INTERFACE_TAG.TAGGED_UNION,
+  kind: "taggedUnion",
+  constructors: [{
+    name: "Example.Choice.left", jsName: "left", tag: 0,
+    type: stringType,
+    objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0,
+    layout: { kind: "object", index: 0 },
+  }],
 };
 
 test("enum values use the JS spelling in both directions", () => {
@@ -56,4 +80,38 @@ test("enum lifting requires a numeric constructor ordinal in range", () => {
   for (const index of [-1, 2, 0.5, NaN, "0", "constructor", "map"]) {
     assert.throws(() => enumValue(type, index), /enum.*index.*out of range/);
   }
+});
+
+test("tagged-union kinds use JS spelling without Lean-name aliases", () => {
+  const value = { kind: "left", value: "payload" };
+  assert.deepEqual(normalizeTaggedUnion(value, taggedType, "value"), {
+    index: 0, ctor: taggedType.constructors[0], payload: "payload",
+  });
+  assert.throws(
+    () => normalizeTaggedUnion({ ...value, kind: "Example.Choice.left" }, taggedType, "value"),
+    /unknown tagged-union constructor/,
+  );
+});
+
+test("browser input defaults use the same constructor names as normalization", () => {
+  assert.equal(interfaceInputTag(type), "SELECT");
+  const enumDefault = defaultValueForType(type);
+  assert.equal(enumDefault, "red");
+  assert.equal(normalizeEnum(enumDefault, type, "input"), 0);
+
+  const taggedDefault = defaultValueForType(taggedType);
+  assert.deepEqual(taggedDefault, { kind: "left", value: "" });
+  assert.equal(normalizeTaggedUnion(taggedDefault, taggedType, "input").index, 0);
+
+  const customType = {
+    type: "Example.Tree", name: "Example.Tree",
+    interfaceTag: INTERFACE_TAG.CUSTOM_INDUCTIVE, kind: "customInductive",
+    constructors: [{
+      name: "Example.Tree.empty", jsName: "empty", tag: 0,
+      objectFieldCount: 0, usizeFieldCount: 0, scalarByteSize: 0, fields: [],
+    }],
+  };
+  const customDefault = defaultValueForType(customType);
+  assert.deepEqual(customDefault, { kind: "empty" });
+  assert.equal(normalizeCustomInductive(customDefault, customType, "input").index, 0);
 });

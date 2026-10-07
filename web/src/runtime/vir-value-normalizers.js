@@ -5,7 +5,6 @@ Author: Emilio J. Gallego Arias
 */
 
 import {
-  customInductiveShape,
   requireCustomInductiveConstructors,
   requireStructureFields,
   requireTaggedUnionConstructors,
@@ -175,6 +174,19 @@ function customInductiveNormalizationPlan(type) {
   };
   customInductiveNormalizationPlanCache.set(type, plan);
   return plan;
+}
+
+function customInductiveShape(ctor) {
+  // The normalization plan has already validated the constructor metadata.
+  const kind = JSON.stringify(ctor.jsName);
+  const fields = ctor.fields;
+  if (fields.length === 0) {
+    return `{ kind: ${kind} }`;
+  }
+  if (fields.length === 1) {
+    return `{ kind: ${kind}, value }`;
+  }
+  return `{ kind: ${kind}, fields: { ${fields.map((field) => field.name).join(", ")} } }`;
 }
 
 export function normalizeEnum(value, type, label) {

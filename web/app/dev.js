@@ -195,8 +195,8 @@ function renderInputFields(entry) {
     if (input.type?.interfaceTag === INTERFACE_TAG.SIMPLE_ENUM) {
       for (const ctor of input.type?.constructors ?? []) {
         const option = document.createElement("option");
-        option.value = ctor.jsName ?? ctor.name;
-        option.textContent = ctor.jsName ?? ctor.name;
+        option.value = ctor.jsName;
+        option.textContent = ctor.jsName;
         field.append(option);
       }
       field.value = inputDefault(input);

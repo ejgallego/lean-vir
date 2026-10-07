@@ -100,7 +100,7 @@ function defaultTaggedUnionValue(type) {
   const ctor = type?.constructors?.[0];
   if (!ctor) return { kind: "", value: null };
   return {
-    kind: ctor.jsName ?? ctor.name,
+    kind: ctor.jsName,
     value: defaultValueForType(ctor.type),
   };
 }
@@ -108,7 +108,7 @@ function defaultTaggedUnionValue(type) {
 function defaultCustomInductiveValue(type, depth = 0) {
   const ctor = type?.constructors?.[0];
   if (!ctor) return { kind: "", value: null };
-  const kind = ctor.jsName ?? ctor.name;
+  const kind = ctor.jsName;
   if ((ctor.fields ?? []).length === 0) {
     return { kind };
   }

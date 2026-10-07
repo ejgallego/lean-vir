@@ -273,9 +273,9 @@ export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
   const expectedControls = info.manifest.exports.map((entry) => ({
     id: entry.id,
     inputTags: entry.args.map((arg) => interfaceInputTag(arg.type)),
-    enumOptionCounts: entry.args.map((arg) =>
+    enumOptions: entry.args.map((arg) =>
       interfaceInputTag(arg.type) === "SELECT"
-        ? (arg.type.constructors ?? []).length
+        ? arg.type.constructors.map((ctor) => ({ value: ctor.jsName, text: ctor.jsName }))
         : null,
     ),
   }));
@@ -289,8 +289,10 @@ export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
       return {
         id: select.value,
         inputTags: Array.from(document.querySelectorAll("[data-input-index]")).map((field) => field.tagName),
-        enumOptionCounts: Array.from(document.querySelectorAll("[data-input-index]")).map((field) =>
-          field.tagName === "SELECT" ? field.options.length : null),
+        enumOptions: Array.from(document.querySelectorAll("[data-input-index]")).map((field) =>
+          field.tagName === "SELECT"
+            ? Array.from(field.options).map((option) => ({ value: option.value, text: option.textContent }))
+            : null),
       };
     });
   })()`,
