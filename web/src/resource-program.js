@@ -82,7 +82,11 @@ async function fetchBounded(url, limit, signal, mediaType = null) {
     ?.split(";")[0]
     .trim()
     .toLowerCase();
-  if (mediaType !== null && type !== mediaType) {
+  // Static hosts also use this JavaScript response MIME. The declared
+  // inventory and its byte/hash checks remain unchanged.
+  const javascriptAlias =
+    mediaType === "text/javascript" && type === "application/javascript";
+  if (mediaType !== null && type !== mediaType && !javascriptAlias) {
     await response.body?.cancel();
     throw new Error(
       `resource ${url}: expected Content-Type ${mediaType}, got ${type}`,

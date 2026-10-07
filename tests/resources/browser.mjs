@@ -208,7 +208,10 @@ const server = createServer((req, res) => {
     return;
   }
   res.writeHead(item.status ?? 200, {
-    "content-type": item.mediaType,
+    // Match GitHub Pages: the declared text/javascript inventory is served
+    // using its application/javascript response alias, including bootstrap.
+    "content-type": item.mediaType === "text/javascript"
+      ? "application/javascript" : item.mediaType,
     "content-length": item.bytes.length,
     ...item.headers,
   });
@@ -262,7 +265,7 @@ try {
       disposed: true,
     });
     outcomes.push(
-      `${prefix}: full-name call, independent instance, disposal, remount PASS`,
+      `${prefix}: JavaScript MIME alias, full-name call, independent instance, disposal, remount PASS`,
     );
   }
   const browserVersion = await cdp.send("Browser.getVersion");
@@ -452,6 +455,27 @@ try {
   assert.equal(missingExport.phase, "program-validation");
   assert.equal(await evaluate(cdp, "resourceInstances"), 0);
   outcomes.push("unknown expected declaration: reject before runtime instantiation PASS");
+  await rejected(
+    "JavaScript MIME",
+    (path) => path === "runtime/runtime.js"
+      ? { ...inventory.get(path), mediaType: "text/plain" } : null,
+    /Content-Type/,
+    "resource-fetch",
+  );
+  await rejected(
+    "JavaScript alias integrity",
+    (path) => path === "runtime/runtime.js"
+      ? { ...inventory.get(path), bytes: Buffer.alloc(compiled.outputFiles[0].contents.length) } : null,
+    /integrity mismatch/,
+    "integrity",
+  );
+  await rejected(
+    "JavaScript alias is not Wasm MIME",
+    (path) => path === "runtime/runtime.wasm"
+      ? { ...inventory.get(path), mediaType: "application/javascript" } : null,
+    /Content-Type/,
+    "resource-fetch",
+  );
   await rejected(
     "Wasm integrity",
     (path) =>

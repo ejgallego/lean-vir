@@ -51,6 +51,57 @@ const entry = {
 const expected = () => ({
   "Root.run": { args: [], result: { ...nat }, effect: "pure" },
 });
+function withResponseType(s, pathname, type, body = undefined) {
+  s.fetchOverride = async (url) => {
+    const response = s.respond(url);
+    if (new URL(url).pathname !== pathname) return response;
+    const headers = new Headers(response.headers);
+    if (type === null) headers.delete("content-type");
+    else headers.set("content-type", type);
+    return new Response(body ?? response.body, { headers });
+  };
+}
+
+for (const type of [
+  "text/javascript", "text/javascript; charset=utf-8",
+  "application/javascript", "Application/JavaScript; charset=UTF-8",
+]) {
+  test(`JavaScript response MIME ${type} admits an intact runtime`, async () =>
+    fixture(async (s) => {
+      withResponseType(s, "/runtime/runtime.js", type);
+      s.creation.resolve(s.runtime);
+      const program = await createProgram(s.options);
+      assert.equal(s.instances, 1);
+      assert.equal(program.call("Root.run"), 42n);
+      program.dispose();
+      assert.equal(s.disposed, 1);
+    }));
+}
+
+for (const type of ["text/html", "text/plain", "application/json", "application/octet-stream", null]) {
+  test(`JavaScript response MIME ${type} rejects before instantiation`, async () =>
+    fixture(async (s) => {
+      withResponseType(s, "/runtime/runtime.js", type);
+      await assert.rejects(createProgram(s.options), (error) =>
+        error.phase === "resource-fetch" && /Content-Type/.test(error.cause.message));
+      assert.equal(s.instances, 0);
+    }));
+}
+
+test("JavaScript alias does not admit an incorrect Wasm MIME", async () =>
+  fixture(async (s) => {
+    withResponseType(s, "/runtime/runtime.wasm", "application/javascript");
+    await assert.rejects(createProgram(s.options), (error) =>
+      error.phase === "resource-fetch" && /Content-Type/.test(error.cause.message));
+    assert.equal(s.instances, 0);
+  }));
+
+test("JavaScript alias retains payload integrity checks", async () =>
+  fixture(async (s) => {
+    withResponseType(s, "/runtime/runtime.js", "application/javascript", "export []");
+    await assert.rejects(createProgram(s.options), (error) => error.phase === "integrity");
+    assert.equal(s.instances, 0);
+  }));
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((a, b) => {
