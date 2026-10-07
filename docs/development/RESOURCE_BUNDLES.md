@@ -283,11 +283,10 @@ must not import that carrier.
 The runtime selection is `vir-resources/runtime.json` in VIR. It selects one
 content ID and acquisition source; `vir-resources/compatibility.json` independently
 defines the Lean revision / VIR version pair shared by program production. The
-current lock still names the published version 1 runtime. It cannot satisfy the
-version 2 producer profile: acquisition rejects that pair. A matching version 2
-runtime release and lock update are required before ordinary application builds
-can use the current source. This is a separate maintainer publication step;
-the old release remains unchanged.
+current lock selects the matching published version 2 runtime. A runtime bundle
+must match that profile; acquisition rejects an incompatible selection.
+Publishing and selecting a matching runtime are separate maintainer operations,
+and earlier releases remain unchanged.
 
 After selecting a matching public, content-addressed runtime, missing local bytes
 are acquired anonymously over HTTPS and verified before installation. A warm
