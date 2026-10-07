@@ -178,8 +178,9 @@ function constructorAt(type, index, label, requireConstructors, kindLabel) {
 }
 
 export function customInductiveShape(ctor) {
-  const kind = JSON.stringify(ctor.jsName ?? ctor.name ?? "?");
-  const fields = ctor.fields ?? [];
+  // The normalization plan has already validated the constructor metadata.
+  const kind = JSON.stringify(ctor.jsName);
+  const fields = ctor.fields;
   if (fields.length === 0) {
     return `{ kind: ${kind} }`;
   }

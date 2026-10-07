@@ -525,7 +525,11 @@ JavaScript number and preserve NaN, infinities, and signed zero across the
 opaque `Lean.Vir.Js Float` resource boundary.
 
 Nullary inductive enums use their generated JavaScript constructor name in both
-directions.
+directions. The required `jsName` field determines that spelling, also used for
+tagged-union and custom-inductive `kind` values. Constructor `name` identifies
+the Lean declaration and `tag` records its numeric ordinal; neither is a
+JavaScript value alias. Descriptor-guided helpers require `jsName` in supplied
+constructor metadata; see the [descriptor format](../reference/IRPKG_FORMAT.md#interface-descriptors).
 
 Options use `null` for `none` and the bare inner value for `some`. Products use
 `{ fst, snd }` in both directions. Arrays and lists use JavaScript arrays,

@@ -86,7 +86,7 @@ export function normalizeTaggedUnion(value, type, label) {
   }
   const constructors = requireTaggedUnionConstructors(type, label);
   const index = constructors.findIndex(
-    (ctor) => (ctor.jsName ?? ctor.name) === value.kind,
+    (ctor) => ctor.jsName === value.kind,
   );
   if (index < 0) {
     throw new Error(`${label} has unknown tagged-union constructor ${value.kind}`);
@@ -164,7 +164,7 @@ function customInductiveNormalizationPlan(type) {
   const constructorsByName = new Map();
   for (const constructorPlan of constructorPlans) {
     constructorsByName.set(
-      constructorPlan.ctor.jsName ?? constructorPlan.ctor.name,
+      constructorPlan.ctor.jsName,
       constructorPlan,
     );
   }
@@ -178,12 +178,12 @@ function customInductiveNormalizationPlan(type) {
 }
 
 export function normalizeEnum(value, type, label) {
-  const constructors = type?.constructors ?? [];
   if (typeof value !== "string") {
     throw new Error(`${label} must be an enum constructor name`);
   }
+  const constructors = requireEnumConstructors(type, label);
   const index = constructors.findIndex(
-    (ctor) => (ctor.jsName ?? ctor.name) === value,
+    (ctor) => requireEnumConstructorName(ctor, label) === value,
   );
   if (index < 0) {
     throw new Error(`${label} has unknown enum constructor ${value}`);
@@ -192,11 +192,26 @@ export function normalizeEnum(value, type, label) {
 }
 
 export function enumValue(type, index) {
-  const ctor = type?.constructors?.[index];
-  if (ctor === undefined) {
+  const constructors = requireEnumConstructors(type, "result");
+  if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
     throw new Error(`result enum index ${index} is out of range`);
   }
-  return ctor.jsName ?? ctor.name ?? String(index);
+  return requireEnumConstructorName(constructors[index], "result");
+}
+
+function requireEnumConstructors(type, label) {
+  const constructors = type?.constructors;
+  if (!Array.isArray(constructors) || constructors.length === 0) {
+    throw new Error(`${label} is missing manifest enum constructors`);
+  }
+  return constructors;
+}
+
+function requireEnumConstructorName(ctor, label) {
+  if (typeof ctor?.jsName !== "string") {
+    throw new Error(`${label} has an invalid manifest enum constructor jsName`);
+  }
+  return ctor.jsName;
 }
 
 function flattenedSubobjectFieldsPresent(value, type) {

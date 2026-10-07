@@ -109,7 +109,10 @@ test("explicit scalar conversions do not traverse callback roots", t => {
     T.UINT8, T.UINT16, T.UINT32, T.UINT64, T.USIZE, T.FLOAT, T.FLOAT32]) {
     h.call([{ interfaceTag }], [1], () => {}, HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION);
   }
-  h.call([{ interfaceTag: T.SIMPLE_ENUM, constructors: [{ name: "zero" }, { name: "one" }] }], [1],
+  h.call([{ interfaceTag: T.SIMPLE_ENUM, constructors: [
+    { name: "Example.Enum.zero", jsName: "zero", tag: 0 },
+    { name: "Example.Enum.one", jsName: "one", tag: 1 },
+  ] }], [1],
     value => assert.equal(value, "one"), HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION);
   assert.equal(h.runtime.liveCallbacks.scans, 0);
   assert.deepEqual(h.released, []);
