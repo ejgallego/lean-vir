@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
+import { createPrimitiveRuntimeFactory } from "../../web/src/runtime/primitive-factory.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { assert, readFile, readRuntimeArtifacts } from "./shared.mjs";
 
@@ -18,31 +19,41 @@ const cases = [
   [INTERFACE_TAG.USIZE, [0n, 1n, 1n << 31n, (1n << 32n) - 1n]],
 ];
 
-const runtime = await createVirRuntime({ wasmBytes, irPackageSet: [defaultPackageBytes] });
-try {
-  for (const [interfaceTag, values] of cases) {
-    const type = { interfaceTag };
-    for (const value of values) {
-      const inputs = [value, value.toString()];
-      if (value >= BigInt(Number.MIN_SAFE_INTEGER) && value <= BigInt(Number.MAX_SAFE_INTEGER)) {
-        inputs.push(Number(value));
-      }
-      for (const input of inputs) {
-        const object = runtime.makeObjectValue(type, input, "number");
-        try {
-          assert.equal(runtime.liftObjectValue(type, object, "number"),
-            interfaceTag === INTERFACE_TAG.USIZE ? Number(value) : value);
-        } finally {
-          runtime.exports.vir_obj_dec(object);
+for (const create of [
+  () => createVirRuntime({ wasmBytes, irPackageSet: [defaultPackageBytes] }),
+  () => createPrimitiveRuntimeFactory({ wasmBytes }).createRuntime({ irPackageSet: [defaultPackageBytes] }),
+]) {
+  const runtime = await create();
+  try {
+    for (const [interfaceTag, values] of cases) {
+      const type = { interfaceTag };
+      for (const value of values) {
+        const inputs = [value, value.toString()];
+        if (value >= BigInt(Number.MIN_SAFE_INTEGER) && value <= BigInt(Number.MAX_SAFE_INTEGER)) {
+          inputs.push(Number(value));
+        }
+        for (const input of inputs) {
+          const object = runtime.makeObjectValue(type, input, "number");
+          try {
+            assert.equal(runtime.liftObjectValue(type, object, "number"),
+              interfaceTag === INTERFACE_TAG.USIZE ? Number(value) : value);
+          } finally {
+            runtime.exports.vir_obj_dec(object);
+          }
         }
       }
     }
+    assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", huge), huge + 1n);
+    assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseIntNegate", -huge), huge);
+    assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", 0), 1n);
+    assert.equal(runtime.failure, null);
+  } finally {
+    runtime.dispose();
   }
-  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", huge), huge + 1n);
-  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseIntNegate", -huge), huge);
-  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", 0), 1n);
-  assert.equal(runtime.failure, null);
+}
 
+const runtime = await createVirRuntime({ wasmBytes, irPackageSet: [defaultPackageBytes] });
+try {
   for (const sequenceTag of [INTERFACE_TAG.ARRAY, INTERFACE_TAG.LIST]) {
     for (const [interfaceTag, values] of cases) {
       const type = { interfaceTag: sequenceTag, element: { interfaceTag } };
@@ -74,4 +85,4 @@ try {
   runtime.dispose();
 }
 
-console.log("numeric results smoke ok: exact stable types, sequences and Expr");
+console.log("numeric results smoke ok: full/primitive, exact stable types, sequences and Expr");

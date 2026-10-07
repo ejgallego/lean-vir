@@ -6,10 +6,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ObjectValueRuntime } from "../../web/src/runtime/object-values.js";
+import { VirRuntime } from "../../web/src/runtime/core.js";
 
 function mockRuntime(nameResult = "Nat.succ") {
-  const runtime = Object.create(ObjectValueRuntime.prototype);
+  const runtime = Object.create(VirRuntime.prototype);
   runtime.exports = {
     vir_obj_expr_fvar: () => 1,
     vir_obj_name_string: () => 1,
