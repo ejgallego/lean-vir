@@ -84,7 +84,7 @@ run_cmd do
       throwError "unexpected ordinary imports for {name}: {runtimeImports}"
 `);
 run("lake", ["env", "lean", "Phases.lean"], "carrier-import-phases");
-const expected = "31aa0de3db1b738af032d0a1c98074426f9b0cad7657d79035c62284d87c2d8e";
+const expected = "a9fbcfec93dbdd836248902deeb6b4fb7b4fe83f64ce9983104c0a945f6811e5";
 // The library key is literal, not a Lean constant or the current module name.
 // Both include forms use the same prepared bytes and embedding operation.
 mkdirSync(join(project, ".vir-generated"));

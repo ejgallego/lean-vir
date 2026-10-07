@@ -16,6 +16,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { readIrPackageInfo } from "../../web/src/runtime/ir-package.js";
 import { checkFacetOutputSafety } from "./output-safety.mjs";
 import { checkNativeProfileRejection } from "./native-profile.mjs";
 import { replaceFixture } from "./fixture-edit.mjs";
@@ -74,16 +75,11 @@ const renamedCarrier = replaceFixture(originalCarrier, "Client.Resources", "Clie
 const carrier = replaceFixture(renamedCarrier,
   "include_vir_library ClientResources", "include_vir_library OtherResources");
 writeFileSync(join(client, "resources/Client/OtherResources.lean"), carrier);
-const recipe = JSON.parse(
-  readFileSync(join(client, "vir-resources/ClientResources.json")),
-);
-writeFileSync(
-  join(client, "vir-resources/OtherResources.json"),
-  JSON.stringify({
-    ...recipe,
-    logicalId: "other-client/greeting",
-  }),
-);
+// Register the second carrier using the same package-local typed target.
+const initialConfig = readFileSync(config, "utf8");
+const registration = "return Job.pure #[(`ClientResources, `Client.Program)]";
+writeFileSync(config, replaceFixture(initialConfig, registration,
+  "return Job.pure #[(`ClientResources, `Client.Program), (`OtherResources, `Client.Program)]"));
 const umbrella = join(client, "Client.lean");
 const withImport = replaceFixture(readFileSync(umbrella, "utf8"),
   "public import Client.Resources",
@@ -97,27 +93,20 @@ cpSync(client, peer, { recursive: true });
 for (const directory of ["program", "resources"])
   renameSync(join(peer, directory, "Client"), join(peer, directory, "Peer"));
 renameSync(join(peer, "Client.lean"), join(peer, "Peer.lean"));
-renameSync(
-  join(peer, "vir-resources/ClientResources.json"),
-  join(peer, "vir-resources/PeerResources.json"),
-);
 for (const path of [
   "lakefile.lean",
   "Peer.lean",
   "program/Peer/Helper.lean",
   "program/Peer/Program.lean",
+  "program/Peer/Alternative.lean",
   "resources/Peer/Resources.lean",
   "resources/Peer/OtherResources.lean",
-  "vir-resources/PeerResources.json",
-  "vir-resources/OtherResources.json",
 ]) {
   const file = join(peer, path);
   let contents = readFileSync(file, "utf8");
   // Only these files contain the additional package/logical-ID spellings.
   for (const [before, after, applies] of [
     ["client_fixture", "peer_fixture", path === "lakefile.lean"],
-    ["client-fixture", "peer-fixture", path === "vir-resources/PeerResources.json"],
-    ["other-client", "other-peer", path === "vir-resources/OtherResources.json"],
   ]) if (applies) contents = replaceFixture(contents, before, after, "all");
   writeFileSync(file, replaceFixture(contents, "Client", "Peer", "all"));
 }
@@ -149,7 +138,7 @@ else {
     ],
   ];
   const descriptor = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     logicalId: "test-only/cache-runtime",
     kind: "runtime",
     compatibility: JSON.parse(
@@ -165,7 +154,6 @@ else {
       { role: "runtimeModule", path: "runtime.js" },
       { role: "wasm", path: "runtime.wasm" },
     ],
-    exports: [],
   };
   const encoded = Buffer.from(encodeDescriptor(descriptor));
   const length = Buffer.alloc(4);
@@ -266,10 +254,26 @@ assert.doesNotMatch(mixed, /Built.*Client\.Program:virProgram/);
 assert.deepEqual(signature(canonical), canonicalSignature);
 const packs = stages.map((p) => readFileSync(p));
 const signatures = stages.map(signature);
+function rootInterface(pack) {
+  const length = pack.readUInt32LE(8);
+  const descriptor = JSON.parse(pack.subarray(12, 12 + length));
+  assert.equal(descriptor.schemaVersion, 2);
+  assert.equal(Object.hasOwn(descriptor, "exports"), false);
+  let offset = 12 + length;
+  for (const file of descriptor.files) {
+    const bytes = pack.subarray(offset, offset + file.byteLength);
+    offset += file.byteLength;
+    if (file.path === "program.irpkg") return readIrPackageInfo(bytes).manifest;
+  }
+  throw new Error("missing actual root member");
+}
+assert.deepEqual(rootInterface(packs[1]).exports.map(entry => entry.entry),
+  ["Client.Program.greet"], "imported marker is not promoted into root interface");
 const warm = build("warm-shared");
 assert.deepEqual(stages.map(signature), signatures);
 assert.doesNotMatch(warm, /Built.*(?:Client|Peer|Main|Runtime)/);
-assert.equal(readdirSync(join(evidence, "site")).length, 5);
+assert.equal(readdirSync(join(evidence, "site")).length, 3);
+assert.deepEqual(packs[1], packs[2], "two carriers of the same root share program identity");
 assert.notDeepEqual(packs[1], packs[3]);
 assert.notDeepEqual(packs[2], packs[4]);
 checkNativeProfileRejection({ client, producer, env, evidence });
@@ -331,54 +335,25 @@ assert.deepEqual(
   packs,
 );
 
-// Exercise every support-file input independently, without recompiling program IR.
-const recipePath = join(client, "vir-resources/ClientResources.json");
-const supportSource = join(client, "support.txt");
-const support = {
-  source: "support.txt",
-  path: "data/message.txt",
-  mediaType: "text/plain",
-};
-writeFileSync(supportSource, "first\n");
-// Normalize back to cache-backed acquisition once, then keep the canonical
-// result completely stable across changes that belong only to the adapter.
-build("support-baseline");
-const supportProgramSignature = canonicalIdentity();
-let previous = packs[1];
-for (const [label, entry, contents] of [
-  ["support-added", support, "first\n"],
-  ["support-bytes", support, "second\n"],
-  ["support-path", { ...support, path: "data/renamed.txt" }, "second\n"],
-  ["support-type", { ...support, mediaType: "text/markdown" }, "second\n"],
-]) {
-  writeFileSync(supportSource, contents);
-  writeFileSync(
-    recipePath,
-    JSON.stringify({ ...recipe, supportFiles: [entry] }),
-  );
-  const log = build(label);
-  const current = readFileSync(stages[1]);
-  assert.notDeepEqual(current, previous);
-  previous = current;
-  assert.deepEqual(readFileSync(stages[2]), packs[2]);
-  assert.deepEqual(
-    stages.slice(3).map((path) => readFileSync(path)),
-    packs.slice(3),
-  );
-  assert.deepEqual(signature(stages[0]), signatures[0]);
-  assert.doesNotMatch(log, /Built.*Client\.(?:Program|Helper)(?:\s|:)/);
-  assert.deepEqual(
-    canonicalIdentity(),
-    supportProgramSignature,
-    `${label} must not regenerate the compiled program`,
-  );
-}
-writeFileSync(recipePath, JSON.stringify(recipe));
-build("support-removed");
-assert.deepEqual(
-  stages.map((path) => readFileSync(path)),
-  packs,
-);
+// A pure registration has no file result to hash. Changing the selected root
+// must invalidate packaging, without recompiling the unchanged selected program.
+const configBefore = readFileSync(config, "utf8");
+const originalRegistration = "(`ClientResources, `Client.Program)";
+const alternativeRegistration = "(`ClientResources, `Client.Alternative)";
+writeFileSync(config, replaceFixture(configBefore, originalRegistration, alternativeRegistration));
+build("registration-change");
+assert.notDeepEqual(readFileSync(stages[1]), packs[1]);
+const selectedInterface = rootInterface(readFileSync(stages[1]));
+assert.equal(selectedInterface.metadata.packageSetMember.module, "Client.Alternative");
+assert.deepEqual(selectedInterface.exports.map(entry => entry.entry).sort(),
+  ["OtherNamespace.greet", "OtherNamespace.startup"],
+  "real module ownership, not namespace prefix; callable startup union is retained");
+assert.deepEqual(readFileSync(stages[2]), packs[2]);
+assert.deepEqual(stages.slice(3).map((path) => readFileSync(path)), packs.slice(3));
+assert.deepEqual(signature(stages[0]), signatures[0]);
+writeFileSync(config, configBefore);
+build("registration-restored");
+assert.deepEqual(stages.map((path) => readFileSync(path)), packs);
 
 // Selecting compatible JS-only runtime bytes must not rebuild either program.
 // This also works with the real selected pack; a comment leaves JS semantics intact.
@@ -479,12 +454,8 @@ assert.deepEqual(
 const facetDir = join(client, "build with spaces/vir/resources/programs");
 if (existsSync(facetDir))
   renameSync(facetDir, join(evidence, "retained-facet-traces"));
-// Change only the recipe identity: compilation stays cached, but packaging
-// must still consume the complete returned private/IR artifacts.
-writeFileSync(
-  recipePath,
-  JSON.stringify({ ...recipe, logicalId: "client-fixture/renamed" }),
-);
+// Change only typed registration: cached compilation remains authoritative.
+writeFileSync(config, replaceFixture(configBefore, originalRegistration, alternativeRegistration));
 build("repack-cached-inputs");
 assert.notDeepEqual(readFileSync(stages[1]), packs[1]);
 assert.deepEqual(readFileSync(stages[2]), packs[2]);

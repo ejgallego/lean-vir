@@ -1,7 +1,12 @@
 # Embedded resources: review and acceptance
 
-This is a draft integration using main's Lean 4.34.0 toolchain. The checked-in
-runtime lock selects a publicly downloadable, exact prebuilt pack. Upstream
+The local Lean-name successor uses descriptor schema2 and resource compatibility3.
+It needs a matching newly qualified runtime distribution before anonymous cold
+adoption. The version1 public832 asset and all results below remain historical;
+they do not qualify changed loader bytes or the new schema.
+
+The prior integration used Lean 4.34.0 and a publicly downloadable exact prebuilt
+pack. Upstream
 anonymous acquisition and downstream ordinary cold-deck qualification are
 separate gates; neither implies a complete product acceptance.
 

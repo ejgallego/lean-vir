@@ -32,7 +32,6 @@ deriving instance ToExpr for BundleKind
 deriving instance ToExpr for Compatibility
 deriving instance ToExpr for FileInfo
 deriving instance ToExpr for FileEntry
-deriving instance ToExpr for ProgramExport
 deriving instance ToExpr for Descriptor
 deriving instance ToExpr for File
 deriving instance ToExpr for Bundle

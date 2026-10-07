@@ -409,20 +409,33 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
   if (← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST").isSome then
     error "VIR_RESOURCE_NATIVE_PROFILE_UNSUPPORTED: unset VIR_NATIVE_EXTERN_MANIFEST; resource programs require the locked runtime profile"
   let stem ← IO.ofExcept (resourceLibraryStem lib)
-  let recipe ← inputTextFile (lib.pkg.dir / "vir-resources" / s!"{stem}.json")
+  let some config := lib.pkg.findTargetConfig? `virPrograms
+    | error s!"missing `virPrograms` target in `{lib.pkg.prettyName}`; register owner library and program module Names"
+  let registrations ← (lib.pkg.target `virPrograms).fetch
   let profile ← virResourceCompatibility.fetch
   let tool ← vir_resource_program.fetch
   let packTool ← vir_resource_pack.fetch
   tool.bindM fun tool => packTool.bindM fun packTool => profile.bindM fun profile =>
-  recipe.bindM fun recipe => do
-    let planText ← captureProc {
-      cmd := tool.toString
-      args := #["plan", recipe.toString, profile.toString, lib.pkg.dir.toString] }
-    let plan ← IO.ofExcept (Lean.Json.parse planText)
-    let moduleName ← IO.ofExcept <| plan.getObjValAs? String "module"
-    let supportPaths ← IO.ofExcept <| plan.getObjValAs? (Array String) "supportFiles"
-    let some mod ← findModule? moduleName.toName
+  registrations.bindM fun registrations => do
+    -- Use the registered target's typed formatter, not an unchecked CustomData
+    -- cast or an import of an unbuilt VIR helper into client configuration.
+    let json ← IO.ofExcept <| Lean.Json.parse (config.format .json registrations)
+    let entries ← IO.ofExcept <| Lean.fromJson? (α := Array (Lean.Name × Lean.Name)) json
+    let mut owners : Array Lean.Name := #[]
+    for (owner, root) in entries do
+      if owner.isAnonymous || root.isAnonymous then
+        error "virPrograms requires nonanonymous owner library and program module Names"
+      if owners.contains owner then
+        error s!"duplicate virPrograms registration for owner `{owner}`"
+      unless (lib.pkg.findLeanLib? owner).isSome do
+        error s!"virPrograms owner library `{owner}` is not registered in `{lib.pkg.prettyName}`"
+      owners := owners.push owner
+    let some (_, moduleName) := entries.find? (·.1 == lib.name)
+      | error s!"missing virPrograms registration for owner `{lib.name}` in `{lib.pkg.prettyName}`"
+    let some mod ← findModule? moduleName
       | error s!"VIR resource program module `{moduleName}` is not Lake-registered"
+    unless mod.pkg.keyName == lib.pkg.keyName do
+      error s!"virPrograms module `{moduleName}` is not owned by `{lib.pkg.prettyName}`"
     if sameResourceLibrary mod.lib lib then
       error s!"VIR resource cycle: program `{moduleName}` belongs to its carrier library `{lib.name}`"
     let imports ← mod.transImports.fetch
@@ -433,10 +446,11 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
       -- Source-only transImports was checked before requesting compilation, so
       -- the common carrier/program cycle produces a diagnostic, not a job wait.
       let program ← (mod.facet `virProgram).fetch
-      let support ← supportPaths.mapM fun path => inputBinFile (lib.pkg.dir / System.FilePath.mk path)
-      let support := Job.collectArray support "VIR resource support files"
-      program.bindM fun program => support.mapM fun _ => do
-        addPureTrace "virResourcePack/v2" "VIR resource producer contract"
+      program.mapM fun program => do
+        -- Job.pure carries no trace. Include the normalized registration value,
+        -- even if two choices have identical compilation traces/paths.
+        addPureTrace (Lean.Json.compress (Lean.toJson entries)) "VIR program registration"
+        addPureTrace "virResourcePack/v3" "VIR resource producer contract"
         let output := lib.pkg.buildDir / "vir/resources/programs" / s!"{stem}.virres"
         for path in #[output, output.addExtension "trace", output.addExtension "hash"] do
           checkResourceOutput path
@@ -445,8 +459,8 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
           createParentDirs output
           proc {
             cmd := tool.toString
-            args := #["build", recipe.toString, profile.toString, program.toString,
-              lib.pkg.dir.toString, output.toString], env := ← getAugmentedEnv }
+            args := #["build", moduleName.toString, profile.toString,
+              program.toString, output.toString], env := ← getAugmentedEnv }
         let stage := lib.srcDir / ".vir-generated" / s!"{stem}.virres"
         -- Always repair/verify staging, even when Lake returns a cached artifact
         -- somewhere other than output. No restoration of conventional IR paths.

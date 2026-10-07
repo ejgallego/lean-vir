@@ -46,8 +46,10 @@ console.log(run([]).trim());
 const encoded = run(["descriptor"]).replace(/\n$/, "");
 const descriptor = JSON.parse(encoded);
 assert.equal(encoded, canonical(descriptor));
-assert.equal(digest(`vir-resource-bundle-v1\n${encoded}`),
-  "31aa0de3db1b738af032d0a1c98074426f9b0cad7657d79035c62284d87c2d8e");
+assert.equal(descriptor.schemaVersion, 2);
+assert.ok(!Object.hasOwn(descriptor, "exports"));
+assert.equal(digest(`vir-resource-bundle-v2\n${encoded}`),
+  "a9fbcfec93dbdd836248902deeb6b4fb7b4fe83f64ce9983104c0a945f6811e5");
 
 const scratch = mkdtempSync(join(tmpdir(), "vir-resource-core-"));
 let passed = false;

@@ -13,7 +13,7 @@ import Std.Data.HashMap.Basic
 public section
 namespace Vir.Resources
 
-/-- v1 limits apply before parsing/allocating a pack and before hashing payloads. -/
+/-- Resource limits apply before parsing/allocating a pack and before hashing payloads. -/
 def maxFiles : Nat := 4096
 def maxPayloadBytes : Nat := 512 * 1024 * 1024
 def maxDescriptorBytes : Nat := 4 * 1024 * 1024
@@ -22,7 +22,7 @@ def maxMetadataBytes : Nat := 4096
 private def hexDigit (n : Nat) : Char :=
   Char.ofNat (if n < 10 then 48 + n else 87 + n)
 
-/-- v1 JSON string spelling; unlike general JSON encoders, every control uses `\u00xx`. -/
+/-- Canonical JSON string spelling; every control uses `\u00xx`. -/
 private def quote (s : String) : String := Id.run do
   let mut out := "\""
   for c in s.toList do
@@ -47,8 +47,6 @@ private def compatibilityJson (c : Compatibility) : String := objectJson [
 Unicode values are preserved without normalization. Call `validateDescriptor` on input. -/
 def encodeDescriptor (d : Descriptor) : ByteArray := (objectJson [
   ("compatibility", compatibilityJson d.compatibility),
-  ("exports", arrayJson <| (d.exports.qsort (·.role < ·.role)).map fun e => objectJson [
-    ("declaration", quote e.declaration), ("interfaceId", quote e.interfaceId), ("role", quote e.role)]),
   ("fileEntries", arrayJson <| (d.fileEntries.qsort (·.role < ·.role)).map fun e => objectJson [
     ("path", quote e.path), ("role", quote e.role)]),
   ("files", arrayJson <| (d.files.qsort (·.path < ·.path)).map fun f => objectJson [
@@ -59,7 +57,7 @@ def encodeDescriptor (d : Descriptor) : ByteArray := (objectJson [
   ("schemaVersion", toString d.schemaVersion)]).toUTF8
 
 def Descriptor.contentId (d : Descriptor) : String :=
-  sha256 ("vir-resource-bundle-v1\n".toUTF8 ++ encodeDescriptor d)
+  sha256 ("vir-resource-bundle-v2\n".toUTF8 ++ encodeDescriptor d)
 
 private def pathChar (c : Char) : Bool :=
   ('a' ≤ c && c ≤ 'z') || ('A' ≤ c && c ≤ 'Z') || ('0' ≤ c && c ≤ '9') ||
@@ -134,9 +132,9 @@ private def uniqueRoles (id : String) (roles : Array String) : Except ResourceEr
 
 def validateDescriptor (d : Descriptor) : Except ResourceError Unit := do
   let id := d.logicalId
-  unless d.schemaVersion == 1 do
+  unless d.schemaVersion == 2 do
     throw {
-      code := "SCHEMA_VERSION", logicalId := id, expected := some "1",
+      code := "SCHEMA_VERSION", logicalId := id, expected := some "2",
       actual := some (toString d.schemaVersion) }
   metadata id "logicalId" id
   metadata id "leanRevision" d.compatibility.leanRevision
@@ -152,7 +150,6 @@ def validateDescriptor (d : Descriptor) : Except ResourceError Unit := do
     if total > maxPayloadBytes then
       throw { code := "PAYLOAD_LIMIT", logicalId := id, path := some f.path }
   uniqueRoles id (d.fileEntries.map (·.role))
-  uniqueRoles id (d.exports.map (·.role))
   for e in d.fileEntries do
     unless d.files.any (·.path == e.path) do
       throw { code := "ENTRY_NOT_FOUND", logicalId := id, role := some e.role, path := some e.path }
@@ -162,11 +159,6 @@ def validateDescriptor (d : Descriptor) : Except ResourceError Unit := do
   for role in required do
     unless d.fileEntries.any (·.role == role) do
       throw { code := "MISSING_ROLE", logicalId := id, role := some role }
-  if d.kind == .runtime && !d.exports.isEmpty then
-    throw { code := "RUNTIME_EXPORTS", logicalId := id }
-  for e in d.exports do
-    metadata id "declaration" e.declaration
-    metadata id "interfaceId" e.interfaceId
   if (encodeDescriptor d).size > maxDescriptorBytes then
     throw { code := "DESCRIPTOR_LIMIT", logicalId := id }
 

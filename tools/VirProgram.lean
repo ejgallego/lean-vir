@@ -47,9 +47,9 @@ private unsafe def build (setupPath output : FilePath) : IO Unit := do
         | none => Program.fileInfo file <|
             if path.endsWith ".json" then "application/json" else "text/markdown"
     let descriptor : Descriptor := {
-      schemaVersion := 1, logicalId := "vir-compiled/" ++ setup.name.toString,
+      schemaVersion := 2, logicalId := "vir-compiled/" ++ setup.name.toString,
       kind := .program, compatibility := Build.currentCompatibility, files := infos,
-      fileEntries := #[{ role := "programSet", path := "program.irpkg-set.json" }], exports := #[] }
+      fileEntries := #[{ role := "programSet", path := "program.irpkg-set.json" }] }
     let bundle : Bundle := { contentId := descriptor.contentId, descriptor, files }
     let packed ← IO.ofExcept <| (Pack.encode bundle).mapError (fun e => s!"{e.code}: {reprStr e}")
     Build.atomicInstall output packed

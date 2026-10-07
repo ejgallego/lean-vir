@@ -5,14 +5,12 @@ its browser program and resources, and its users keep an ordinary dependency
 and executable command. The application does not discover VIR build paths or
 invoke a resource preparation command.
 
-**This checkpoint implements data, packing, embedding, native acquisition,
-automatic carriers, the client recipe and browser role loading.** The three-package
-build test passes with the exact runtime acquired anonymously from its public
-release. Slides' supplied-pack successor has passed its bounded native/browser
-and publication review. Slides also reports ordinary cold root/downstream builds
-on its reduced branch; final product qualification remains separate.
-See [review order and acceptance status](RESOURCE_ACCEPTANCE.md)
-for the exact covered, partial and pending gates; this is still a draft workflow.
+**The Lean-name successor removes the resource export table and handwritten
+recipe.** Root generated interfaces provide exact fully qualified call names;
+ordinary package-local Lake registration selects the owner and module. Descriptor
+schema 2/resource compatibility 3 require a new matching runtime pack. The prior
+832/version1 public distribution and Slides checks remain historical evidence,
+not qualification of this successor. See [acceptance status](RESOURCE_ACCEPTANCE.md).
 
 ## Portable values
 
@@ -22,7 +20,7 @@ failures; it is not hostile-program admission or a Lean soundness certificate.
 
 `Vir.Resources` imports types and pure validation, not a runtime carrier. A
 `Bundle` contains a descriptor, content identity and every payload as bytes.
-Lookup operations (`file?`, `entryPath?`, `exportName?`) perform no I/O.
+Lookup operations (`file?`, `entryPath?`) perform no I/O.
 
 `Bundle.validate` checks the schema, portable paths, exact inventory, required
 roles, byte lengths, SHA-256 and descriptor identity. It does not execute JavaScript
@@ -50,7 +48,7 @@ runtime JavaScript repackaging need not change program bytes.
 The public resource compatibility record has exactly two fields:
 
 ```json
-{"leanRevision":"293d5d0c0c3f3dded4688b3ccd6a33939ac5102b","virVersion":2}
+{"leanRevision":"293d5d0c0c3f3dded4688b3ccd6a33939ac5102b","virVersion":3}
 ```
 
 `leanRevision` is `Lean.githash` (also `lean --githash`): the compiler's reported
@@ -59,14 +57,14 @@ installed libraries. Qualification of the actual runtime bytes remains necessary
 
 `virVersion` is one combined contract for the client-facing JavaScript API,
 runtime ABI and accepted program formats. It is independent of the runtime ABI
-number. Version 2 currently covers ABI 4, interface manifest 9, IR binary format
+number. Version 3 currently covers descriptor schema 2, ABI 4, interface manifest 9, IR binary format
 11 and the `createProgram` / `call` / `status` / `dispose` resource API. Internal
 format versions remain in their headers and validators; applications do not
 select them independently. Advance `virVersion` when any constituent contract
 breaks; compatible fixes/repackaging retain it. Both native and JS constants are
 checked together by `check:package-abi`.
 
-Version 2 returns bigint for Nat, Int and UInt64 and Number for wasm32 USize.
+Version 3 retains version 2's bigint results for Nat, Int and UInt64 and Number for wasm32 USize.
 Version 1's decimal-string results are not accepted as the current contract.
 See the [numeric value mapping](../guides/JS_API.md#calls-and-manifest).
 
@@ -74,8 +72,8 @@ The pair says whether program and runtime bundles are compatible. The separate
 content ID selects exact descriptor and payload bytes. Two runtime bundles can
 share the pair but have different content IDs, without requiring program rebuilds.
 This draft replaces the earlier four-field record; old or mixed records reject
-and must be regenerated. There are no legacy field aliases. Descriptor/pack
-framing stays v1; canonical descriptor identity changes with the new fields.
+and must be regenerated. There are no legacy field aliases. Descriptor schema
+is 2; pack framing stays v1, with no parallel descriptor reader.
 
 Native package and resource hashing share `Vir.Hash`, without Node, subprocesses
 or FFI. The SHA-256
@@ -86,9 +84,9 @@ checking, not publisher authentication or a claim of cryptographic certification
 ## Identity and internal pack
 
 `encodeDescriptor` emits canonical UTF-8 JSON. All schema fields are present;
-object keys are sorted, files are sorted by path, and entries/exports by role.
+object keys are sorted, files are sorted by path, and file entries by role.
 Controls use lowercase `\u00xx`; other Unicode scalars are preserved. Identity is
-SHA-256 of `"vir-resource-bundle-v1\n"` followed by those bytes.
+SHA-256 of `"vir-resource-bundle-v2\n"` followed by those bytes.
 
 The internal v1 pack is deliberately not a public client file format:
 
@@ -172,7 +170,7 @@ from Apache-2.0 `VersoUtil.BinFiles`; VIR has no Verso dependency. One internal
 `ToExpr` helper constructs literals without reading files or knowing resource formats.
 The inclusion wrapper owns bounded file reading and canonical pack validation.
 
-User-authored recipes, locks and compatibility files instead use ordinary Lean
+User-authored locks and compatibility files instead use ordinary Lean
 JSON parsing followed by typed field/schema checks. They do not need canonical
 number or whitespace spelling. Duplicate-key behavior is the parser's behavior,
 not a separate VIR admission promise for manually ambiguous configurations.
@@ -311,33 +309,18 @@ lean_lib ClientResources where
   needs := #[`@client_fixture/ClientResources:virResourcePack]
 ```
 
-The owning package supplies `vir-resources/ClientResources.json`:
+The owning package declares a stock typed target, importing only Lake:
 
-```json
-{
-  "schemaVersion": 1,
-  "logicalId": "client-fixture/greeting",
-  "module": "Client.Program",
-  "exports": [
-    {
-      "role": "greet",
-      "declaration": "Client.Program.greet",
-      "interfaceId": "vir-fixture-greet-v1"
-    }
-  ],
-  "supportFiles": []
-}
+```lean
+target virPrograms (_pkg) : Array (Lean.Name × Lean.Name) := do
+  return Job.pure #[(`ClientResources, `Client.Program)]
 ```
 
-The program uses `module`, `meta import Vir.Attributes`, and public declarations
-marked `@[vir_export]`. Each requested export must exist in the generated root
-package. V1 accepts one registered composition root; import contributions there
-and expose the intended public wrappers. The recipe has one `module` field;
-the obsolete experimental `modules` array is rejected, even with one element.
-Export roles must be unique; distinct roles may name the same declaration.
-Optional support entries contain `source`, `path`, and `mediaType`: sources are
-portable paths relative to the owning package, destinations relative to the
-bundle, and neither may traverse links or escape their root.
+One registered root per owning library; no handwritten recipe, alias, logical ID,
+interface ID or export list. Logical identity is the selected module's name.
+The canonical root `vir_export ∪ vir_startup` inventory supplies callable names;
+imported markers do not become root entrypoints. Startup hooks are callable but
+not automatically executed.
 
 The facet stages `.vir-generated/ClientResources.virres` under the owning
 library's `srcDir` (here `resources`). `resources/Client/Resources.lean` embeds it
@@ -362,9 +345,9 @@ actual returned artifact, including cache hits, while retaining semantic traces.
 The internal `virProgram` facet is shared with `:vir`: one cached result owns full
 artifact acquisition, implementation/location traces, analysis and emission.
 `Vir.Resources.Program` verifies its canonical package-set inventory and reads
-the actual root interface manifest. The resource adapter checks requested exports
-against that result before adding recipe roles/support files. Role/support edits
-therefore do not regenerate IR, and requesting both adapters reuses generation.
+the actual root interface manifest. The resource adapter retains that generated interface, strips the private report
+and packages member bytes unchanged. Explicit registration-value traces preserve
+invalidation even for pure Lake targets; both adapters reuse generation.
 Carrier-cycle checks still run before requesting the shared program job.
 Resource facets and direct program-tool calls reject `VIR_NATIVE_EXTERN_MANIFEST`
 (including an empty value) before using cached outputs: custom providers are not
@@ -382,7 +365,7 @@ for both this path and the SDK installer. Domain validators and source selection
 remain separate: an SDK release/commit is not a resource content ID, and SDK
 authentication does not enter locked resource acquisition. These tools do not
 depend on the generator or acquire program inputs. Neither runtime selection
-nor compatible JavaScript-only runtime changes are program recipe inputs.
+nor compatible JavaScript-only runtime changes are program compilation inputs.
 
 Native rendering consumes compiled bytes only; moving the executable or removing
 raw program packs does not turn rendering into acquisition. The complete test
@@ -415,7 +398,7 @@ The runtime distribution's `runtimeModule` role exports `createProgram`:
 const { createProgram } = await import(runtimeModuleUrl.href);
 const program = await createProgram({ runtimeManifestUrl, programManifestUrl });
 try {
-  const result = program.call("prettyM", requestJson);
+  const result = program.call("My.Program.pretty", requestJson);
 } finally {
   program.dispose();
 }
@@ -432,33 +415,32 @@ embedding page, not only the manifest URL's scheme. The envelope is
 keys and redirects, validates canonical identity and every declared payload,
 checks exact compatibility, then delegates complete package-set validation and
 loading to the existing interpreter. The set can only read members present in
-the verified outer inventory. Export roles are resolved against actual package
+the verified outer inventory. Full Lean names are resolved against actual package
 root exports and bound to exact installed entries, not `id`/`jsName` aliases.
-Dependency-only exports do not become callable roles. No PrettyM protocol or
+Dependency-only exports do not become call entrypoints. No PrettyM protocol or
 Slides policy is built into this API.
 
 Two optional creation fields are supported, with no compatibility aliases:
 
 ```ts
 expectedExports?: Readonly<Record<string, {
-  declaration: string;
-  interfaceId: string;
-  signature: { args: readonly InterfaceType[]; result: InterfaceType; effect: InterfaceEffect };
+  args: readonly InterfaceType[];
+  result: InterfaceType;
+  effect: InterfaceEffect;
 }>>;
 signal?: AbortSignal;
 ```
 
 `InterfaceType` and `InterfaceEffect` mean the existing manifest representations,
 not a new wire format. Complete expectations are validated and privately copied
-before asynchronous work. Each required role must occur once, with its exact
-declaration and ID. Additional roles are allowed. The ordered argument types,
+before asynchronous work. Each key must name an actual root declaration. Additional root exports are
+allowed. The ordered argument types,
 result and effect must match the validated actual root callable before runtime
 instantiation/Lean initialization. Constructor/field order, recursive references
 and representation/layout facts matter; JSON key order, argument display names
 and diagnostic extensions do not. Exact declaration binding never uses aliases.
 
-Metadata mismatch can reject before payload acquisition; actual ABI comparison
-requires verified package bytes. Every mismatch rejects in `program-validation`
+Exact-name and ABI comparison requires verified package bytes. Every mismatch rejects in `program-validation`
 with zero runtime creations. The consumer owns a separately reviewed reference,
 not one inferred from the just-loaded program. This establishes interface/artifact
 agreement, not proof of executable behavior. Omission preserves two-URL callers.
@@ -466,8 +448,7 @@ agreement, not proof of executable behavior. Omission preserves two-URL callers.
 Each `createProgram` creates an independent runtime instance. No startup markers
 are invoked. Calls return the runtime's
 [documented JavaScript values](../guides/JS_API.md#calls-and-manifest) directly;
-this facade does not introduce a second marshaller. `interfaceId` is
-client-owned protocol metadata, not a runtime proof of a function's semantics.
+this facade does not introduce a second marshaller or semantic-ID layer.
 
 The publisher's ESM bootstrap is trusted: importing JavaScript executes it before
 its loader can verify a manifest. These checks prevent unverified Lean execution,
@@ -486,7 +467,7 @@ runtime acquisition. Diagnostic identities and full packs are retained locally.
 ### Browser lifecycle
 
 `program.status` is read-only: `"active"`, `"failed"`, or `"disposed"`.
-Ordinary Lean IO errors and invalid roles do not retire the program. An escaping
+Ordinary Lean IO errors and unknown declaration names do not retire the program. An escaping
 Wasm failure does: later calls reject. **Failed is not disposed**: dispose the
 failed instance before explicitly creating a replacement, and never automatically
 replay its last effectful call. Other program instances remain independent.
@@ -562,7 +543,7 @@ separate Lean 4.35 support change. Runtime packs are nevertheless compiler-speci
 select a matching pack rather than copying Wasm or a lock from another toolchain.
 Source builds and native-to-Wasm reference/format/parser checks do not substitute
 for the complete PrettyM/resource acceptance. The browser
-facade additionally tests role calls, independent instances, disposal/remount,
+facade additionally tests exact-name calls, independent instances, disposal/remount,
 root/nested hosting, corrupt payload/identity, MIME, duplicate JSON keys, depth,
 missing exports, undeclared members, incompatibility and rejected redirects.
 Negative cases assert that no Wasm instance was created.
@@ -574,9 +555,10 @@ build regression covers cold
 and warm ordinary builds, program edits without runtime replacement, missing and
 corrupt staging repair, carrier-cycle rejection, and native execution with the
 raw program pack removed. The producer tests cover deterministic complete packs,
-required exports, strict recipes/locks, profile mismatches, and atomic replacement
+generated exports, strict locks, profile mismatches, and atomic replacement
 of larger hardlinked outputs without altering their other names.
-The selected prebuilt distribution is now a public GitHub release asset; a
+The historical version1 distribution is a public GitHub release asset; the
+version3 successor's new loader pack still needs publication. a
 supplied local archive alone is still not anonymous acquisition evidence. The
 complete product campaign and resource size/compile-memory/browser measurements
 remain outstanding. The historical 4.35

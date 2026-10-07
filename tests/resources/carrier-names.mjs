@@ -44,7 +44,7 @@ for (const [index, [name, stem,
     "ClientResources", name, "all");
   let sourceRoot = client;
   if (index === 1) {
-    // Compose package and library source roots; leave recipes package-relative.
+    // Compose package and library source roots; registration remains package-local.
     config = replaceFixture(config, "package client_fixture where",
       'package client_fixture where\n  srcDir := "base source"');
     sourceRoot = join(client, "base source");
@@ -53,6 +53,13 @@ for (const [index, [name, stem,
       renameSync(join(client, source), join(sourceRoot, source));
   }
   let carrierPath = join(sourceRoot, "resources/Client/Resources.lean");
+  if (index === 1) {
+    // A quoted dot is one module component in the stock Name registration,
+    // native root adapter and generated package ownership, not dot splitting.
+    config = replaceFixture(config, "`Client.Program", "`Client.«Program.with.dots»", "all");
+    renameSync(join(sourceRoot, "program/Client/Program.lean"),
+      join(sourceRoot, "program/Client/Program.with.dots.lean"));
+  }
   if (carrierModule !== "Client.Resources") {
     config = replaceFixture(config, ".one `Client.Resources",
       `.one \`${carrierModule}`);
@@ -65,8 +72,6 @@ for (const [index, [name, stem,
   writeFileSync(configPath, config);
   writeFileSync(carrierPath, replaceFixture(readFileSync(carrierPath, "utf8"),
     "include_vir_library ClientResources", `include_vir_library ${name}`));
-  const recipe = readFileSync(join(client, "vir-resources/ClientResources.json"));
-  if (stem) writeFileSync(join(client, `vir-resources/${stem}.json`), recipe);
   let previous;
   for (const phase of ["cold", "warm"]) {
     const result = spawnSync("elan", ["run",

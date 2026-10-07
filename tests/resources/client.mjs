@@ -140,6 +140,26 @@ if (published) {
 }
 const programStage = join(client, "resources/.vir-generated/ClientResources.virres");
 const programFirst = readFileSync(programStage);
+const clientConfig = join(client, "lakefile.lean");
+const originalConfig = readFileSync(clientConfig, "utf8");
+for (const [label, change, diagnostic] of [
+  ["missing-target", text => replaceFixture(text, "target virPrograms", "target unrelatedPrograms"),
+    /missing `virPrograms` target/],
+  ["missing-owner", text => replaceFixture(text, "#[(`ClientResources, `Client.Program)]", "#[]"),
+    /missing virPrograms registration/],
+  ["duplicate-owner", text => replaceFixture(text, "#[(`ClientResources, `Client.Program)]",
+    "#[(`ClientResources, `Client.Program), (`ClientResources, `Client.Alternative)]"),
+    /duplicate virPrograms registration/],
+  ["foreign-module", text => replaceFixture(text, "`Client.Program)]", "`Vir.Attributes)]"),
+    /not owned by/],
+  ["carrier-as-root", text => replaceFixture(text, "`Client.Program)]", "`Client.Resources)]"),
+    /VIR resource cycle/],
+]) {
+  writeFileSync(clientConfig, change(originalConfig));
+  run(leaf, label, "lake", ["build", "generate-site"], diagnostic);
+  assert.deepEqual(readFileSync(programStage), programFirst, "rejection preserves prepared program");
+}
+writeFileSync(clientConfig, originalConfig);
 const first = [snapshot(programStage), snapshot(runtimeStage)];
 build("warm");
 assert.deepEqual([snapshot(programStage), snapshot(runtimeStage)], first);

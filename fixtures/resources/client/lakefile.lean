@@ -10,13 +10,16 @@ package client_fixture where
 lean_lib ClientProgram where
   srcDir := "program"
   roots := #[]
-  globs := #[.one `Client.Program, .one `Client.Helper]
+  globs := #[.one `Client.Program, .one `Client.Helper, .one `Client.Alternative]
 
 lean_lib ClientResources where
   srcDir := "resources"
   roots := #[]
   globs := #[.one `Client.Resources]
   needs := #[`@client_fixture/ClientResources:virResourcePack]
+
+target virPrograms (_pkg) : Array (Lean.Name × Lean.Name) := do
+  return Job.pure #[(`ClientResources, `Client.Program)]
 
 lean_lib Client where
   roots := #[]

@@ -25,7 +25,6 @@ export function checkNativeProfileRejection({
   for (const name of [
     "program",
     "resources",
-    "vir-resources",
     "lean-toolchain",
   ])
     cpSync(join(client, name), join(cold, name), {
@@ -76,7 +75,6 @@ export function checkNativeProfileRejection({
   };
   const before = retained.map(snapshot);
   const tool = join(producer, ".lake/build/bin/vir_resource_program");
-  const recipe = join(client, "vir-resources/ClientResources.json");
   const compatibility = join(producer, "vir-resources/compatibility.json");
   for (const [label, value] of [
     ["empty", ""],
@@ -86,20 +84,18 @@ export function checkNativeProfileRejection({
     const cases = [
       ["warm", client, "lake", ["build", "ClientResources:virResourcePack"]],
       ["cold", cold, "lake", ["build", "ClientResources:virResourcePack"]],
-      ["plan", client, tool, ["plan", recipe, compatibility, client]],
       [
         "build",
         client,
         tool,
         [
           "build",
-          recipe,
+          "Client.Program",
           compatibility,
           join(
             client,
             "build with spaces/vir/programs/Client/Program.virprogram",
           ),
-          client,
           join(dir, "unexpected.virres"),
         ],
       ],

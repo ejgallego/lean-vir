@@ -41,7 +41,7 @@ private def compatibility : Compatibility := {
 private def runtime : Bundle := Id.run do
   let files : Array File := #[⟨"runtime.js", "abc".toUTF8⟩, ⟨"runtime.wasm", ByteArray.empty⟩]
   let descriptor : Descriptor := {
-    schemaVersion := 1
+    schemaVersion := 2
     logicalId := "test/λ😀\n\u0001"
     kind := .runtime
     compatibility
@@ -50,17 +50,15 @@ private def runtime : Bundle := Id.run do
       mediaType := if f.path.endsWith ".js" then "text/javascript" else "application/wasm"
       byteLength := f.bytes.size
       sha256 := sha256 f.bytes }
-    fileEntries := #[⟨"runtimeModule", "runtime.js"⟩, ⟨"wasm", "runtime.wasm"⟩]
-    exports := #[] }
+    fileEntries := #[⟨"runtimeModule", "runtime.js"⟩, ⟨"wasm", "runtime.wasm"⟩] }
   return { contentId := descriptor.contentId, descriptor, files }
 
 private def program : Bundle := Id.run do
   let files : Array File := #[⟨"program.json", "{}".toUTF8⟩]
   let descriptor : Descriptor := {
-    schemaVersion := 1, logicalId := "test/program", kind := .program, compatibility
+    schemaVersion := 2, logicalId := "test/program", kind := .program, compatibility
     files := files.map fun f => ⟨f.path, "application/json", f.bytes.size, sha256 f.bytes⟩
-    fileEntries := #[⟨"programSet", "program.json"⟩]
-    exports := #[⟨"run", "Test.run", "test-v1"⟩] }
+    fileEntries := #[⟨"programSet", "program.json"⟩] }
   return { contentId := descriptor.contentId, descriptor, files }
 
 private def withDescriptor (bundle : Bundle) (descriptor : Descriptor) : Bundle :=
@@ -206,7 +204,7 @@ private def unitTests : IO Unit := do
   let r := runtime
   let d := r.descriptor
   let _ ← success "runtime validation" r.validate
-  check "Unicode canonical identity" (r.contentId == "31aa0de3db1b738af032d0a1c98074426f9b0cad7657d79035c62284d87c2d8e")
+  check "Unicode canonical identity" (r.contentId == "a9fbcfec93dbdd836248902deeb6b4fb7b4fe83f64ce9983104c0a945f6811e5")
   let reordered := { r with
     descriptor := { d with files := d.files.reverse, fileEntries := d.fileEntries.reverse }
     files := r.files.reverse }
@@ -214,9 +212,9 @@ private def unitTests : IO Unit := do
   check "reordered identity" (reordered.descriptor.contentId == r.contentId)
   check "pure role access" (r.entryPath? "wasm" == some "runtime.wasm")
   check "missing role" (r.entryPath? "missing" == none)
-  check "pure export access" (program.exportName? "run" == some "Test.run")
   check "pure payload access" ((r.file? "runtime.js").map (·.bytes) == some "abc".toUTF8)
-  failure "SCHEMA_VERSION" (withDescriptor r { d with schemaVersion := 2 }).validate
+  failure "SCHEMA_VERSION" (withDescriptor r { d with schemaVersion := 1 }).validate
+  failure "SCHEMA_VERSION" (withDescriptor r { d with schemaVersion := 3 }).validate
   failure "INVALID_VERSION" (withDescriptor r { d with
     compatibility := { compatibility with virVersion := 9007199254740992 } }).validate
   failure "PAYLOAD_LIMIT" (withDescriptor r { d with
@@ -243,7 +241,8 @@ private def unitTests : IO Unit := do
   let incompatible := withDescriptor program { program.descriptor with
     compatibility := { compatibility with leanRevision := "other" } }
   failure "INCOMPATIBLE" { set with programs := #[incompatible] }.validate
-  let conflict := withDescriptor program { program.descriptor with exports := #[] }
+  let conflict := withDescriptor program { program.descriptor with
+    files := #[{ program.descriptor.files[0]! with mediaType := "text/plain" }] }
   failure "LOGICAL_ID_CONFLICT" { set with programs := #[program, conflict] }.validate
   failure "EXPECTED_PROGRAM" { set with programs := #[r] }.validate
   failure "EXPECTED_RUNTIME" { set with runtime := program }.validate
@@ -259,23 +258,28 @@ private def unitTests : IO Unit := do
   failure "TRAILING_PACK_DATA" (Pack.decode (encoded.push 0))
   failure "HASH_MISMATCH" (Pack.decode (encoded.set! (encoded.size - 1) 100))
   let json := String.fromUTF8! (encodeDescriptor d)
-  for bad in #[json ++ "\n", json.replace "\"schemaVersion\":1" "\"schemaVersion\":1,\"unknown\":0",
+  check "descriptor omits role-export table" (!json.contains "\"exports\"")
+  failure "SCHEMA_VERSION" (Pack.decode (rawPack
+    (json.replace "\"schemaVersion\":2" "\"schemaVersion\":1") "abc".toUTF8))
+  failure "NONCANONICAL_DESCRIPTOR" (Pack.decode (rawPack
+    (json.replace "\"fileEntries\"" "\"exports\":[],\"fileEntries\"") "abc".toUTF8))
+  for bad in #[json ++ "\n", json.replace "\"schemaVersion\":2" "\"schemaVersion\":2,\"unknown\":0",
       json.replace "\"virVersion\":1" "\"virVersion\":1,\"runtimeAbi\":\"4\"",
-      json.replace "\"schemaVersion\":1" "\"schemaVersion\":1,\"schemaVersion\":1"] do
+      json.replace "\"schemaVersion\":2" "\"schemaVersion\":2,\"schemaVersion\":2"] do
     failure "NONCANONICAL_DESCRIPTOR" (Pack.decode (rawPack bad "abc".toUTF8))
   failure "DESCRIPTOR_JSON" (Pack.decode (rawPack
-    (json.replace "\"schemaVersion\":1" "\"schemaVersion\":1.0") "abc".toUTF8))
+    (json.replace "\"schemaVersion\":2" "\"schemaVersion\":2.0") "abc".toUTF8))
   failure "DESCRIPTOR_JSON" (Pack.decode (rawPack
     (json.replace "\"virVersion\":1" "\"runtimeAbi\":\"4\",\"jsApiVersion\":1,\"irFormatVersion\":11"
       |>.replace "leanRevision" "leanBuildId") "abc".toUTF8))
   failure "DESCRIPTOR_JSON" (Pack.decode (rawPack (String.ofList (List.replicate 17 '['))))
   failure "SCHEMA_VERSION" (Pack.decode (rawPack
-    (json.replace "\"schemaVersion\":1" "\"schemaVersion\":10000000000000000")))
+    (json.replace "\"schemaVersion\":2" "\"schemaVersion\":10000000000000000")))
   -- Persisted descriptors retain exact canonical spelling. Deliberately huge
   -- exponent/depth exhaustion is not a supported-input requirement or test gate.
-  for number in #["1e0", "1E+0"] do
+  for number in #["2e0", "2E+0"] do
     failure "NONCANONICAL_DESCRIPTOR" (Pack.decode (rawPack
-      (json.replace "\"schemaVersion\":1" s!"\"schemaVersion\":{number}") "abc".toUTF8))
+      (json.replace "\"schemaVersion\":2" s!"\"schemaVersion\":{number}") "abc".toUTF8))
   let quotedExponent := withDescriptor r { d with logicalId := "quoted\"1e1000000000\\still-text" }
   let quotedPack ← success "encode exponent-like metadata" (Pack.encode quotedExponent)
   let _ ← success "quoted exponent is ordinary text" (Pack.decode quotedPack)

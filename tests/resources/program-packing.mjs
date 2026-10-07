@@ -18,7 +18,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { encodeDescriptor } from "../../web/src/resources/descriptor.js";
 import {
@@ -38,31 +38,11 @@ const program = join(
 const compat = join(repo, "vir-resources/compatibility.json");
 assert.ok(existsSync(tool) && existsSync(program));
 const evidence = mkdtempSync(join(repo, "build/resource-program-"));
-const recipePath = join(evidence, "recipe.json");
+const rootModule = "tests.resources.BrowserProgram";
 const runtimeLockPath = join(evidence, "runtime-lock.json");
 const packPath = join(evidence, "program.virres");
 const stagedPath = join(evidence, "stage", "program.virres");
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const recipe = {
-  schemaVersion: 1,
-  logicalId: "resource-program-test/pretty",
-  module: "tests.resources.BrowserProgram",
-  exports: [
-    {
-      role: "prettyM",
-      declaration: "Vir.Resources.Test.prettyScore",
-      interfaceId: "vir-pretty-test-v1",
-    },
-  ],
-  supportFiles: [
-    {
-      source: "tests/resources/BrowserProgram.lean",
-      path: "support/BrowserProgram.lean",
-      mediaType: "text/plain",
-    },
-  ],
-};
-const writeRecipe = (value) => writeFileSync(recipePath, JSON.stringify(value));
 const runtimeLock = {
   schemaVersion: 1,
   contentId: "a".repeat(64),
@@ -91,16 +71,14 @@ function run(label, args, error) {
   } else assert.equal(result.status, 0, `${label}: ${log}`);
   return result.stdout.trim();
 }
-const plan = () => run("plan", ["plan", recipePath, compat, repo]);
 const build = (label, error, input = program) => {
   const stdout = run(
     label,
-    ["build", recipePath, compat, input, repo, packPath],
+    ["build", rootModule, compat, input, packPath],
     error,
   );
   return stdout.split("\n").at(-1);
 };
-writeRecipe(recipe);
 writeRuntimeLock(runtimeLock);
 const runtimePlan = (label, error) =>
   run(label, ["runtime-plan", compat, runtimeLockPath, repo], error);
@@ -142,30 +120,24 @@ runtimePlan("runtime-plan-id", /INVALID_RUNTIME_LOCK/);
 writeRuntimeLock({ ...runtimeLock, extra: true });
 runtimePlan("runtime-plan-unknown", /INVALID_RUNTIME_LOCK/);
 writeRuntimeLock(runtimeLock);
-assert.deepEqual(JSON.parse(plan()), {
-  module: "tests.resources.BrowserProgram",
-  supportFiles: ["tests/resources/BrowserProgram.lean"],
-});
 const firstId = build("build-cold");
 assert.match(firstId, /^[0-9a-f]{64}$/);
 const first = readFileSync(packPath);
 assert.equal(first.subarray(0, 8).toString("hex"), "5649525245530001");
 const descriptorLength = first.readUInt32LE(8);
 const descriptor = JSON.parse(first.subarray(12, 12 + descriptorLength));
-assert.equal(descriptor.logicalId, recipe.logicalId);
+assert.equal(descriptor.logicalId, rootModule);
 assert.equal(descriptor.kind, "program");
-assert.deepEqual(descriptor.exports, recipe.exports);
+assert.ok(!Object.hasOwn(descriptor, "exports"), "only the generated interface owns callable inventory");
 assert.equal(descriptor.fileEntries[0].role, "programSet");
 assert.equal(descriptor.fileEntries[0].path, "program.irpkg-set.json");
 assert.ok(descriptor.files.some((f) => f.path === "program.irpkg"));
-assert.ok(
-  descriptor.files.some((f) => f.path === "support/BrowserProgram.lean"),
-);
+
 assert.equal(
   firstId,
   hash(
     Buffer.concat([
-      Buffer.from("vir-resource-bundle-v1\n"),
+      Buffer.from("vir-resource-bundle-v2\n"),
       first.subarray(12, 12 + descriptorLength),
     ]),
   ),
@@ -204,83 +176,10 @@ const stageBefore = statSync(stagedPath, { bigint: true });
 run("stage-warm", ["stage", compat, packPath, stagedPath]);
 assert.equal(statSync(stagedPath, { bigint: true }).ino, stageBefore.ino);
 
-// A prior good pack survives all validation failures.
-for (const path of ["bundle.json/child", "BUNDLE.JSON/child/nested"]) {
-  writeRecipe({
-    ...recipe,
-    supportFiles: [{ ...recipe.supportFiles[0], path }],
-  });
-  build("reserved-envelope-prefix", /INVALID_RECIPE/);
-  assert.deepEqual(readFileSync(packPath), first);
-}
-writeRecipe({
-  ...recipe,
-  exports: [{ ...recipe.exports[0], declaration: "Missing.export" }],
-});
-build("missing-export", /required VIR interface export/);
+// Wrong requested root fails without replacing a previously valid output.
+run("wrong-requested-root", ["build", "Other.Root", compat, program, packPath],
+  /INVALID_COMPILED_PROGRAM/);
 assert.deepEqual(readFileSync(packPath), first);
-writeRecipe({
-  ...recipe,
-  modules: ["tests.resources.BrowserProgram", "fixtures.Basic"],
-});
-run("multiple-roots", ["plan", recipePath, compat, repo], /INVALID_RECIPE/);
-writeRecipe({ ...recipe, module: undefined, modules: [recipe.module] });
-run(
-  "obsolete-singleton",
-  ["plan", recipePath, compat, repo],
-  /obsolete `modules`/,
-);
-for (const [index, module] of [
-  "",
-  "Bad..Name",
-  ["tests.resources.BrowserProgram"],
-  "A".repeat(4097),
-].entries()) {
-  writeRecipe({ ...recipe, module });
-  run(
-    `invalid-module-${index}`,
-    ["plan", recipePath, compat, repo],
-    /INVALID_RECIPE/,
-  );
-}
-writeRecipe({
-  ...recipe,
-  supportFiles: [{ ...recipe.supportFiles[0], source: "../outside" }],
-});
-run("traversal", ["plan", recipePath, compat, repo], /INVALID_RECIPE/);
-writeRecipe({
-  ...recipe,
-  supportFiles: [{ ...recipe.supportFiles[0], path: "program.irpkg" }],
-});
-run("member-conflict", ["plan", recipePath, compat, repo], /INVALID_RECIPE/);
-writeRecipe({ ...recipe, unknown: true });
-run("unknown-field", ["plan", recipePath, compat, repo], /INVALID_RECIPE/);
-writeFileSync(
-  recipePath,
-  replaceFixture(JSON.stringify(recipe, null, 2),
-    '"schemaVersion": 1',
-    '"schemaVersion": 1e0',
-  ),
-);
-// Recipes use ordinary JSON, not the canonical persisted-pack spelling. Typed
-// field/schema checks remain authoritative after Lean's parser admits it.
-run("ordinary-json-spelling", ["plan", recipePath, compat, repo]);
-assert.equal(build("ordinary-json-equivalent-pack"), firstId);
-writeRecipe(recipe);
-const linkedSupport = join(evidence, "linked-support.lean");
-symlinkSync(join(repo, recipe.supportFiles[0].source), linkedSupport);
-writeRecipe({
-  ...recipe,
-  supportFiles: [
-    { ...recipe.supportFiles[0], source: relative(repo, linkedSupport) },
-  ],
-});
-run(
-  "linked-support",
-  ["plan", recipePath, compat, repo],
-);
-assert.equal(build("linked-support-equivalent-pack"), firstId);
-writeRecipe(recipe);
 
 // Staging replaces a hardlink without mutating the other name, and rejects links.
 const retained = join(evidence, "retained");
@@ -369,10 +268,10 @@ function writeCanonical(label, mutate) {
   );
   return path;
 }
-run("canonical-verified", ["verify", program, recipe.module]);
+run("canonical-verified", ["verify", program, rootModule]);
 // Exercise the persisted-artifact adapter and its requested-root/member binding.
 const direct = spawnSync("lake", ["env", "lean", "--run",
-  "tests/resources/ProgramRead.lean", program, recipe.module], {
+  "tests/resources/ProgramRead.lean", program, rootModule], {
   cwd: repo, encoding: "utf8", timeout: 180000,
 });
 const directLog = `${direct.stdout ?? ""}${direct.stderr ?? ""}`;
@@ -426,7 +325,7 @@ for (const role of ["root", "dependency"]) {
     const name = `${role}-${label}`;
     const candidate = writeCanonical(name, (_descriptor, files) =>
       mutateMemberBytes(files, role, transform));
-    run(`${name}-verify`, ["verify", candidate, recipe.module], /INVALID_COMPILED_PROGRAM/);
+    run(`${name}-verify`, ["verify", candidate, rootModule], /INVALID_COMPILED_PROGRAM/);
     build(`${name}-build`, /INVALID_COMPILED_PROGRAM/, candidate);
     assert.deepEqual(readFileSync(packPath), first, `${name}: preserve prior output`);
   }
@@ -438,7 +337,7 @@ for (const role of ["root", "dependency"]) {
       const after = `"packageSetMember":${JSON.stringify({ ...owner, module: `X${owner.module.slice(1)}` })}`;
       return replaceFixture(text, before, after);
     }));
-  run(`${name}-verify`, ["verify", candidate, recipe.module], /INVALID_COMPILED_PROGRAM/);
+  run(`${name}-verify`, ["verify", candidate, rootModule], /INVALID_COMPILED_PROGRAM/);
   build(`${name}-build`, /INVALID_COMPILED_PROGRAM/, candidate);
   assert.deepEqual(readFileSync(packPath), first, `${name}: preserve prior output`);
 }
@@ -455,7 +354,7 @@ for (const role of ["root", "dependency"]) {
     const name = `${role}-${label}`;
     const candidate = writeCanonical(name, (_descriptor, files) =>
       mutateInterface(files, role, transform));
-    run(`${name}-verify`, ["verify", candidate, recipe.module], /INVALID_COMPILED_PROGRAM/);
+    run(`${name}-verify`, ["verify", candidate, rootModule], /INVALID_COMPILED_PROGRAM/);
     build(`${name}-build`, /INVALID_COMPILED_PROGRAM/, candidate);
     assert.deepEqual(readFileSync(packPath), first, `${name}: preserve prior output`);
   }
@@ -491,13 +390,13 @@ for (const [label, mutate] of [
   ],
 ]) {
   const candidate = writeCanonical(label, mutate);
-  run(label, ["verify", candidate, recipe.module], /INVALID_COMPILED_PROGRAM/);
+  run(label, ["verify", candidate, rootModule], /INVALID_COMPILED_PROGRAM/);
 }
 const truncated = join(evidence, "truncated.virprogram");
 writeFileSync(truncated, canonical.subarray(0, canonical.length - 1));
 run(
   "canonical-truncated",
-  ["verify", truncated, recipe.module],
+  ["verify", truncated, rootModule],
   /TRUNCATED|LENGTH|PACK_/,
 );
 

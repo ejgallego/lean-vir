@@ -13,7 +13,7 @@ export const PACKAGE_FORMAT_VERSION = IR_PACKAGE_VERSION;
 export const RUNTIME_ABI_VERSION = 4;
 // Combined resource contract; advance for breaking client API, runtime ABI or
 // accepted program-format changes. This is not the runtime ABI number.
-export const VIR_COMPATIBILITY_VERSION = 2;
+export const VIR_COMPATIBILITY_VERSION = 3;
 
 export const PACKAGE_VERSIONS = Object.freeze({
   packageFormatVersion: PACKAGE_FORMAT_VERSION,

@@ -25,7 +25,7 @@ libraries so packaging the program cannot depend on compiling its own carrier.
 
 ```text
 registered program + transitive imports ── full compiled artifacts ──┐
-recipe + compatibility + support files + native producer tools ─────┤
+typed registration + compatibility + native producer tools ─────┤
                                                                   ↓
                                                         virResourcePack
                                                                   ↓
@@ -44,11 +44,11 @@ The two carrier branches meet in `ResourceSet`; program packaging does not
 depend on acquiring the Wasm runtime. The steps below describe the implementation
 in [lakefile.lean](../../lakefile.lean), not commands the application must run.
 
-1. **Plan.** Fetch the library's `vir-resources/<Library>.json`, VIR's compatibility
-   file, and the native `vir_resource_program` / `vir_resource_pack` executable
-   jobs. Lake builds or restores those executables and their Lean/native
-   dependencies. The planner validates the recipe and returns its single root
-   module and support-file inputs.
+1. **Select.** Fetch the owning package's stock `virPrograms` target, an array of
+   owner-library/program-module Name pairs, plus the compatibility and native
+   producer jobs. Use Lake's registered typed result formatter; no unbuilt VIR
+   module is imported into the client lakefile. Reject missing/duplicate owners
+   and roots belonging to another package.
 2. **Check the graph.** Resolve the root with Lake's `findModule?`; unregistered
    modules fail. Fetch `transImports` and reject direct or transitive imports of
    the carrier library before requesting compiled program artifacts.
@@ -57,16 +57,15 @@ in [lakefile.lean](../../lakefile.lean), not commands the application must run.
    add `allArtsTrace`. Lake owns compilation/cache retrieval and returns the real
    artifact locations; the producer does not reconstruct conventional paths.
    Acquiring the import graph does not mean shipping every declaration in it.
-4. **Trace the build.** Support files use `inputBinFile`. Jobs propagate recipe,
-   tool and compatibility dependencies; the facet adds Lean identity, a producer
-   contract marker, and the serialized resolved-path map. Paths matter for
-   relocation; implementation traces matter when paths stay unchanged.
+4. **Trace the build.** Explicitly trace normalized registration values: a pure
+   target's returned value does not itself carry a content trace. Jobs retain tool,
+   compatibility, Lean identity and full implementation/location traces.
 5. **Build or restore two separate results.** The shared program facet uses
-   `buildArtifactUnlessUpToDate` for a canonical, recipe-independent program.
+   `buildArtifactUnlessUpToDate` for a canonical selected program.
    On a miss, `vir_program` consumes the resolved setup and calls
    `Vir.GeneratePackage.runModuleSet` once. The resource adapter consumes that
-   verified result, checks its actual interface exports against the recipe, adds
-   roles/support files, and caches the outer `.virres` pack. It does not launch
+   verified result, removes the private diagnostic report and caches the portable
+   `.virres` pack. The generated root interface stays the sole callable inventory. It does not launch
    another generator or recompile sources. The diagnostic report stays internal.
 6. **Stage even on a hit.** Use the artifact path returned by Lake, which may be in
    its cache rather than the conventional output directory. Validate and repair
@@ -96,7 +95,8 @@ pack tool to acquire the exact content identity:
 3. Validate the complete pack and compatibility before installation; restore
    cache/stage without writing through existing hard links.
 
-The current lock names a public release asset; an empty runtime cache downloads
+The previous contract's lock named a public release asset; the Lean-name
+successor still needs its matching public distribution. Once selected, an empty runtime cache downloads
 and verifies those exact bytes. `source: "-"` remains an available-only selection,
 not a download source. There is no implicit SDK installation, npm invocation,
 GitHub authentication, WASI installation, or local runtime build. HTTPS acquisition
@@ -111,21 +111,20 @@ Both program adapters depend on the internal `virProgram` facet instead.
 | -------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | Compiled acquisition | Shared `virProgram`: full artifacts, implementation/location traces and setup map | The same job, after carrier-cycle checks                              |
 | Package generation   | Shared cached marked-root program via `vir_program` → `runModuleSet`              | The same cached result; no independent IR generation                  |
-| Result               | Loose package-set descriptor, root/shards and report                              | One portable pack containing the package set, roles and support files |
+| Result               | Loose package-set descriptor, root/shards and report                              | One portable pack containing the package set and generated interface |
 | Cache/publication    | File build rule plus package-set completeness checks                              | Lake artifact rule plus verified source-relative stage repair         |
 | Runtime              | Independent `:virSdk` installs an SDK directory                                   | Independent `virRuntimePack` supplies a compiled runtime carrier      |
 
 The inner cache key includes full implementation traces and resolved paths,
-Lean/producer identity, marked-root selection and the native profile. Roles,
-support files and runtime locks stay outside that key. It is a selected program,
+Lean/producer identity, marked-root selection and the native profile. Runtime
+locks stay outside that key. It is a selected program,
 not a canonical representation of every declaration in each imported module.
 The existing pack codec supplies the internal container and its size limits;
 there is no new public archive format or setup schema.
 
 The loose adapter installs member bytes unchanged under existing paths, rewrites
 only descriptor paths, and installs the descriptor last. The resource adapter
-keeps the canonical member layout and validates required exports from the actual
-embedded root manifest on cache hits as well as misses. Damaged loose files can
+keeps the canonical member layout and reads the actual embedded root manifest on cache hits as well as misses. Damaged loose files can
 be repaired without regeneration. A malformed internal cached result fails
 closed; it is not silently substituted with a conventional-path program.
 

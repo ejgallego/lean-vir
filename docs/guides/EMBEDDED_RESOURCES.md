@@ -12,8 +12,8 @@ It can compile native Lean producer tools; it never builds Wasm on an applicatio
 cache miss. HTTPS runtime acquisition uses Lake's standard download operation,
 which needs `curl` and uses its normal host configuration.
 
-The first release is still under review. This example pins landed VIR source for
-Lean 4.34.0; [qualification and limits](../development/RESOURCE_ACCEPTANCE.md)
+The first release is still under review. The Lean-name resource successor is local-only and needs a matching runtime
+publication before this example can be used from a cold checkout; [qualification and limits](../development/RESOURCE_ACCEPTANCE.md)
 are recorded separately. When changing the VIR revision, use its `lean-toolchain`
 and runtime lock together.
 
@@ -31,7 +31,6 @@ greeting-app/
   lakefile.lean
   program/Client/Program.lean
   resources/Client/Resources.lean
-  vir-resources/ClientResources.json
   Client.lean
   Main.lean
 ```
@@ -50,7 +49,7 @@ import Lake
 open Lake DSL
 
 require lean_vir from git
-  "https://github.com/ejgallego/lean-vir" @ "77dd14b652eeb91f173ab023dcfdaabb653b8327"
+  "https://github.com/ejgallego/lean-vir" @ "<qualified-Lean-name-resource-commit>"
 
 package greeting_app
 
@@ -64,6 +63,9 @@ lean_lib ClientResources where
   roots := #[]
   globs := #[.one `Client.Resources]
   needs := #[`@greeting_app/ClientResources:virResourcePack]
+
+target virPrograms (_pkg) : Array (Lean.Name × Lean.Name) := do
+  return Job.pure #[(`ClientResources, `Client.Program)]
 
 lean_lib Client where
   roots := #[]
@@ -89,26 +91,12 @@ meta import Vir.Attributes
 public def Client.Program.greet (name : String) : String := "Hello, " ++ name
 ```
 
-Declare that export in `vir-resources/ClientResources.json`:
-
-```json
-{
-  "schemaVersion": 1,
-  "logicalId": "greeting-app/greeting",
-  "module": "Client.Program",
-  "exports": [{
-    "role": "greet",
-    "declaration": "Client.Program.greet",
-    "interfaceId": "greeting-app-greet-v1"
-  }],
-  "supportFiles": []
-}
-```
-
-`greet` is the browser-facing role used by `program.call`. The current resource
-adapter requires this recipe; `interfaceId` is application-owned contract
-metadata, not a proof of argument/result types. You do not need to hand-author a
-signature descriptor for this example.
+The package-local `virPrograms` target selects the owning library and one
+registered program module. The generated root interface supplies all public
+`@[vir_export]` and callable `@[vir_startup]` declarations; imported declarations
+remain dependencies, not additional call entrypoints. Creation does not execute
+startup hooks. No JSON recipe, export aliases or handwritten interface IDs are
+needed.
 
 Embed the prepared program in `resources/Client/Resources.lean`:
 
@@ -187,7 +175,7 @@ const programManifestUrl = new URL("./PROGRAM_MANIFEST_PATH", import.meta.url);
 const { createProgram } = await import(runtimeModuleUrl.href);
 const program = await createProgram({ runtimeManifestUrl, programManifestUrl });
 try {
-  console.log(program.call("greet", "world")); // Hello, world
+  console.log(program.call("Client.Program.greet", "world")); // Hello, world
 } finally {
   program.dispose();
 }
@@ -262,9 +250,8 @@ root's URL (including any deployment prefix). They are not Lean build paths.
 - [Existing three-package fixture](../../fixtures/resources/): a client library
   consumed by a separate publisher, used by the resource acceptance harness.
 
-The recipe filename uses its carrier's Lean name spelling, including quotes when
-needed (`«Client-Resources».json` for `lean_lib «Client-Resources»`). Dotted and
-Unicode names work; names containing path separators are not filenames.
+Registration uses semantic Lean Names, including quoted components. The owning
+library name must still be usable as one private staging filename.
 
 `Bundle` holds one program or runtime's files and descriptor; `ResourceSet` groups
 the runtime and programs a publisher uses. `.virres` is their build-time carrier,

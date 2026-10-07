@@ -20,25 +20,21 @@ const program = await createProgram({
   programManifestUrl,
   signal: pending.signal,
   expectedExports: {
-    greet: {
-      declaration: "Client.Program.greet",
-      interfaceId: "vir-fixture-greet-v1",
-      signature: {
-        args: [{ type: "String", interfaceTag: 3 }],
-        result: { type: "String", interfaceTag: 3 },
-        effect: "pure",
-      },
+    "Client.Program.greet": {
+      args: [{ type: "String", interfaceTag: 3 }],
+      result: { type: "String", interfaceTag: 3 },
+      effect: "pure",
     },
   },
 });
 ```
 
-This example matches the [existing greeting fixture](../../fixtures/resources/client/vir-resources/ClientResources.json),
-not the quickstart's `greeting-app-greet-v1` metadata or Slides' formatter. For compound
-types, retain the existing complete interface representation from separately
-reviewed compiler output alongside the client's typed adapter. Do not construct
-the expectation from the program being loaded. IDs and exact ABI agreement do
-not prove semantics; native/browser oracle tests remain necessary.
+The key is the full Lean declaration name from the
+[existing greeting fixture](../../fixtures/resources/client/program/Client/Program.lean).
+For compound types, retain the existing complete interface representation from
+separately reviewed compiler output alongside the client's typed adapter. Do not
+construct expectations from the program being loaded. ABI agreement does not
+prove semantics; native/browser oracle tests remain necessary.
 
 ## Pending-creation cancellation
 
