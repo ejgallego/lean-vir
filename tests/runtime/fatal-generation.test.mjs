@@ -24,24 +24,23 @@ for (const kind of ["named", "closure"]) {
       vir_alloc_bytes: () => 32,
       vir_free_bytes: () => cleanups++,
       vir_obj_dec: () => cleanups++,
-      vir_closure_release: () => cleanups++,
       vir_abort_ir_package_set: () => cleanups++,
       vir_resource_roots_clear: () => rootClears++,
       vir_call_resolved_objects: fail,
-      vir_closure_call_objects: fail,
+      vir_closure_apply_objects: fail,
     }, { hostState });
     runtime.resolveCallSlot = () => 1;
     const args = [100, 200];
     assert.throws(() => kind === "named"
       ? runtime.callResolvedObjects({ entry: "test" }, {}, args, () => {})
-      : runtime.callClosureObjects(1, {}, args), error => error === failure);
+      : runtime.callClosureObjects({ runtime, object: 1, live: true },
+        { args: ["a", "b"].map(name => ({ name, type: { interfaceTag: 1 } })), effect: "pure" }, args), error => error === failure);
     assert.deepEqual(args, [], "ownership has left JavaScript even when entry throws");
     assert.equal(runtime.failure, failure);
     assert.equal(hostState.callError, null);
     assert.throws(() => runtime.requireLiveRuntime(), /fresh runtime/);
     assert.throws(() => runtime.exports.vir_call_resolved_objects(1, 0, 0), /fresh runtime/);
     runtime.releaseOwnedObjects([100]);
-    runtime.releaseClosure(1);
     runtime.exports.vir_abort_ir_package_set();
     runtime.dispose();
     runtime.dispose();
@@ -107,7 +106,7 @@ for (const throughHostWrapper of [false, true]) {
       const instance = new WebAssembly.Instance(module, imports);
       runtime = new VirRuntime({ ...instance.exports,
         vir_obj_dec: () => cleanups++, vir_free_bytes: () => cleanups++,
-        vir_closure_release: () => cleanups++, vir_abort_ir_package_set: () => cleanups++,
+        vir_abort_ir_package_set: () => cleanups++,
       }, { hostState });
       let failure;
       try { runtime.exports.run(); assert.fail("expected exceptional unwind"); }
@@ -125,7 +124,6 @@ for (const throughHostWrapper of [false, true]) {
       assert.throws(() => runtime.exports.run(), /fresh runtime/);
       runtime.exports.vir_obj_dec(10);
       runtime.exports.vir_free_bytes(10);
-      runtime.exports.vir_closure_release(1);
       runtime.exports.vir_abort_ir_package_set();
       runtime.dispose();
       assert.equal(calls, 1);

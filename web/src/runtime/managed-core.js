@@ -7,7 +7,6 @@ Author: Emilio J. Gallego Arias
 import { validateInterfaceManifest } from "./interface-manifest.js";
 import { validateIrPackageSetMembers } from "./ir-package.js";
 import { encodePackageContract } from "./package-contract.js";
-import { releaseCallbackRoots } from "./callbacks.js";
 import { RuntimeCallTiming } from "./call-timing.js";
 import {
   asError,
@@ -48,7 +47,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     this.startupError = null;
     this.disposed = false;
     this.disposing = false;
-    this.liveCallbacks = new Set();
     this.hostState?.attachRuntime(this);
     this.hostState?.attach(this.exports);
 
@@ -88,7 +86,7 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
         "VirRuntime already owns an IR package set; create a fresh runtime for another generation",
       );
     }
-    if (this.liveCallbacks.size !== 0) {
+    if (this.liveCallbackCount() !== 0) {
       throw new Error(
         "VirRuntime cannot install an IR package set while callbacks are live; create a fresh runtime",
       );
@@ -107,7 +105,7 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
         "VirRuntime already owns an IR package set; create a fresh runtime for another generation",
       );
     }
-    if (this.liveCallbacks.size !== 0) {
+    if (this.liveCallbackCount() !== 0) {
       throw new Error(
         "VirRuntime cannot install an IR package set while callbacks are live; create a fresh runtime",
       );
@@ -517,16 +515,8 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     return runtimeBoundaries.get(this).subscribe(listener);
   }
 
-  trackCallback(callback) {
-    this.liveCallbacks.add(callback);
-  }
-
-  untrackCallback(callback) {
-    this.liveCallbacks.delete(callback);
-  }
-
-  releaseClosure(rootId) {
-    this.exports.vir_closure_release?.(rootId);
+  liveCallbackCount() {
+    return this.hostState?.liveCallbackCount ?? 0;
   }
 
   dispose() {
@@ -542,19 +532,17 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
   }
 
   teardownPackageResources() {
-    const errors = [];
-    collectCleanupError(errors, () => this.hostState?.dispose());
-    collectCleanupError(errors, () => this.releaseLiveCallbacks());
-    throwCollectedErrors(errors, "VirRuntime package resource teardown failed");
+    this.hostState?.dispose();
   }
 
   releaseLiveCallbacks() {
-    const callbacks = Array.from(this.liveCallbacks);
-    try {
-      releaseCallbackRoots(callbacks);
-    } finally {
-      this.liveCallbacks.clear();
+    const errors = [];
+    for (const cell of this.hostState?.leanObjectHandleCells ?? []) {
+      if (cell.callType !== null) {
+        collectCleanupError(errors, () => this.releaseLeanObjectHandleCell(cell));
+      }
     }
+    throwCollectedErrors(errors, "Vir callback releases failed");
   }
 
   markDisposed() {
@@ -570,7 +558,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
 const abandonedCleanupExports = new Set([
   "vir_obj_dec",
   "vir_free_bytes",
-  "vir_closure_release",
   "vir_abort_ir_package_set",
 ]);
 

@@ -135,7 +135,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `runtime/factory.js`               | Shared acquisition, WASM instantiation, package input validation and host import wiring. |
 | `host/vir-common-host-bindings.js` | Environment-neutral JavaScript value and console providers. |
 | `runtime/call-timing.js`             | Internal accumulator for opt-in synchronous runtime call phase attribution.                               |
-| `runtime/callbacks.js`               | Private Lean closure roots associated with ordinary JavaScript functions.                                 |
+| `runtime/callbacks.js`               | Callable wrappers over shared Lean-value cells; calling metadata and conversion.                                 |
 | `runtime/cleanup.js`                 | Cleanup error collection with deterministic single-error and aggregate reporting.                         |
 | `runtime/core.js`                    | Package loading, manifest export tables, call resolution, memory helpers, and runtime/callback lifecycle. |
 | `runtime/object-values.js`           | Object ABI lowering and lifting between JavaScript values and owned Lean objects.                         |

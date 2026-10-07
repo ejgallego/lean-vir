@@ -106,9 +106,9 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     irPackageSet: [new Uint8Array(pkg)],
     hostBindings,
   });
-  const iterateCallbacks = runtime.liveCallbacks[Symbol.iterator];
+  const iterateCallbacks = runtime.hostState.leanObjectHandleCells[Symbol.iterator];
   let callbackRegistryScans = 0;
-  runtime.liveCallbacks[Symbol.iterator] = function* () {
+  runtime.hostState.leanObjectHandleCells[Symbol.iterator] = function* () {
     callbackRegistryScans++;
     yield* iterateCallbacks.call(this);
   };
@@ -124,7 +124,7 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   try {
     await React.act(async () => check(runtime.call("ReactTamagotchi.mount", `#${peer.id}`),
       "peer Tamagotchi mounts"));
-    check(callbackRegistryScans === 0 && runtime.liveCallbacks.size > 0,
+    check(callbackRegistryScans === 0 && runtime.liveCallbackCount() > 0,
       "real Lean callbacks own closure roots without a per-call registry census");
     await React.act(async () => peer.querySelector("#react-pet-art-toggle").click());
     check(peer.querySelector("#react-pet-device").dataset.art === "pet",
@@ -772,7 +772,7 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       "authoring interactions leave the peer widget unchanged");
     return true;
   } finally {
-    delete runtime.liveCallbacks[Symbol.iterator];
+    delete runtime.hostState.leanObjectHandleCells[Symbol.iterator];
     try { await React.act(async () => runtime.dispose()); }
     finally {
       fixtures.remove();

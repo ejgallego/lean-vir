@@ -67,7 +67,7 @@ try {
     assert.equal(int(-huge), 1n - huge);
     assert.throws(() => nat(-1n), /non-negative/);
     runtime.releaseLiveCallbacks();
-    assert.equal(runtime.liveCallbacks.size, 0);
+    assert.equal(runtime.liveCallbackCount(), 0);
     assert.throws(() => wide(0), /disposed runtime/);
     assert.throws(() => nat(0), /disposed runtime/);
 

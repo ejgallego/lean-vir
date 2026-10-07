@@ -96,7 +96,7 @@ end Fatal`,
       assert.equal(exports.vir_resource_roots_active(), 0);
       assert.equal(exports.vir_resource_roots_reusable(), 0);
       assert.equal(hostState.leanObjectHandleCells.size, 0);
-      assert.equal(runtime.liveCallbacks.size, 0);
+      assert.equal(runtime.liveCallbackCount(), 0);
       assert.equal(hostState.callTimings.length, 0);
     }
     assert.equal(caughtNested, true);

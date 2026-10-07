@@ -455,7 +455,7 @@ async function run() {
       "unmounted generation's Lean stale guard prevents a late success",
     );
     old.dispose();
-    check(old.liveCallbacks.size === 0, "explicit disposal releases old Lean roots");
+    check(old.liveCallbackCount() === 0, "explicit disposal releases old Lean roots");
 
     await gate("arm", "after unmount");
     render(a, query("after unmount"));
@@ -470,7 +470,7 @@ async function run() {
       "late success after unmount is inert",
     );
     runtime.dispose();
-    check(runtime.liveCallbacks.size === 0, "explicit disposal releases Lean closure roots");
+    check(runtime.liveCallbackCount() === 0, "explicit disposal releases Lean closure roots");
 
     const failures = requests.filter(
       (record) =>

@@ -571,7 +571,7 @@ assert.equal(hostRuntime.call("HostInterop.callbackRoundTrip", 5), 12n);
 assert.equal(hostRuntime.call("HostInterop.runtimeRefRoundTrip", 5), 714n);
 hostRuntime.dispose();
 assert.equal(
-  hostRuntime.liveCallbacks.size,
+  hostRuntime.liveCallbackCount(),
   0,
   "runtime disposal should release the key listener",
 );

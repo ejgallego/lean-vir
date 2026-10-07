@@ -9,11 +9,16 @@ import {
   directJsResultSupported,
 } from "./js-value-support.js";
 import { OBJECT_VALUE_EXPORTS } from "./object-abi-exports.js";
+import {
+  collectCleanupError,
+  throwCollectedErrors,
+  throwWithCleanup,
+} from "./cleanup.js";
 const textEncoder = new TextEncoder();
 
-// A JSL value is an ordinary JavaScript object. Its Lean root lives only in
-// this out-of-band cell, and ordinary JavaScript reachability controls when
-// that root is released.
+// JSL objects and converted callbacks retain one Lean value through the same
+// out-of-band cell. JavaScript reachability controls its lifetime; calling
+// metadata does not introduce a separate owner.
 const leanObjectHandleStates = new WeakMap();
 const leanObjectHandleFinalizer =
   typeof FinalizationRegistry === "function"
@@ -23,7 +28,11 @@ const leanObjectHandleFinalizer =
         try {
           releaseLeanObjectHandleCell(cell, true);
         } catch (error) {
-          cell?.runtime?.hostState?.recordFinalizerError(error);
+          try {
+            cell.runtime.hostState?.recordFinalizerError(error);
+          } catch {
+            // Finalization must never surface through the host job queue.
+          }
         }
       })
     : null;
@@ -48,33 +57,38 @@ function releaseLeanObjectHandleCell(cell, fromFinalizer = false) {
   if (!fromFinalizer) {
     leanObjectHandleFinalizer?.unregister(cell);
   }
-  try {
-    cell.runtime.exports.vir_obj_dec(cell.object);
-  } finally {
-    if (typeof onRelease === "function") onRelease();
-  }
+  const errors = [];
+  collectCleanupError(errors, () => cell.runtime.exports.vir_obj_dec(cell.object));
+  if (typeof onRelease === "function") collectCleanupError(errors, onRelease);
+  throwCollectedErrors(errors, "Lean object handle release failed");
   return true;
 }
 
-function createLeanObjectHandle(cell) {
+function attachLeanObjectHandle(cell, target) {
   if (cell?.live !== true) {
     throw new Error("cannot create a released Lean object handle");
   }
-  const handle = {};
-  leanObjectHandleStates.set(handle, cell);
+  leanObjectHandleStates.set(target, cell);
   // Weakening the entire cleanup record also avoids rooting the generation
-  // through cell.onRelease. The live handle and host tracking set still own it.
-  leanObjectHandleFinalizer?.register(handle, new WeakRef(cell), cell);
-  return handle;
+  // through cell.onRelease. The live target and host tracking set still own it.
+  leanObjectHandleFinalizer?.register(target, new WeakRef(cell), cell);
+  return target;
 }
 
-function requireLeanObjectHandle(resource, runtime, label) {
-  const cell = leanObjectHandleStates.get(resource);
+function requireLiveLeanObjectCell(cell, runtime, label) {
   if (cell?.runtime !== runtime || cell.live !== true) {
     throw new Error(`${label} must be a live Lean object handle resource`);
   }
   normalizeObjectPointer(cell.object, label);
   return cell;
+}
+
+function requireLeanObjectHandle(resource, runtime, label) {
+  const cell = leanObjectHandleStates.get(resource);
+  if (cell?.callType !== null) {
+    throw new Error(`${label} must be a live Lean object handle resource`);
+  }
+  return requireLiveLeanObjectCell(cell, runtime, label);
 }
 
 export function requireString(value, label) {
@@ -140,7 +154,7 @@ export class ObjectRuntime {
     return argObj;
   }
 
-  makeLeanObjectHandleResource(obj, label) {
+  makeLeanObjectHandleCell(obj, label, callType = null) {
     const object = normalizeObjectPointer(obj, label);
     this.exports.vir_obj_inc(object);
     const cell = {
@@ -148,6 +162,7 @@ export class ObjectRuntime {
       object,
       live: true,
       onRelease: null,
+      callType,
     };
     try {
       if (typeof this.hostState?.trackLeanObjectHandleCell !== "function") {
@@ -156,11 +171,41 @@ export class ObjectRuntime {
         );
       }
       this.hostState.trackLeanObjectHandleCell(cell);
-      return createLeanObjectHandle(cell);
+      return cell;
     } catch (error) {
-      releaseLeanObjectHandleCell(cell);
-      throw error;
+      throwWithCleanup(
+        error, () => releaseLeanObjectHandleCell(cell),
+        "Lean object handle creation failed",
+      );
     }
+  }
+
+  attachLeanObjectHandle(cell, target) {
+    return attachLeanObjectHandle(cell, target);
+  }
+
+  makeLeanObjectHandleResource(obj, label) {
+    const cell = this.makeLeanObjectHandleCell(obj, label);
+    try {
+      return attachLeanObjectHandle(cell, {});
+    } catch (error) {
+      throwWithCleanup(
+        error, () => releaseLeanObjectHandleCell(cell),
+        "Lean object handle creation failed",
+      );
+    }
+  }
+
+  requireLiveLeanObjectCell(cell, label) {
+    return requireLiveLeanObjectCell(cell, this, label);
+  }
+
+  leanCallbackCell(callback, label) {
+    const cell = leanObjectHandleStates.get(callback);
+    if (typeof callback !== "function" || cell?.callType == null) {
+      throw new Error(`${label} must be a live Lean callback`);
+    }
+    return requireLiveLeanObjectCell(cell, this, label);
   }
 
   leanObjectHandleCell(resource, label) {

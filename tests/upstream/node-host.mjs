@@ -40,10 +40,10 @@ function assertMissingBrowserProvider(runtime, entry, args) {
   }
   if (
     !/host import binding not found/.test(message) ||
-    runtime.liveCallbacks.size !== 0
+    runtime.liveCallbackCount() !== 0
   ) {
     throw new Error(
-      `${entry} must require an explicit browser host: ${JSON.stringify({ message, callbacks: runtime.liveCallbacks.size })}`,
+      `${entry} must require an explicit browser host: ${JSON.stringify({ message, callbacks: runtime.liveCallbackCount() })}`,
     );
   }
 }

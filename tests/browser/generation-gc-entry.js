@@ -84,7 +84,7 @@ async function runFatalRecovery(wasmModule, irPackageSet) {
     check(exports.vir_resource_roots_active() === 0 &&
       exports.vir_resource_roots_reusable() === 0,
       "browser disposal clears the Wasm table after trap");
-    check(state.leanObjectHandleCells.size === 0 && bad.liveCallbacks.size === 0,
+    check(state.leanObjectHandleCells.size === 0 && bad.liveCallbackCount() === 0,
       "browser disposal releases JavaScript roots after trap");
     for (const runtime of [good, recovered = await factory.createRuntime({ irPackageSet })]) {
       runtime.call("HostInterop.callbackRoundTrip", 3);
@@ -166,7 +166,7 @@ async function runReactChurn(createRuntime) {
     );
     await collectUntil(
       () =>
-        runtime.liveCallbacks.size === 0 &&
+        runtime.liveCallbackCount() === 0 &&
         runtime.hostState.leanObjectHandleCells.size === 0,
       "React render foreign-root recovery",
     );

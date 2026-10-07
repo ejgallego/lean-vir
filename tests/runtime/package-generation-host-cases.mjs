@@ -428,7 +428,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       ),
     /host import binding not found: browser\.document\.current/,
   );
-  assert.equal(reactExternalRuntime.liveCallbacks.size, 0);
+  assert.equal(reactExternalRuntime.liveCallbackCount(), 0);
   reactExternalRuntime.dispose();
 }
 

@@ -68,7 +68,7 @@ end InitializerRetirement`,
         if (failNextInitializer) {
           failNextInitializer = false;
           stateBeforeFailure = {
-            callbacks: failedRuntime.liveCallbacks.size,
+            callbacks: failedRuntime.liveCallbackCount(),
             objectHandles: failedRuntime.hostState.leanObjectHandleCells.size,
           };
           return true;
@@ -109,7 +109,7 @@ end InitializerRetirement`,
     try {
       assert.equal(retainedHandles.length, 2,
         "a fresh interpreter can complete the initializer sequence");
-      assert.equal(freshRuntime.liveCallbacks.size, 0,
+      assert.equal(freshRuntime.liveCallbackCount(), 0,
         "the retained value is a JSL handle rather than a converted JS callback");
       assert.equal(freshRuntime.call("InitializerRetirement.consume", retainedHandles[1]), 17n);
       assert.throws(

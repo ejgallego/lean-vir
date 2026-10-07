@@ -296,14 +296,15 @@ pointers. Use an explicit `Unit` argument for a callable pure import. This is di
 from an effectful import with no JavaScript arguments, whose IR
 arity includes its world argument.
 
-For converted Lean functions, `vir_obj_closure_root` retains a closure with its
-arity and effect bit. JavaScript keeps the full function descriptor privately,
-lowers callback inputs to owned objects, and lifts the owned result of
-`vir_closure_call_objects`. Reentry may root more closures and reallocate the
-root table. The native caller therefore snapshots the selected function, arity
-and effect flag, retaining no table-entry pointer across application.
-[HOST_BINDINGS.md](HOST_BINDINGS.md#lean-backed-javascript-values) owns collection
-and explicit `vir_closure_release` lifetime rules.
+Converted Lean functions use the same retained-object cells, weak finalizer and
+terminal tracking set as JSL values. Their JavaScript wrappers keep the declared
+argument/result types and effect for automatic conversion. A callback-count
+summary preserves package-admission checks without a separate ownership registry.
+`vir_closure_apply_objects` borrows the function from its live cell, receives
+arity/effect by value, and takes an invocation-owned reference before applying it.
+Reentry can release the wrapper without invalidating that active invocation.
+The native closure-root vector/free list and its root/release exports are retired;
+this requires matching JavaScript and Wasm assets from the same build.
 
 Synchronous host exceptions use an out-of-band error slot, preserving the
 original JavaScript Error at the owning named/closure/initializer boundary.

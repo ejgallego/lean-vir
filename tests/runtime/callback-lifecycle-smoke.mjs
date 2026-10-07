@@ -32,7 +32,7 @@ assert.equal(typeof retainedCallback, "function");
 assert.deepEqual(Object.keys(retainedCallback), []);
 assert.equal(Object.hasOwn(retainedCallback, "retain"), false);
 assert.equal(Object.hasOwn(retainedCallback, "release"), false);
-assert.equal(runtime.liveCallbacks.size, 1);
+assert.equal(runtime.liveCallbackCount(), 1);
 
 const jsNat = (value) =>
   runtime.hostState.defaultBindings["js.nat"](BigInt(value));
@@ -41,7 +41,7 @@ const jsNatValue = (value) =>
 assert.equal(jsNatValue(retainedCallback(jsNat(4))), 11n);
 
 runtime.dispose();
-assert.equal(runtime.liveCallbacks.size, 0);
+assert.equal(runtime.liveCallbackCount(), 0);
 assert.throws(
   () => retainedCallback(1n),
   /disposed runtime|belongs to a disposed runtime/,
@@ -64,10 +64,10 @@ assert.throws(
   /host binding boom/,
 );
 assert.equal(typeof failedCallback, "function");
-assert.equal(failedRuntime.liveCallbacks.size, 1);
+assert.equal(failedRuntime.liveCallbackCount(), 1);
 assert.equal(failedCallback(1n), 8n, "a throwing host may still retain its callback");
 failedRuntime.dispose();
-assert.equal(failedRuntime.liveCallbacks.size, 0);
+assert.equal(failedRuntime.liveCallbackCount(), 0);
 assert.throws(() => failedCallback(1n), /disposed runtime/);
 
 let extraArgumentCallback = null;
@@ -83,7 +83,7 @@ const extraArgumentRuntime = await createVirRuntime({
   },
 });
 assert.equal(extraArgumentRuntime.call("HostInterop.callbackRoundTrip", 1), 8n);
-assert.equal(extraArgumentRuntime.liveCallbacks.size, 1);
+assert.equal(extraArgumentRuntime.liveCallbackCount(), 1);
 assert.equal(extraArgumentCallback(2n, undefined), 9n);
 extraArgumentRuntime.dispose();
 assert.throws(() => extraArgumentCallback(2n, undefined), /disposed runtime/);

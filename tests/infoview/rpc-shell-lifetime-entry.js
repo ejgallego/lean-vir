@@ -414,7 +414,7 @@ async function run() {
     );
     current.runtime.dispose();
     check(
-      current.runtime.liveCallbacks.size === 0,
+      current.runtime.liveCallbackCount() === 0,
       "hard disposal releases Lean closure roots",
     );
     for (const task of stopped) await release(task, true, true);

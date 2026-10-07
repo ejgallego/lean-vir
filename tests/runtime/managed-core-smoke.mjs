@@ -53,7 +53,7 @@ try {
     await test(`${profile}: opaque state/functions avoid automatic conversion and reject unsupported entries`, async () => {
       const runtime = await fresh();
       try {
-        runtime.exports.vir_obj_closure_root = () => {
+        runtime.exports.vir_closure_apply_objects = () => {
           throw new Error("unexpected callback conversion");
         };
         assert.throws(
@@ -74,7 +74,7 @@ try {
           );
         }
         assert.equal(runtime.failure, null);
-        assert.equal(runtime.liveCallbacks.size, 0);
+        assert.equal(runtime.liveCallbackCount(), 0);
         assert.equal(runtime.hostState.leanObjectHandleCells.size, 3);
         assert.equal(runtime.exports.vir_resource_roots_active(), 0);
         let fired = false;

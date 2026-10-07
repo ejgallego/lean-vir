@@ -16,10 +16,6 @@ Author: Emilio J. Gallego Arias
 #include "runtime/object.h"
 
 static std::string g_obj_decimal_result;
-extern "C" uint32_t vir_closure_root(
-    lean::object * value,
-    uint32_t arity,
-    uint8_t is_io);
 
 static bool is_decimal(char const * text, uint32_t len) {
     if (text == nullptr || len == 0) {
@@ -277,16 +273,6 @@ extern "C" __externref_t vir_obj_resource_externref(lean::object * value) {
 
 extern "C" uint8_t vir_obj_resource_is_valid(lean::object * value) {
     return lean::vir_resource_is_valid(value) ? 1 : 0;
-}
-
-extern "C" uint32_t vir_obj_closure_root(
-    lean::object * value,
-    uint32_t arity,
-    uint8_t is_io) {
-    if (value == nullptr) {
-        return 0;
-    }
-    return vir_closure_root(value, arity, is_io);
 }
 
 extern "C" uint32_t vir_obj_decimal_size(void) {

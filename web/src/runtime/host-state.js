@@ -42,6 +42,7 @@ export class VirHostState {
     this.ownsDefaultHostBindings = ownsDefaultHostBindings;
     this.runtime = null;
     this.leanObjectHandleCells = new Set();
+    this.liveCallbackCount = 0;
     this.callError = null;
     this.callTimings = [];
     this.finalizerErrorMessages = [];
@@ -296,8 +297,10 @@ export class VirHostState {
     }
     cell.onRelease = () => {
       this.leanObjectHandleCells.delete(cell);
+      if (cell.callType != null) this.liveCallbackCount--;
     };
     this.leanObjectHandleCells.add(cell);
+    if (cell.callType != null) this.liveCallbackCount++;
     return cell;
   }
 

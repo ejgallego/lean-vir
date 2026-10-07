@@ -127,7 +127,7 @@ assert.equal(
   true,
 );
 assert.deepEqual(retainedCallbackRuntime.hostState.callTimings, []);
-assert.equal(retainedCallbackRuntime.liveCallbacks.size, 1);
+assert.equal(retainedCallbackRuntime.liveCallbackCount(), 1);
 const retainedJsNat = (value) =>
   retainedCallbackRuntime.hostState.defaultBindings["js.nat"](BigInt(value));
 const retainedJsNatValue = (value) =>
@@ -135,7 +135,7 @@ const retainedJsNatValue = (value) =>
 assert.equal(retainedJsNatValue(retainedCallback(retainedJsNat(4))), 11n);
 assert.deepEqual(Object.keys(retainedCallback), []);
 retainedCallbackRuntime.dispose();
-assert.equal(retainedCallbackRuntime.liveCallbacks.size, 0);
+assert.equal(retainedCallbackRuntime.liveCallbackCount(), 0);
 assert.throws(() => retainedCallback(4n), /disposed runtime/);
 
 const extraArgumentRuntime = await createVirRuntime({
@@ -150,9 +150,9 @@ assert.equal(
   extraArgumentRuntime.call("HostInterop.callbackRoundTrip", 1),
   8n,
 );
-assert.equal(extraArgumentRuntime.liveCallbacks.size, 1);
+assert.equal(extraArgumentRuntime.liveCallbackCount(), 1);
 extraArgumentRuntime.dispose();
-assert.equal(extraArgumentRuntime.liveCallbacks.size, 0);
+assert.equal(extraArgumentRuntime.liveCallbackCount(), 0);
 
 let throwingCallback = null;
 const throwingBindingRuntime = await createVirRuntime({
@@ -170,10 +170,10 @@ assert.throws(
   () => throwingBindingRuntime.callTimed("HostInterop.callbackRoundTrip", 1),
   /host binding boom/,
 );
-assert.equal(throwingBindingRuntime.liveCallbacks.size, 1);
+assert.equal(throwingBindingRuntime.liveCallbackCount(), 1);
 assert.equal(throwingCallback(1n), 8n);
 throwingBindingRuntime.dispose();
-assert.equal(throwingBindingRuntime.liveCallbacks.size, 0);
+assert.equal(throwingBindingRuntime.liveCallbackCount(), 0);
 assert.throws(() => throwingCallback(1n), /disposed runtime/);
 
 let bindingDisposals = 0;
@@ -191,7 +191,7 @@ const firstRuntime = await hostFactory.createRuntime({
   irPackageSet: [hostPackageBytes],
 });
 assert.equal(firstRuntime.call("HostInterop.callbackRoundTrip", 3), 10n);
-assert.equal(firstRuntime.liveCallbacks.size, 1);
+assert.equal(firstRuntime.liveCallbackCount(), 1);
 const badPackage = Uint8Array.from(hostPackageBytes);
 badPackage[4] ^= 1;
 const failedCandidate = await hostFactory.createRuntime();
@@ -201,7 +201,7 @@ assert.throws(
 );
 failedCandidate.dispose();
 assert.equal(bindingDisposals, 0);
-assert.equal(firstRuntime.liveCallbacks.size, 1);
+assert.equal(firstRuntime.liveCallbackCount(), 1);
 const nextRuntime = await hostFactory.createRuntime({
   irPackageSet: [defaultPackageBytes],
 });
