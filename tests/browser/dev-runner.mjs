@@ -300,6 +300,55 @@ export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
   assert.deepEqual(renderedControls, expectedControls);
 }
 
+export async function smokeConstructorTemplates(cdp, origin) {
+  for (const spec of [
+    {
+      entry: "Vir.Fixtures.ListOption.sumScore", kind: "inr",
+      template: { kind: "inr", value: 0 },
+      edited: { kind: "inr", value: 7 }, result: "70",
+    },
+    {
+      entry: "Vir.Fixtures.RecursiveTypes.treeRootScore", kind: "branch",
+      template: { kind: "branch", fields: {
+        left: { kind: "leaf", value: 0 }, right: { kind: "leaf", value: 0 },
+      } },
+      edited: { kind: "branch", fields: {
+        left: { kind: "leaf", value: 4 }, right: { kind: "leaf", value: 5 },
+      } }, result: "309",
+    },
+    {
+      entry: "Vir.Fixtures.RecursiveTypes.jsonRootScore", kind: "null",
+      template: { kind: "null" }, edited: { kind: "null" }, result: "1",
+    },
+  ]) {
+    const { url } = await runnerCaseFromManifest("fixtures-basic.irpkg", spec.entry, {});
+    await navigate(cdp, `${origin}${basePath}${url}`);
+    await waitForReady(cdp);
+    const template = await evaluate(cdp, `(() => {
+      const select = document.querySelector('[data-constructor-index="0"]');
+      select.value = ${JSON.stringify(spec.kind)};
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      return JSON.parse(document.querySelector('[data-input-index="0"]').value);
+    })()`);
+    assert.deepEqual(template, spec.template);
+    const selected = await evaluate(cdp, `(() => {
+      const field = document.querySelector('[data-input-index="0"]');
+      field.value = ${JSON.stringify(JSON.stringify(spec.edited))};
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      return document.querySelector('[data-constructor-index="0"]').value;
+    })()`);
+    assert.equal(selected, spec.kind);
+    assert.equal(await runSelectedEntry(cdp), spec.result);
+    const incomplete = await evaluate(cdp, `(() => {
+      const field = document.querySelector('[data-input-index="0"]');
+      field.value = "{";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      return { text: field.value, choice: document.querySelector('[data-constructor-index="0"]').value };
+    })()`);
+    assert.deepEqual(incomplete, { text: "{", choice: "" });
+  }
+}
+
 export async function prepareNegativePackages() {
   await writeFile(
     resolve(distRoot, "bad-magic.irpkg"),

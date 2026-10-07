@@ -102,6 +102,10 @@ Open:
 http://127.0.0.1:5173/dev.html?package=my-app.irpkg
 ```
 
+For tagged-union and custom-inductive inputs, choose a constructor to fill an
+editable JSON template. Choosing another constructor replaces that input.
+Manual JSON edits remain available; the selector follows recognized `kind` values.
+
 If the package lives outside `web/public/`, open `/dev.html` and use the
 `.irpkg` file picker instead.
 

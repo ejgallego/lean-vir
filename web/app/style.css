@@ -1299,6 +1299,11 @@ h2 {
   min-width: 0;
 }
 
+.dev-constructor-input {
+  display: grid;
+  gap: 10px;
+}
+
 .dev-input-empty {
   min-height: 42px;
   margin: 0;

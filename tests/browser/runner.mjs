@@ -20,6 +20,7 @@ import {
   prepareNegativePackages,
   runnerCaseFromManifest,
   smokeAtomicPackageLoads,
+  smokeConstructorTemplates,
   smokeManifestDrivenEntryList,
   smokeRunner,
   smokeRunnerFailure,
@@ -68,6 +69,7 @@ try {
   for (const packageFile of packageFiles) {
     await smokeManifestDrivenEntryList(cdp, server.origin, packageFile);
   }
+  await smokeConstructorTemplates(cdp, server.origin);
   await smokeBrowserCallbacks(cdp, server.origin);
   await smokeBrowserCallbackCleanup(cdp, server.origin);
   await smokeAtomicPackageLoads(cdp, server.origin);

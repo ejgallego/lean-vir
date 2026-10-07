@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import "./style.css";
 import {
+  defaultValueForConstructor,
   inputDefault,
   interfaceInputTag,
   isJsonInputTag,
@@ -242,8 +243,62 @@ function renderInputFields(entry) {
       field.setAttribute("aria-describedby", hint.id);
       label.append(hint);
     }
-    inputFields.append(label);
+    if (input.type.interfaceTag === INTERFACE_TAG.TAGGED_UNION ||
+        input.type.interfaceTag === INTERFACE_TAG.CUSTOM_INDUCTIVE) {
+      const group = document.createElement("div");
+      group.className = "dev-constructor-input";
+      group.append(constructorControl(input, index, field), label);
+      inputFields.append(group);
+    } else {
+      inputFields.append(label);
+    }
   }
+}
+
+function constructorControl(input, index, field) {
+  const type = input.type;
+  const label = document.createElement("label");
+  label.className = "dev-field";
+  const caption = document.createElement("span");
+  caption.textContent = `Constructor for ${input.name}`;
+  const select = document.createElement("select");
+  select.id = `${field.id}-constructor`;
+  select.dataset.constructorIndex = String(index);
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Choose a constructor";
+  placeholder.disabled = true;
+  select.append(placeholder);
+  for (const ctor of type.constructors) {
+    const option = document.createElement("option");
+    option.value = ctor.jsName;
+    option.textContent = ctor.jsName;
+    select.append(option);
+  }
+  const syncSelection = () => {
+    try {
+      const value = JSON.parse(field.value);
+      select.value = type.constructors.some((ctor) => ctor.jsName === value?.kind)
+        ? value.kind : "";
+    } catch {
+      select.value = "";
+    }
+  };
+  field.addEventListener("input", syncSelection);
+  select.addEventListener("change", () => {
+    const ctor = type.constructors.find((ctor) => ctor.jsName === select.value);
+    if (ctor === undefined) return;
+    field.value = JSON.stringify(defaultValueForConstructor(type, ctor), null, 2);
+    syncSelection();
+  });
+  syncSelection();
+  const hint = document.createElement("small");
+  hint.className = "dev-field-hint";
+  hint.id = `${select.id}-hint`;
+  hint.textContent = "Choosing a constructor replaces this input with an editable JSON template.";
+  select.setAttribute("aria-describedby", hint.id);
+  label.append(caption, select, hint);
+  return label;
 }
 
 function inputOverride(entry, input, index) {

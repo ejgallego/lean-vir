@@ -15,6 +15,7 @@ import {
 } from "../../web/src/runtime/vir-value-normalizers.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import {
+  defaultValueForConstructor,
   defaultValueForType,
   interfaceInputTag,
 } from "../../web/app/pages/interface-inputs.js";
@@ -114,4 +115,33 @@ test("browser input defaults use the same constructor names as normalization", (
   const customDefault = defaultValueForType(customType);
   assert.deepEqual(customDefault, { kind: "empty" });
   assert.equal(normalizeCustomInductive(customDefault, customType, "input").index, 0);
+});
+
+test("selected custom constructors produce canonical editable templates", () => {
+  const field = (name, index) => ({
+    name, type: stringType, layout: { kind: "object", index },
+  });
+  const ctors = [
+    { name: "Example.Tree.empty", jsName: "empty", tag: 0, fields: [] },
+    { name: "Example.Tree.leaf", jsName: "leaf", tag: 1, fields: [field("payload", 0)] },
+    { name: "Example.Tree.branch", jsName: "branch", tag: 2, fields: [field("left", 0), field("right", 1)] },
+  ].map((ctor) => ({ ...ctor,
+    objectFieldCount: ctor.fields.length, usizeFieldCount: 0, scalarByteSize: 0,
+  }));
+  const custom = {
+    type: "Example.Tree", name: "Example.Tree",
+    interfaceTag: INTERFACE_TAG.CUSTOM_INDUCTIVE, kind: "customInductive",
+    constructors: ctors,
+  };
+  const before = structuredClone(custom);
+  const expected = [
+    { kind: "empty" }, { kind: "leaf", value: "" },
+    { kind: "branch", fields: { left: "", right: "" } },
+  ];
+  for (const [index, ctor] of ctors.entries()) {
+    const value = defaultValueForConstructor(custom, ctor);
+    assert.deepEqual(value, expected[index]);
+    assert.equal(normalizeCustomInductive(value, custom, "input").index, index);
+  }
+  assert.deepEqual(custom, before);
 });
