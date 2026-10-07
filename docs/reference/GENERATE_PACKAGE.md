@@ -70,7 +70,7 @@ visibility flags nor extension state are shared between these contexts.
 `importModulesCore` at exported level with
 interpretation IR. It uses `import all Lean.Environment` for its internal
 acquisition types/readers and ordinary `finalizeImport`; see [the upstream
-implementation at the source revision used for this adapter](https://github.com/leanprover/lean4/blob/470d5ce1400764999581fd26d5d72b00d990b0f4/src/Lean/Environment.lean#L2108).
+implementation at the source revision used for this adapter](https://github.com/leanprover/lean4/blob/c29b6dda4f7c20e3eeaa717c4e565663c5cfa364/src/Lean/Environment.lean#L2108).
 On toolchain changes, compare it with the new upstream implementation, update
 the source link, and run the import-cache equivalence tests.
 `CompiledImportCache.empty` fixes the resolved artifact map for one index;
