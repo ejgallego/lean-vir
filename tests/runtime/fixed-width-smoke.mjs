@@ -32,11 +32,7 @@ for (const name of Object.keys(transport)) {
 
 try {
   assert.equal(runtime.targetPointerBytes(), 4);
-  // Keep legacy exports callable, but forbid their use by the ordinary codec.
   runtime.exports = { ...originalExports };
-  for (const name of ["vir_obj_uint64", "vir_obj_uint64_decimal", "vir_obj_usize", "vir_obj_usize_decimal"]) {
-    runtime.exports[name] = () => assert.fail(`ordinary codec called ${name}`);
-  }
   for (const [name, interfaceTag, max, values, entry] of cases) {
     const type = { type: name, interfaceTag };
     const inputs = values.flatMap(n => n <= BigInt(Number.MAX_SAFE_INTEGER)
@@ -49,14 +45,16 @@ try {
       try {
         assert.equal(runtime.exports.vir_obj_is_scalar(object), 0);
         const output = runtime.liftObjectValue(type, object, name);
-        assert.equal(output, BigInt(input).toString());
-        assert.equal(typeof output, "string");
+        assert.equal(output, interfaceTag === INTERFACE_TAG.USIZE ? Number(BigInt(input)) : BigInt(input));
+        assert.equal(typeof output, interfaceTag === INTERFACE_TAG.USIZE ? "number" : "bigint");
         assert.deepEqual(transport, { allocBytes: 0, freeBytes: 0, readWasmString: 0 });
       } finally {
         runtime.exports.vir_obj_dec(object);
       }
       assert.equal(runtime.call(`Vir.Fixtures.InterfaceShapes.${entry}`, input),
-        ((BigInt(input) + 1n) & max).toString());
+        interfaceTag === INTERFACE_TAG.USIZE
+          ? Number((BigInt(input) + 1n) & max)
+          : (BigInt(input) + 1n) & max);
     }
 
     const constructor = name === "UInt64" ? "vir_obj_uint64_scalar" : "vir_obj_usize_scalar";
@@ -77,18 +75,20 @@ try {
       runtime.exports[constructor] = make;
     }
     assert.equal(runtime.failure, null);
-    assert.equal(runtime.call(`Vir.Fixtures.InterfaceShapes.${entry}`, max), "0");
+    assert.equal(runtime.call(`Vir.Fixtures.InterfaceShapes.${entry}`, max),
+      interfaceTag === INTERFACE_TAG.USIZE ? 0 : 0n);
   }
 
   for (const entry of ["boxUInt64Bump", "uint64BoxBump"]) {
-    assert.deepEqual(runtime.call(`Vir.Fixtures.InterfaceShapes.${entry}`, { value: max64 }), { value: "0" });
+    assert.deepEqual(runtime.call(`Vir.Fixtures.InterfaceShapes.${entry}`, { value: max64 }), { value: 0n });
   }
   for (const interfaceTag of [INTERFACE_TAG.UINT64, INTERFACE_TAG.USIZE]) {
     const type = { interfaceTag: INTERFACE_TAG.ARRAY, element: { interfaceTag } };
     const values = interfaceTag === INTERFACE_TAG.UINT64 ? [0n, 1n << 63n, max64] : [0n, 1n << 31n, max32];
     const object = runtime.makeObjectValue(type, values, "nested");
     try {
-      assert.deepEqual(runtime.liftObjectValue(type, object, "nested"), values.map(String));
+      assert.deepEqual(runtime.liftObjectValue(type, object, "nested"),
+        interfaceTag === INTERFACE_TAG.USIZE ? values.map(Number) : values);
     } finally {
       runtime.exports.vir_obj_dec(object);
     }
@@ -103,32 +103,13 @@ try {
     }
   }
 
-  // Legacy text entrypoints retain their signatures, range errors and ownership.
-  runtime.exports = originalExports;
-  for (const [name, _tag, max] of cases) {
-    const prefix = name === "UInt64" ? "vir_obj_uint64" : "vir_obj_usize";
-    for (const input of ["0", String(max), String(max + 1n), "-1", "invalid"]) {
-      const bytes = new TextEncoder().encode(input);
-      const ptr = runtime.allocBytes(bytes);
-      try {
-        const object = originalExports[prefix](ptr, bytes.length);
-        if (input === "0" || input === String(max)) {
-          assert.notEqual(object, 0);
-          try { assert.equal(runtime.readObjectDecimal(object, `${prefix}_decimal`), input); }
-          finally { originalExports.vir_obj_dec(object); }
-        } else {
-          assert.equal(object, 0);
-        }
-      } finally { runtime.freeBytes(ptr); }
-    }
-  }
   const huge = (1n << 256n) + 3n;
-  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", huge), String(huge + 1n));
-  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseIntNegate", -huge), String(huge));
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", huge), huge + 1n);
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseIntNegate", -huge), huge);
 } finally {
   runtime.exports = originalExports;
   Object.assign(runtime, originalMethods);
   runtime.dispose();
 }
 
-console.log("fixed-width smoke ok: exact String results, direct scalars, legacy text ABI and cleanup");
+console.log("fixed-width smoke ok: exact numeric results, direct scalars and cleanup");

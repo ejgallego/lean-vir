@@ -319,7 +319,8 @@ a supported outer type shape.
 Top-level `Float`, `Float32`, `UInt64` and trivial wrappers over them require a
 compiler-generated `_boxed` declaration for wasm32 calls. Generation includes
 that companion or fails with an explicit diagnostic; it does not emit a partial
-package. Large exact integer results use decimal strings at the JS boundary;
+package. `Nat`, `Int`, and `UInt64` results use bigint at the JS boundary, while
+wasm32 `USize` results use Number;
 the [JS value reference](../guides/JS_API.md#calls-and-manifest) owns concrete shapes.
 
 ### Resources and callbacks

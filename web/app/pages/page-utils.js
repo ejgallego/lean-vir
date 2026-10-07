@@ -18,6 +18,18 @@ export function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
 }
 
+export function formatResult(value) {
+  if (value instanceof Uint8Array) return Array.from(value).join(", ");
+  if (value !== null && typeof value === "object") {
+    return JSON.stringify(
+      value,
+      (_key, item) => typeof item === "bigint" ? item.toString() : item,
+      2,
+    );
+  }
+  return String(value);
+}
+
 export function assetPathFor(text, baseUrl) {
   if (/^(https?:)?\/\//.test(text) || text.startsWith("/")) {
     return text;

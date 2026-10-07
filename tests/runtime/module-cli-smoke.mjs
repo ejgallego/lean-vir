@@ -98,9 +98,9 @@ try {
     ),
   });
   for (const [bytes, entry, input, expected] of [
-    [singleBytes, "fib", 8, "21"],
-    [quickstartBytes, "Quickstart.double", 21, "42"],
-    [await readFile(configs[2].package), "Quickstart.total", [2, 3, 5], "10"],
+    [singleBytes, "fib", 8, 21n],
+    [quickstartBytes, "Quickstart.double", 21, 42n],
+    [await readFile(configs[2].package), "Quickstart.total", [2, 3, 5], 10n],
   ]) {
     const runtime = await factory.createRuntime({ irPackageSet: [bytes] });
     try {

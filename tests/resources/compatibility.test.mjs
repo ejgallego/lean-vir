@@ -18,7 +18,7 @@ test("producer profile agrees with the browser resource contract", () => {
   assert.equal(profile.virVersion, VIR_COMPATIBILITY_VERSION);
 });
 test("virVersion rejects drift, a missing field and a wrong type", () => {
-  for (const value of ["wrong", undefined, null, profile.virVersion + 1]) {
+  for (const value of ["wrong", undefined, null, profile.virVersion - 1, profile.virVersion + 1]) {
     assert.notEqual(value, profile.virVersion);
     assert.throws(
       () => assertResourceCompatibility({ ...profile, virVersion: value }),

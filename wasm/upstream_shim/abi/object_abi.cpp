@@ -41,22 +41,6 @@ static bool is_signed_decimal(char const * text, uint32_t len) {
     return first_digit < len && is_decimal(text + first_digit, len - first_digit);
 }
 
-static bool parse_u64(char const * text, uint32_t len, uint64_t & out) {
-    if (!is_decimal(text, len)) {
-        return false;
-    }
-    uint64_t value = 0;
-    for (uint32_t i = 0; i < len; i++) {
-        uint64_t digit = static_cast<uint64_t>(text[i] - '0');
-        if (value > (std::numeric_limits<uint64_t>::max() - digit) / 10) {
-            return false;
-        }
-        value = value * 10 + digit;
-    }
-    out = value;
-    return true;
-}
-
 static lean::object * mk_nat_from_decimal(char const * text, uint32_t len) {
     if (!is_decimal(text, len)) {
         return nullptr;
@@ -210,14 +194,6 @@ extern "C" lean::object * vir_obj_field(lean::object * value, uint32_t index) {
     return field;
 }
 
-extern "C" char const * vir_obj_ctor_usize_decimal(lean::object * value, uint32_t index) {
-    if (lean_is_scalar(value) || index < lean_ctor_num_objs(value)) {
-        return nullptr;
-    }
-    g_obj_decimal_result = std::to_string(lean_ctor_get_usize(value, index));
-    return g_obj_decimal_result.c_str();
-}
-
 extern "C" uint8_t const * vir_obj_ctor_scalar_data(lean::object * value, uint32_t usize_field_count) {
     if (lean_is_scalar(value)) {
         return nullptr;
@@ -273,32 +249,6 @@ extern "C" lean::object * vir_obj_usize_scalar(size_t value) {
 
 extern "C" size_t vir_obj_usize_value(lean::object * value) {
     return lean_unbox_usize(value);
-}
-
-extern "C" lean::object * vir_obj_uint64(char const * text, uint32_t len) {
-    uint64_t value = 0;
-    if (!parse_u64(text, len, value)) {
-        return nullptr;
-    }
-    return lean_box_uint64(value);
-}
-
-extern "C" char const * vir_obj_uint64_decimal(lean::object * value) {
-    g_obj_decimal_result = std::to_string(lean_unbox_uint64(value));
-    return g_obj_decimal_result.c_str();
-}
-
-extern "C" lean::object * vir_obj_usize(char const * text, uint32_t len) {
-    uint64_t value = 0;
-    if (!parse_u64(text, len, value) || value > std::numeric_limits<size_t>::max()) {
-        return nullptr;
-    }
-    return lean_box_usize(static_cast<size_t>(value));
-}
-
-extern "C" char const * vir_obj_usize_decimal(lean::object * value) {
-    g_obj_decimal_result = std::to_string(lean_unbox_usize(value));
-    return g_obj_decimal_result.c_str();
 }
 
 extern "C" lean::object * vir_obj_float(double value) {

@@ -188,11 +188,11 @@ export async function runIrPackageLifecycleSmoke({
   const initializerRuntime = await initializerFactory.createRuntime({
     irPackageSet: [leanPackageBytes],
   });
-  assert.equal(initializerRuntime.call(parserScoreEntry), "1123");
+  assert.equal(initializerRuntime.call(parserScoreEntry), 1123n);
   const secondInitializerRuntime = await initializerFactory.createRuntime({
     irPackageSet: [leanPackageBytes],
   });
-  assert.equal(secondInitializerRuntime.call(parserScoreEntry), "1123");
+  assert.equal(secondInitializerRuntime.call(parserScoreEntry), 1123n);
   initializerRuntime.dispose();
   secondInitializerRuntime.dispose();
 
@@ -203,12 +203,12 @@ export async function runIrPackageLifecycleSmoke({
   const fallbackRuntime = await createVirRuntimeFactory({
     wasmBytes,
   }).createRuntime({ irPackageSet: [await readFile(fallbackPackage)] });
-  assert.equal(fallbackRuntime.call("callExternIncrement", 41), "42");
+  assert.equal(fallbackRuntime.call("callExternIncrement", 41), 42n);
   const fallbackBytes = new Uint8Array([0, 1, 2, 255]);
   assert.deepEqual(
     fallbackRuntime.call("callExternBorrowedIdentity", fallbackBytes),
     fallbackBytes,
   );
-  assert.equal(fallbackRuntime.call("callExternOwnedSize", fallbackBytes), "4");
+  assert.equal(fallbackRuntime.call("callExternOwnedSize", fallbackBytes), 4n);
   fallbackRuntime.dispose();
 }

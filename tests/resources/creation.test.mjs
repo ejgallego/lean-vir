@@ -5,6 +5,7 @@ import {
   descriptorContentId,
   sha256Hex,
 } from "../../web/src/resources/descriptor.js";
+import { VIR_COMPATIBILITY_VERSION } from "../../web/src/runtime/versions.js";
 
 // Exercise the real loader, envelope integrity and export resolver. Substitute
 // only the expensive package/runtime boundaries; browser.mjs admits real IR/Wasm.
@@ -77,7 +78,7 @@ async function fixture(body) {
   globalThis.clearTimeout = (token) => timers.delete(token);
   const inventory = new Map(),
     requests = [];
-  const compatibility = { leanRevision: "test-revision", virVersion: 1 };
+  const compatibility = { leanRevision: "test-revision", virVersion: VIR_COMPATIBILITY_VERSION };
   for (const kind of ["runtime", "program"]) {
     const files =
       kind === "runtime"
@@ -175,7 +176,7 @@ async function fixture(body) {
       },
       callEntry() {
         state.calls++;
-        return 42;
+        return 42n;
       },
       dispose() {
         state.disposed++;
@@ -344,7 +345,7 @@ test("correct subset, extra roles and reordered keys admit; mutation after await
     await s.started.promise;
     s.creation.resolve(s.runtime);
     const program = await pending;
-    assert.equal(program.call("run"), 42);
+    assert.equal(program.call("run"), 42n);
     assert.equal(program.status, "active");
     program.dispose();
     program.dispose();
@@ -474,7 +475,7 @@ test("post-handoff abort owns nothing; explicit throwing disposal is terminal an
     assert.equal(listeners.size, 0);
     assert.equal(s.timers.size, 0);
     controller.abort();
-    assert.equal(program.call("run"), 42);
+    assert.equal(program.call("run"), 42n);
     assert.equal(s.disposed, 0);
     s.runtime.dispose = () => {
       s.disposed++;
@@ -594,7 +595,7 @@ for (const order of [
       await rejectedA;
       const program = await pendingB;
       assert.deepEqual(disposed, [1, 0]);
-      assert.equal(program.call("run"), 42);
+      assert.equal(program.call("run"), 42n);
       program.dispose();
       assert.deepEqual(disposed, [1, 1]);
     }));

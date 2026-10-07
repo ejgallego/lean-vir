@@ -50,7 +50,7 @@ runtime JavaScript repackaging need not change program bytes.
 The public resource compatibility record has exactly two fields:
 
 ```json
-{"leanRevision":"293d5d0c0c3f3dded4688b3ccd6a33939ac5102b","virVersion":1}
+{"leanRevision":"293d5d0c0c3f3dded4688b3ccd6a33939ac5102b","virVersion":2}
 ```
 
 `leanRevision` is `Lean.githash` (also `lean --githash`): the compiler's reported
@@ -59,12 +59,16 @@ installed libraries. Qualification of the actual runtime bytes remains necessary
 
 `virVersion` is one combined contract for the client-facing JavaScript API,
 runtime ABI and accepted program formats. It is independent of the runtime ABI
-number. Version 1 currently covers ABI 4, interface manifest 9, IR binary format
+number. Version 2 currently covers ABI 4, interface manifest 9, IR binary format
 11 and the `createProgram` / `call` / `status` / `dispose` resource API. Internal
 format versions remain in their headers and validators; applications do not
 select them independently. Advance `virVersion` when any constituent contract
 breaks; compatible fixes/repackaging retain it. Both native and JS constants are
 checked together by `check:package-abi`.
+
+Version 2 returns bigint for Nat, Int and UInt64 and Number for wasm32 USize.
+Version 1's decimal-string results are not accepted as the current contract.
+See the [numeric value mapping](../guides/JS_API.md#calls-and-manifest).
 
 The pair says whether program and runtime bundles are compatible. The separate
 content ID selects exact descriptor and payload bytes. Two runtime bundles can
@@ -279,7 +283,12 @@ must not import that carrier.
 The runtime selection is `vir-resources/runtime.json` in VIR. It selects one
 content ID and acquisition source; `vir-resources/compatibility.json` independently
 defines the Lean revision / VIR version pair shared by program production. The
-current lock names a public, content-addressed release asset. Missing local bytes
+current lock selects the matching published version 2 runtime. A runtime bundle
+must match that profile; acquisition rejects an incompatible selection.
+Publishing and selecting a matching runtime are separate maintainer operations,
+and earlier releases remain unchanged.
+
+After selecting a matching public, content-addressed runtime, missing local bytes
 are acquired anonymously over HTTPS and verified before installation. A warm
 verified cache or stage needs no runtime download. Missing offline bytes produce
 an acquisition error naming the required identity, never an implicit Wasm build.
@@ -449,9 +458,9 @@ not one inferred from the just-loaded program. This establishes interface/artifa
 agreement, not proof of executable behavior. Omission preserves two-URL callers.
 
 Each `createProgram` creates an independent runtime instance. No startup markers
-are invoked. The existing call
-API's value representation is preserved (for example, Nat results are decimal
-strings); this facade does not introduce a second marshaller. `interfaceId` is
+are invoked. Calls return the runtime's
+[documented JavaScript values](../guides/JS_API.md#calls-and-manifest) directly;
+this facade does not introduce a second marshaller. `interfaceId` is
 client-owned protocol metadata, not a runtime proof of a function's semantics.
 
 The publisher's ESM bootstrap is trusted: importing JavaScript executes it before

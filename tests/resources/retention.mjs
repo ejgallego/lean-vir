@@ -41,12 +41,12 @@ export async function measureResourceRetention(cdp, record) {
     assert.equal(live.created, 1, "probe must observe the actual Wasm instance");
     assert.equal(live.live, 1, "a live program must retain its memory");
     for (let batch = 0; batch < 3; batch++) {
-      const value = await evaluate(cdp, `(() => {
+      const correctValue = await evaluate(cdp, `(() => {
         let result;
         for (let i = 0; i < 100; i++) result = resourceRetention.held[0].call('score');
-        return result;
+        return result === 6093n;
       })()`);
-      assert.equal(value, "6093");
+      assert.equal(correctValue, true);
       await sample(`100-score-calls-${batch + 1}`);
     }
     await evaluate(cdp, `resourceRetention.held[0].dispose()`);
@@ -61,16 +61,16 @@ export async function measureResourceRetention(cdp, record) {
     await evaluate(cdp, `resourceRetention.held.length = 0`);
     assert.equal((await sample("disposed-facade-released")).live, 0);
     for (let batch = 0; batch < 3; batch++) {
-      const values = await evaluate(cdp, `(async () => {
+      const correctValues = await evaluate(cdp, `(async () => {
         const values = [];
         for (let i = 0; i < 4; i++) {
           const program = await openResourceProgram();
           try { values.push(program.call('score')); }
           finally { program.dispose(); program.dispose(); }
         }
-        return values;
+        return values.map(value => value === 6093n);
       })()`);
-      assert.deepEqual(values, Array(4).fill("6093"));
+      assert.deepEqual(correctValues, Array(4).fill(true));
       const released = await sample(`four-create-call-dispose-${batch + 1}`);
       assert.equal(released.created, 1 + 4 * (batch + 1));
       assert.equal(released.live, 0, "released programs must be collectable");

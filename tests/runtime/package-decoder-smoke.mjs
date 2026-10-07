@@ -43,8 +43,8 @@ const first = await factory.createRuntime({
 const second = await factory.createRuntime({
   irPackageSet: [defaultPackageBytes],
 });
-assert.equal(first.call("SortDemo.demo"), "192");
-assert.equal(second.call("fib", 8), "21");
+assert.equal(first.call("SortDemo.demo"), 192n);
+assert.equal(second.call("fib", 8), 21n);
 
 const contract = encodePackageContract(first.interfaceManifest);
 function validateContract(bytes) {
@@ -215,7 +215,7 @@ assertFailedSetCleanly(
   /IR package-set member 2 is invalid: invalid IR package magic/,
 );
 partialSetRuntime.loadIrPackageSetBytes([defaultPackageBytes]);
-assert.equal(partialSetRuntime.call("fib", 8), "21");
+assert.equal(partialSetRuntime.call("fib", 8), 21n);
 partialSetRuntime.dispose();
 
 const previousManifest = first.interfaceManifest;
@@ -226,7 +226,7 @@ assert.throws(
 assert.notEqual(first.packageInfo, null);
 assert.notEqual(first.interfaceManifest, null);
 assert.notEqual(first.packageMetadata, null);
-assert.equal(first.call("fib", 8), "21");
+assert.equal(first.call("fib", 8), 21n);
 assert.throws(
   () =>
     first.loadIrPackageSetBytes([
@@ -234,13 +234,13 @@ assert.throws(
     ]),
   /already owns an IR package set/,
 );
-assert.equal(first.call("fib", 8), "21");
+assert.equal(first.call("fib", 8), 21n);
 assert.equal(first.interfaceManifest, previousManifest);
 assert.ok(Object.isFrozen(first.interfaceManifest.exports[0].args[0].type));
-assert.equal(first.call("fib", 8), "21");
+assert.equal(first.call("fib", 8), 21n);
 
 badPackageRuntime.loadIrPackageSetBytes([defaultPackageBytes]);
-assert.equal(badPackageRuntime.call("fib", 8), "21");
+assert.equal(badPackageRuntime.call("fib", 8), 21n);
 
 first.dispose();
 second.dispose();

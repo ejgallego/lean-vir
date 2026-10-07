@@ -251,6 +251,7 @@ try {
       const first = await createProgram(checkedOptions);
       controller.abort(); // A handed-off instance belongs to the facade, not this signal.
       const second = await createProgram(options);
+      // Assert native result types here; CDP carries only JSON observations.
       const values = [first.call('score'), second.call('score')];
       let unknown = false; try {first.call('missing')} catch(e) {unknown = /unknown.*role/.test(e.message)};
       first.dispose(); first.dispose();
@@ -258,11 +259,11 @@ try {
       values.push(second.call('score')); second.dispose();
       const remounted = await createProgram(options); values.push(remounted.call('score')); remounted.dispose();
       globalThis.openResourceProgram = (extra = {}) => createProgram({...options, ...extra});
-      return {values, unknown, disposed};
+      return {correctValues: values.map(value => value === 6093n), unknown, disposed};
     })()`,
     );
     assert.deepEqual(result, {
-      values: ["6093", "6093", "6093", "6093"],
+      correctValues: [true, true, true, true],
       unknown: true,
       disposed: true,
     });
@@ -295,10 +296,10 @@ try {
       const fresh = await openResourceProgram();
       let value; try { value = fresh.call('score'); } finally { fresh.dispose(); }
       globalThis.cancelledCreationMemories = memories;
-      return {handedOff, name, cause, created: memories.length, value};
+      return {handedOff, name, cause, created: memories.length, correctValue: value === 6093n};
     } finally { WebAssembly.Instance = original; }
   })()`);
-  assert.deepEqual(cancelledCreation, {handedOff: false, name: "AbortError", cause: "cancel actual creation", created: 2, value: "6093"});
+  assert.deepEqual(cancelledCreation, {handedOff: false, name: "AbortError", cause: "cancel actual creation", created: 2, correctValue: true});
   await cdp.send("HeapProfiler.enable");
   await cdp.send("HeapProfiler.collectGarbage");
   assert.equal(await evaluate(cdp, "cancelledCreationMemories.filter(ref => ref.deref()).length"), 0,
@@ -343,21 +344,21 @@ try {
       program.dispose(); program.dispose();
       const disposed = program.status;
       fresh = await openResourceProgram();
-      return {initial, ioError, afterIo, afterIoValue, invalidRole, afterInvalidRole,
+      return {initial, ioError, afterIo, afterIoCorrect: afterIoValue === 6093n, invalidRole, afterInvalidRole,
         immutable, realTrap: failure instanceof WebAssembly.RuntimeError, failed,
-        retired, noReplay, peerState, peerValue, disposed,
-        freshState: fresh.status, freshValue: fresh.call('score')};
+        retired, noReplay, peerState, peerCorrect: peerValue === 6093n, disposed,
+        freshState: fresh.status, freshCorrect: fresh.call('score') === 6093n};
     } finally {
       program?.dispose(); peer?.dispose(); fresh?.dispose();
       WebAssembly.Instance = original;
     }
   })()`);
   assert.deepEqual(status, {
-    initial: "active", ioError: true, afterIo: "active", afterIoValue: "6093",
+    initial: "active", ioError: true, afterIo: "active", afterIoCorrect: true,
     invalidRole: true, afterInvalidRole: "active", immutable: true,
     realTrap: true, failed: "failed", retired: true, noReplay: true,
-    peerState: "active", peerValue: "6093", disposed: "disposed",
-    freshState: "active", freshValue: "6093",
+    peerState: "active", peerCorrect: true, disposed: "disposed",
+    freshState: "active", freshCorrect: true,
   });
   outcomes.push("status: recoverable IO, real Wasm trap, no replay, independent recovery, disposal PASS");
   const jsonItem = (value) => ({
@@ -427,7 +428,7 @@ try {
     "integrity",
   );
   const incompatible = await changed(
-    (d) => (d.compatibility.virVersion = 2),
+    (d) => (d.compatibility.virVersion += 1),
   );
   await rejected(
     "compatibility",

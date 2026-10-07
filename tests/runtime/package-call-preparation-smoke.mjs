@@ -133,8 +133,8 @@ public def CallPreparation.wide (value : UInt64) : UInt64 := value
 }
 
 function assertCallable(runtime) {
-  assert.equal(runtime.call("CallPreparation.nat", "12345678901234567890"), "12345678901234567890");
-  assert.equal(runtime.call("CallPreparation.wide", "18446744073709551615"), "18446744073709551615");
+  assert.equal(runtime.call("CallPreparation.nat", "12345678901234567890"), 12345678901234567890n);
+  assert.equal(runtime.call("CallPreparation.wide", "18446744073709551615"), 18446744073709551615n);
 }
 
 // This fixture uses only string-component names; these helpers edit selected

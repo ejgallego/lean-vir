@@ -21,6 +21,14 @@ def wideCallback (offset : UInt64) : IO (UInt64 → IO UInt64) :=
 def indexCallback (offset : USize) : IO (USize → IO USize) :=
   pure (fun value => pure (value + offset))
 
+@[vir_export]
+def natCallback (offset : Nat) : IO (Nat → IO Nat) :=
+  pure (fun value => pure (value + offset))
+
+@[vir_export]
+def intCallback (offset : Int) : IO (Int → IO Int) :=
+  pure (fun value => pure (value + offset))
+
 structure FixedWidthPayload where
   wide : Array UInt64
   indices : Array USize

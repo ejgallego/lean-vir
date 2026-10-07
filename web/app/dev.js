@@ -33,6 +33,7 @@ import {
   assetPathFor,
   errorMessage,
   formatBytes,
+  formatResult,
   setReadyState,
 } from "./pages/page-utils.js";
 import { createLatestLoadGate } from "./pages/latest-load.js";
@@ -233,6 +234,14 @@ function renderInputFields(entry) {
       field.value = inputOverride(entry, input, index) ?? inputDefault(input);
     }
     label.append(caption, field);
+    if (isJsonInputTag(input.type?.interfaceTag)) {
+      const hint = document.createElement("small");
+      hint.id = `dev-entry-input-${index}-hint`;
+      hint.className = "dev-field-hint";
+      hint.textContent = 'For large integers, use quoted decimal strings, e.g. ["9007199254740993"].';
+      field.setAttribute("aria-describedby", hint.id);
+      label.append(hint);
+    }
     inputFields.append(label);
   }
 }
@@ -369,13 +378,6 @@ function parseInputValue(input, field) {
     default:
       throw new Error(`unsupported input type: ${input.type?.type ?? "?"}`);
   }
-}
-
-function formatResult(value) {
-  if (value instanceof Uint8Array) return Array.from(value).join(", ");
-  if (value !== null && typeof value === "object")
-    return JSON.stringify(value, null, 2);
-  return String(value);
 }
 
 function renderResult(value) {

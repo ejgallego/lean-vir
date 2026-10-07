@@ -126,10 +126,10 @@ try {
   );
 
   for (const [pkg, entry, expected] of [
-    [marked, selected, "69"],
-    [all, unmarked, "99"],
-    [combined, selected, "69"],
-    [explicitImported, imported, "62"],
+    [marked, selected, 69n],
+    [all, unmarked, 99n],
+    [combined, selected, 69n],
+    [explicitImported, imported, 62n],
   ]) {
     const runtime = await factory.createRuntime({ irPackageSet: [pkg.bytes] });
     try {

@@ -106,7 +106,11 @@ export function createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGene
     const runtime = await instantiateWasm(generated.packagePath);
     let wasm;
     try {
-      wasm = runtime.call(fixture.entry);
+      const value = runtime.call(fixture.entry);
+      if (typeof value !== "bigint" || value < 0n) {
+        throw new Error(`${fixture.id}: Wasm fixture must return a Nat bigint`);
+      }
+      wasm = value.toString();
     } finally {
       runtime.dispose();
     }
