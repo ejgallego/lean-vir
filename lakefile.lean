@@ -36,6 +36,27 @@ target infoviewBundle (pkg) : System.FilePath := do
 lean_lib Vir where
   roots := #[`Vir]
 
+/-- Package generation uses both compiler metadata and resource-core hashing.
+Keep its shared library separate from those dependencies to avoid a cycle. -/
+lean_lib VirPackage where
+  roots := #[]
+  globs := #[.one `Vir.GeneratePackage, .submodules `Vir.GeneratePackage,
+    .one `Vir.ClientNativeExternManifest]
+
+/-- Lake loads whole owning libraries for native-precompiled imports. Assign
+compiler APIs to a native-only owner instead of the JavaScript-bound umbrella.
+Register these leaves after VirPackage so they override its generator glob;
+resource owners below keep their existing assignments. Module names stay put. -/
+lean_lib VirCompiler where
+  roots := #[]
+  globs := #[.one `Vir.Attributes, .one `Vir.ExternFallback,
+    .one `Vir.ExportValidation, .one `Vir.Host, .one `Vir.HostMetadata,
+    .one `Vir.HostValidation, .one `Vir.IRDependencies, .one `Vir.LeanName,
+    .one `Vir.InterfaceValidation, .submodules `Vir.Interface,
+    .one `Vir.GeneratePackage.NativeExterns, .one `Vir.GeneratePackage.PackageSet,
+    .one `Vir.GeneratePackage.PackageFormat, .one `Vir.GeneratePackage.PackageIRTags,
+    .one `Vir.GeneratePackage.CachedImports]
+
 /-- Resource data/tools must never depend on the optional runtime carrier. -/
 lean_lib VirResourceCore where
   roots := #[]
