@@ -66,7 +66,7 @@ try {
   const coldLog = build("cold", false);
   assert.match(coldLog, /Built .*CacheFixture[.]Root:vir/);
   const cold = packageSummary();
-  await assertRuntimeResult("cold", "42");
+  await assertRuntimeResult("cold", 42n);
 
   // The facet uses vir_program; npm producers use vir_irpkg. Prepare both
   // executables before removing conventional artifacts, so the cache-only phase
@@ -94,7 +94,7 @@ try {
     const restored = packageSummary();
     assert.deepEqual(restored.contract, cold.contract);
     assert.deepEqual(restored.memberHashes, cold.memberHashes);
-    await assertRuntimeResult("negative restoration control", "42");
+    await assertRuntimeResult("negative restoration control", 42n);
     console.log(
       `expected cache-only failure reproduced; output retained at ${temporary}`,
     );
@@ -107,8 +107,8 @@ try {
     const cachedSetup = setupArtifactIdentity();
     assert.deepEqual(cached.contract, cold.contract);
     assert.deepEqual(cached.memberHashes, cold.memberHashes);
-    await assertRuntimeResult("cache-only", "42");
-    await assertProducerBridge("cache-only", cached, "42", true);
+    await assertRuntimeResult("cache-only", 42n);
+    await assertProducerBridge("cache-only", cached, 42n, true);
 
     const beforeWarm = outputSnapshot();
     const warmLog = build("warm-no-op", false);
@@ -120,7 +120,7 @@ try {
     assert.deepEqual(outputSnapshot(), beforeWarm);
     assert.deepEqual(packageSummary(), cached);
     assertNoConventionalCompiledInputs("warm-no-op");
-    await assertRuntimeResult("warm no-op", "42");
+    await assertRuntimeResult("warm no-op", 42n);
 
     writeFileSync(hiddenSource, hiddenModule(2));
     const changedLog = build("private-body-change", false);
@@ -140,7 +140,7 @@ try {
       cold.memberHashes["CacheFixture.Hidden"],
       "imported private implementation did not invalidate its package member",
     );
-    await assertRuntimeResult("private-body change", "43");
+    await assertRuntimeResult("private-body change", 43n);
 
     moveConventionalBuilds("changed");
     build("changed-cache-only", false);
@@ -149,8 +149,8 @@ try {
     const changedCached = packageSummary();
     assert.deepEqual(changedCached.contract, changed.contract);
     assert.deepEqual(changedCached.memberHashes, changed.memberHashes);
-    await assertRuntimeResult("changed cache-only", "43");
-    await assertProducerBridge("changed-cache-only", changedCached, "43");
+    await assertRuntimeResult("changed cache-only", 43n);
+    await assertProducerBridge("changed-cache-only", changedCached, 43n);
 
     moveConventionalBuilds("changed-cache-only");
     build("restore-control", true);
@@ -159,7 +159,7 @@ try {
     const restored = packageSummary();
     assert.deepEqual(restored.contract, changed.contract);
     assert.deepEqual(restored.memberHashes, changed.memberHashes);
-    await assertRuntimeResult("restoration control", "43");
+    await assertRuntimeResult("restoration control", 43n);
     console.log("VIR Lake cache-only artifact smoke ok");
   }
   succeeded = true;
