@@ -13,8 +13,8 @@ cache miss. HTTPS runtime acquisition uses Lake's standard download operation,
 which needs `curl` and uses its normal host configuration.
 
 The first release is still under review. The Lean-name source is published for
-review in PR217; its matching runtime still needs durable publication before
-this example can be used from a cold checkout. [Qualification and limits](../development/RESOURCE_ACCEPTANCE.md)
+review in PR217 and selects its matching content-named public runtime.
+[Qualification and limits](../development/RESOURCE_ACCEPTANCE.md)
 are recorded separately. When changing the VIR revision, use its `lean-toolchain`
 and runtime lock together.
 

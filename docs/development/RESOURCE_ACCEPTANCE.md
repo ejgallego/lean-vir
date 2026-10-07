@@ -1,8 +1,12 @@
 # Embedded resources: review and acceptance
 
 The Lean-name successor under review in PR217 uses descriptor schema2 and resource compatibility3.
-It needs a matching newly qualified runtime distribution before anonymous cold
-adoption. The version1 public832 asset and all results below remain historical;
+It now selects the [matching public e415 runtime](https://github.com/ejgallego/lean-vir/releases/tag/resource-e415e41a43eccf298b710056efccf6c3d436d5fceb4e130fb06cb09d12d027dd).
+Its exact pack is 1,120,065 bytes, SHA256
+`3910c29e40ee68c3b110355fa1d30dae3029f2b34967269642521fc8409848d7`.
+Anonymous public download and independent native cold/warm/offline acquisition
+passed; owning-library and downstream adoption qualification are separate.
+The version1 public832 asset and all results below remain historical;
 they do not qualify changed loader bytes or the new schema.
 
 The prior integration used Lean 4.34.0 and a publicly downloadable exact prebuilt

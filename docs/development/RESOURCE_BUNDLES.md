@@ -282,8 +282,8 @@ The runtime selection is `vir-resources/runtime.json` in VIR. It selects one
 content ID and acquisition source; `vir-resources/compatibility.json` independently
 defines the Lean revision / VIR version pair shared by program production. The
 version-2 baseline has a matching published runtime. This successor selects the
-qualified version-3 e415 bundle as available-only (`source: "-"`); its durable
-publication is still required before anonymous cold application builds. A runtime
+qualified [version-3 e415 bundle](https://github.com/ejgallego/lean-vir/releases/tag/resource-e415e41a43eccf298b710056efccf6c3d436d5fceb4e130fb06cb09d12d027dd)
+from its content-named public release, without credentials or supplied bytes. A runtime
 must match the selected profile; the published version-2 bundle is not a fallback.
 Earlier releases and their frozen consumers remain unchanged.
 
