@@ -282,10 +282,14 @@ The runtime selection is `vir-resources/runtime.json` in VIR. It selects one
 content ID and acquisition source; `vir-resources/compatibility.json` independently
 defines the Lean revision / VIR version pair shared by program production. The
 version-2 baseline has a matching published runtime. This successor selects the
-qualified version-3 d72 bundle as available-only (`source: "-"`); its durable
+qualified version-3 e415 bundle as available-only (`source: "-"`); its durable
 publication is still required before anonymous cold application builds. A runtime
 must match the selected profile; the published version-2 bundle is not a fallback.
 Earlier releases and their frozen consumers remain unchanged.
+
+This pack includes the landed managed-runtime split and the JavaScript response
+MIME correction. Its Wasm bytes are unchanged; the earlier d72 pack does not
+contain that correction.
 
 After selecting a matching public, content-addressed runtime, missing local bytes
 are acquired anonymously over HTTPS and verified before installation. A warm
@@ -405,6 +409,10 @@ try {
 ```
 
 All three URLs come from the host's published bundle plan, not from build paths.
+For declared `text/javascript` files, responses may use `text/javascript` or
+`application/javascript` (with optional parameters). Other declared media types,
+including `application/wasm`, still require their matching response type. Payload
+length and hash checks are unchanged.
 The two manifest arguments must be explicit same-origin HTTP(S) `URL` objects,
 without credentials, query strings or fragments. The page must provide WebCrypto
 SHA-256 in a secure context: use HTTPS for deployment, or trusted localhost/loopback
