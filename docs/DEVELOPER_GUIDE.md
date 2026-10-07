@@ -20,7 +20,8 @@ describes supported mappings and gaps.
 | Interpreter shim      | `wasm/upstream_shim/`                                                        | Upstream interpreter integration, package provider, object ABI, and resource table/boxing/finalization. |
 | Managed runtime       | `web/src/runtime/factory-core.js`, `web/src/runtime/managed-core.js`        | Instantiation, one-generation package loading, calls, and disposal.                         |
 | Object transport      | `web/src/runtime/object-core.js`, `web/src/runtime/primitive-values.js`     | Shared ownership, opaque Js/JSL transport and primitive conversion.                         |
-| Optional conversion   | `web/src/runtime/object-values.js`, `web/src/runtime/host-state.js`         | Structural/syntax/callable conversion and host-import dispatch.                             |
+| Shared host state     | `web/src/runtime/host-state.js`                                           | Host-import dispatch, transactions, JSL tracking and provider cleanup.                       |
+| Optional conversion   | `web/src/runtime/object-values.js`                                       | Structural/syntax conversion and automatic callable conversion/invocation.                   |
 | JS boundary           | `web/src/host-boundary.js`                                                   | Host-call rollback transactions and reference-type capability checks.                       |
 | Active host lifecycle | `web/src/host/vir-active-host-bindings.js`                                   | Shared lifecycle plus timer and frame teardown.                                             |
 | Browser providers     | `web/src/vir-host-bindings.js`, `web/src/host/vir-infoview-host-bindings.js` | Browser targets and the repository-owned infoview protocol.                                 |

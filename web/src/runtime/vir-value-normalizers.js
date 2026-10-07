@@ -12,15 +12,6 @@ import {
 } from "./vir-codec.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
 
-export {
-  normalizeDecimal,
-  normalizeBoundedUnsignedDecimal,
-  normalizeBoundedUnsignedBigInt,
-  normalizeFloat,
-  normalizeInteger,
-  requireByteArrayBytes,
-} from "./primitive-value-normalizers.js";
-
 const customInductiveNormalizationPlanCache = new WeakMap();
 
 export function normalizeArray(value, label) {

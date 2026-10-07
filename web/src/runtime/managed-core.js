@@ -16,11 +16,7 @@ import {
 } from "./cleanup.js";
 import { PrimitiveObjectRuntime } from "./primitive-values.js";
 import { RESOURCE_ROOT_EXPORTS } from "./object-abi-exports.js";
-import {
-  asBytes,
-  requireFunctionArgs,
-  requireFunctionResult,
-} from "./vir-codec.js";
+import { asBytes } from "./vir-codec.js";
 
 const runtimeBoundaries = new WeakMap();
 const textDecoder = new TextDecoder();
@@ -529,86 +525,8 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     this.liveCallbacks.delete(callback);
   }
 
-  callClosure(rootId, type, args) {
-    this.requireLiveRuntime();
-    this.requireFunction("vir_closure_call_objects");
-    const fnArgs = requireFunctionArgs(type, "callback");
-    // Like ordinary JS formal parameters, ignore extra arguments and read
-    // missing arguments as undefined. Each declared boundary view still
-    // performs its normal conversion/check when lowered into Lean.
-    const argObjs = [];
-    try {
-      fnArgs.forEach((arg, index) => {
-        argObjs.push(
-          this.makeObjectValue(
-            arg.type,
-            args[index],
-            `callback argument ${arg.name}`,
-          ),
-        );
-      });
-      return this.callClosureObjects(rootId, type, argObjs);
-    } finally {
-      this.releaseOwnedObjects(argObjs);
-    }
-  }
-
-  callClosureObjects(rootId, type, argObjs) {
-    let argvPtr = 0;
-    let resultObj = 0;
-    try {
-      if (this.hostState?.callError) throw this.hostState.callError;
-      if (argObjs.length !== 0) {
-        argvPtr = this.allocByteLength(
-          argObjs.length * 4,
-          "callback argv pointer array",
-        );
-        this.writePointerArray(argvPtr, argObjs);
-      }
-      try {
-        const argc = argObjs.length;
-        // The consuming ABI owns arguments from entry, including trap paths.
-        argObjs.length = 0;
-        resultObj = this.exports.vir_closure_call_objects(
-          rootId,
-          argvPtr,
-          argc,
-        );
-      } catch (error) {
-        const hostError = this.hostState?.takeCallError();
-        throw hostError ?? error;
-      }
-      const hostError = this.hostState?.takeCallError();
-      if (hostError) {
-        throw hostError;
-      }
-      if (resultObj === 0) {
-        throw new Error(this.lastClosureCallError() || "closure call failed");
-      }
-      return this.liftObjectValue(
-        requireFunctionResult(type, "callback"),
-        resultObj,
-        "callback result",
-      );
-    } finally {
-      if (argvPtr !== 0) {
-        this.freeBytes(argvPtr);
-      }
-      if (resultObj !== 0) {
-        this.exports.vir_obj_dec(resultObj);
-      }
-    }
-  }
-
   releaseClosure(rootId) {
     this.exports.vir_closure_release?.(rootId);
-  }
-
-  lastClosureCallError() {
-    const len = this.exports.vir_closure_call_error_size?.() ?? 0;
-    return len === 0
-      ? ""
-      : this.readWasmString(this.exports.vir_closure_call_error(), len);
   }
 
   dispose() {

@@ -22,23 +22,25 @@ import {
   objectLayoutSlotsFromPlan,
   readObjectScalarField as readObjectScalarFieldValue,
   taggedUnionField,
-  trivialStructureField,
   writeObjectScalarField,
 } from "./object-abi.js";
 import {
   enumValue,
   flattenStructureSubobjects,
-  normalizeBoundedUnsignedDecimal,
-  normalizeBoundedUnsignedBigInt,
   normalizeArray,
   normalizeCustomInductive,
-  normalizeDecimal,
   normalizeEnum,
   normalizeOption,
   normalizePair,
   normalizeStructure,
   normalizeTaggedUnion,
 } from "./vir-value-normalizers.js";
+import {
+  normalizeBoundedUnsignedDecimal,
+  normalizeBoundedUnsignedBigInt,
+  normalizeDecimal,
+} from "./primitive-value-normalizers.js";
+import { trivialStructureField } from "./object-boundary.js";
 import { requireString } from "./object-core.js";
 
 // The pinned kernel stores index + 1 in a 20-bit loose-bound-variable range.
@@ -48,6 +50,84 @@ const MAX_EXPR_BVAR_INDEX = 1048574n;
 // runtime. Primitive conversions and opaque Js/JSL ownership stay inherited.
 export function withObjectValues(Base) {
   return class extends Base {
+    callClosure(rootId, type, args) {
+      this.requireLiveRuntime();
+      this.requireFunction("vir_closure_call_objects");
+      const fnArgs = requireFunctionArgs(type, "callback");
+      // Like ordinary JS formal parameters, ignore extra arguments and read
+      // missing arguments as undefined. Each declared boundary view still
+      // performs its normal conversion/check when lowered into Lean.
+      const argObjs = [];
+      try {
+        fnArgs.forEach((arg, index) => {
+          argObjs.push(
+            this.makeObjectValue(
+              arg.type,
+              args[index],
+              `callback argument ${arg.name}`,
+            ),
+          );
+        });
+        return this.callClosureObjects(rootId, type, argObjs);
+      } finally {
+        this.releaseOwnedObjects(argObjs);
+      }
+    }
+
+    callClosureObjects(rootId, type, argObjs) {
+      let argvPtr = 0;
+      let resultObj = 0;
+      try {
+        if (this.hostState?.callError) throw this.hostState.callError;
+        if (argObjs.length !== 0) {
+          argvPtr = this.allocByteLength(
+            argObjs.length * 4,
+            "callback argv pointer array",
+          );
+          this.writePointerArray(argvPtr, argObjs);
+        }
+        try {
+          const argc = argObjs.length;
+          // The consuming ABI owns arguments from entry, including trap paths.
+          argObjs.length = 0;
+          resultObj = this.exports.vir_closure_call_objects(
+            rootId,
+            argvPtr,
+            argc,
+          );
+        } catch (error) {
+          const hostError = this.hostState?.takeCallError();
+          throw hostError ?? error;
+        }
+        const hostError = this.hostState?.takeCallError();
+        if (hostError) {
+          throw hostError;
+        }
+        if (resultObj === 0) {
+          throw new Error(this.lastClosureCallError() || "closure call failed");
+        }
+        return this.liftObjectValue(
+          requireFunctionResult(type, "callback"),
+          resultObj,
+          "callback result",
+        );
+      } finally {
+        if (argvPtr !== 0) {
+          this.freeBytes(argvPtr);
+        }
+        if (resultObj !== 0) {
+          this.exports.vir_obj_dec(resultObj);
+        }
+      }
+    }
+
+    lastClosureCallError() {
+      const len = this.exports.vir_closure_call_error_size?.() ?? 0;
+      return len === 0
+        ? ""
+        : this.readWasmString(this.exports.vir_closure_call_error(), len);
+    }
+
     makeObjectStringConstructor(
       constructorName,
       value,

@@ -10,8 +10,10 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as wait } from "node:timers/promises";
-import { createPrimitiveRuntimeFactory } from "../../web/src/runtime/primitive-factory.js";
-import { VIR_HOST_DISPOSE } from "../../web/src/runtime/factory.js";
+import {
+  createPrimitiveRuntimeFactory,
+  VIR_HOST_DISPOSE,
+} from "../../web/src/runtime/primitive-factory.js";
 import { createCommonHostBindings } from "../../web/src/host/vir-common-host-bindings.js";
 import { generateIrPackage } from "./shared.mjs";
 import { collectUntil } from "./generation-gc-cases.js";

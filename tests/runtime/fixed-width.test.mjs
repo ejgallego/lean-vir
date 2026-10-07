@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
-import { normalizeDecimal, normalizeBoundedUnsignedDecimal } from "../../web/src/runtime/vir-value-normalizers.js";
+import { normalizeDecimal, normalizeBoundedUnsignedDecimal } from "../../web/src/runtime/primitive-value-normalizers.js";
 
 test("direct fixed-width boxing reports null constructor results as lowering failures", () => {
   const runtime = Object.create(VirRuntime.prototype);

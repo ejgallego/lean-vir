@@ -12,23 +12,13 @@ import {
   requireTypeField,
 } from "./vir-codec.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
+import { enumValue, normalizeEnum } from "./vir-value-normalizers.js";
 import {
-  enumValue,
   normalizeBoundedUnsignedBigInt,
-  normalizeEnum,
   normalizeFloat,
   normalizeInteger,
-} from "./vir-value-normalizers.js";
-export { OBJECT_VALUE_EXPORTS } from "./object-abi-exports.js";
+} from "./primitive-value-normalizers.js";
 import { trivialStructureField } from "./object-boundary.js";
-export {
-  objectTypeNeedsBoxedBoundary,
-  trivialStructureField,
-} from "./object-boundary.js";
-export {
-  directJsArgumentSupported,
-  directJsResultSupported,
-} from "./js-value-support.js";
 
 const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;

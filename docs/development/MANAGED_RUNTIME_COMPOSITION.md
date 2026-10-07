@@ -21,7 +21,8 @@ Both compositions share these modules:
 
 The full `core.js` composition adds `object-values.js`: arrays, lists, options,
 pairs, structures, inductives, `Lean.Expr` and automatic Lean-function conversion
-to JavaScript callables. Its primitive cases delegate to the shared implementation.
+to JavaScript callables, including their typed invocation. Its primitive cases
+delegate to the shared implementation.
 Owned collection and constructor builders also stay in this optional layer.
 The internal `primitive-factory.js` imports none of those structural converters
 or their layout/normalization modules. It uses the same factory and lifecycle;
@@ -53,6 +54,8 @@ execution. Package admission still validates the complete binary contract and
 metadata; omitting converters does not relax it. Ordinary managed callbacks
 retain their existing invocation metadata and closure-root protocol in the full
 composition. This extraction does not unify or remove that protocol.
+Callback root tracking and terminal retirement stay in the shared managed core;
+the optional layer invokes the converted functions through the existing protocol.
 Host imports that receive Lean callbacks as ordinary JavaScript functions also
 need the full callable converter. A primitive JSL client can instead schedule a
 JavaScript closure that calls its explicit Lean `invoke...` boundary with the
@@ -65,7 +68,8 @@ cycle collection or post-trap interpreter re-entry. The existing four permitted
 retirement-safe Wasm exports and native-cleanup quarantine are unchanged.
 
 `tests/runtime/entry-composition.test.mjs` checks that the primitive import graph
-omits optional conversion modules and retains shared admission/lifecycle modules.
+omits optional conversion modules. `tests/runtime/primitive-composition.test.mjs`
+checks that both compositions share their ownership and ordinary call methods.
 The existing unit and Wasm smoke suites exercise the full composition. SDK
 payloads must include every extracted module needed by the existing entries.
 `tests/runtime/managed-core-smoke.mjs` compiles a small Lean fixture and exercises
