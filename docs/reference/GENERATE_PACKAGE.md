@@ -6,6 +6,11 @@ Non-module developments and source-file package loading are unsupported.
 Use [Packages](../guides/PACKAGES.md) for commands, facets and caches, and the
 [format reference](IRPKG_FORMAT.md) for binary and manifest schemas.
 
+Application package generation belongs to the [support scope](../SUPPORT.md).
+This reference also covers experimental editor snapshot integration. The
+generator's accepted signatures describe implementation capabilities rather than
+an official support commitment for every automatic conversion.
+
 ## Entry points and selection
 
 [`tools/GeneratePackage.lean`](../../tools/GeneratePackage.lean) parses CLI targets

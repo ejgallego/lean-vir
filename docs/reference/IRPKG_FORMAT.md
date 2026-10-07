@@ -242,6 +242,11 @@ and [host bindings](HOST_BINDINGS.md) for authoring and lifetime rules.
 
 ## Interface descriptors
 
+The table below specifies accepted descriptor shapes, including those used by
+experimental automatic conversion of records and custom inductives. Official
+support follows the [support scope](../SUPPORT.md); accepting a descriptor does
+not extend that promise.
+
 Every descriptor has `type` (the applied Lean type label) and `interfaceTag`.
 Compound descriptors also have the `kind` and payload below. The numeric tags
 are package ABI, owned by

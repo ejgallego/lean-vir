@@ -281,10 +281,11 @@ must not import that carrier.
 The runtime selection is `vir-resources/runtime.json` in VIR. It selects one
 content ID and acquisition source; `vir-resources/compatibility.json` independently
 defines the Lean revision / VIR version pair shared by program production. The
-current lock selects the matching published version 2 runtime. A runtime bundle
-must match that profile; acquisition rejects an incompatible selection.
-Publishing and selecting a matching runtime are separate maintainer operations,
-and earlier releases remain unchanged.
+version-2 baseline has a matching published runtime. This successor selects the
+qualified version-3 d72 bundle as available-only (`source: "-"`); its durable
+publication is still required before anonymous cold application builds. A runtime
+must match the selected profile; the published version-2 bundle is not a fallback.
+Earlier releases and their frozen consumers remain unchanged.
 
 After selecting a matching public, content-addressed runtime, missing local bytes
 are acquired anonymously over HTTPS and verified before installation. A warm
