@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collection-bindings.js";
-import { ObjectValueRuntime } from "../../web/src/runtime/object-values.js";
+import { VirRuntime } from "../../web/src/runtime/core.js";
 
 test("literal construction defines own data properties; ordinary assignment and push stay native", () => {
   const b = createJsCollectionHostBindings();
@@ -91,7 +91,7 @@ test("batched JSX props do not consult a mutable array iterator", () => {
 test("structural array lifting creates dense own elements and releases borrowed fields on failure", () => {
   const released = [];
   const pointers = new Map([[1, [11, 12, 13]]]);
-  const runtime = Object.create(ObjectValueRuntime.prototype);
+  const runtime = Object.create(VirRuntime.prototype);
   runtime.exports = {
     vir_obj_array_size: pointer => pointers.get(pointer).length,
     vir_obj_array_get: (pointer, index) => pointers.get(pointer)[index],

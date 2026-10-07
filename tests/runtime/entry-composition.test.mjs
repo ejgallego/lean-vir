@@ -20,8 +20,34 @@ test("Node runtime excludes browser and Infoview providers", async () => {
     platform: "neutral",
   });
   for (const input of Object.keys(result.metafile.inputs)) {
-    assert.doesNotMatch(input, /vir-(?:dom|active|infoview|react).*bindings|vir-host-bindings\.js|web\/app\//);
+    assert.doesNotMatch(
+      input,
+      /vir-(?:dom|active|infoview|react).*bindings|vir-host-bindings\.js|web\/app\//,
+    );
     assert.doesNotMatch(input, /node_modules/);
   }
   assert.ok(result.metafile.inputs["web/src/host/vir-common-host-bindings.js"]);
+});
+
+test("internal primitive composition excludes structural codecs and browser providers", async () => {
+  const result = await build({
+    absWorkingDir: repositoryRoot,
+    entryPoints: ["web/src/runtime/primitive-factory.js"],
+    bundle: true,
+    write: false,
+    metafile: true,
+    format: "esm",
+    platform: "neutral",
+  });
+  const inputs = result.metafile.inputs;
+  for (const input of Object.keys(inputs)) {
+    assert.doesNotMatch(
+      input,
+      /\/(?:object-values|object-abi|vir-value-normalizers)\.js$/,
+    );
+    assert.doesNotMatch(
+      input,
+      /vir-(?:dom|active|infoview|react).*bindings|web\/app\//,
+    );
+  }
 });

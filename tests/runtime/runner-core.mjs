@@ -160,6 +160,7 @@ export const runtimeTests = Object.freeze(
       group: "lean",
     },
     { id: "sdk-import", file: "sdk-import-smoke.mjs", group: "lean" },
+    { id: "managed-core", file: "managed-core-smoke.mjs", group: "lean", nodeArgs: ["--expose-gc"] },
   ].map(freezeRuntimeTest),
 );
 
