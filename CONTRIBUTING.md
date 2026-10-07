@@ -10,6 +10,16 @@ cooperative users following documented workflows, trusted generated artifacts,
 and explicit producer/consumer contracts. Do not infer an adversarial admission
 or Lean kernel-soundness guarantee from artifact validation.
 
+## API changes
+
+Maintain the current API and artifact contracts without legacy or backward
+compatibility layers. When replacing an interface, remove the retired code,
+aliases and fallback paths; update repository callers, documentation and tests
+together. A previously documented API alone is not a reason to retain it.
+Keep checks that enforce the current contract and implementations required by
+current supported hosts. Applications must refresh their build and deployed
+assets together; see [matching runtime assets](docs/guides/JS_API.md#matching-runtime-assets).
+
 ## Branches
 
 - Use `feat/<slug>` for user-facing or architectural changes.

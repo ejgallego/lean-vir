@@ -25,7 +25,7 @@ try {
 
   const max64 = (1n << 64n) - 1n;
   const max32 = (1n << 32n) - 1n;
-  const expected = { wide: ["0", String(1n << 63n), String(max64)], indices: ["0", String(1n << 31n), String(max32)] };
+  const expected = { wide: [0n, 1n << 63n, max64], indices: [0, Number(1n << 31n), Number(max32)] };
   let rejectHostResult = null;
   let conversions = 0;
   const runtime = await createVirRuntime({
@@ -46,18 +46,30 @@ try {
     assert.ok(runtime.interfaceManifest.hostImports.every(entry => entry.boundary === "explicitConversion"));
     const wide = runtime.call("wideCallback", 1);
     const index = runtime.call("indexCallback", 1);
-    for (const [callback, max, high] of [[wide, max64, 1n << 63n], [index, max32, 1n << 31n]]) {
+    for (const [callback, max, high, resultType] of [
+      [wide, max64, 1n << 63n, "bigint"], [index, max32, 1n << 31n, "number"],
+    ]) {
       for (const input of [0n, high, max]) {
         const result = callback(input);
-        assert.equal(result, ((input + 1n) & max).toString());
-        assert.equal(typeof result, "string");
+        assert.equal(result, resultType === "number" ? Number((input + 1n) & max) : (input + 1n) & max);
+        assert.equal(typeof result, resultType);
       }
       for (const input of [-1n, max + 1n]) assert.throws(() => callback(input), /non-negative|out of range/);
-      assert.equal(callback(max), "0");
+      assert.equal(callback(max), resultType === "number" ? 0 : 0n);
     }
+    const huge = (1n << 256n) + 3n;
+    const nat = runtime.call("natCallback", 1);
+    const int = runtime.call("intCallback", 1);
+    for (const input of [0n, huge, huge.toString()]) {
+      assert.equal(nat(input), BigInt(input) + 1n);
+      assert.equal(int(input), BigInt(input) + 1n);
+    }
+    assert.equal(int(-huge), 1n - huge);
+    assert.throws(() => nat(-1n), /non-negative/);
     runtime.releaseLiveCallbacks();
     assert.equal(runtime.liveCallbacks.size, 0);
     assert.throws(() => wide(0), /disposed runtime/);
+    assert.throws(() => nat(0), /disposed runtime/);
 
     const input = { wide: [0n, 1n << 63n, max64], indices: [0n, 1n << 31n, max32] };
     const roots = runtime.hostState.resourceRootCounts().active;

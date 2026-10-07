@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
 import { createVirRuntime, fetchBytes } from "../src/vir-runtime.js";
+import { formatResult } from "./pages/page-utils.js";
 
 const output = document.querySelector("#runtime-example-output");
 let vir = null;
@@ -40,7 +41,7 @@ try {
     leanToBrowserTitle: hostVir.call("HostInterop.titleHandshake", "runtime example"),
   };
 
-  output.textContent = JSON.stringify(results, null, 2);
+  output.textContent = formatResult(results);
 } catch (error) {
   output.textContent = error instanceof Error ? error.stack : String(error);
   throw error;

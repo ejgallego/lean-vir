@@ -335,8 +335,8 @@ Tags named `v<package.json version>` trigger
 ABI versions, builds the SDK, imports its packaged modules and uploads the
 archive plus a content-named runtime pack to the matching release. Runtime pack
 publication uploads absent assets, verifies and reuses byte-identical assets on
-reruns, and rejects different bytes without replacing them. The retained legacy
-SDK archive upload remains replaceable. Create the tag from the final merged commit
+reruns, and rejects different bytes without replacing them. The SDK archive
+upload remains replaceable. Create the tag from the final merged commit
 so its manifest identifies the revision clients use. Before the tag exists,
 select `VIR_SDK_ARCHIVE` or the exact-commit artifact path; the zero-argument
 `:virSdk` facet targets the tagged release. See

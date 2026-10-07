@@ -88,13 +88,13 @@ public initialize Lifecycle.value : Nat ← do
     try {
       assert.equal(runtime.packageInfo.count, info.package.declarationCount);
       assert.equal(runtime.packageInfo.packageCount, 2);
-      assert.equal(runtime.call("Lifecycle.answer"), "1");
-      assert.equal(runtime.call("Lifecycle.read"), "1");
+      assert.equal(runtime.call("Lifecycle.answer"), 1n);
+      assert.equal(runtime.call("Lifecycle.read"), 1n);
       assert.throws(() => runtime.call("Lifecycle.failure"), /IO action failed:.*lifecycle failure/);
-      assert.equal(runtime.call("Lifecycle.read"), "1", "ordinary IO failure must preserve initialized globals");
+      assert.equal(runtime.call("Lifecycle.read"), 1n, "ordinary IO failure must preserve initialized globals");
       assert.equal(runtime.exports.vir_finish_ir_package_set(), 0);
       assert.match(runtime.lastPackageError(), /not prepared/);
-      assert.equal(runtime.call("Lifecycle.read"), "1", "invalid finish must neither rerun nor retire initializers");
+      assert.equal(runtime.call("Lifecycle.read"), 1n, "invalid finish must neither rerun nor retire initializers");
     } finally { runtime.dispose(); }
   });
 
@@ -203,8 +203,8 @@ public initialize Lifecycle.value : Nat ← do
         Uint8Array.from([...u32(2), ...hostRecords])), retryManifest);
       const recovered = await factory.createRuntime({ irPackageSet: [retry] });
       try {
-        assert.equal(recovered.call("Lifecycle.answer"), "1");
-        assert.equal(recovered.call("Lifecycle.read"), "1");
+        assert.equal(recovered.call("Lifecycle.answer"), 1n);
+        assert.equal(recovered.call("Lifecycle.read"), 1n);
         assert.deepEqual(hostCalls, ["A"], "the failed initializer must have called host A");
         hostCalls.length = 0;
         recovered.call("Lifecycle.readA");

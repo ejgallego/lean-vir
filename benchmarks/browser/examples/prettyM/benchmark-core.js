@@ -345,7 +345,7 @@ function deserializeFormat(json) {
  * The object ABI uses Lean's generated constructor field names rather than
  * the compact JSON node names: `nest` stores `{ indent, f }`, `append` stores
  * `{ arg1, arg2 }`, `group` stores `{ arg1, behavior }`, and `tag` stores
- * `{ arg1, arg2 }`. Nat/Int fields cross this ABI as decimal strings.
+ * `{ arg1, arg2 }`. Nat/Int fields accept exact decimal-string inputs.
  * @param {*} json
  * @return {*}
  */

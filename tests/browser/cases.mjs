@@ -177,7 +177,7 @@ export const browserRunnerCaseSpecs = [
   "level": 3,
   "score16": 32,
   "visits": 403,
-  "quota": "9",
+  "quota": 9,
   "checksum": "6005",
   "tier": "elite",
   "note": "ok!"

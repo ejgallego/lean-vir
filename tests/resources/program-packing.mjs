@@ -314,7 +314,7 @@ const descriptorText = first
   .toString("utf8");
 const changedText = replaceFixture(descriptorText,
   `"virVersion":${descriptor.compatibility.virVersion}`,
-  `"virVersion":2`,
+  `"virVersion":${descriptor.compatibility.virVersion + 1}`,
 );
 assert.notEqual(changedText, descriptorText, "compatibility negative must change virVersion");
 assert.equal(changedText.length, descriptorText.length);

@@ -141,7 +141,7 @@ try {
       "Vir.Fixtures.InterpreterConstantCache.denseLookupValue",
       32770,
     ),
-    "1",
+    1n,
     "the packaged implementation must use the dense-table implemented_by body",
   );
 

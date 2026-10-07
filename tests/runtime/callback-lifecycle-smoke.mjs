@@ -27,7 +27,7 @@ const runtime = await createVirRuntime({
   },
 });
 
-assert.equal(runtime.call("HostInterop.callbackRoundTrip", 3), "10");
+assert.equal(runtime.call("HostInterop.callbackRoundTrip", 3), 10n);
 assert.equal(typeof retainedCallback, "function");
 assert.deepEqual(Object.keys(retainedCallback), []);
 assert.equal(Object.hasOwn(retainedCallback, "retain"), false);
@@ -82,7 +82,7 @@ const extraArgumentRuntime = await createVirRuntime({
     "test.recordNat": () => undefined,
   },
 });
-assert.equal(extraArgumentRuntime.call("HostInterop.callbackRoundTrip", 1), "8");
+assert.equal(extraArgumentRuntime.call("HostInterop.callbackRoundTrip", 1), 8n);
 assert.equal(extraArgumentRuntime.liveCallbacks.size, 1);
 assert.equal(extraArgumentCallback(2n, undefined), 9n);
 extraArgumentRuntime.dispose();

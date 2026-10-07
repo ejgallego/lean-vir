@@ -57,7 +57,7 @@ export async function makeGeneration(
     "test.recordNat": () => undefined,
   });
   check(
-    runtime.call("HostInterop.callbackRoundTrip", 3) === "10",
+    runtime.call("HostInterop.callbackRoundTrip", 3) === 10n,
     "real Lean callback setup",
   );
   const callback = capture.callback;
@@ -225,7 +225,7 @@ async function returnedCallbacks(createRuntime) {
       let values = runtime[method]("HostInterop.callbackResults", 7);
       // callTimed returns an envelope; call returns the value directly.
       if (method === "callTimed") values = values.value;
-      check(values[0](4) === "11" && values[1](4) === "12",
+      check(values[0](4) === 11n && values[1](4) === 12n,
         "returned Lean callbacks preserve captured values");
       values = null;
       await collectUntil(() => runtime.liveCallbacks.size === 0,

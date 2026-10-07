@@ -229,10 +229,10 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(nullableOfImport?.boundary, "hostResource");
   assert.equal(hostRuntime.call("freshEchoBang", "ok"), "ok!");
   assert.equal(hostRuntime.call("freshTitleRoundtrip", "Lean.Vir"), "Lean.Vir");
-  assert.equal(hostRuntime.call("freshReactValue"), "7");
-  assert.equal(hostRuntime.call("freshRuntimeValue"), "9");
-  assert.equal(hostRuntime.call("freshRuntimeInDom"), "10");
-  assert.equal(hostRuntime.call("freshRuntimeInReact"), "11");
+  assert.equal(hostRuntime.call("freshReactValue"), 7n);
+  assert.equal(hostRuntime.call("freshRuntimeValue"), 9n);
+  assert.equal(hostRuntime.call("freshRuntimeInDom"), 10n);
+  assert.equal(hostRuntime.call("freshRuntimeInReact"), 11n);
   assert.deepEqual(hostRuntime.call("freshElementRoundtrip", "element"), {
     fst: "element",
     snd: "element!",
@@ -285,7 +285,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const jsArrayAlias = jsObjectRuntime.call("freshJsIdNat", jsArray);
   assert.equal(jsArrayAlias, jsArray);
   assert.deepEqual(jsArray, [10, 20, 30]);
-  assert.equal(jsObjectRuntime.call("freshJsLengthNatArray", jsArray), "3");
+  assert.equal(jsObjectRuntime.call("freshJsLengthNatArray", jsArray), 3n);
   for (const [target, prefix, arity, effect] of [
     ["test.js.proofId", 3, 5, "runtime"],
     ["test.js.pureProofId", 2, 3, "pure"],
@@ -377,7 +377,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     customJsValueRuntime.call("Vir.Fixtures.CustomJsValue.makePayload"),
     {
       name: "custom!",
-      count: "3",
+      count: 3n,
     },
   );
 

@@ -1196,6 +1196,10 @@ export class ObjectValueRuntime {
     return this.readWasmString(data, len);
   }
 
+  readObjectNat(obj) {
+    return BigInt(this.readObjectDecimal(obj, "vir_obj_nat_decimal"));
+  }
+
   readObjectName(obj) {
     const data = this.exports.vir_obj_name_string(obj);
     const len = this.exports.vir_obj_name_string_size();
@@ -1252,7 +1256,7 @@ export class ObjectValueRuntime {
       case 0:
         return this.withOwnedObjectField(obj, 0, label, (index) => ({
           kind: "bvar",
-          index: this.readObjectDecimal(index, "vir_obj_nat_decimal"),
+          index: this.readObjectNat(index),
         }));
       case 1:
         return this.withOwnedObjectField(obj, 0, label, (name) => ({
@@ -1348,7 +1352,7 @@ export class ObjectValueRuntime {
           ([typeName, index, structure]) => ({
             kind: "proj",
             typeName: this.readObjectName(typeName),
-            index: this.readObjectDecimal(index, "vir_obj_nat_decimal"),
+            index: this.readObjectNat(index),
             struct: this.liftObjectExpr(structure, `${label}.struct`),
           }),
         );
@@ -1423,7 +1427,7 @@ export class ObjectValueRuntime {
       case 0:
         return this.withOwnedObjectField(obj, 0, label, (value) => ({
           kind: "nat",
-          value: this.readObjectDecimal(value, "vir_obj_nat_decimal"),
+          value: this.readObjectNat(value),
         }));
       case 1:
         return this.withOwnedObjectField(obj, 0, label, (value) => ({
@@ -1462,18 +1466,18 @@ export class ObjectValueRuntime {
       case INTERFACE_TAG.SIMPLE_ENUM:
         return enumValue(type, this.readObjectScalar(obj, label));
       case INTERFACE_TAG.NAT:
-        return this.readObjectDecimal(obj, "vir_obj_nat_decimal");
+        return this.readObjectNat(obj);
       case INTERFACE_TAG.INT:
-        return this.readObjectDecimal(obj, "vir_obj_int_decimal");
+        return BigInt(this.readObjectDecimal(obj, "vir_obj_int_decimal"));
       case INTERFACE_TAG.STRING:
         return this.readObjectString(obj);
       case INTERFACE_TAG.UINT32:
         return this.exports.vir_obj_uint32_value(obj) >>> 0;
       case INTERFACE_TAG.UINT64:
-        return BigInt.asUintN(64, this.exports.vir_obj_uint64_value(obj)).toString();
+        return BigInt.asUintN(64, this.exports.vir_obj_uint64_value(obj));
       case INTERFACE_TAG.USIZE:
         this.requireWasm32USize();
-        return String(this.exports.vir_obj_usize_value(obj) >>> 0);
+        return this.exports.vir_obj_usize_value(obj) >>> 0;
       case INTERFACE_TAG.BYTE_ARRAY:
         return this.readObjectByteArray(obj);
       case INTERFACE_TAG.FLOAT:
@@ -1788,7 +1792,7 @@ export class ObjectValueRuntime {
         }
       }
       case "usize":
-        return this.readObjectUSizeField(obj, field.layout.index, label);
+        return this.readObjectUSizeField(owner, obj, fieldPlan.index, label);
       case "scalar":
         return this.readObjectScalarField(
           owner,
@@ -1803,12 +1807,14 @@ export class ObjectValueRuntime {
     }
   }
 
-  readObjectUSizeField(obj, index, label) {
-    const data = this.exports.vir_obj_ctor_usize_decimal(obj, index);
+  readObjectUSizeField(owner, obj, index, label) {
+    this.requireWasm32USize();
+    const data = this.exports.vir_obj_ctor_scalar_data(obj, 0);
     if (data === 0) {
-      throw new Error(`${label} USize field ${index} is unavailable`);
+      throw new Error(`${label} USize field ${owner.objectFieldCount + index} is unavailable`);
     }
-    return this.readWasmString(data, this.exports.vir_obj_decimal_size());
+    const fields = new DataView(this.exports.memory.buffer, data, owner.usizeFieldCount * 4);
+    return fields.getUint32(index * 4, true);
   }
 
   readObjectScalarField(owner, obj, type, layout, label, offset = null) {

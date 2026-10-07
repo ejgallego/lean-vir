@@ -381,7 +381,7 @@ for (const inputKind of ["fetched", "bytes"]) {
       runtime.packageMetadata.generator,
       manifest.metadata.generator,
     );
-    assert.equal(runtime.call("fib", 12), "144");
+    assert.equal(runtime.call("fib", 12), 144n);
     if (inputKind === "fetched") {
       assert.equal(
         runtime.packageInfo.packageSet.members[0].sha256,

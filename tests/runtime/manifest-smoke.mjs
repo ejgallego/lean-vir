@@ -528,7 +528,7 @@ assert.throws(
 );
 const fibEntry = runtime.findManifestEntry("fib");
 assert.notEqual(fibEntry, null);
-assert.equal(runtime.call("fib", 12), "144");
+assert.equal(runtime.call("fib", 12), 144n);
 // Installed metadata is an owned, deeply frozen JSON tree. In particular,
 // mutating a descriptor after the first call cannot stale a cached call plan.
 for (const manifest of [
@@ -555,20 +555,20 @@ assert.throws(() => {
 assert.throws(() => {
   hostRuntime.interfaceManifest.hostImports[0].target = "unknown";
 }, TypeError);
-assert.equal(runtime.call("fib", 12), "144");
+assert.equal(runtime.call("fib", 12), 144n);
 // Freezing metadata must not freeze the real objects passed through host calls.
 assert.equal(Object.isFrozen(testDocument), false);
 assert.ok(
   (runtime.entryCallCache.get(fibEntry)?.callSlot ?? 0) > 0,
   "expected fib call slot to be cached",
 );
-assert.equal(runtime.exportsByName.fib(12), "144");
+assert.equal(runtime.exportsByName.fib(12), 144n);
 assert.equal(
   hostRuntime.call("HostInterop.titleHandshake", "runtime smoke"),
   "Lean VIR host: runtime smoke",
 );
-assert.equal(hostRuntime.call("HostInterop.callbackRoundTrip", 5), "12");
-assert.equal(hostRuntime.call("HostInterop.runtimeRefRoundTrip", 5), "714");
+assert.equal(hostRuntime.call("HostInterop.callbackRoundTrip", 5), 12n);
+assert.equal(hostRuntime.call("HostInterop.runtimeRefRoundTrip", 5), 714n);
 hostRuntime.dispose();
 assert.equal(
   hostRuntime.liveCallbacks.size,

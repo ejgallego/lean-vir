@@ -34,11 +34,14 @@ test("direct USize transport rejects wider targets before calling the ABI", () =
     exports: {
       vir_obj_usize_scalar() { assert.fail("must not truncate a wider input"); },
       vir_obj_usize_value() { assert.fail("must not truncate a wider result"); },
+      vir_obj_ctor_scalar_data() { assert.fail("must not inspect a wider USize field"); },
     },
   });
   const type = { interfaceTag: INTERFACE_TAG.USIZE };
   assert.throws(() => runtime.makeObjectValue(type, 1n << 32n, "wide"), /requires a wasm32 runtime/);
   assert.throws(() => runtime.liftObjectValue(type, 1, "wide"), /requires a wasm32 runtime/);
+  assert.throws(() => runtime.readObjectUSizeField(
+    { objectFieldCount: 0, usizeFieldCount: 1 }, 1, 0, "wide"), /requires a wasm32 runtime/);
 });
 
 test("decimal clients retain their existing text normalization", () => {
