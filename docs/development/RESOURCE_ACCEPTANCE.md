@@ -1,6 +1,6 @@
 # Embedded resources: review and acceptance
 
-The local Lean-name successor uses descriptor schema2 and resource compatibility3.
+The Lean-name successor under review in PR217 uses descriptor schema2 and resource compatibility3.
 It needs a matching newly qualified runtime distribution before anonymous cold
 adoption. The version1 public832 asset and all results below remain historical;
 they do not qualify changed loader bytes or the new schema.
@@ -82,7 +82,7 @@ rejection and relocated native rendering. See the
    not full IR execution admission; see the contract's boundary table.
 4. `Vir/Resources/Embed.lean`: preparation has already happened; elaboration only
    validates and embeds bytes. Native rendering does not reopen producer files.
-5. `web/src/resource-program.js`: validate published resources, resolve roles to
+5. `web/src/resource-program.js`: validate published resources, bind full Lean names to
    actual root exports, instantiate the existing runtime and dispose explicitly.
 6. `fixtures/resources/` and `tests/resources/`: ordinary leaf builds and negative
    cases. The resource API contains no PrettyM or Slides-specific policy.

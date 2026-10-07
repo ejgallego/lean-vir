@@ -12,8 +12,9 @@ It can compile native Lean producer tools; it never builds Wasm on an applicatio
 cache miss. HTTPS runtime acquisition uses Lake's standard download operation,
 which needs `curl` and uses its normal host configuration.
 
-The first release is still under review. The Lean-name resource successor is local-only and needs a matching runtime
-publication before this example can be used from a cold checkout; [qualification and limits](../development/RESOURCE_ACCEPTANCE.md)
+The first release is still under review. The Lean-name source is published for
+review in PR217; its matching runtime still needs durable publication before
+this example can be used from a cold checkout. [Qualification and limits](../development/RESOURCE_ACCEPTANCE.md)
 are recorded separately. When changing the VIR revision, use its `lean-toolchain`
 and runtime lock together.
 
@@ -49,7 +50,7 @@ import Lake
 open Lake DSL
 
 require lean_vir from git
-  "https://github.com/ejgallego/lean-vir" @ "<qualified-Lean-name-resource-commit>"
+  "https://github.com/ejgallego/lean-vir" @ "37d2eb99f85f58b295dbf67996b0b7492366bd8e"
 
 package greeting_app
 
