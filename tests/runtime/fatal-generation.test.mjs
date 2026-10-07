@@ -33,8 +33,8 @@ for (const kind of ["named", "closure"]) {
     const args = [100, 200];
     assert.throws(() => kind === "named"
       ? runtime.callResolvedObjects({ entry: "test" }, {}, args, () => {})
-      : runtime.callClosureObjects({ runtime, object: 1, live: true },
-        { args: ["a", "b"].map(name => ({ name, type: { interfaceTag: 1 } })), effect: "pure" }, args), error => error === failure);
+      : runtime.callClosureObjects({ runtime, object: 1, live: true,
+        callType: { args: ["a", "b"].map(name => ({ name, type: { interfaceTag: 1 } })), effect: "pure" } }, args), error => error === failure);
     assert.deepEqual(args, [], "ownership has left JavaScript even when entry throws");
     assert.equal(runtime.failure, failure);
     assert.equal(hostState.callError, null);

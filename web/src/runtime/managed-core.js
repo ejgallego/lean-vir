@@ -522,27 +522,11 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
   dispose() {
     if (this.disposed || this.disposing) return;
     this.disposing = true;
-    const errors = [];
     try {
-      collectCleanupError(errors, () => this.teardownPackageResources());
+      this.hostState?.dispose();
     } finally {
       this.markDisposed();
     }
-    throwCollectedErrors(errors, "VirRuntime disposal failed");
-  }
-
-  teardownPackageResources() {
-    this.hostState?.dispose();
-  }
-
-  releaseLiveCallbacks() {
-    const errors = [];
-    for (const cell of this.hostState?.leanObjectHandleCells ?? []) {
-      if (cell.callType !== null) {
-        collectCleanupError(errors, () => this.releaseLeanObjectHandleCell(cell));
-      }
-    }
-    throwCollectedErrors(errors, "Vir callback releases failed");
   }
 
   markDisposed() {

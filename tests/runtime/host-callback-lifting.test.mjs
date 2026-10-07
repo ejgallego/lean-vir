@@ -7,7 +7,6 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 import { registerHostCallRollback } from "../../web/src/host-boundary.js";
-import { createVirCallback } from "../../web/src/runtime/callbacks.js";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { VirHostState } from "../../web/src/runtime/host-state.js";
 import { HOST_IMPORT_BOUNDARY } from "../../web/src/runtime/interface-manifest.js";
@@ -61,7 +60,7 @@ function harness(t, { lower = () => 1 } = {}) {
   state.attach(exports);
   state.attachRuntime(runtime);
   state.leanObjectHandleCells = new CountedRoots();
-  const existing = Array.from({ length: 56 }, () => createVirCallback(runtime, ++nextObject, callback));
+  const existing = Array.from({ length: 56 }, () => runtime.liftObjectFunction(callback, ++nextObject, "existing callback"));
   runtime.hostState.leanObjectHandleCells.resetCounts();
   t.after(() => state.dispose());
   return {
@@ -182,7 +181,7 @@ for (const stage of ["host", "result"]) {
     assert.deepEqual(h.released, []);
     assert.equal(retained(), 2);
     assert.equal(h.existing[0](), 1);
-    h.runtime.releaseLiveCallbacks();
+    h.runtime.hostState.releaseLeanObjectHandleCells();
     assert.throws(() => retained(), /disposed runtime/);
     assert.equal(h.runtime.liveCallbackCount(), 0);
     assert.equal(h.released.length, 57, "each independent owner releases once, including shared function pointers");
@@ -216,8 +215,8 @@ for (const fail of [false, true]) {
     h.objects.set(1, fail ? [2, 0] : [2]);
     h.runtime.exports.vir_closure_apply_objects = () => 1;
     const invoke = () => h.runtime.callClosureObjects(
-      { runtime: h.runtime, object: 60, live: true },
-      { args: [], effect: "pure", result: array(callback) }, [],
+      { runtime: h.runtime, object: 60, live: true,
+        callType: { args: [], effect: "pure", result: array(callback) } }, [],
     );
     if (fail) {
       assert.throws(invoke, /\[1\] is unavailable/);

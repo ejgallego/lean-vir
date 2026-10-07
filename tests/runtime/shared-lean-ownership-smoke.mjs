@@ -58,7 +58,7 @@ try {
       assert.throws(() => effectful(5), /disposed runtime/);
       assert.equal(nested(2), 47n);
       other = await fresh();
-      assert.throws(() => other.callClosure(runtime.leanCallbackCell(nested, "nested"), cell.callType, [0]),
+      assert.throws(() => other.callClosure(runtime.leanCallbackCell(nested, "nested"), [0]),
         /live Lean object handle/);
       assert.equal(other.failure, null, "foreign cell rejects before native entry");
 

@@ -33,7 +33,6 @@ const environmentLookupSharedHarnessPaths = [
   "web/app/pages/browser-package-config.js",
   "web/src/react/vir-react-root.js",
   "web/src/runtime/call-timing.js",
-  "web/src/runtime/callbacks.js",
   "web/src/runtime/cleanup.js",
   "web/src/runtime/core.js",
   "web/src/runtime/factory-core.js",

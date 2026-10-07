@@ -17,11 +17,13 @@ Both compositions share these modules:
 | `object-core.js` | Object transport and consuming calls, exact JavaScript resources and the single retained-value ownership registry for JSL and converted callbacks |
 | `primitive-values.js` | Unit, resources, booleans, numeric values, strings and byte-array conversion |
 | `object-boundary.js` | Boxed-boundary requirements used by package admission |
-| `host-state.js` | Host-call transactions, Shared retained-value tracking, callback-admission count and binding-provider cleanup |
+| `host-state.js` | Host-call transactions, shared retained-value tracking, callback-admission count and binding-provider cleanup |
 
 The full `core.js` composition adds `object-values.js`: arrays, lists, options,
 pairs, structures, inductives, `Lean.Expr` and automatic Lean-function conversion
-to JavaScript callables, including their typed invocation. Its primitive cases
+to JavaScript callables, including their creation and typed invocation. The
+retained cell holds the sole calling descriptor; the shared owner manages
+lifetime. Its primitive cases
 delegate to the shared implementation.
 Owned collection and constructor builders also stay in this optional layer.
 The internal `primitive-factory.js` imports none of those structural converters

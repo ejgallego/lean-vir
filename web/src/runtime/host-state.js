@@ -295,12 +295,13 @@ export class VirHostState {
         "cannot track a Lean object handle in an inactive host state",
       );
     }
+    const isCallback = cell.callType != null;
     cell.onRelease = () => {
       this.leanObjectHandleCells.delete(cell);
-      if (cell.callType != null) this.liveCallbackCount--;
+      if (isCallback) this.liveCallbackCount--;
     };
     this.leanObjectHandleCells.add(cell);
-    if (cell.callType != null) this.liveCallbackCount++;
+    if (isCallback) this.liveCallbackCount++;
     return cell;
   }
 

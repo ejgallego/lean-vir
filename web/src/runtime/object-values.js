@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createVirCallback } from "./callbacks.js";
+import { throwWithCleanup } from "./cleanup.js";
 import {
   customInductiveConstructorAt,
   requireFunctionArgs,
@@ -50,10 +50,11 @@ const MAX_EXPR_BVAR_INDEX = 1048574n;
 // runtime. Primitive conversions and opaque Js/JSL ownership stay inherited.
 export function withObjectValues(Base) {
   return class extends Base {
-    callClosure(cell, type, args) {
+    callClosure(cell, args) {
       this.requireLiveRuntime();
       this.requireLiveLeanObjectCell(cell, "callback");
       this.requireFunction("vir_closure_apply_objects");
+      const type = cell.callType;
       const fnArgs = requireFunctionArgs(type, "callback");
       // Like ordinary JS formal parameters, ignore extra arguments and read
       // missing arguments as undefined. Each declared boundary view still
@@ -69,18 +70,19 @@ export function withObjectValues(Base) {
             ),
           );
         });
-        return this.callClosureObjects(cell, type, argObjs);
+        return this.callClosureObjects(cell, argObjs);
       } finally {
         this.releaseOwnedObjects(argObjs);
       }
     }
 
-    callClosureObjects(cell, type, argObjs) {
+    callClosureObjects(cell, argObjs) {
       let argvPtr = 0;
       let resultObj = 0;
       try {
         if (this.hostState?.callError) throw this.hostState.callError;
         this.requireLiveLeanObjectCell(cell, "callback");
+        const type = cell.callType;
         const arity = requireFunctionArgs(type, "callback").length;
         const effect = interfaceEffectRuntimeTag(type.effect);
         if (argObjs.length !== 0) {
@@ -1196,7 +1198,21 @@ export function withObjectValues(Base) {
     liftObjectFunction(type, obj, label) {
       requireFunctionArgs(type, label);
       requireFunctionResult(type, label);
-      return createVirCallback(this, obj, type);
+      const cell = this.makeLeanObjectHandleCell(obj, label, type);
+      try {
+        const callback = function virCallback(...args) {
+          if (!cell.live)
+            throw new Error("Vir callback belongs to a disposed runtime");
+          return cell.runtime.callClosure(cell, args);
+        };
+        return this.attachLeanObjectHandle(cell, callback);
+      } catch (error) {
+        throwWithCleanup(
+          error,
+          () => this.releaseLeanObjectHandleCell(cell),
+          "Lean callback creation failed",
+        );
+      }
     }
 
     liftObjectArrayValue(type, obj, label, selfType) {

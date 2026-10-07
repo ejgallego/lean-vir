@@ -25,37 +25,10 @@ unrelated responsibilities.
 
 ## Runtime Internals
 
-- `runtime/factory.js`: environment-neutral acquisition, WASM instantiation,
-  package input validation and host import wiring.
-- `runtime/call-timing.js`: opt-in synchronous runtime call phase
-  attribution.
-- `runtime/vir-codec.js`: byte normalization, contract writer and live descriptor
-  accessors.
-- `runtime/callbacks.js`: private Lean closure roots associated with ordinary
-  JavaScript functions, plus runtime-disposal helpers.
-- `runtime/cleanup.js`: shared cleanup error collection and deterministic
-  single/aggregate reporting.
-- `runtime/core.js`: package loading, manifest export tables, call resolution,
-  memory helpers, and runtime/callback lifecycle.
-- `runtime/object-values.js`: object ABI lowering and lifting between
-  JavaScript values and owned Lean objects.
-- `runtime/host-state.js`: host import dispatch state, host-binding lookup,
-  Wasm root diagnostics/terminal clearing, and runtime-owned fresh-provider disposal.
-- `runtime/object-abi.js`: object ABI support checks, layout planning, scalar
-  field packing, and unpacking helpers used by the object-value runtime.
-- `runtime/object-abi-exports.js`: shared object ABI export-name manifest used
-  by runtime availability checks and Wasm linker tooling.
-- `runtime/vir-value-normalizers.js`: JavaScript input normalization for the
-  object ABI lowering path.
-- `runtime/interface-manifest.js`: interface manifest validation, diagnostics,
-  and type formatting helpers.
-- `runtime/ir-package.js`: browser-safe package-envelope parsing and package-set
-  member identity validation.
-- `runtime/module-name.js`: normalized Lean module-name validation shared by
-  descriptors and embedded package member identities.
-- `runtime/interface-tags.js`: shared interface descriptor tag constants.
-- `runtime/package-targets.js`: validated package-target mode constants and
-  shared user-facing formatting.
+The [managed runtime composition](../../docs/development/MANAGED_RUNTIME_COMPOSITION.md)
+is the canonical map of runtime modules, conversion layers and retained-value
+ownership. Those modules are revision-locked internals of the public entries.
+
 - `host-boundary.js`: host-call rollback transactions for unpublished resources.
 - `host/vir-common-host-bindings.js`: environment-neutral JavaScript value and
   console providers, shared by the browser and Node entry points.
@@ -73,7 +46,7 @@ Every shipped boundary layer has one of these explicit sources:
 
 | Files                                                                                           | Provenance and justification                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `host-boundary.js`, `runtime/host-state.js`, `runtime/object-values.js`, `runtime/callbacks.js` | VIR-owned Lean/Wasm ABI machinery for host-call rollback, terminal root clearing, object ABI conversion, and foreign Lean closure ownership. |
+| `host-boundary.js`, `runtime/host-state.js`, `runtime/object-core.js`, `runtime/object-values.js` | VIR-owned Lean/Wasm ABI machinery for host-call rollback, terminal root clearing, object ABI conversion, and foreign Lean closure ownership. |
 | `wasm/upstream_shim/abi/resource_roots.cpp` | VIR-owned slot allocator and release operations over an engine-managed Wasm `externref` table. JavaScript references remain exact values; allocator metadata lives in linear memory. |
 | `vir-host-bindings.js`, `host/vir-dom-host-bindings.js`, `host/vir-js-*.js`                     | Thin handwritten providers for generated targets. Each target's TypeScript, VIR-owned, or local-contract provenance is recorded in `Vir/*.bindings.json` and checked by `npm run check:bindings`.    |
 | `host/vir-active-host-bindings.js`                                                              | VIR-owned lifecycle plus schedule/frame teardown and failed-publication rollback. React roots register with that lifecycle from the React module.                                                    |

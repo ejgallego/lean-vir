@@ -66,7 +66,9 @@ try {
     }
     assert.equal(int(-huge), 1n - huge);
     assert.throws(() => nat(-1n), /non-negative/);
-    runtime.releaseLiveCallbacks();
+    for (const fn of [wide, index, nat, int]) {
+      runtime.releaseLeanObjectHandleCell(runtime.leanCallbackCell(fn, "numeric callback"));
+    }
     assert.equal(runtime.liveCallbackCount(), 0);
     assert.throws(() => wide(0), /disposed runtime/);
     assert.throws(() => nat(0), /disposed runtime/);
