@@ -401,8 +401,8 @@ private def resourceLibraryStem (lib : LeanLib) : Except String String := do
     throw "virResourcePack requires a library name usable as one filename"
   return stem
 
-/-- Resolve only independent program inputs; never fetch the carrier's modules
-or extra dependencies while producing the prerequisite for that carrier. -/
+/-- Resolve independent program inputs without compiling the carrier or fetching
+its extra dependencies. Source-only module collection supplies inclusion inputs. -/
 library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
   -- Enforce this before any cache lookup. Resource runtime capabilities come
   -- from the locked bundle, not an ambient custom native-provider selection.
