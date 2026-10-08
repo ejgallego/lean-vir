@@ -27,7 +27,7 @@ the include operation itself only reads prepared bytes. Compiler tools can also
 meta-import `Vir.GeneratePackage`. Ordinary applications use the
 [library-owned resource workflow](EMBEDDED_RESOURCES.md), not a custom generator.
 
-The classifier returns a pure `Vir.Interface.ClassifiedSignature` value.
+The classifier's successful result is a plain `Vir.Interface.ClassifiedSignature` value.
 `signature.toExpectedSignatureJson` encodes the type-only `args`, `result` and
 `effect` expected by JavaScript's `createProgram({ expectedExports: ... })`.
 Construct this expectation from the author's declaration type independently of
@@ -86,8 +86,10 @@ Resource imports `Vir.Resources`, `Vir.Resources.Embed` and the explicitly optio
 | `Vir.GeneratePackage.Json` | `Vir.Package.Json` |
 | `Vir.LeanName` | `Vir.Package.Name` |
 
-Update these imports when adopting the reorganized source. Declaration names,
-attribute names and wire-format values remain unchanged. Existing clients pinned
+Update these imports when adopting the reorganized source. The moves preserve
+declaration names, attribute names and wire-format values. Generator diagnostics
+now use the single `PackageDiagnostic` record; `DeclIndexDiagnostic` and its
+conversion helper have been removed. Existing clients pinned
 to an earlier VIR revision can continue using that revision's imports.
 
 ## Regression example

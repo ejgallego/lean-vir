@@ -58,14 +58,17 @@ assert.equal(descriptor.schemaVersion, 2);
 assert.ok(!Object.hasOwn(descriptor, "exports"));
 assert.deepEqual(descriptor.compatibility,
   JSON.parse(readFileSync(join(producer, "vir-resources/compatibility.json"))));
-const signatures = snapshotExpectedExports({
+const expectedExports = {
   "NativeClient.greet": JSON.parse(greetingSignature),
   "NativeClient.double": JSON.parse(numericSignature),
-});
+};
+const signatures = snapshotExpectedExports(expectedExports);
 for (const [declaration, type, tag] of [
   ["NativeClient.greet", "String", 3], ["NativeClient.double", "Nat", 0],
 ]) {
   const expectedType = { type, interfaceTag: tag };
+  assert.deepEqual(expectedExports[declaration].args, [expectedType],
+    "caller arguments contain types only, without parameter display names");
   assert.equal(signatures.get(declaration),
     interfaceSignatureKey({ args: [expectedType], result: expectedType, effect: "pure" }));
 }
