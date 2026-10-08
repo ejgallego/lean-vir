@@ -32,7 +32,7 @@ static void cleanup_object_args(uint32_t argc, object ** args) {
 // like the other object operations, trusts that object/type provenance; it does
 // not accept arbitrary integers as validated native handles.
 extern "C" object * vir_closure_apply_objects(
-    object * fn, uint32_t arity, uint8_t is_io, object ** argv, uint32_t argc) {
+    object * fn, uint8_t is_io, object ** argv, uint32_t argc) {
     g_closure_call_error.clear();
     if (argv == nullptr && argc != 0) {
         g_closure_call_error = "closure object argv pointer is null";
@@ -41,14 +41,6 @@ extern "C" object * vir_closure_apply_objects(
     if (fn == nullptr) {
         cleanup_object_args(argc, argv);
         g_closure_call_error = "closure object is null";
-        return nullptr;
-    }
-    if (argc != arity) {
-        cleanup_object_args(argc, argv);
-        g_closure_call_error =
-            "closure argument count mismatch: expected " +
-            std::to_string(arity) +
-            ", got " + std::to_string(argc);
         return nullptr;
     }
 

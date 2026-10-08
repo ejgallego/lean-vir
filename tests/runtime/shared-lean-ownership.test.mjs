@@ -2,6 +2,7 @@
 Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { VirRuntime } from "../../web/src/runtime/core.js";
@@ -29,13 +30,13 @@ test("JSL and callable targets share tracking and retirement but keep their admi
   const callback = runtime.liftObjectFunction(type, 200, "callback");
   assert.deepEqual(increments, [100, 200]);
   assert.equal(state.leanObjectHandleCells.size, 2);
-  assert.equal(runtime.liveCallbackCount(), 1);
+  assert.equal(countLiveCallbacks(runtime.hostState), 1);
   assert.throws(() => runtime.leanObjectHandleCell(callback, "JSL"), /live Lean object handle/);
   assert.throws(() => runtime.leanCallbackCell(jsl, "callback"), /live Lean callback/);
   runtime.dispose(); runtime.dispose();
   assert.deepEqual(decrements, [100, 200]);
   assert.equal(state.leanObjectHandleCells.size, 0);
-  assert.equal(state.liveCallbackCount, 0);
+  assert.equal(countLiveCallbacks(state), 0);
   assert.throws(() => callback(), /disposed runtime/);
 });
 
@@ -52,12 +53,12 @@ test("independent wrappers release independently before simulated pointer reuse"
   assert.throws(() => other.runtime.requireLiveLeanObjectCell(runtime.leanCallbackCell(second, "second"), "foreign"), /live Lean object handle/);
   runtime.releaseLeanObjectHandleCell(runtime.leanCallbackCell(second, "second"));
   assert.throws(() => second(), /disposed runtime/);
-  assert.equal(state.liveCallbackCount, 0);
+  assert.equal(countLiveCallbacks(state), 0);
   // The mock explicitly simulates a new allocation at the now-released address.
   const reused = runtime.liftObjectFunction(type, 100, "reused callback");
   assert.equal(runtime.releaseLeanObjectHandleCell(old), false);
   assert.equal(reused(), 100);
-  assert.equal(state.liveCallbackCount, 1);
+  assert.equal(countLiveCallbacks(state), 1);
   assert.deepEqual(increments, [100, 100, 100]);
   assert.deepEqual(decrements, [100, 100]);
   runtime.dispose(); other.runtime.dispose();
@@ -67,12 +68,11 @@ test("independent wrappers release independently before simulated pointer reuse"
 test("unpublished callback creation rolls back the shared owner", () => {
   const { runtime, state, increments, decrements } = harness();
   const error = new Error("target registration failed");
-  runtime.attachLeanObjectHandle = () => { throw error; };
-  assert.throws(() => runtime.liftObjectFunction(type, 100, "callback"), e => e === error);
+  assert.throws(() => runtime.makeLeanObjectHandleTarget(100, "callback", type, () => { throw error; }), e => e === error);
   assert.deepEqual(increments, [100]);
   assert.deepEqual(decrements, [100]);
   assert.equal(state.leanObjectHandleCells.size, 0);
-  assert.equal(state.liveCallbackCount, 0);
+  assert.equal(countLiveCallbacks(state), 0);
   runtime.dispose();
 });
 
@@ -88,7 +88,7 @@ test("native release and untracking errors are both retained without repeating c
     error instanceof AggregateError && error.errors[0] === native && error.errors[1] === tracking);
   assert.equal(cell.live, false);
   assert.equal(state.leanObjectHandleCells.size, 0);
-  assert.equal(state.liveCallbackCount, 0);
+  assert.equal(countLiveCallbacks(state), 0);
   assert.equal(runtime.releaseLeanObjectHandleCell(cell), false);
   runtime.dispose();
 });
@@ -131,7 +131,7 @@ test("provider cleanup can create callbacks, but the retirement sweep closes acq
   assert.throws(() => callback(), /disposed runtime/);
   assert.deepEqual(decrements, [200, 100, 300]);
   assert.equal(state.leanObjectHandleCells.size, 0);
-  assert.equal(state.liveCallbackCount, 0);
+  assert.equal(countLiveCallbacks(state), 0);
 });
 
 test("signed Wasm i32 addresses are canonicalized without coercing invalid pointers", () => {
@@ -159,4 +159,61 @@ test("signed Wasm i32 addresses are canonicalized without coercing invalid point
   runtime.dispose();
   assert.equal(increments.length, 12, "invalid inputs never reach the native retain");
   assert.deepEqual(decrements, increments);
+});
+
+test("retirement detaches cells while preserving cleanup failures and finalizer diagnostics", async () => {
+  const OriginalRegistry = globalThis.FinalizationRegistry;
+  let finalize, holding;
+  let rejectRegistration = false;
+  globalThis.FinalizationRegistry = class {
+    constructor(callback) { finalize = callback; }
+    register(_target, weakCell) {
+      if (rejectRegistration) throw new Error("registration sentinel");
+      holding = weakCell;
+    }
+    unregister() {}
+  };
+  let ObjectRuntime;
+  try {
+    ({ ObjectRuntime } = await import("../../web/src/runtime/object-core.js?finalizer-test"));
+  } finally {
+    globalThis.FinalizationRegistry = OriginalRegistry;
+  }
+  const runtime = new ObjectRuntime();
+  const state = new VirHostState();
+  state.attachRuntime(runtime);
+  const native = new Error("native sentinel");
+  runtime.hostState = state;
+  runtime.exports = { vir_obj_inc() {}, vir_obj_dec() { throw native; } };
+  const target = runtime.makeLeanObjectHandleResource(100, "finalizer target");
+  const cell = runtime.leanObjectHandleCell(target, "finalizer target");
+  finalize(holding);
+  assert.deepEqual({ runtime: cell.runtime, object: cell.object, type: cell.callType, live: cell.live },
+    { runtime: null, object: 0, type: null, live: false });
+  assert.equal(state.leanObjectHandleCells.size, 0);
+  assert.match(state.takeFinalizerErrors()[0].message, /native sentinel/);
+  assert.equal(runtime.releaseLeanObjectHandleCell(cell), false);
+  runtime.makeLeanObjectHandleResource(200, "diagnostic containment");
+  state.recordFinalizerError = () => { throw new Error("diagnostic sentinel"); };
+  assert.doesNotThrow(() => finalize(holding));
+  assert.equal(state.leanObjectHandleCells.size, 0);
+  rejectRegistration = true;
+  assert.throws(() => runtime.makeLeanObjectHandleResource(300, "registration failure"), error =>
+    error instanceof AggregateError && error.errors[0].message === "registration sentinel" && error.errors[1] === native);
+  assert.equal(state.leanObjectHandleCells.size, 0);
+});
+
+test("untransferred callback arguments are released even when argv cleanup throws", () => {
+  const { runtime, decrements } = harness();
+  delete runtime.callClosure;
+  const callback = runtime.liftObjectFunction({ ...type, args: [{ name: "value", type: type.result }] }, 100, "callback");
+  const original = new Error("preparation sentinel"), cleanup = new Error("argv cleanup sentinel");
+  runtime.exports.vir_closure_apply_objects = () => assert.fail("native entry");
+  runtime.makeObjectValue = () => 200;
+  runtime.allocByteLength = () => 4;
+  runtime.writePointerArray = () => { throw original; };
+  runtime.freeBytes = () => { throw cleanup; };
+  assert.throws(() => callback(undefined), error => error === cleanup);
+  assert.deepEqual(decrements, [200]);
+  runtime.dispose();
 });

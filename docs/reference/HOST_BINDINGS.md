@@ -178,6 +178,9 @@ it deterministically. After a fatal failure, native cleanup is quarantined:
 disposal invalidates the carriers and clears the permitted JavaScript resource
 roots, while abandoned Lean heap objects are reclaimed with the Wasm instance.
 See the [object ABI ownership contract](OBJECT_ABI.md#ownership) for that boundary.
+Retirement also detaches the cell from its runtime, pointer and calling descriptor.
+Keeping a dead callback or JSL carrier alone therefore does not retain the old
+generation. Collection timing remains the JavaScript engine's responsibility.
 Calling a Lean callback after disposal fails before entering its Lean body.
 If invoked as a Promise reaction, that failure rejects the resulting Promise.
 Hard disposal prevents Lean entry; it does not guarantee cancellation or quiet

@@ -158,7 +158,7 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_resource_roots_active`   | Count live JavaScript roots.                                                                      | Diagnostic only; allowed after a fatal trap.                                                                        |
 | `vir_resource_roots_capacity` | Count allocated root slots, excluding reserved zero.                                               | Diagnostic only; capacity remains allocated after clearing.                                                        |
 | `vir_resource_roots_reusable` | Count currently reusable root slots.                                                              | Diagnostic only; returns zero after terminal clearing.                                                              |
-| `vir_closure_apply_objects` | Apply a borrowed Lean function with its declared arity/effect and owned object arguments. | Borrows the live function from the managed ownership cell; acquires an invocation reference. Consumes object arguments after accepting a non-null `argv`; returns one owned result or `0`. |
+| `vir_closure_apply_objects` | Apply a borrowed Lean function with its effect and owned object arguments. | Borrows the live function from the managed ownership cell; acquires an invocation reference. Consumes object arguments after accepting a non-null `argv`; returns one owned result or `0`. |
 | `vir_closure_call_error`      | Return a borrowed pointer to the last closure-call diagnostic.                                    | Borrowed until the next closure call or runtime teardown.                                                           |
 | `vir_closure_call_error_size` | Return the byte length of `vir_closure_call_error`.                                               | No object ownership.                                                                                                |
 | `vir_obj_inc`                 | Retain one Lean object reference.                                                                 | Adds one reference for heap objects; scalar objects are no-ops.                                                     |
@@ -260,6 +260,12 @@ Object pointers are scoped to one wasm runtime instance. They must not survive:
 - `VirRuntime.dispose`
 - runtime generation disposal
 - wasm instance teardown
+
+`vir_closure_apply_objects(fn, is_io, argv, argc)` borrows a live function and
+consumes accepted argument references. The caller supplies the trusted calling
+description; `argc` is the single argument-count input, not an independent
+function-type check. An invocation-owned function reference protects active calls
+from reentrant retirement of their JavaScript carrier.
 
 Longer-lived Lean values need an explicit Lean root. Closures and JSL values
 already follow that pattern through private state associated with ordinary

@@ -19,12 +19,14 @@ test("callback formal parameters ignore extras and receive undefined when absent
   const runtime = Object.create(VirRuntime.prototype);
   const lowered = [];
   Object.assign(runtime, {
-    exports: { vir_closure_apply_objects() {} },
+    exports: { vir_closure_apply_objects() { return 1; }, vir_obj_dec() {} },
     makeObjectValue(_type, value) { lowered.push(value); return lowered.length; },
-    callClosureObjects(_cell, args) { assert.equal(args.length, 1); },
+    allocByteLength: () => 4,
+    writePointerArray(_ptr, args) { assert.equal(args.length, 1); },
+    freeBytes() {},
     releaseOwnedObjects() {},
   });
-  const type = { effect: "runtime", args: [{ name: "value", type: { interfaceTag: INTERFACE_TAG.RESOURCE } }] };
+  const type = { effect: "runtime", result: { interfaceTag: INTERFACE_TAG.UNIT }, args: [{ name: "value", type: { interfaceTag: INTERFACE_TAG.RESOURCE } }] };
   const value = {};
   const args = [value];
   Object.defineProperty(args, 1, { get() { assert.fail("unused argument must not be lowered"); } });
@@ -122,7 +124,7 @@ test("callback bridge preserves the String check error as a Promise rejection", 
         },
       },
     });
-    const project = () => runtime.callClosureObjects({ runtime, object: 1, live: true,
+    const project = () => runtime.callClosure({ runtime, object: 1, live: true,
       callType: { args: [], effect: "pure", result: { interfaceTag: INTERFACE_TAG.UNIT } } }, []);
     await assert.rejects(objects["js.promise.thenValue"](Promise.resolve({}), project),
       (error) => error === hostError && error instanceof TypeError);

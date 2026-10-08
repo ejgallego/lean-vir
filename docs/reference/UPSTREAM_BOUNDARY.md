@@ -298,10 +298,11 @@ arity includes its world argument.
 
 Converted Lean functions use the same retained-object cells, weak finalizer and
 terminal tracking set as JSL values. Their JavaScript wrappers keep the declared
-argument/result types and effect for automatic conversion. A callback-count
-summary preserves package-admission checks without a separate ownership registry.
+argument/result types and effect for automatic conversion. Package-state admission
+already excludes installing a new generation while callbacks from one are live.
 `vir_closure_apply_objects` borrows the function from its live cell, receives
-arity/effect by value, and takes an invocation-owned reference before applying it.
+effect and argument count by value, and takes an invocation-owned reference
+before applying it.
 Reentry can release the wrapper without invalidating that active invocation.
 The native closure-root vector/free list and its root/release exports are retired;
 this requires matching JavaScript and Wasm assets from the same build.

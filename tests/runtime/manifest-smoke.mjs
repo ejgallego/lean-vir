@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import { createVirRuntime as createExportedBrowserVirRuntime } from "lean-vir";
 import {
@@ -571,7 +572,7 @@ assert.equal(hostRuntime.call("HostInterop.callbackRoundTrip", 5), 12n);
 assert.equal(hostRuntime.call("HostInterop.runtimeRefRoundTrip", 5), 714n);
 hostRuntime.dispose();
 assert.equal(
-  hostRuntime.liveCallbackCount(),
+  countLiveCallbacks(hostRuntime.hostState),
   0,
   "runtime disposal should release the key listener",
 );

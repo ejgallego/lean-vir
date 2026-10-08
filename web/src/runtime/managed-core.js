@@ -86,11 +86,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
         "VirRuntime already owns an IR package set; create a fresh runtime for another generation",
       );
     }
-    if (this.liveCallbackCount() !== 0) {
-      throw new Error(
-        "VirRuntime cannot install an IR package set while callbacks are live; create a fresh runtime",
-      );
-    }
     const packageBytes = validateIrPackageSetMembers(packages, {
       members: packageSet?.members ?? null,
     }).bytes;
@@ -103,11 +98,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     if (this.hasPackageState()) {
       throw new Error(
         "VirRuntime already owns an IR package set; create a fresh runtime for another generation",
-      );
-    }
-    if (this.liveCallbackCount() !== 0) {
-      throw new Error(
-        "VirRuntime cannot install an IR package set while callbacks are live; create a fresh runtime",
       );
     }
     this.requireFunction("vir_begin_ir_package_set");
@@ -342,8 +332,11 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     }
 
     const cache = this.callCacheFor(entry);
-    const plan = this.objectCallPlanFor(entry, cache);
-    if (plan === null || !this.hasObjectValueExports()) {
+    if (cache.objectCallSupported === undefined) {
+      cache.objectCallSupported = this.objectResultSupported(entry.result) &&
+        entry.args.every((arg) => this.objectArgumentSupported(arg.type));
+    }
+    if (!cache.objectCallSupported || !this.hasObjectValueExports()) {
       throw new Error(
         `object ABI does not support interface entry ${entry.entry}`,
       );
@@ -352,8 +345,8 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     try {
       const marshalStarted = timing?.beginPhase();
       try {
-        for (let index = 0; index < plan.args.length; index++) {
-          const arg = plan.args[index];
+        for (let index = 0; index < entry.args.length; index++) {
+          const arg = entry.args[index];
           argObjs.push(
             this.makeObjectValue(
               arg.type,
@@ -371,7 +364,7 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
         argObjs,
         (resultObj) =>
           this.liftObjectValue(
-            plan.resultType,
+            entry.result,
             resultObj,
             `${entry.entry} result`,
           ),
@@ -380,28 +373,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     } finally {
       this.releaseOwnedObjects(argObjs);
     }
-  }
-
-  objectCallPlanFor(entry, cache) {
-    if (cache.objectCallPlan !== undefined) {
-      return cache.objectCallPlan;
-    }
-    const resultType = entry.result;
-    if (
-      !this.objectResultSupported(resultType) ||
-      !entry.args.every((arg) => this.objectArgumentSupported(arg.type))
-    ) {
-      cache.objectCallPlan = null;
-      return null;
-    }
-    // Preparation resolves the actual boxed declaration. The binary contract
-    // independently checks its boundary requirement; display aliases and
-    // target provenance cannot establish executable declaration availability.
-    cache.objectCallPlan = {
-      args: entry.args,
-      resultType,
-    };
-    return cache.objectCallPlan;
   }
 
   usizeMaxValue() {
@@ -513,10 +484,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     if (typeof listener !== "function")
       throw new TypeError("failure listener must be a function");
     return runtimeBoundaries.get(this).subscribe(listener);
-  }
-
-  liveCallbackCount() {
-    return this.hostState?.liveCallbackCount ?? 0;
   }
 
   dispose() {

@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
 import {
   check,
@@ -97,7 +98,7 @@ export async function runGenerationLifecycleCases(
   );
   check(
     failedState.leanObjectHandleCells.size === 0 &&
-      failures.runtime.liveCallbackCount() === 0,
+      countLiveCallbacks(failures.runtime.hostState) === 0,
     "failed shutdown clears tracked foreign roots",
   );
   check(
@@ -129,7 +130,7 @@ export async function runGenerationLifecycleCases(
     "both finalizer errors are recorded",
   );
   check(
-    owned.liveCallbackCount() === 0 &&
+    countLiveCallbacks(owned.hostState) === 0 &&
       owned.hostState.leanObjectHandleCells.size === 0,
     "failing finalizers untrack their roots",
   );
@@ -150,16 +151,17 @@ export async function runGenerationLifecycleCases(
 function injectReleaseFailures(runtime) {
   const counts = { callback: 0, jsl: 0 };
   const dec = runtime.exports.vir_obj_dec;
+  const identities = Array.from(runtime.hostState.leanObjectHandleCells,
+    cell => ({ cell, object: cell.object, kind: cell.callType === null ? "jsl" : "callback" }));
   runtime.exports = {
     ...runtime.exports,
     vir_obj_dec: (ptr) => {
       dec(ptr);
       // Cell retirement marks it dead before native release and untracks in
       // finally. Observe that ordering for both kinds, including finalizers.
-      const cell = Array.from(runtime.hostState.leanObjectHandleCells)
-        .find(cell => cell.object === ptr && !cell.live);
-      if (cell) {
-        const kind = cell.callType === null ? "jsl" : "callback";
+      const identity = identities.find(({ cell, object }) => object === ptr && !cell.live);
+      if (identity) {
+        const { kind } = identity;
         counts[kind]++;
         throw new Error(`${kind} release sentinel`);
       }

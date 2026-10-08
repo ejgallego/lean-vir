@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -84,7 +85,7 @@ test("three existing resources do not traverse any of 56 callback roots", t => {
   assert.equal(object.field, h.existing[0], "a resource may already contain a callback without creating one");
   assert.equal(h.runtime.hostState.leanObjectHandleCells.scans, 0);
   assert.equal(h.runtime.hostState.leanObjectHandleCells.visits, 0);
-  assert.equal(h.runtime.liveCallbackCount(), 56);
+  assert.equal(countLiveCallbacks(h.runtime.hostState), 56);
   assert.deepEqual(h.released, []);
   const failure = new Error("host failure");
   assert.throws(() => h.call([resource], [3], () => { throw failure; }), e => e === failure);
@@ -128,7 +129,7 @@ test("functions and nested composites retain callbacks without a registry census
   h.call([callback, array(array(callback))], [4, 1], (...args) => { received = args; },
     HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION);
   assert.equal(h.runtime.hostState.leanObjectHandleCells.scans, 0);
-  assert.equal(h.runtime.liveCallbackCount(), 58);
+  assert.equal(countLiveCallbacks(h.runtime.hostState), 58);
   assert.equal(received[0](), 4);
   assert.equal(received[1][0][0](), 3);
   assert.deepEqual(h.decremented, [3, 2]);
@@ -151,7 +152,7 @@ test("partial composite failure releases temporary objects without a callback ce
     HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION), /\[1\] is unavailable/);
   assert.equal(h.runtime.hostState.leanObjectHandleCells.scans, 0);
   assert.deepEqual(h.released, []);
-  assert.equal(h.runtime.liveCallbackCount(), 58, "foreign roots await GC or explicit disposal");
+  assert.equal(countLiveCallbacks(h.runtime.hostState), 58, "foreign roots await GC or explicit disposal");
   assert.deepEqual(h.decremented, [2]);
 });
 
@@ -161,7 +162,7 @@ test("later lifting failure leaves callback reclamation to reachability", t => {
     /did not lift to a live host resource/);
   assert.equal(h.runtime.hostState.leanObjectHandleCells.scans, 0);
   assert.deepEqual(h.released, []);
-  assert.equal(h.runtime.liveCallbackCount(), 57);
+  assert.equal(countLiveCallbacks(h.runtime.hostState), 57);
 });
 
 for (const stage of ["host", "result"]) {
@@ -183,7 +184,7 @@ for (const stage of ["host", "result"]) {
     assert.equal(h.existing[0](), 1);
     h.runtime.hostState.releaseLeanObjectHandleCells();
     assert.throws(() => retained(), /disposed runtime/);
-    assert.equal(h.runtime.liveCallbackCount(), 0);
+    assert.equal(countLiveCallbacks(h.runtime.hostState), 0);
     assert.equal(h.released.length, 57, "each independent owner releases once, including shared function pointers");
   });
 }
@@ -206,7 +207,7 @@ test("reentrant successful calls retain their own callbacks when the outer host 
   assert.equal(h.runtime.hostState.leanObjectHandleCells.scans, 0);
   assert.deepEqual(h.released, []);
   assert.equal(innerCallback(), 3);
-  assert.equal(h.runtime.liveCallbackCount(), 58);
+  assert.equal(countLiveCallbacks(h.runtime.hostState), 58);
 });
 
 for (const fail of [false, true]) {
@@ -214,7 +215,7 @@ for (const fail of [false, true]) {
     const h = harness(t);
     h.objects.set(1, fail ? [2, 0] : [2]);
     h.runtime.exports.vir_closure_apply_objects = () => 1;
-    const invoke = () => h.runtime.callClosureObjects(
+    const invoke = () => VirRuntime.prototype.callClosure.call(h.runtime,
       { runtime: h.runtime, object: 60, live: true,
         callType: { args: [], effect: "pure", result: array(callback) } }, [],
     );
@@ -225,7 +226,7 @@ for (const fail of [false, true]) {
     }
     assert.deepEqual(h.decremented, [2, 1], "element and outer result each released once");
     assert.deepEqual(h.released, [], "foreign closure follows reachability, not result success");
-    assert.equal(h.runtime.liveCallbackCount(), 57);
+    assert.equal(countLiveCallbacks(h.runtime.hostState), 57);
   });
 }
 

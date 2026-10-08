@@ -2,6 +2,7 @@
 Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
@@ -74,25 +75,23 @@ try {
         const refs = () => new DataView(runtime.exports.memory.buffer).getUint32(argument, true);
         assert.equal(refs(), 2);
         runtime.writePointerArray(argv, [argument]);
-        assert.equal(runtime.exports.vir_closure_apply_objects(callable.object, 2, 0, argv, 1), 0);
-        assert.match(runtime.lastClosureCallError(), /argument count mismatch/);
-        assert.equal(refs(), 1, "rejected argv releases its owned reference");
-        assert.equal(runtime.readObjectString(argument), "owned rejected argument");
+        assert.equal(runtime.exports.vir_closure_apply_objects(callable.object, 0, 0, 1), 0);
+        assert.match(runtime.lastClosureCallError(), /argv pointer is null/);
+        assert.equal(refs(), 2, "a null argv was not accepted or consumed");
         assert.equal(independent(5), 195n, "rejection does not release the borrowed function");
-        runtime.exports.vir_obj_inc(argument);
-        assert.equal(runtime.exports.vir_closure_apply_objects(0, 1, 0, argv, 1), 0);
+        assert.equal(runtime.exports.vir_closure_apply_objects(0, 0, argv, 1), 0);
         assert.match(runtime.lastClosureCallError(), /closure object is null/);
-        assert.equal(refs(), 1);
+        assert.equal(refs(), 1, "accepted rejected argv releases its owned reference");
       } finally {
         runtime.freeBytes(argv);
         runtime.exports.vir_obj_dec(argument);
       }
       const wasm = runtime.exports;
       const host = runtime.hostState;
-      assert.equal(runtime.liveCallbackCount(), 2);
+      assert.equal(countLiveCallbacks(runtime.hostState), 2);
       runtime.dispose(); runtime.dispose();
       assert.equal(host.leanObjectHandleCells.size, 0);
-      assert.equal(host.liveCallbackCount, 0);
+      assert.equal(countLiveCallbacks(host), 0);
       assert.equal(wasm.vir_resource_roots_active(), 0);
       assert.throws(() => independent(1), /disposed runtime/);
       assert.throws(() => nested(1), /disposed runtime/);
@@ -132,7 +131,7 @@ try {
         assert.equal(disposingRuntime.disposed, true);
         assert.equal(disposingRuntime.failure, null);
         assert.equal(state.leanObjectHandleCells.size, 0);
-        assert.equal(state.liveCallbackCount, 0);
+        assert.equal(countLiveCallbacks(state), 0);
         assert.equal(wasm.vir_resource_roots_active(), 0);
         assert.throws(() => retained(3), /disposed runtime/);
       } finally {

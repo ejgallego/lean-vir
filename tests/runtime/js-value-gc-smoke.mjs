@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import assert from "node:assert/strict";
 
@@ -38,7 +39,7 @@ const jslWeak = new WeakRef(jsl);
 jsl = null;
 
 assert.equal(runtime.call("HostInterop.callbackRoundTrip", 3), 10n);
-assert.equal(runtime.liveCallbackCount(), 1);
+assert.equal(countLiveCallbacks(runtime.hostState), 1);
 assert.equal(runtime.hostState.leanObjectHandleCells.size, 2,
   "JSL and actual Lean callback use the same tracking set");
 assert.equal(typeof callback, "function");
@@ -50,7 +51,7 @@ for (
   let attempt = 0;
   attempt < 300 &&
   (runtime.hostState.leanObjectHandleCells.size !== 0 ||
-    runtime.liveCallbackCount() !== 0);
+    countLiveCallbacks(runtime.hostState) !== 0);
   attempt++
 ) {
   globalThis.gc();
@@ -64,7 +65,7 @@ assert.equal(
   "an unreachable JSL object must release its Lean root",
 );
 assert.equal(callbackWeak.deref(), undefined);
-assert.equal(runtime.liveCallbackCount(), 0,
+assert.equal(countLiveCallbacks(runtime.hostState), 0,
   "an unreachable callback must release its shared ownership cell");
 
 runtime.dispose();

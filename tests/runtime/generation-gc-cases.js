@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 export function check(condition, message) {
   if (!condition) throw new Error(message);
@@ -76,7 +77,35 @@ function observations({ runtime, callback, jsl }) {
   };
 }
 
+async function retiredGeneration(createRuntime, failed) {
+  const generation = await makeGeneration(createRuntime);
+  const { runtime, callback, jsl } = generation;
+  const weak = { runtime: new WeakRef(runtime), memory: new WeakRef(runtime.exports.memory) };
+  if (failed) {
+    let trap;
+    try { runtime.exports.vir_obj_nat(0xfffffff0, 32); }
+    catch (error) { trap = error; }
+    check(trap instanceof WebAssembly.RuntimeError && runtime.failure === trap,
+      "dead-target collection uses a genuinely failed Wasm generation");
+  }
+  runtime.dispose();
+  return { weak, callback, jsl };
+}
+
+async function retiredTargets(createRuntime) {
+  for (const failed of [false, true]) {
+    const dead = await retiredGeneration(createRuntime, failed);
+    await collectUntil(() => !dead.weak.runtime.deref() && !dead.weak.memory.deref(),
+      `retained retired callback/JSL generation: failed=${failed}`);
+    let rejected = false;
+    try { dead.callback(0); } catch (error) { rejected = /disposed runtime/.test(error.message); }
+    check(rejected, "retained dead callback still gives its terminal error");
+    check(typeof dead.jsl === "object", "dead JSL carrier remains retained across collection");
+  }
+}
+
 export async function runGenerationGcCases(createRuntime) {
+  await retiredTargets(createRuntime);
   await failedHostCallbacks(createRuntime);
   await returnedCallbacks(createRuntime);
   // Real Wasm roots are released while the original generation stays owned.
@@ -86,7 +115,7 @@ export async function runGenerationGcCases(createRuntime) {
   acyclic = null;
   await collectUntil(
     () =>
-      owned.liveCallbackCount() === 0 &&
+      countLiveCallbacks(owned.hostState) === 0 &&
       owned.hostState.leanObjectHandleCells.size === 0,
     "acyclic foreign root release",
   );
@@ -125,7 +154,7 @@ export async function runGenerationGcCases(createRuntime) {
   const jslOwner = new WeakRef(jslCase.runtime);
   jslCase = null;
   await collectUntil(
-    () => jslOwner.deref()?.liveCallbackCount() === 0,
+    () => countLiveCallbacks(jslOwner.deref()?.hostState) === 0,
     "JSL-only owner control",
   );
   check(
@@ -228,7 +257,7 @@ async function returnedCallbacks(createRuntime) {
       check(values[0](4) === 11n && values[1](4) === 12n,
         "returned Lean callbacks preserve captured values");
       values = null;
-      await collectUntil(() => runtime.liveCallbackCount() === 0,
+      await collectUntil(() => countLiveCallbacks(runtime.hostState) === 0,
         "successful returned callbacks collected while runtime lives");
 
       let first;
@@ -244,12 +273,12 @@ async function returnedCallbacks(createRuntime) {
         try { runtime[method]("HostInterop.callbackResults", 7); }
         catch (error) { caught = error; }
         check(caught === failure && count === 2, "partial result preserves exact error");
-        check(runtime.liveCallbackCount() === 1,
+        check(countLiveCallbacks(runtime.hostState) === 1,
           "partial result callback is not eagerly invalidated");
       } finally {
         runtime.liftObjectFunction = liftObjectFunction;
       }
-      await collectUntil(() => first.deref() === undefined && runtime.liveCallbackCount() === 0,
+      await collectUntil(() => first.deref() === undefined && countLiveCallbacks(runtime.hostState) === 0,
         "partial result callback eligible for collection while runtime lives");
     }
   } finally {
@@ -278,9 +307,9 @@ async function failedHostCallbacks(createRuntime) {
       await collectUntil(() => true, "escaped callback retention control");
       check(capture.weak.deref() === capture.strong && capture.strong(4n) === 11n,
         "failed host callback survives GC while JavaScript retains it");
-      check(runtime.liveCallbackCount() === 1, "escaped callback keeps its foreign root");
+      check(countLiveCallbacks(runtime.hostState) === 1, "escaped callback keeps its foreign root");
       capture.strong = null;
-      await collectUntil(() => capture.weak.deref() === undefined && runtime.liveCallbackCount() === 0,
+      await collectUntil(() => capture.weak.deref() === undefined && countLiveCallbacks(runtime.hostState) === 0,
         "failed host callback eligible for collection while runtime remains live");
       check(runtime.hostState.resourceRootCounts().active === 0,
         "failed host call releases temporary externref roots");
@@ -305,7 +334,7 @@ async function failedHostCallbacks(createRuntime) {
     } finally {
       runtime.liftObjectValue = liftObjectValue;
     }
-    await collectUntil(() => partial.deref() === undefined && runtime.liveCallbackCount() === 0,
+    await collectUntil(() => partial.deref() === undefined && countLiveCallbacks(runtime.hostState) === 0,
       "partial lifting callback eligible for collection");
     check(runtime.hostState.resourceRootCounts().active === 0,
       "partial lifting failure releases temporary externref roots");

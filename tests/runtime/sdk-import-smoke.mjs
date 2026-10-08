@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
@@ -175,11 +176,11 @@ try {
     try {
       assert.equal(callableRuntime.call("HostInterop.callbackRoundTrip", 3), 10n);
       assert.equal(retained(4n), 11n);
-      assert.equal(callableRuntime.liveCallbackCount(), 1);
+      assert.equal(countLiveCallbacks(callableRuntime.hostState), 1);
       const wasm = callableRuntime.exports, host = callableRuntime.hostState;
       callableRuntime.dispose();
       assert.equal(host.leanObjectHandleCells.size, 0);
-      assert.equal(host.liveCallbackCount, 0);
+      assert.equal(countLiveCallbacks(host), 0);
       assert.equal(wasm.vir_resource_roots_active(), 0);
       assert.throws(() => retained(1n), /disposed runtime/);
     } finally { callableRuntime.dispose(); }

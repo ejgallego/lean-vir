@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -74,7 +75,7 @@ try {
           );
         }
         assert.equal(runtime.failure, null);
-        assert.equal(runtime.liveCallbackCount(), 0);
+        assert.equal(countLiveCallbacks(runtime.hostState), 0);
         assert.equal(runtime.hostState.leanObjectHandleCells.size, 3);
         assert.equal(runtime.exports.vir_resource_roots_active(), 0);
         let fired = false;

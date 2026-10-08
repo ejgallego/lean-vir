@@ -4,7 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { throwWithCleanup } from "./cleanup.js";
 import {
   customInductiveConstructorAt,
   requireFunctionArgs,
@@ -46,86 +45,72 @@ import { requireString } from "./object-core.js";
 // The pinned kernel stores index + 1 in a 20-bit loose-bound-variable range.
 const MAX_EXPR_BVAR_INDEX = 1048574n;
 
+// A callback must capture only its cell, not a construction method's context
+// containing the runtime: retired targets must allow that generation to collect.
+function makeLeanCallback(cell) {
+  return function virCallback(...args) {
+    if (!cell.live) throw new Error("Vir callback belongs to a disposed runtime");
+    return cell.runtime.callClosure(cell, args);
+  };
+}
+
 // Add structural, syntax and automatic callable conversion to the same managed
 // runtime. Primitive conversions and opaque Js/JSL ownership stay inherited.
 export function withObjectValues(Base) {
   return class extends Base {
     callClosure(cell, args) {
       this.requireLiveRuntime();
+      if (this.hostState?.callError) throw this.hostState.callError;
       this.requireLiveLeanObjectCell(cell, "callback");
       this.requireFunction("vir_closure_apply_objects");
       const type = cell.callType;
       const fnArgs = requireFunctionArgs(type, "callback");
-      // Like ordinary JS formal parameters, ignore extra arguments and read
-      // missing arguments as undefined. Each declared boundary view still
-      // performs its normal conversion/check when lowered into Lean.
       const argObjs = [];
       try {
-        fnArgs.forEach((arg, index) => {
-          argObjs.push(
-            this.makeObjectValue(
-              arg.type,
-              args[index],
-              `callback argument ${arg.name}`,
-            ),
-          );
-        });
-        return this.callClosureObjects(cell, argObjs);
-      } finally {
-        this.releaseOwnedObjects(argObjs);
-      }
-    }
-
-    callClosureObjects(cell, argObjs) {
-      let argvPtr = 0;
-      let resultObj = 0;
-      try {
-        if (this.hostState?.callError) throw this.hostState.callError;
-        this.requireLiveLeanObjectCell(cell, "callback");
-        const type = cell.callType;
-        const arity = requireFunctionArgs(type, "callback").length;
-        const effect = interfaceEffectRuntimeTag(type.effect);
-        if (argObjs.length !== 0) {
-          argvPtr = this.allocByteLength(
-            argObjs.length * 4,
-            "callback argv pointer array",
-          );
-          this.writePointerArray(argvPtr, argObjs);
-        }
+        let argvPtr = 0;
+        let resultObj = 0;
         try {
-          const argc = argObjs.length;
-          // The consuming ABI owns arguments from entry, including trap paths.
-          argObjs.length = 0;
-          resultObj = this.exports.vir_closure_apply_objects(
-            cell.object,
-            arity,
-            effect,
-            argvPtr,
-            argc,
-          );
-        } catch (error) {
+          // Match JS formal parameters: ignore extras, read absent values as
+          // undefined, and convert each declared argument normally.
+          fnArgs.forEach((arg, index) => {
+            argObjs.push(
+              this.makeObjectValue(arg.type, args[index], `callback argument ${arg.name}`),
+            );
+          });
+          if (this.hostState?.callError) throw this.hostState.callError;
+          this.requireLiveLeanObjectCell(cell, "callback");
+          const effect = interfaceEffectRuntimeTag(type.effect);
+          if (argObjs.length !== 0) {
+            argvPtr = this.allocByteLength(
+              argObjs.length * 4, "callback argv pointer array",
+            );
+            this.writePointerArray(argvPtr, argObjs);
+          }
+          try {
+            const argc = argObjs.length;
+            // The consuming ABI owns arguments from entry, including traps.
+            argObjs.length = 0;
+            resultObj = this.exports.vir_closure_apply_objects(
+              cell.object, effect, argvPtr, argc,
+            );
+          } catch (error) {
+            throw this.hostState?.takeCallError() ?? error;
+          }
           const hostError = this.hostState?.takeCallError();
-          throw hostError ?? error;
+          if (hostError) throw hostError;
+          if (resultObj === 0) {
+            throw new Error(this.lastClosureCallError() || "closure call failed");
+          }
+          return this.liftObjectValue(
+            requireFunctionResult(type, "callback"), resultObj, "callback result",
+          );
+        } finally {
+          if (argvPtr !== 0) this.freeBytes(argvPtr);
+          if (resultObj !== 0) this.exports.vir_obj_dec(resultObj);
         }
-        const hostError = this.hostState?.takeCallError();
-        if (hostError) {
-          throw hostError;
-        }
-        if (resultObj === 0) {
-          throw new Error(this.lastClosureCallError() || "closure call failed");
-        }
-        return this.liftObjectValue(
-          requireFunctionResult(type, "callback"),
-          resultObj,
-          "callback result",
-        );
       } finally {
-        if (argvPtr !== 0) {
-          this.freeBytes(argvPtr);
-        }
-        if (resultObj !== 0) {
-          this.exports.vir_obj_dec(resultObj);
-        }
+        // Also runs if argv/result cleanup itself throws before native transfer.
+        this.releaseOwnedObjects(argObjs);
       }
     }
 
@@ -1198,21 +1183,7 @@ export function withObjectValues(Base) {
     liftObjectFunction(type, obj, label) {
       requireFunctionArgs(type, label);
       requireFunctionResult(type, label);
-      const cell = this.makeLeanObjectHandleCell(obj, label, type);
-      try {
-        const callback = function virCallback(...args) {
-          if (!cell.live)
-            throw new Error("Vir callback belongs to a disposed runtime");
-          return cell.runtime.callClosure(cell, args);
-        };
-        return this.attachLeanObjectHandle(cell, callback);
-      } catch (error) {
-        throwWithCleanup(
-          error,
-          () => this.releaseLeanObjectHandleCell(cell),
-          "Lean callback creation failed",
-        );
-      }
+      return this.makeLeanObjectHandleTarget(obj, label, type, makeLeanCallback);
     }
 
     liftObjectArrayValue(type, obj, label, selfType) {

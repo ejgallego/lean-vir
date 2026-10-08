@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import {
   createVirRuntime,
@@ -127,7 +128,7 @@ assert.equal(
   true,
 );
 assert.deepEqual(retainedCallbackRuntime.hostState.callTimings, []);
-assert.equal(retainedCallbackRuntime.liveCallbackCount(), 1);
+assert.equal(countLiveCallbacks(retainedCallbackRuntime.hostState), 1);
 const retainedJsNat = (value) =>
   retainedCallbackRuntime.hostState.defaultBindings["js.nat"](BigInt(value));
 const retainedJsNatValue = (value) =>
@@ -135,7 +136,7 @@ const retainedJsNatValue = (value) =>
 assert.equal(retainedJsNatValue(retainedCallback(retainedJsNat(4))), 11n);
 assert.deepEqual(Object.keys(retainedCallback), []);
 retainedCallbackRuntime.dispose();
-assert.equal(retainedCallbackRuntime.liveCallbackCount(), 0);
+assert.equal(countLiveCallbacks(retainedCallbackRuntime.hostState), 0);
 assert.throws(() => retainedCallback(4n), /disposed runtime/);
 
 const extraArgumentRuntime = await createVirRuntime({
@@ -150,9 +151,9 @@ assert.equal(
   extraArgumentRuntime.call("HostInterop.callbackRoundTrip", 1),
   8n,
 );
-assert.equal(extraArgumentRuntime.liveCallbackCount(), 1);
+assert.equal(countLiveCallbacks(extraArgumentRuntime.hostState), 1);
 extraArgumentRuntime.dispose();
-assert.equal(extraArgumentRuntime.liveCallbackCount(), 0);
+assert.equal(countLiveCallbacks(extraArgumentRuntime.hostState), 0);
 
 let throwingCallback = null;
 const throwingBindingRuntime = await createVirRuntime({
@@ -170,10 +171,10 @@ assert.throws(
   () => throwingBindingRuntime.callTimed("HostInterop.callbackRoundTrip", 1),
   /host binding boom/,
 );
-assert.equal(throwingBindingRuntime.liveCallbackCount(), 1);
+assert.equal(countLiveCallbacks(throwingBindingRuntime.hostState), 1);
 assert.equal(throwingCallback(1n), 8n);
 throwingBindingRuntime.dispose();
-assert.equal(throwingBindingRuntime.liveCallbackCount(), 0);
+assert.equal(countLiveCallbacks(throwingBindingRuntime.hostState), 0);
 assert.throws(() => throwingCallback(1n), /disposed runtime/);
 
 let bindingDisposals = 0;
@@ -191,7 +192,7 @@ const firstRuntime = await hostFactory.createRuntime({
   irPackageSet: [hostPackageBytes],
 });
 assert.equal(firstRuntime.call("HostInterop.callbackRoundTrip", 3), 10n);
-assert.equal(firstRuntime.liveCallbackCount(), 1);
+assert.equal(countLiveCallbacks(firstRuntime.hostState), 1);
 const badPackage = Uint8Array.from(hostPackageBytes);
 badPackage[4] ^= 1;
 const failedCandidate = await hostFactory.createRuntime();
@@ -201,7 +202,7 @@ assert.throws(
 );
 failedCandidate.dispose();
 assert.equal(bindingDisposals, 0);
-assert.equal(firstRuntime.liveCallbackCount(), 1);
+assert.equal(countLiveCallbacks(firstRuntime.hostState), 1);
 const nextRuntime = await hostFactory.createRuntime({
   irPackageSet: [defaultPackageBytes],
 });

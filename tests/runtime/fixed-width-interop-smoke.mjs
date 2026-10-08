@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -69,7 +70,7 @@ try {
     for (const fn of [wide, index, nat, int]) {
       runtime.releaseLeanObjectHandleCell(runtime.leanCallbackCell(fn, "numeric callback"));
     }
-    assert.equal(runtime.liveCallbackCount(), 0);
+    assert.equal(countLiveCallbacks(runtime.hostState), 0);
     assert.throws(() => wide(0), /disposed runtime/);
     assert.throws(() => nat(0), /disposed runtime/);
 

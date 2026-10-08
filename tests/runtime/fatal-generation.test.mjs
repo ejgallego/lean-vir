@@ -30,12 +30,13 @@ for (const kind of ["named", "closure"]) {
       vir_closure_apply_objects: fail,
     }, { hostState });
     runtime.resolveCallSlot = () => 1;
+    runtime.makeObjectValue = (_type, value) => value;
     const args = [100, 200];
     assert.throws(() => kind === "named"
       ? runtime.callResolvedObjects({ entry: "test" }, {}, args, () => {})
-      : runtime.callClosureObjects({ runtime, object: 1, live: true,
+      : runtime.callClosure({ runtime, object: 1, live: true,
         callType: { args: ["a", "b"].map(name => ({ name, type: { interfaceTag: 1 } })), effect: "pure" } }, args), error => error === failure);
-    assert.deepEqual(args, [], "ownership has left JavaScript even when entry throws");
+    assert.deepEqual(args, kind === "named" ? [] : [100, 200], "callbacks own their lowered array, not the caller inputs");
     assert.equal(runtime.failure, failure);
     assert.equal(hostState.callError, null);
     assert.throws(() => runtime.requireLiveRuntime(), /fresh runtime/);

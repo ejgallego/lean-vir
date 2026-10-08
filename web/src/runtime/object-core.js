@@ -25,11 +25,12 @@ const leanObjectHandleFinalizer =
     ? new FinalizationRegistry((weakCell) => {
         const cell = weakCell.deref();
         if (cell === undefined) return;
+        const hostState = cell.runtime?.hostState;
         try {
           releaseLeanObjectHandleCell(cell, true);
         } catch (error) {
           try {
-            cell.runtime.hostState?.recordFinalizerError(error);
+            hostState?.recordFinalizerError(error);
           } catch {
             // Finalization must never surface through the host job queue.
           }
@@ -58,12 +59,17 @@ function releaseLeanObjectHandleCell(cell, fromFinalizer = false) {
     if (typeof onRelease === "function") onRelease();
     return false;
   }
+  const runtime = cell.runtime;
+  const object = cell.object;
   cell.live = false;
+  cell.runtime = null;
+  cell.object = 0;
+  cell.callType = null;
   if (!fromFinalizer) {
     leanObjectHandleFinalizer?.unregister(cell);
   }
   const errors = [];
-  collectCleanupError(errors, () => cell.runtime.exports.vir_obj_dec(cell.object));
+  collectCleanupError(errors, () => runtime.exports.vir_obj_dec(object));
   if (typeof onRelease === "function") collectCleanupError(errors, onRelease);
   throwCollectedErrors(errors, "Lean object handle release failed");
   return true;
@@ -159,46 +165,26 @@ export class ObjectRuntime {
     return argObj;
   }
 
-  makeLeanObjectHandleCell(obj, label, callType = null) {
+  makeLeanObjectHandleTarget(obj, label, callType, makeTarget) {
     const object = normalizeObjectPointer(obj, label);
     this.exports.vir_obj_inc(object);
-    const cell = {
-      runtime: this,
-      object,
-      live: true,
-      onRelease: null,
-      callType,
-    };
+    const cell = { runtime: this, object, live: true, onRelease: null, callType };
     try {
       if (typeof this.hostState?.trackLeanObjectHandleCell !== "function") {
-        throw new Error(
-          `${label} requires deterministic Lean object handle tracking`,
-        );
+        throw new Error(`${label} requires deterministic Lean object handle tracking`);
       }
       this.hostState.trackLeanObjectHandleCell(cell);
-      return cell;
+      return attachLeanObjectHandle(cell, makeTarget(cell));
     } catch (error) {
       throwWithCleanup(
         error, () => releaseLeanObjectHandleCell(cell),
         "Lean object handle creation failed",
       );
     }
-  }
-
-  attachLeanObjectHandle(cell, target) {
-    return attachLeanObjectHandle(cell, target);
   }
 
   makeLeanObjectHandleResource(obj, label) {
-    const cell = this.makeLeanObjectHandleCell(obj, label);
-    try {
-      return attachLeanObjectHandle(cell, {});
-    } catch (error) {
-      throwWithCleanup(
-        error, () => releaseLeanObjectHandleCell(cell),
-        "Lean object handle creation failed",
-      );
-    }
+    return this.makeLeanObjectHandleTarget(obj, label, null, () => ({}));
   }
 
   requireLiveLeanObjectCell(cell, label) {

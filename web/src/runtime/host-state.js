@@ -43,7 +43,6 @@ export class VirHostState {
     this.runtime = null;
     this.leanObjectHandleCells = new Set();
     this.leanObjectHandleTrackingClosed = false;
-    this.liveCallbackCount = 0;
     this.callError = null;
     this.callTimings = [];
     this.finalizerErrorMessages = [];
@@ -255,16 +254,7 @@ export class VirHostState {
       } catch (error) {
         throwWithCleanup(
           error,
-          () => {
-            const errors = [];
-            collectCleanupError(errors, () =>
-              this.runtime.releaseLeanObjectHandleCell(cell),
-            );
-            throwCollectedErrors(
-              errors,
-              `${entry.target} failed during object-handle rollback`,
-            );
-          },
+          () => this.runtime.releaseLeanObjectHandleCell(cell),
           `${entry.target} failed during result cleanup`,
         );
       }
@@ -304,10 +294,8 @@ export class VirHostState {
     }
     cell.onRelease = () => {
       this.leanObjectHandleCells.delete(cell);
-      if (isCallback) this.liveCallbackCount--;
     };
     this.leanObjectHandleCells.add(cell);
-    if (isCallback) this.liveCallbackCount++;
     return cell;
   }
 

@@ -17,7 +17,7 @@ Both compositions share these modules:
 | `object-core.js` | Object transport and consuming calls, exact JavaScript resources and the single retained-value ownership registry for JSL and converted callbacks |
 | `primitive-values.js` | Unit, resources, booleans, numeric values, strings and byte-array conversion |
 | `object-boundary.js` | Boxed-boundary requirements used by package admission |
-| `host-state.js` | Host-call transactions, shared retained-value tracking, callback-admission count and binding-provider cleanup |
+| `host-state.js` | Host-call transactions, shared retained-value tracking and binding-provider cleanup |
 
 The full `core.js` composition adds `object-values.js`: arrays, lists, options,
 pairs, structures, inductives, `Lean.Expr` and automatic Lean-function conversion
@@ -58,7 +58,7 @@ retain their existing invocation metadata in the full composition. They share
 JSL's retained-value cell, finalizer and terminal tracking rather than using a
 second native ownership registry. The optional layer performs typed closure
 application through `vir_closure_apply_objects`; the shared host state owns
-retirement and a callback count for package admission.
+retirement.
 Host imports that receive Lean callbacks as ordinary JavaScript functions also
 need the full callable converter. A primitive JSL client can instead schedule a
 JavaScript closure that calls its explicit Lean `invoke...` boundary with the
