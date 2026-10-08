@@ -208,6 +208,11 @@ the standard workflow, record a decision as an `update` when the thread remains
 active, or as a `completion` when the request asked only for an investigation
 or decision. The requester can accept a completed decision with `closure`.
 
+These states are optional, not a required conversation sequence. Do not send
+claim, acceptance or closure messages merely to advance a status label; use the
+board for routine status. A substantive ownership transfer or decision still
+needs an explicit handoff.
+
 The checker warns when standard workflow messages bypass a requested claim,
 ownership, routing, transition, or disposition conventions. These warnings are
 coordination advice, not transport failures. The Markdown body remains the
@@ -257,6 +262,13 @@ that needs that owner's action. Batch independent status into one coordinator
 digest; notify the human when review/decision is needed or a material blocker
 changes the plan.
 
+Consult only owners affected by overlapping edits or shared-contract changes.
+Do not seek unrelated owners' agreement or repeat permission already granted.
+An assigned liaison can handle intake and handoffs directly; the coordinator
+handles priorities, conflicts and decisions rather than relaying every exchange.
+Keep one CI owner per PR; avoid duplicate watches and routine receipt echoes.
+Independent substantive review remains useful and does not transfer ownership.
+
 ## Commands
 
 Validate and atomically publish a complete draft message:
@@ -298,13 +310,6 @@ Include terminal threads or emit JSON:
 ```bash
 npm run mailbox:list -- --all
 npm run mailbox:list -- --json
-```
-
-For routine lane selection, prefer the compact one-line index rather than the
-full human-readable checkpoint report:
-
-```bash
-npm run mailbox:list -- --brief
 ```
 
 Archive a wholly closed or cancelled thread:

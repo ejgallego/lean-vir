@@ -57,9 +57,10 @@ asks for that machinery.
 
 - When present, read `WORKBOARD.md` in the primary checkout before choosing or
   resuming work. It is the single private queue; do not create worktree copies.
-  The coordinator maintains priorities, next actions, and review readiness;
-  mailbox threads retain supporting evidence and ownership handoffs. Give new
-  or older sessions the canonical board path in their assignment.
+  Keep its active queue short: task, owner, state, and next action or blocker.
+  Owners update their entries; the coordinator maintains priorities and resolves
+  conflicts. Link supporting history instead of repeating it. Give assigned
+  sessions the canonical board path.
 - Report discoveries with a proposed next action. The coordinator must put
   deferred work on the board with an owner and revisit trigger, or explicitly
   decline it; a mailbox mention of "after the PR" is not a queued task.
@@ -76,17 +77,23 @@ asks for that machinery.
 - Follow `docs/development/MAILBOX_PROTOCOL.md` for same-project and cross-project
   messages. A cross-project thread belongs to the project that owns the
   requested code change.
-- Read the relevant mailbox threads and run `npm run mailbox:list -- --brief`
-  before creating or resuming a lane. Git reports current paths, heads, and
-  dirty work; messages report intent and checkpoints, not whether an agent is
-  still running. Use the full list or an individual message only when the brief
-  index identifies a relevant lane.
+- Read the board and relevant handoffs before starting or resuming work. Use
+  `npm run mailbox:list` when ownership is unclear; do not scan the entire
+  mailbox for routine continuation. Check Git for actual heads and dirty work;
+  messages record intent, not whether an agent is running.
 - Give each implementation lane one accountable writer, a concrete agent
   address, an explicit base commit, write scope, acceptance checks, and
   publication boundary. Check for overlapping work before recording the claim.
 - For parallel work, the coordinating agent owns task decomposition,
   dependencies, integration order, and final validation. Keep overlapping edits
   sequential. Review agents may inspect a lane without acquiring write ownership.
+- Consult another owner only for overlapping edits or a change to a shared
+  contract. Source ownership is not approval authority over unrelated work.
+  Continue already-authorized scope without another agreement round trip;
+  request a decision only for new scope, a real conflict, or missing authority.
+  A liaison handles assigned intake and handoffs directly; the coordinator need
+  not relay or re-approve each exchange. Each PR operation (publication, CI,
+  landing) has one accountable owner; roles may differ, but do not duplicate them.
 - Scale coordination to the work. Use explicit assignments, inspectable agent
   IDs, and durable checkpoints for long or overlapping lanes; keep independent
   work independent. Do not poll or message other lanes for routine status.
@@ -107,16 +114,16 @@ asks for that machinery.
   fan out routine status. Keep hashes, logs, and test inventories in evidence.
   Default actionable handoffs to four lines: outcome, exact head/PR, decision
   needed, and one evidence link.
-- For long non-interactive builds/tests, prefer `npm run quiet -- -- COMMAND`:
-  it stores full stdout/stderr under ignored `build/logs/`, prints one success
-  line, and prints a short tail only on failure. Do not use it for interactive
-  servers or when live progress is itself the diagnostic.
+- Keep long non-interactive build/test output in ignored logs; report the result
+  and a short failure excerpt when needed. Preserve full diagnostics. Do not
+  suppress interactive output or progress needed for diagnosis.
 - Continue approved work without another permission loop, but surface real
   blockers and decisions promptly. Do not reply merely to acknowledge this rule.
 - Treat an agent's completion as a handoff for review. Verify the actual head,
   diff, dirty state, and remaining work before consuming it. Transfer ownership
-  explicitly before another agent writes to the same lane. Use the protocol's
-  restart and handoff procedure after an interruption or model switch.
+  explicitly before another agent writes to the same lane. After an interruption,
+  check the current source and handoff before continuing; a model switch alone
+  does not require a new claim or notification.
 - The validated envelope is deliberately small. Kinds, states, ownership, and
   lane metadata are recommended coordination conventions, not a requirement
   for free-form agent messages.
