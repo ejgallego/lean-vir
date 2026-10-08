@@ -10,7 +10,7 @@ import Vir.Resources
 import Vir.Resources.Pack
 import Vir.Hash
 import Vir.BinaryLiteral
-import Vir.GeneratePackage.PackageFormat
+import Vir.Package.Format
 public meta import Vir.Resources
 public meta import Vir.Resources.Pack
 public meta import Vir.Hash

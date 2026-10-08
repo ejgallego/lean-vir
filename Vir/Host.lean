@@ -8,7 +8,7 @@ module
 
 public import Lean
 public import Lean.Compiler.ExternAttr
-public import Vir.HostValidation
+public import Vir.Compiler.HostValidation
 
 public section
 

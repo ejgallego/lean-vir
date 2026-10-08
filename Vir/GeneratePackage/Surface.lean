@@ -10,7 +10,7 @@ import Lean.Compiler.InitAttr
 import Lean.Elab.Frontend
 public import Lean.Compiler.MetaAttr
 public import Vir.GeneratePackage.Closure
-public import Vir.GeneratePackage.Json
+public import Vir.Package.Json
 
 public section
 

@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Lean.Compiler.IR.CompilerM
-public import Vir.HostMetadata
+public import Vir.Compiler.HostMetadata
 
 public section
 

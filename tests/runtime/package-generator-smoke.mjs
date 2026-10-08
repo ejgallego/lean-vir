@@ -52,7 +52,7 @@ try {
   const jsonProject = await createRuntimeModuleProject(join(freshDir, "json"), {
     JsonControls: [
       "module",
-      "public meta import Vir.GeneratePackage.Json",
+      "public meta import Vir.Package.Json",
       "public meta import Lean.CoreM",
       "",
       "open Vir.GeneratePackage",

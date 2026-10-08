@@ -68,7 +68,7 @@ once in C++ decoding. The C++ side also owns object construction details and
 reference-counting behavior while materializing upstream `Lean.IR` values.
 
 The package name/IR declaration payload tag table in
-`Vir/GeneratePackage/PackageIRTags.lean` defines the wire values, and
+`Vir/Package/IRTags.lean` defines the wire values, and
 `scripts/native/ir-codec-tags.mjs` maps them into the generated
 `build/generated/wasm/package/package_ir_tags.h`. Name tags are shared by
 declarations, initializer globals, host imports, and export summaries; the

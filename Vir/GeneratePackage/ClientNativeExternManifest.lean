@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Lean.Data.Json.Parser
-public import Vir.GeneratePackage.NativeExterns
+public import Vir.Compiler.NativeExterns
 
 public section
 

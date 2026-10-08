@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.Interface.Classify.Basic
+public import Vir.Compiler.Interface.Classify.Basic
 
 public section
 

@@ -124,6 +124,13 @@ structure InterfaceArg where
   name : String
   type : InterfaceType
 
+/-- A JavaScript-boundary signature after interface type classification. -/
+structure ClassifiedSignature where
+  args : Array InterfaceArg
+  result : InterfaceType
+  effect : InterfaceEffect
+  erasedPrefixArgs : Nat := 0
+
 /-- The runtime policy applied to a JavaScript host import. -/
 inductive HostImportBoundary where
   | hostResource

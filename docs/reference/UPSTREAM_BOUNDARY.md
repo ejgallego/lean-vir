@@ -42,7 +42,7 @@ same manifest for package native-over-fallback selection and the Wasm build.
 
 ## Native boxed wrappers
 
-[`NativeExternSpec`](../../Vir/GeneratePackage/NativeExterns.lean) stores VIR policy:
+[`NativeExternSpec`](../../Vir/Compiler/NativeExterns.lean) stores VIR policy:
 declaration name, wrapper selection, explicit closure dependencies and an optional
 provider-symbol override. Its resolver obtains parameter IR types, borrow bits
 and result IR type from `Lean.IR.findEnvDecl`, and the C symbol from

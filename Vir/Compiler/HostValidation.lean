@@ -6,8 +6,8 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.HostMetadata
-public import Vir.Interface.Classify.Signature
+public import Vir.Compiler.HostMetadata
+public import Vir.Compiler.Interface.Classify.Signature
 
 public section
 

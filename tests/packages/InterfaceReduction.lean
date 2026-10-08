@@ -10,7 +10,7 @@ public import Vir.Js
 public import Vir.Browser.Types
 public import Vir.React.Types
 public meta import Vir.Attributes
-public meta import Vir.HostValidation
+public meta import Vir.Compiler.HostValidation
 
 public section
 

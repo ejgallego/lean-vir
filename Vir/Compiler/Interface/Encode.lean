@@ -6,7 +6,8 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.GeneratePackage.Json
+public import Vir.Compiler.Interface.Model
+import Vir.Package.Json
 
 public section
 
@@ -212,5 +213,25 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
         ("type", jsonString ty.label),
         ("interfaceTag", jsonNat ty.interfaceTag)
       ]
+
+/-- Encode a named argument without depending on generator metadata. -/
+def InterfaceArg.toJson (arg : InterfaceArg) : String :=
+  jsonObject #[
+    ("name", jsonString arg.name),
+    ("type", arg.type.toJson)
+  ]
+
+def InterfaceEffect.toJson (effect : InterfaceEffect) : String :=
+  jsonString effect.label
+
+/-- Independent callable expectation for createProgram's expectedExports.
+Only argument types, result and effect participate: parameter display names and
+erased implementation slots are not the caller's JavaScript value interface. -/
+def ClassifiedSignature.toExpectedSignatureJson (signature : ClassifiedSignature) : String :=
+  jsonObject #[
+    ("args", jsonArray (signature.args.map (·.type.toJson))),
+    ("result", signature.result.toJson),
+    ("effect", signature.effect.toJson)
+  ]
 
 end Vir.Interface

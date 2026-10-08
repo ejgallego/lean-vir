@@ -8,7 +8,7 @@ module
 public import Vir.Resources.Build
 import Vir.Resources.Pack
 import Vir.Hash
-import Vir.GeneratePackage.PackageSet
+import Vir.Package.Set
 import Lean.Data.Json.Printer
 import Lean.Data.Json.FromToJson
 

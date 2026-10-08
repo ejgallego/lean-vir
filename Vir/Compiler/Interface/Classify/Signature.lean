@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.Interface.Classify.Core
+public import Vir.Compiler.Interface.Classify.Core
 
 public section
 
@@ -15,13 +15,6 @@ open Lean
 namespace Vir.Interface
 
 open Vir.InterfaceValidation
-
-/-- A JavaScript-boundary signature after interface type classification. -/
-public structure ClassifiedSignature where
-  args : Array InterfaceArg
-  result : InterfaceType
-  effect : InterfaceEffect
-  erasedPrefixArgs : Nat := 0
 
 /-- A failure while validating or classifying a complete export interface. -/
 public inductive ExportInterfaceValidationError where

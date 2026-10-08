@@ -39,7 +39,7 @@ const buildInputDiffPaths = [
 ];
 const sourceIdentityPaths = [
   "package-lock.json",
-  "Vir/GeneratePackage/PackageIRTags.lean",
+  "Vir/Package/IRTags.lean",
   "fixtures/browser-packages.json",
   "scripts/packages/browser-package-config.mjs",
   "scripts/packages/check-package-abi.mjs",
@@ -71,7 +71,7 @@ const sourceIdentityPaths = [
   "wasm/upstream_shim/runtime/io_error.h",
   "wasm/upstream_shim/runtime/native_symbols.cpp",
   "wasm/upstream_shim/runtime/native_symbol_lookup.cpp",
-  "Vir/GeneratePackage/NativeExterns.lean",
+  "Vir/Compiler/NativeExterns.lean",
   "scripts/native/check-boundary-registry.mjs",
   "scripts/native/native-symbol-registry.mjs",
   "wasm/upstream_shim/abi/object_abi.cpp",

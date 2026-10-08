@@ -47,7 +47,7 @@ This check makes six mechanically enforceable claims:
 
 1. Every row comes from elaborated declarations and compiled IR metadata, not
    source-text matching.
-2. Lean revalidates every complete signature against `Vir.HostValidation`.
+2. Lean revalidates every complete signature against `Vir.Compiler.HostValidation`.
    Ordinary `@[vir_js]` declarations may use only `Unit`, JavaScript resources,
    object handles, and resource-shaped callbacks at the boundary.
 3. Conversions between JavaScript values and ordinary Lean values must be

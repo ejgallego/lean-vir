@@ -130,7 +130,7 @@ function assertEqual(actual, expected, label) {
   }
 }
 
-const packageFormat = await readRepoText("Vir/GeneratePackage/PackageFormat.lean");
+const packageFormat = await readRepoText("Vir/Package/Format.lean");
 assertEqual(
   leanStringConstant(packageFormat, "packageSetFormat"),
   IR_PACKAGE_SET_FORMAT,
@@ -240,7 +240,7 @@ for (const [leanName, cppName, jsName] of packageSections) {
   );
 }
 
-const interfaceSource = await readRepoText("Vir/GeneratePackage/Interface/Encode.lean");
+const interfaceSource = await readRepoText("Vir/Compiler/Interface/Encode.lean");
 const leanTags = leanInterfaceTags(interfaceSource);
 const jsTags = new Map(Object.entries(INTERFACE_TAG));
 
@@ -269,7 +269,7 @@ if (SUPPORTED_INTERFACE_TAGS.size !== jsTags.size) {
   throw new Error(`SUPPORTED_INTERFACE_TAGS has ${SUPPORTED_INTERFACE_TAGS.size} entries; INTERFACE_TAG has ${jsTags.size}`);
 }
 
-const interfaceModelSource = await readRepoText("Vir/Interface/Model.lean");
+const interfaceModelSource = await readRepoText("Vir/Compiler/Interface/Model.lean");
 const leanBoundaries = leanHostImportBoundaries(interfaceModelSource);
 const jsBoundaries = new Map(Object.entries(HOST_IMPORT_BOUNDARY));
 

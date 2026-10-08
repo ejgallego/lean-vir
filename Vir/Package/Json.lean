@@ -6,7 +6,11 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.GeneratePackage.Basic
+public import Lean.Data.Json.Printer
+
+/-! Compact package/interface JSON fragments. Object fields retain caller order;
+string values go through Lean's JSON printer. Resource content-ID serialization
+has its own canonical spelling and must not use these helpers interchangeably. -/
 
 public section
 

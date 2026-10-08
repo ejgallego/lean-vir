@@ -8,7 +8,7 @@ module
 
 public import Vir.GeneratePackage.Emit
 public import Vir.GeneratePackage.Report
-import Vir.ClientNativeExternManifest
+import Vir.GeneratePackage.ClientNativeExternManifest
 import Vir.Hash
 
 public section

@@ -12,7 +12,7 @@ Author: Emilio J. Gallego Arias
 
 namespace lean::vir {
 
-// Keep the canonical key aligned with Vir.nameKey (Vir/LeanName.lean).
+// Keep the canonical key aligned with Vir.nameKey (Vir/Package/Name.lean).
 // No display escaping, dot splitting or numeric narrowing participates.
 inline std::string name_key(name const & value) {
     std::vector<name> parts;

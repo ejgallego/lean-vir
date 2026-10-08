@@ -9,7 +9,7 @@ module
 public meta import Lean.AddDecl
 public meta import Lean.Compiler.ExternAttr
 public meta import Lean.Elab.Command
-public meta import Vir.ExportValidation
+public meta import Vir.Compiler.ExportValidation
 
 public section
 

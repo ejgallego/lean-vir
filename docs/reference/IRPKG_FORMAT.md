@@ -149,7 +149,7 @@ package owner releases the complete graph both when a later section fails and
 when the package state is cleared.
 
 Package `Name` tags and IR declaration payload tag values live in
-`Vir/GeneratePackage/PackageIRTags.lean`. The mapping in
+`Vir/Package/IRTags.lean`. The mapping in
 `scripts/native/ir-codec-tags.mjs` generates
 `build/generated/wasm/package/package_ir_tags.h`. Name encoding is shared by the
 declaration, initializer-global, host-import, and export-summary sections; the
@@ -250,7 +250,7 @@ not extend that promise.
 Every descriptor has `type` (the applied Lean type label) and `interfaceTag`.
 Compound descriptors also have the `kind` and payload below. The numeric tags
 are package ABI, owned by
-[`Interface.Encode`](../../Vir/GeneratePackage/Interface/Encode.lean) and checked
+[`Interface.Encode`](../../Vir/Compiler/Interface/Encode.lean) and checked
 against [`interface-tags.js`](../../web/src/runtime/interface-tags.js) by
 `npm run check:package-abi`. JS constant names in this table have the prefix
 `INTERFACE_TAG.`; unlisted tags are unsupported.

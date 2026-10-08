@@ -15,6 +15,8 @@ experimental conveniences; shipped coverage is not a support commitment.
 
 ## Experimental
 
+- [Native-precompiled clients](guides/NATIVE_CLIENTS.md): native authoring tools,
+  interface classification/encoding, library ownership and import migration.
 - [DOM helpers](guides/LEAN_VIR_LIBRARY.md): browser receivers, events, timers and canvas.
 - [React and JSX](guides/REACT.md): native values, components, hooks and implemented call shapes.
 - [Infoview widgets and RPC](guides/INFOVIEW.md): editor activation, sessions, server

@@ -32,15 +32,38 @@ target infoviewBundle (pkg) : System.FilePath := do
     return mixTrace entryTrace (mixTrace errorsTrace (mixTrace scriptTrace (mixTrace packageTrace lockTrace)))) fun _ =>
     runNpmScript root "build:infoview"
 
+/- Lake roots claim all descendants, even when globs build only the root.
+Use explicit owners so native imports never load the browser library by accident.
+The cold native-client regression checks one owner for every Vir module. -/
+/-- Browser bindings and example support; native APIs have separate owners. -/
 @[default_target]
 lean_lib Vir where
-  roots := #[`Vir]
+  roots := #[]
+  globs := #[.one `Vir, .one `Vir.Runtime, .andSubmodules `Vir.Js,
+    .andSubmodules `Vir.Browser, .andSubmodules `Vir.React,
+    .andSubmodules `Vir.ProofWidgets, .submodules `Vir.Examples]
+
+/-- Pure format, JSON, Name and hashing utilities shared by native libraries. -/
+lean_lib VirPackageFormat where
+  roots := #[]
+  globs := #[.submodules `Vir.Package, .one `Vir.Hash]
+
+/-- Native compiler APIs and the public authoring attributes. No browser externs. -/
+lean_lib VirCompiler where
+  roots := #[]
+  globs := #[.submodules `Vir.Compiler, .one `Vir.Attributes,
+    .one `Vir.Host, .one `Vir.ExternFallback]
+
+/-- Native package generation, independent of resource preparation and carriers. -/
+lean_lib VirPackage where
+  roots := #[]
+  globs := #[.andSubmodules `Vir.GeneratePackage]
 
 /-- Resource data/tools must never depend on the optional runtime carrier. -/
 lean_lib VirResourceCore where
   roots := #[]
   globs := #[.one `Vir.BinaryLiteral, .one `Vir.Resources, .one `Vir.Resources.Types,
-    .one `Vir.Hash, .one `Vir.Resources.Validate, .one `Vir.Resources.Site, .one `Vir.Resources.Pack,
+    .one `Vir.Resources.Validate, .one `Vir.Resources.Site, .one `Vir.Resources.Pack,
     .one `Vir.Resources.Build, .one `Vir.Resources.Program, .one `Vir.NativePayload]
 
 lean_lib VirResourceEmbed where
@@ -164,9 +187,10 @@ it). This job carries implementation contents as well as their resolved paths;
 serializing its result must not replace that semantic dependency trace. -/
 private def fetchVirCompiledSetup
     (mod : Module) (imports : Array Module) : FetchM (Job Lean.ModuleSetup) := do
-  -- Lean 4.33's importAllArts facet returns exportInfo.arts, not allArts,
-  -- despite using allArtsTrace. Extract both explicitly so private artifact
-  -- groups reach the generator as well as participating in invalidation.
+  -- The importAllArts behavior first observed in Lean 4.33 still holds in
+  -- pinned 4.34: it returns exportInfo.arts despite using allArtsTrace.
+  -- Extract allArts explicitly so private artifact groups reach the generator
+  -- as well as participating in invalidation.
   let jobs ← (imports.push mod).mapM fun input => do
     (← input.exportInfo.fetch).mapM fun info => do
       addTrace info.allArtsTrace

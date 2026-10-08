@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import Lake
 import Vir.NativePayload
-import Vir.GeneratePackage.PackageFormat
+import Vir.Package.Format
 
 open Lean
 open System

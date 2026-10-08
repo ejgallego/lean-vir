@@ -6,10 +6,10 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.IRDependencies
+public import Vir.Compiler.IRDependencies
 import Lean.Compiler.InitAttr
 import Lean.LabelAttribute
-import Vir.GeneratePackage.NativeExterns
+import Vir.Compiler.NativeExterns
 
 public section
 

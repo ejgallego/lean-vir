@@ -7,9 +7,9 @@ Author: Emilio J. Gallego Arias
 import Lean.Compiler.LCNF.EmitC
 import Lean.Compiler.Main
 import Lean.Elab.Frontend
-import Vir.ClientNativeExternManifest
-import Vir.GeneratePackage.Json
-import Vir.GeneratePackage.NativeExterns
+import Vir.GeneratePackage.ClientNativeExternManifest
+import Vir.Package.Json
+import Vir.Compiler.NativeExterns
 
 open Lean
 
