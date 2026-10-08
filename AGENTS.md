@@ -68,9 +68,13 @@ asks for that machinery.
   Work directly or use independent agents/subagents as useful; routine choices
   need no additional permission. Consider correctness, context, latency, cost,
   and coordination overhead, and adapt when the evidence changes.
-- Keep ownership clear and progress understandable. Existing active sessions
-  retain their lanes until an agreed handoff; delegation does not grant
-  ownership of their work.
+- Ownership belongs to an explicit active task and write scope, not a subsystem
+  or agent nickname. Labels such as "Module" describe expertise, not permanent
+  control of all build/resource work. Completed tasks and historical mailbox
+  claims do not reserve future work. Preserve actual in-flight edits until a
+  handoff, but do not ask former owners for permission to start independent work.
+  Resolve ambiguous or stale assignments once on the board, not through a chain
+  of owner approvals. Delegation does not transfer an existing active task.
 - Use the canonical mailbox at `.agents/mailbox/` in the primary/root
   checkout. Linked implementation worktrees must not create separate
   mailboxes.

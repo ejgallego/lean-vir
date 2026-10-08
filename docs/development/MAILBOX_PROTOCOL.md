@@ -220,6 +220,13 @@ authoritative place to explain intent and any deliberate exception.
 
 ## Ownership and archival
 
+Ownership is task-scoped. Agent names and historical claims do not establish
+permanent subsystem ownership or veto power. Use the current assignment and Git
+state to identify an active overlap; completion ends the task's write reservation,
+though an explicitly recorded publication or cleanup action may remain pending.
+Route ambiguity to the coordinator once rather than seeking every former owner's
+agreement.
+
 Lane checkpoints use the optional `owner`, `worktree`, `branch`, `base`, `head`,
 `worktree-state` and `publication` fields. The body supplies write scope,
 acceptance checks and any ownership handoff. Recorded metadata describes a
