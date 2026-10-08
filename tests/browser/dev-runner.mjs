@@ -312,9 +312,7 @@ export async function smokeConstructorTemplates(cdp, origin) {
       template: { kind: "branch", fields: {
         left: { kind: "leaf", value: 0 }, right: { kind: "leaf", value: 0 },
       } },
-      edited: { kind: "branch", fields: {
-        left: { kind: "leaf", value: 4 }, right: { kind: "leaf", value: 5 },
-      } }, result: "309",
+      edited: { kind: "leaf", value: 9 }, result: "109",
     },
     {
       entry: "Vir.Fixtures.RecursiveTypes.jsonRootScore", kind: "null",
@@ -337,7 +335,7 @@ export async function smokeConstructorTemplates(cdp, origin) {
       field.dispatchEvent(new Event("input", { bubbles: true }));
       return document.querySelector('[data-constructor-index="0"]').value;
     })()`);
-    assert.equal(selected, spec.kind);
+    assert.equal(selected, spec.edited.kind);
     assert.equal(await runSelectedEntry(cdp), spec.result);
     const incomplete = await evaluate(cdp, `(() => {
       const field = document.querySelector('[data-input-index="0"]');

@@ -15,7 +15,7 @@ import {
 } from "../../web/src/runtime/vir-value-normalizers.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import {
-  defaultValueForConstructor,
+  constructorTemplate,
   defaultValueForType,
   interfaceInputTag,
 } from "../../web/app/pages/interface-inputs.js";
@@ -51,29 +51,6 @@ test("enum values use the JS spelling in both directions", () => {
   }
   for (const value of ["Example.Color.red", "Example.Color.constructor", "0", "1"]) {
     assert.throws(() => normalizeEnum(value, type, "value"), /unknown enum constructor/);
-  }
-});
-
-test("enum metadata cannot substitute the Lean name or ordinal for jsName", () => {
-  for (const ctor of [
-    { name: "Example.Color.red", tag: 0 },
-    { tag: 0 },
-    { name: "Example.Color.red", jsName: null, tag: 0 },
-    { name: "Example.Color.red", jsName: 42, tag: 0 },
-  ]) {
-    const incomplete = { constructors: [ctor] };
-    assert.throws(
-      () => normalizeEnum("Example.Color.red", incomplete, "value"),
-      /invalid manifest enum constructor/,
-    );
-    assert.throws(() => enumValue(incomplete, 0), /invalid manifest enum constructor/);
-  }
-});
-
-test("enum conversion requires a nonempty constructor table", () => {
-  for (const incomplete of [{}, { constructors: [] }]) {
-    assert.throws(() => normalizeEnum("red", incomplete, "value"), /missing manifest enum constructors/);
-    assert.throws(() => enumValue(incomplete, 0), /missing manifest enum constructors/);
   }
 });
 
@@ -139,7 +116,7 @@ test("selected custom constructors produce canonical editable templates", () => 
     { kind: "branch", fields: { left: "", right: "" } },
   ];
   for (const [index, ctor] of ctors.entries()) {
-    const value = defaultValueForConstructor(custom, ctor);
+    const value = constructorTemplate(custom, ctor);
     assert.deepEqual(value, expected[index]);
     assert.equal(normalizeCustomInductive(value, custom, "input").index, index);
   }

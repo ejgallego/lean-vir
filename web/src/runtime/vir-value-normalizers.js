@@ -189,13 +189,14 @@ function customInductiveShape(ctor) {
   return `{ kind: ${kind}, fields: { ${fields.map((field) => field.name).join(", ")} } }`;
 }
 
+// Enum helpers consume admitted descriptors and check only per-call values.
 export function normalizeEnum(value, type, label) {
   if (typeof value !== "string") {
     throw new Error(`${label} must be an enum constructor name`);
   }
-  const constructors = requireEnumConstructors(type, label);
+  const constructors = type.constructors;
   const index = constructors.findIndex(
-    (ctor) => requireEnumConstructorName(ctor, label) === value,
+    (ctor) => ctor.jsName === value,
   );
   if (index < 0) {
     throw new Error(`${label} has unknown enum constructor ${value}`);
@@ -204,26 +205,11 @@ export function normalizeEnum(value, type, label) {
 }
 
 export function enumValue(type, index) {
-  const constructors = requireEnumConstructors(type, "result");
+  const constructors = type.constructors;
   if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
     throw new Error(`result enum index ${index} is out of range`);
   }
-  return requireEnumConstructorName(constructors[index], "result");
-}
-
-function requireEnumConstructors(type, label) {
-  const constructors = type?.constructors;
-  if (!Array.isArray(constructors) || constructors.length === 0) {
-    throw new Error(`${label} is missing manifest enum constructors`);
-  }
-  return constructors;
-}
-
-function requireEnumConstructorName(ctor, label) {
-  if (typeof ctor?.jsName !== "string") {
-    throw new Error(`${label} has an invalid manifest enum constructor jsName`);
-  }
-  return ctor.jsName;
+  return constructors[index].jsName;
 }
 
 function flattenedSubobjectFieldsPresent(value, type) {

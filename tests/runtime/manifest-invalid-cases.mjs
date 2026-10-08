@@ -413,6 +413,25 @@ export const invalidManifestCases = [
     },
     pattern: /constructors\[1\]\.tag must be 1/,
   },
+  ...[undefined, null, 42].map((jsName) => ({
+    name: `invalid enum constructor jsName ${String(jsName)}`,
+    mutate: (manifest) => {
+      manifest.exports[0].result = {
+        type: "Mode", interfaceTag: 14, kind: "simpleEnum",
+        constructors: [{ name: "Mode.cold", jsName, tag: 0 }],
+      };
+    },
+    pattern: /constructors\[0\]\.jsName must be a non-empty string/,
+  })),
+  {
+    name: "empty enum constructor table",
+    mutate: (manifest) => {
+      manifest.exports[0].result = {
+        type: "Mode", interfaceTag: 14, kind: "simpleEnum", constructors: [],
+      };
+    },
+    pattern: /constructors must be a non-empty array/,
+  },
   {
     name: "empty tagged union constructors",
     mutate: (manifest) => {

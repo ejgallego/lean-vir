@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import "./style.css";
 import {
-  defaultValueForConstructor,
+  constructorTemplate,
   inputDefault,
   interfaceInputTag,
   isJsonInputTag,
@@ -281,14 +281,14 @@ function constructorControl(input, index, field) {
   select.addEventListener("change", () => {
     const ctor = type.constructors.find((ctor) => ctor.jsName === select.value);
     if (ctor === undefined) return;
-    field.value = JSON.stringify(defaultValueForConstructor(type, ctor), null, 2);
+    field.value = JSON.stringify(constructorTemplate(type, ctor), null, 2);
     syncSelection();
   });
   syncSelection();
   const hint = document.createElement("small");
   hint.className = "dev-field-hint";
   hint.id = `${select.id}-hint`;
-  hint.textContent = "Choosing a constructor replaces this input with an editable JSON template.";
+  hint.textContent = "Choosing a constructor replaces this input with an editable JSON template. Recursive placeholders may need editing before running.";
   select.setAttribute("aria-describedby", hint.id);
   label.append(caption, select, hint);
   return label;

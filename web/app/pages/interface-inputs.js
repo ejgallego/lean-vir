@@ -75,11 +75,9 @@ export function defaultValueForType(type, selfType = null, depth = 0) {
       return defaultStructureValue(type, depth);
     case INTERFACE_TAG.TAGGED_UNION:
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      return type.constructors[0]
-        ? defaultValueForConstructor(type, type.constructors[0], depth)
-        : { kind: "", value: null };
+      return constructorTemplate(type, type.constructors[0], depth);
     case INTERFACE_TAG.SIMPLE_ENUM:
-      return type?.constructors?.[0]?.jsName ?? "";
+      return type.constructors[0].jsName;
     default:
       return "";
   }
@@ -97,7 +95,8 @@ function defaultStructureValue(type, depth = 0) {
   return value;
 }
 
-export function defaultValueForConstructor(type, ctor, depth = 0) {
+// Editable suggestion for admitted descriptors; recursive positions may need edits.
+export function constructorTemplate(type, ctor, depth = 0) {
   const kind = ctor.jsName;
   if (type.interfaceTag === INTERFACE_TAG.TAGGED_UNION) {
     return { kind, value: defaultValueForType(ctor.type) };
