@@ -42,6 +42,7 @@ export class VirHostState {
     this.ownsDefaultHostBindings = ownsDefaultHostBindings;
     this.runtime = null;
     this.leanObjectHandleCells = new Set();
+    this.leanObjectHandleTrackingClosed = false;
     this.callError = null;
     this.callTimings = [];
     this.finalizerErrorMessages = [];
@@ -253,16 +254,7 @@ export class VirHostState {
       } catch (error) {
         throwWithCleanup(
           error,
-          () => {
-            const errors = [];
-            collectCleanupError(errors, () =>
-              this.runtime.releaseLeanObjectHandleCell(cell),
-            );
-            throwCollectedErrors(
-              errors,
-              `${entry.target} failed during object-handle rollback`,
-            );
-          },
+          () => this.runtime.releaseLeanObjectHandleCell(cell),
           `${entry.target} failed during result cleanup`,
         );
       }
@@ -289,7 +281,13 @@ export class VirHostState {
   }
 
   trackLeanObjectHandleCell(cell) {
-    if (this.disposed || this.disposing || this.runtime === null) {
+    const isCallback = cell.callType != null;
+    if (
+      this.disposed ||
+      this.runtime === null ||
+      this.leanObjectHandleTrackingClosed ||
+      (this.disposing && !isCallback)
+    ) {
       throw new Error(
         "cannot track a Lean object handle in an inactive host state",
       );
@@ -339,6 +337,9 @@ export class VirHostState {
   }
 
   releaseLeanObjectHandleCells() {
+    // Providers may synchronously convert callbacks while cleaning up. Close
+    // acquisition before the final snapshot so every accepted cell is retired.
+    this.leanObjectHandleTrackingClosed = true;
     const errors = [];
     for (const cell of Array.from(this.leanObjectHandleCells)) {
       collectCleanupError(errors, () =>

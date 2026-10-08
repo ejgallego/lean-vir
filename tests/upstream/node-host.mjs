@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
 import { demoHostImportTargets } from "../../scripts/native/demo-host-import-targets.mjs";
@@ -40,10 +41,10 @@ function assertMissingBrowserProvider(runtime, entry, args) {
   }
   if (
     !/host import binding not found/.test(message) ||
-    runtime.liveCallbacks.size !== 0
+    countLiveCallbacks(runtime.hostState) !== 0
   ) {
     throw new Error(
-      `${entry} must require an explicit browser host: ${JSON.stringify({ message, callbacks: runtime.liveCallbacks.size })}`,
+      `${entry} must require an explicit browser host: ${JSON.stringify({ message, callbacks: countLiveCallbacks(runtime.hostState) })}`,
     );
   }
 }

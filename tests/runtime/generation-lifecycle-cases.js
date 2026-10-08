@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
 import {
   check,
@@ -90,14 +91,14 @@ export async function runGenerationLifecycleCases(
   check(exports.vir_resource_roots_active() > 0,
     "table has live roots before failed shutdown");
   const counts = injectReleaseFailures(failures.runtime);
-  rejects(() => failures.runtime.dispose(), /cleanup|teardown/i);
+  rejects(() => failures.runtime.dispose(), /cleanup|teardown|disposal/i);
   check(
     hostDisposals === 1 && counts.callback === 1 && counts.jsl === 1,
     "shutdown attempts host, callback and JSL cleanup exactly once",
   );
   check(
     failedState.leanObjectHandleCells.size === 0 &&
-      failures.runtime.liveCallbacks.size === 0,
+      countLiveCallbacks(failures.runtime.hostState) === 0,
     "failed shutdown clears tracked foreign roots",
   );
   check(
@@ -129,7 +130,7 @@ export async function runGenerationLifecycleCases(
     "both finalizer errors are recorded",
   );
   check(
-    owned.liveCallbacks.size === 0 &&
+    countLiveCallbacks(owned.hostState) === 0 &&
       owned.hostState.leanObjectHandleCells.size === 0,
     "failing finalizers untrack their roots",
   );
@@ -149,19 +150,21 @@ export async function runGenerationLifecycleCases(
 
 function injectReleaseFailures(runtime) {
   const counts = { callback: 0, jsl: 0 };
-  const release = runtime.releaseClosure.bind(runtime);
   const dec = runtime.exports.vir_obj_dec;
-  runtime.releaseClosure = (id) => {
-    release(id);
-    counts.callback++;
-    throw new Error("callback release sentinel");
-  };
+  const identities = Array.from(runtime.hostState.leanObjectHandleCells,
+    cell => ({ cell, object: cell.object, kind: cell.callType === null ? "jsl" : "callback" }));
   runtime.exports = {
     ...runtime.exports,
     vir_obj_dec: (ptr) => {
       dec(ptr);
-      counts.jsl++;
-      throw new Error("JSL release sentinel");
+      // Cell retirement marks it dead before native release and untracks in
+      // finally. Observe that ordering for both kinds, including finalizers.
+      const identity = identities.find(({ cell, object }) => object === ptr && !cell.live);
+      if (identity) {
+        const { kind } = identity;
+        counts[kind]++;
+        throw new Error(`${kind} release sentinel`);
+      }
     },
   };
   return counts;

@@ -2,6 +2,7 @@
 Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -68,7 +69,7 @@ end InitializerRetirement`,
         if (failNextInitializer) {
           failNextInitializer = false;
           stateBeforeFailure = {
-            callbacks: failedRuntime.liveCallbacks.size,
+            callbacks: countLiveCallbacks(failedRuntime.hostState),
             objectHandles: failedRuntime.hostState.leanObjectHandleCells.size,
           };
           return true;
@@ -109,7 +110,7 @@ end InitializerRetirement`,
     try {
       assert.equal(retainedHandles.length, 2,
         "a fresh interpreter can complete the initializer sequence");
-      assert.equal(freshRuntime.liveCallbacks.size, 0,
+      assert.equal(countLiveCallbacks(freshRuntime.hostState), 0,
         "the retained value is a JSL handle rather than a converted JS callback");
       assert.equal(freshRuntime.call("InitializerRetirement.consume", retainedHandles[1]), 17n);
       assert.throws(
