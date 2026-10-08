@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import * as React from "react";
 import { createRoot } from "react-dom/client";
@@ -414,7 +415,7 @@ async function run() {
     );
     current.runtime.dispose();
     check(
-      current.runtime.liveCallbacks.size === 0,
+      countLiveCallbacks(current.runtime.hostState) === 0,
       "hard disposal releases Lean closure roots",
     );
     for (const task of stopped) await release(task, true, true);

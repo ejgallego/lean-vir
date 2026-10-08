@@ -161,6 +161,7 @@ export const runtimeTests = Object.freeze(
     },
     { id: "sdk-import", file: "sdk-import-smoke.mjs", group: "lean" },
     { id: "managed-core", file: "managed-core-smoke.mjs", group: "lean", nodeArgs: ["--expose-gc"] },
+    { id: "shared-lean-ownership", file: "shared-lean-ownership-smoke.mjs", group: "lean" },
   ].map(freezeRuntimeTest),
 );
 

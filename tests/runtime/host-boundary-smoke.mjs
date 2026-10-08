@@ -188,7 +188,6 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
   });
   hostState.attach({ memory: new WebAssembly.Memory({ initial: 1 }) });
   hostState.attachRuntime({
-    liveCallbacks: new Set(),
     makeJsObjectValue(_type, value) {
       return value;
     },

@@ -18,7 +18,7 @@ test("a pending host error forbids dispatch and reentry without clearing the ori
   Object.assign(runtime, { hostState, resolveCallSlot: () => 1 });
   for (const operation of [
     () => hostState.callObjectsImpl(0, 0, 0),
-    () => runtime.callClosureObjects(1, null, []),
+    () => runtime.callClosure(1, []),
     () => runtime.callResolvedObjects({ entry: "test" }, null, [], () => {}),
   ]) {
     assert.throws(operation, error => error === failure);

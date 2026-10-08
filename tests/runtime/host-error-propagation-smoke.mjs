@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -63,7 +64,7 @@ try {
     for (const method of ["call", "callTimed"]) {
       assert.throws(() => runtime[method](prefix + "failThenWork", counter), error => error === failure);
       assert.equal(runtime.call(prefix + "readCounter", counter), 0n, "Lean continuation must not mutate its reference");
-      assert.equal(runtime.liveCallbacks.size, 0, "later callback allocation must not run");
+      assert.equal(countLiveCallbacks(runtime.hostState), 0, "later callback allocation must not run");
       assert.equal(hostCalls, 0, "later native effects must not run");
       assert.equal(runtime.hostState.callError, null);
       assert.equal(runtime.hostState.callTimings.length, 0);
@@ -72,7 +73,7 @@ try {
     }
     const callback = runtime.call(prefix + "failureCallback", counter);
     const invokeCallback = runtime.call(prefix + "invocationCallback", callback);
-    const roots = runtime.liveCallbacks.size;
+    const roots = countLiveCallbacks(runtime.hostState);
     const resourceRoots = runtime.hostState.resourceRootCounts().active;
     assert.throws(() => callback(undefined), error => error === failure);
     for (nestedMethod of ["call", "callTimed", "closure"]) {
@@ -92,7 +93,7 @@ try {
             `${outer} must succeed after catching ${nestedMethod}; subsequent call: ${callAfterCatch}`);
           assert.equal(runtime.hostState.callError, null);
           assert.equal(runtime.hostState.callTimings.length, 0);
-          assert.equal(runtime.liveCallbacks.size, roots);
+          assert.equal(countLiveCallbacks(runtime.hostState), roots);
           assert.equal(runtime.hostState.resourceRootCounts().active, resourceRoots,
             "nested calls must release their temporary argument roots");
           assert.equal(runtime.call(prefix + "readCounter", counter), 0n);
@@ -149,7 +150,7 @@ try {
     assert.equal(hostCalls, 1, "successful imports still permit ordinary continuation");
   } finally {
     runtime.dispose();
-    assert.equal(runtime.liveCallbacks.size, 0);
+    assert.equal(countLiveCallbacks(runtime.hostState), 0);
   }
 
   // The host error is caught by Lean inside this one exported IO action. The

@@ -77,7 +77,7 @@ runtime arguments and data-carrying instances are not supported.
 | `Lean.Vir.Js.Nullable α` | The exact value or `null`                                       | Native nullable result or argument.       |
 | `Lean.Vir.JSL α`         | An ordinary JavaScript object backed by one Lean root           | Store an opaque Lean value in JavaScript. |
 | `Lean.Vir.Js.Function1 α β` | An exact ordinary JavaScript function                         | Native unary function with a phantom call shape. |
-| Lean function argument   | An ordinary JavaScript function backed by one Lean closure root | Explicit callback conversion into Lean.   |
+| Lean function argument   | An ordinary JavaScript function backed by one retained Lean value | Explicit callback conversion into Lean.   |
 | `Unit`                   | `undefined`                                                     | No result.                                |
 
 Raw Lean scalars and structures are rejected on an ordinary host-import
@@ -166,26 +166,40 @@ ordinary values.
 
 JSL objects and converted Lean callbacks need bridge state because their payload
 lives in the Lean heap. A JSL value is an ordinary empty JavaScript object with
-one retained Lean pointer; a callback is an ordinary function with one closure
-root. Private WeakMaps associate those values with their roots. There is no
-public retain/release protocol, and native functions acquire no Lean lifetime.
+one retained Lean pointer; a callback is an ordinary function using the same
+ownership cell, plus its call description. One private WeakMap associates both
+target kinds with their cells. There is no public retain/release protocol, and
+native JavaScript functions acquire no Lean lifetime.
 
 A live value strongly retains its original runtime generation: the Wasm instance
 and host state containing its Lean payload. Collection releases the foreign root
-through a best-effort finalizer; explicit disposal releases it deterministically.
+through a best-effort finalizer; explicit disposal of a healthy generation releases
+it deterministically. After a fatal failure, native cleanup is quarantined:
+disposal invalidates the carriers and clears the permitted JavaScript resource
+roots, while abandoned Lean heap objects are reclaimed with the Wasm instance.
+See the [object ABI ownership contract](OBJECT_ABI.md#ownership) for that boundary.
+Retirement also detaches the cell from its runtime, pointer and calling descriptor.
+Keeping a dead callback or JSL carrier alone therefore does not retain the old
+generation. Collection timing remains the JavaScript engine's responsibility.
 Calling a Lean callback after disposal fails before entering its Lean body.
 If invoked as a Promise reaction, that failure rejects the resulting Promise.
 Hard disposal prevents Lean entry; it does not guarantee cancellation or quiet
 settlement of pending JavaScript work. Terminal handling that must survive
 disposal must run outside the disposed Lean runtime.
 
-Global finalization registries hold only weak references to cleanup records;
-generation-owned sets keep those records available while the generation is live.
+The shared global finalization registry holds only weak references to cleanup records;
+the generation-owned tracking set keeps those records available while it is live.
 This includes the entire JSL cell and its `onRelease` closure. Otherwise global
 metadata could anchor a runtime whose externref table points back to the targets.
 A wholly unreachable generation can be collected without running every foreign
 finalizer; this is not a collector for mixed Lean/JS cycles inside a runtime
 still owned elsewhere.
+
+During healthy disposal, runtime-owned providers run before retained Lean values
+are released. Their synchronous Lean cleanup may convert temporary callbacks;
+those cells join the same terminal cleanup. JSL acquisition remains closed during
+disposal. Before the final cell snapshot, acquisition closes for callbacks too,
+so release hooks cannot leave newly acquired cells outside the retirement sweep.
 
 Finalizer diagnostics store only bounded text, not error objects or failed
 payload graphs that could keep Lean-backed values alive.

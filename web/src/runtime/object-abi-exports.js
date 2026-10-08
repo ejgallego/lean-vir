@@ -9,10 +9,9 @@ export const OBJECT_ABI_CALL_EXPORTS = [
   "vir_call_resolved_objects",
   "vir_call_error",
   "vir_call_error_size",
-  "vir_closure_call_objects",
+  "vir_closure_apply_objects",
   "vir_closure_call_error",
   "vir_closure_call_error_size",
-  "vir_closure_release",
 ];
 
 export const OBJECT_VALUE_EXPORTS = [
@@ -25,7 +24,6 @@ export const OBJECT_VALUE_EXPORTS = [
   "vir_obj_ctor",
   "vir_obj_ctor_layout",
   "vir_obj_ctor_scalar_data",
-  "vir_obj_closure_root",
   "vir_obj_dec",
   "vir_obj_decimal_size",
   "vir_obj_expr_app",

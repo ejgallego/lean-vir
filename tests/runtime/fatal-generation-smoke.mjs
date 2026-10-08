@@ -2,6 +2,7 @@
 Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -96,7 +97,7 @@ end Fatal`,
       assert.equal(exports.vir_resource_roots_active(), 0);
       assert.equal(exports.vir_resource_roots_reusable(), 0);
       assert.equal(hostState.leanObjectHandleCells.size, 0);
-      assert.equal(runtime.liveCallbacks.size, 0);
+      assert.equal(countLiveCallbacks(runtime.hostState), 0);
       assert.equal(hostState.callTimings.length, 0);
     }
     assert.equal(caughtNested, true);

@@ -3,12 +3,12 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
-import { releaseCallbackRoots } from "../../web/src/runtime/callbacks.js";
 import {
   publicArtifactPath,
   wasmPublicFile,
@@ -52,8 +52,8 @@ function assertCallbackCache(label) {
   // disguise reconstruction. Explicit internal releases make cleanup deterministic.
   runtime.releaseLeanObjectHandleCell(secondCell);
   assert.equal(secondCell.live, false);
-  releaseCallbackRoots([callbacks.shift()]);
-  assert.equal(runtime.liveCallbacks.size, 1);
+  runtime.releaseLeanObjectHandleCell(runtime.leanCallbackCell(callbacks.shift(), "first callback"));
+  assert.equal(countLiveCallbacks(runtime.hostState), 1);
   const surviving = callbacks[0](0n);
   const survivingCell = liveObjectCell(
     surviving,
@@ -64,9 +64,10 @@ function assertCallbackCache(label) {
     pointer,
     `${label} releasing a result and one callback preserves the cache`,
   );
-  releaseCallbackRoots(callbacks);
+  for (const callback of callbacks.splice(0))
+    runtime.releaseLeanObjectHandleCell(runtime.leanCallbackCell(callback, "callback"));
   runtime.releaseLeanObjectHandleCell(survivingCell);
-  assert.equal(runtime.liveCallbacks.size, 0);
+  assert.equal(countLiveCallbacks(runtime.hostState), 0);
   const named = runtime.call(
     "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
   );
@@ -186,7 +187,7 @@ try {
     const hostState = runtime?.hostState;
     runtime?.dispose();
     if (runtime !== null) {
-      assert.equal(runtime.liveCallbacks.size, 0);
+      assert.equal(countLiveCallbacks(runtime.hostState), 0);
       assert.equal(hostState.leanObjectHandleCells.size, 0);
     }
   } finally {

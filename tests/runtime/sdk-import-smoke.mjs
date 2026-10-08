@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
@@ -121,6 +122,7 @@ try {
     for (const name of [
       "vir_obj_uint64", "vir_obj_uint64_decimal",
       "vir_obj_usize", "vir_obj_usize_decimal", "vir_obj_ctor_usize_decimal",
+      "vir_obj_closure_root", "vir_closure_release", "vir_closure_call_objects",
     ]) {
       assert.equal(Object.hasOwn(packagedRuntime.exports, name), false, `${name} must not ship in the SDK`);
     }
@@ -160,6 +162,30 @@ try {
   } finally {
     packagedRuntime.dispose();
   }
+  const hostPackage = await readFile(new URL("../../web/public/demo-host.irpkg", import.meta.url));
+  for (const profile of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
+    let retained;
+    const callableRuntime = await nodeRuntime.createVirRuntime({
+      wasmBytes: await readFile(join(jsDir, "..", "wasm", profile)),
+      irPackageSet: [hostPackage],
+      hostBindings: {
+        "test.callNatCallback": (input, callback) => { retained = callback; return callback(input); },
+        "test.recordNat": () => undefined,
+      },
+    });
+    try {
+      assert.equal(callableRuntime.call("HostInterop.callbackRoundTrip", 3), 10n);
+      assert.equal(retained(4n), 11n);
+      assert.equal(countLiveCallbacks(callableRuntime.hostState), 1);
+      const wasm = callableRuntime.exports, host = callableRuntime.hostState;
+      callableRuntime.dispose();
+      assert.equal(host.leanObjectHandleCells.size, 0);
+      assert.equal(countLiveCallbacks(host), 0);
+      assert.equal(wasm.vir_resource_roots_active(), 0);
+      assert.throws(() => retained(1n), /disposed runtime/);
+    } finally { callableRuntime.dispose(); }
+  }
+
 } finally {
   await rm(isolatedDir, { recursive: true, force: true });
 }

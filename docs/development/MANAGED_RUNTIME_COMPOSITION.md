@@ -14,14 +14,16 @@ Both compositions share these modules:
 | --- | --- |
 | `factory-core.js` | Wasm acquisition, one host state per instance, package-set creation and construction-failure cleanup |
 | `managed-core.js` | Package admission, startup, calls, argument transfer, failed-generation quarantine and retirement |
-| `object-core.js` | Object transport and consuming calls, exact JavaScript resources and the single JSL ownership registry |
+| `object-core.js` | Object transport and consuming calls, exact JavaScript resources and the single retained-value ownership registry for JSL and converted callbacks |
 | `primitive-values.js` | Unit, resources, booleans, numeric values, strings and byte-array conversion |
 | `object-boundary.js` | Boxed-boundary requirements used by package admission |
-| `host-state.js` | Host-call transactions, JSL cell tracking and binding-provider cleanup |
+| `host-state.js` | Host-call transactions, shared retained-value tracking and binding-provider cleanup |
 
 The full `core.js` composition adds `object-values.js`: arrays, lists, options,
 pairs, structures, inductives, `Lean.Expr` and automatic Lean-function conversion
-to JavaScript callables, including their typed invocation. Its primitive cases
+to JavaScript callables, including their creation and typed invocation. The
+retained cell holds the sole calling descriptor; the shared owner manages
+lifetime. Its primitive cases
 delegate to the shared implementation.
 Owned collection and constructor builders also stay in this optional layer.
 The internal `primitive-factory.js` imports none of those structural converters
@@ -52,17 +54,20 @@ apply to state and function carriers alike.
 An unsupported structural entry is rejected before argument lowering or native
 execution. Package admission still validates the complete binary contract and
 metadata; omitting converters does not relax it. Ordinary managed callbacks
-retain their existing invocation metadata and closure-root protocol in the full
-composition. This extraction does not unify or remove that protocol.
-Callback root tracking and terminal retirement stay in the shared managed core;
-the optional layer invokes the converted functions through the existing protocol.
+retain their existing invocation metadata in the full composition. They share
+JSL's retained-value cell, finalizer and terminal tracking rather than using a
+second native ownership registry. The optional layer performs typed closure
+application through `vir_closure_apply_objects`; the shared host state owns
+retirement.
 Host imports that receive Lean callbacks as ordinary JavaScript functions also
 need the full callable converter. A primitive JSL client can instead schedule a
 JavaScript closure that calls its explicit Lean `invoke...` boundary with the
 opaque function carrier.
 
 JavaScript reachability and terminal runtime disposal retain their current
-meaning. Canceling a timeout does not release a separately reachable carrier or
+meaning; see [Lean-backed value lifetimes](../reference/HOST_BINDINGS.md#lean-backed-javascript-values)
+for provider-cleanup admission and healthy versus failed retirement.
+Canceling a timeout does not release a separately reachable carrier or
 interrupt a synchronous Lean call. This split adds no per-value public disposal,
 cycle collection or post-trap interpreter re-entry. The existing four permitted
 retirement-safe Wasm exports and native-cleanup quarantine are unchanged.
