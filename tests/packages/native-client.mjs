@@ -10,6 +10,8 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { interfaceSignatureKey } from "../../web/src/runtime/interface-manifest.js";
+import { snapshotExpectedExports } from "../../web/src/resources/program-exports.js";
 
 // Independent producer and cold native-precompiled consumer: a developer's
 // dependency cache could conceal accidental umbrella imports. Retain evidence.
@@ -47,7 +49,7 @@ const modules = ["Vir", ...readdirSync(join(producer, "Vir"), { recursive: true 
   .map((path) => "Vir." + path.slice(0, -5).replaceAll("/", ".").replaceAll("\\", "."))];
 run(["lake", "run", "checkOwners", ...modules], "module-owners");
 const output = run([join(client, ".lake/build/bin/native_client")], "native-output");
-const [greeting, numeric, descriptorText] = output.trim().split("\n");
+const [greeting, numeric, descriptorText, greetingSignature, numericSignature] = output.trim().split("\n");
 assert.equal(greeting, "Hello, native 🌍");
 assert.equal(numeric, "18014398509481986");
 const descriptor = JSON.parse(descriptorText);
@@ -56,6 +58,17 @@ assert.equal(descriptor.schemaVersion, 2);
 assert.ok(!Object.hasOwn(descriptor, "exports"));
 assert.deepEqual(descriptor.compatibility,
   JSON.parse(readFileSync(join(producer, "vir-resources/compatibility.json"))));
+const signatures = snapshotExpectedExports({
+  "NativeClient.greet": JSON.parse(greetingSignature),
+  "NativeClient.double": JSON.parse(numericSignature),
+});
+for (const [declaration, type, tag] of [
+  ["NativeClient.greet", "String", 3], ["NativeClient.double", "Nat", 0],
+]) {
+  const expectedType = { type, interfaceTag: tag };
+  assert.equal(signatures.get(declaration),
+    interfaceSignatureKey({ args: [expectedType], result: expectedType, effect: "pure" }));
+}
 
 // Use Lake's returned executable, not a reconstructed dependency build path.
 run(["lake", "--no-cache", "build", "GeneratorClient"], "generator-meta-client");

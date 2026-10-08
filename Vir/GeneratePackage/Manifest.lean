@@ -63,7 +63,7 @@ def collectInterfaceManifest
   let mut manifest : InterfaceManifest := {
     metadata := metadata,
     hostImports := hostImports,
-    diagnostics := hostDiagnostics ++ index.diagnostics.map (·.toPackageDiagnostic)
+    diagnostics := hostDiagnostics ++ index.diagnostics
   }
   for target in targets do
     let source := target.publicSource

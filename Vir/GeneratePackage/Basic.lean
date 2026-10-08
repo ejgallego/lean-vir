@@ -89,7 +89,8 @@ structure LoadedDecl where
   module? : Option Name := none
   decl : Decl
 
-structure DeclIndexDiagnostic where
+/-- A generation diagnostic shared by input acquisition and interface collection. -/
+structure PackageDiagnostic where
   name : Name
   source : String
   reason : String
@@ -113,7 +114,7 @@ structure DeclIndex where
   virExports : NameSet := {}
   virStartups : NameSet := {}
   loadedModules : NameSet := {}
-  diagnostics : Array DeclIndexDiagnostic := #[]
+  diagnostics : Array PackageDiagnostic := #[]
 
 def DeclIndex.sourceForTarget? (index : DeclIndex) (target : Target) : Option DeclSource :=
   index.sources.find? (fun source => source.origin == target.origin)
@@ -157,18 +158,6 @@ structure HostImport where
   args : Array InterfaceArg
   result : InterfaceType
   effect : InterfaceEffect
-
-structure PackageDiagnostic where
-  name : Name
-  source : String
-  reason : String
-
-def DeclIndexDiagnostic.toPackageDiagnostic (diagnostic : DeclIndexDiagnostic) : PackageDiagnostic :=
-  {
-    name := diagnostic.name
-    source := diagnostic.source
-    reason := diagnostic.reason
-  }
 
 structure PackageTargetMetadata where
   origin : PackageTargetOrigin

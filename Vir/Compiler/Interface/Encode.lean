@@ -224,4 +224,14 @@ def InterfaceArg.toJson (arg : InterfaceArg) : String :=
 def InterfaceEffect.toJson (effect : InterfaceEffect) : String :=
   jsonString effect.label
 
+/-- Independent callable expectation for createProgram's expectedExports.
+Only argument types, result and effect participate: parameter display names and
+erased implementation slots are not the caller's JavaScript value interface. -/
+def ClassifiedSignature.toExpectedSignatureJson (signature : ClassifiedSignature) : String :=
+  jsonObject #[
+    ("args", jsonArray (signature.args.map (·.type.toJson))),
+    ("result", signature.result.toJson),
+    ("effect", signature.effect.toJson)
+  ]
+
 end Vir.Interface

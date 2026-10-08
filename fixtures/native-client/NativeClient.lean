@@ -55,3 +55,14 @@ public def NativeClient.descriptor : Vir.Resources.Descriptor := {
 run_meta do
   unless Vir.Interface.InterfaceType.nat.toJson == "{\"type\":\"Nat\",\"interfaceTag\":0}" do
     Lean.throwError "unexpected independently loaded interface encoding"
+
+-- Produce the caller's expectation from classification, before reading any
+-- package manifest. A term elaborator embeds the pure JSON result as a String.
+elab "expected_signature% " entry:ident : term => do
+  let info ← Lean.getConstInfo entry.getId
+  let .ok signature ← Vir.Interface.analyzeExportInterface info.type
+    | Lean.throwError "cannot classify expected interface for {entry}"
+  return Lean.mkStrLit signature.toExpectedSignatureJson
+
+public def NativeClient.greetSignature : String := expected_signature% NativeClient.greet
+public def NativeClient.doubleSignature : String := expected_signature% NativeClient.double

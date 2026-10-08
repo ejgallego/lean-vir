@@ -16,13 +16,6 @@ namespace Vir.Interface
 
 open Vir.InterfaceValidation
 
-/-- A JavaScript-boundary signature after interface type classification. -/
-public structure ClassifiedSignature where
-  args : Array InterfaceArg
-  result : InterfaceType
-  effect : InterfaceEffect
-  erasedPrefixArgs : Nat := 0
-
 /-- A failure while validating or classifying a complete export interface. -/
 public inductive ExportInterfaceValidationError where
   | signature (error : ExportSignatureError)

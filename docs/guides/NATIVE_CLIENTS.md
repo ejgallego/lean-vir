@@ -27,6 +27,13 @@ the include operation itself only reads prepared bytes. Compiler tools can also
 meta-import `Vir.GeneratePackage`. Ordinary applications use the
 [library-owned resource workflow](EMBEDDED_RESOURCES.md), not a custom generator.
 
+The classifier returns a pure `Vir.Interface.ClassifiedSignature` value.
+`signature.toExpectedSignatureJson` encodes the type-only `args`, `result` and
+`effect` expected by JavaScript's `createProgram({ expectedExports: ... })`.
+Construct this expectation from the author's declaration type independently of
+the produced manifest. Parameter display names belong to manifest metadata and
+do not participate in the caller's expected ABI.
+
 ## Native library boundary
 
 Lake loads whole owning shared libraries for native-precompiled imports. A
