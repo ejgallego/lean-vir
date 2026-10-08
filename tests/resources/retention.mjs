@@ -43,7 +43,7 @@ export async function measureResourceRetention(cdp, record) {
     for (let batch = 0; batch < 3; batch++) {
       const correctValue = await evaluate(cdp, `(() => {
         let result;
-        for (let i = 0; i < 100; i++) result = resourceRetention.held[0].call('score');
+        for (let i = 0; i < 100; i++) result = resourceRetention.held[0].call('Vir.Resources.Test.prettyScore');
         return result === 6093n;
       })()`);
       assert.equal(correctValue, true);
@@ -54,7 +54,7 @@ export async function measureResourceRetention(cdp, record) {
       "a disposed facade must release its runtime even while the facade is held");
     const disposed = await evaluate(cdp, `(() => {
       resourceRetention.held[0].dispose();
-      try { resourceRetention.held[0].call('score'); return false; }
+      try { resourceRetention.held[0].call('Vir.Resources.Test.prettyScore'); return false; }
       catch (error) { return /disposed/.test(error.message); }
     })()`);
     assert.equal(disposed, true, "released facade keeps disposal semantics");
@@ -65,7 +65,7 @@ export async function measureResourceRetention(cdp, record) {
         const values = [];
         for (let i = 0; i < 4; i++) {
           const program = await openResourceProgram();
-          try { values.push(program.call('score')); }
+          try { values.push(program.call('Vir.Resources.Test.prettyScore')); }
           finally { program.dispose(); program.dispose(); }
         }
         return values.map(value => value === 6093n);
@@ -95,7 +95,7 @@ export async function measureResourceRetention(cdp, record) {
       finally { Array.from = original; }
       program.dispose();
       let rejected = false;
-      try { program.call('score'); } catch { rejected = true; }
+      try { program.call('Vir.Resources.Test.prettyScore'); } catch { rejected = true; }
       return {injected, caught, rejected, status: program.status};
     })()`);
     assert.deepEqual(cleanup, { injected: true, caught: true, rejected: true, status: "disposed" });

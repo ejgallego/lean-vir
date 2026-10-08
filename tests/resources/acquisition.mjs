@@ -44,7 +44,7 @@ const snapshot = (path) => {
 };
 run(join(root, ".lake/build/bin/vir_resource_tests"), ["native-pack", source], "fixture");
 const bytes = readFileSync(source);
-const expected = createHash("sha256").update("vir-resource-bundle-v1\n")
+const expected = createHash("sha256").update("vir-resource-bundle-v2\n")
   .update(bytes.subarray(12, 12 + bytes.readUInt32LE(8))).digest("hex");
 acquire("cold");
 assert.deepEqual(readFileSync(stage), bytes);
@@ -130,7 +130,10 @@ unlinkSync(stage);
 // A transport replacement cannot change either selected content or Lean revision.
 const descriptorSize = bytes.readUInt32LE(8);
 const originalJson = bytes.subarray(12, 12 + descriptorSize).toString("utf8");
-const originalRevision = JSON.parse(originalJson).compatibility.leanRevision;
+const originalDescriptor = JSON.parse(originalJson);
+assert.equal(originalDescriptor.schemaVersion, 2);
+assert.ok(!Object.hasOwn(originalDescriptor, "exports"), "resource descriptors do not carry a role table");
+const originalRevision = originalDescriptor.compatibility.leanRevision;
 const json = Buffer.from(replaceFixture(originalJson,
   `"leanRevision":${JSON.stringify(originalRevision)}`, '"leanRevision":"wrong-revision"'));
 const header = Buffer.from(bytes.subarray(0, 12));
@@ -138,7 +141,7 @@ header.writeUInt32LE(json.length, 8);
 const other = join(evidence, "other-compiler");
 writeFileSync(other, Buffer.concat([header, json, bytes.subarray(12 + descriptorSize)]));
 acquire("reject-transport-identity", other, { error: /CONTENT_ID_MISMATCH/ });
-const otherId = createHash("sha256").update("vir-resource-bundle-v1\n").update(json).digest("hex");
+const otherId = createHash("sha256").update("vir-resource-bundle-v2\n").update(json).digest("hex");
 run(tool, ["acquire", compat, otherId, other, cache, stage], "reject-compiler",
   { error: /LEAN_BUILD_MISMATCH/ });
 assert.ok(!existsSync(cache) && !existsSync(stage));
@@ -178,7 +181,7 @@ for (const field of ["virVersion"]) {
   const changedHeader = Buffer.from(header);
   changedHeader.writeUInt32LE(changedJson.length, 8);
   const changed = Buffer.concat([changedHeader, changedJson, bytes.subarray(12 + descriptorSize)]);
-  const changedId = createHash("sha256").update("vir-resource-bundle-v1\n").update(changedJson).digest("hex");
+  const changedId = createHash("sha256").update("vir-resource-bundle-v2\n").update(changedJson).digest("hex");
   const changedSource = join(evidence, `incompatible-${field}`);
   writeFileSync(changedSource, changed);
   for (const candidate of ["source", "cache", "stage"]) {

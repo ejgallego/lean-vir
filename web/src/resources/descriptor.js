@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-// Browser-side counterpart of Vir.Resources.Validate's v1 descriptor rules.
+// Browser-side counterpart of Vir.Resources.Validate's v2 descriptor rules.
 // This intentionally receives already-parsed JSON: callers must bound JSON
 // input and reject duplicate JSON keys before calling it.
 
@@ -13,7 +13,7 @@ const MAX_FILES = 4096;
 const MAX_PAYLOAD_BYTES = 512 * 1024 * 1024;
 const MAX_DESCRIPTOR_BYTES = 4 * 1024 * 1024;
 const MAX_METADATA_BYTES = 4096;
-const DOMAIN_PREFIX = textEncoder.encode("vir-resource-bundle-v1\n");
+const DOMAIN_PREFIX = textEncoder.encode("vir-resource-bundle-v2\n");
 
 const descriptorKeys = [
   "schemaVersion",
@@ -22,7 +22,6 @@ const descriptorKeys = [
   "compatibility",
   "files",
   "fileEntries",
-  "exports",
 ];
 const compatibilityKeys = [
   "leanRevision",
@@ -30,7 +29,6 @@ const compatibilityKeys = [
 ];
 const fileKeys = ["path", "mediaType", "byteLength", "sha256"];
 const entryKeys = ["role", "path"];
-const exportKeys = ["role", "declaration", "interfaceId"];
 const hex64 = /^[0-9a-f]{64}$/;
 const pathPart = /^[A-Za-z0-9._-]+$/;
 
@@ -44,7 +42,7 @@ function prepareDescriptor(value) {
     descriptor.schemaVersion,
     "SCHEMA_VERSION",
   );
-  if (schemaVersion !== 1) fail("SCHEMA_VERSION");
+  if (schemaVersion !== 2) fail("SCHEMA_VERSION");
   const logicalId = metadata(descriptor.logicalId, "INVALID_METADATA");
   if (descriptor.kind !== "runtime" && descriptor.kind !== "program") {
     fail("INVALID_KIND");
@@ -79,10 +77,6 @@ function prepareDescriptor(value) {
   checkPaths(normalizedFiles.map((file) => file.path));
 
   const fileEntries = normalizeEntries(descriptor.fileEntries, normalizedFiles);
-  const exports = normalizeExports(descriptor.exports);
-  if (descriptor.kind === "runtime" && exports.length !== 0) {
-    fail("RUNTIME_EXPORTS");
-  }
   const requiredRoles =
     descriptor.kind === "runtime" ? ["runtimeModule", "wasm"] : ["programSet"];
   for (const role of requiredRoles) {
@@ -96,7 +90,6 @@ function prepareDescriptor(value) {
     compatibility: normalizedCompatibility,
     files: normalizedFiles.sort((a, b) => compareUtf8(a.path, b.path)),
     fileEntries: fileEntries.sort((a, b) => compareUtf8(a.role, b.role)),
-    exports: exports.sort((a, b) => compareUtf8(a.role, b.role)),
   };
   const encoded = encodeCanonical(normalized);
   if (encoded.byteLength > MAX_DESCRIPTOR_BYTES) {
@@ -172,22 +165,6 @@ function normalizeEntries(value, files) {
     const path = requireString(item.path, "INVALID_PATH");
     if (!files.some((file) => file.path === path)) fail("ENTRY_NOT_FOUND");
     return { role, path };
-  });
-  checkUniqueRoles(normalized);
-  return normalized;
-}
-
-function normalizeExports(value) {
-  const exports = requireArray(value, "INVALID_EXPORTS");
-  if (exports.length > MAX_FILES) fail("TOO_MANY_ROLES");
-  const normalized = exports.map((entry) => {
-    const item = requireObject(entry, "INVALID_EXPORT");
-    requireExactKeys(item, exportKeys, "INVALID_EXPORT");
-    return {
-      role: metadata(item.role, "INVALID_METADATA"),
-      declaration: metadata(item.declaration, "INVALID_METADATA"),
-      interfaceId: metadata(item.interfaceId, "INVALID_METADATA"),
-    };
   });
   checkUniqueRoles(normalized);
   return normalized;
@@ -334,12 +311,6 @@ function compareUtf8(left, right) {
 
 function encodeCanonical(descriptor) {
   const compatibility = `{\"leanRevision\":${quote(descriptor.compatibility.leanRevision)},\"virVersion\":${descriptor.compatibility.virVersion}}`;
-  const exports = descriptor.exports
-    .map(
-      (entry) =>
-        `{\"declaration\":${quote(entry.declaration)},\"interfaceId\":${quote(entry.interfaceId)},\"role\":${quote(entry.role)}}`,
-    )
-    .join(",");
   const entries = descriptor.fileEntries
     .map(
       (entry) =>
@@ -353,7 +324,7 @@ function encodeCanonical(descriptor) {
     )
     .join(",");
   return textEncoder.encode(
-    `{\"compatibility\":${compatibility},\"exports\":[${exports}],\"fileEntries\":[${entries}],\"files\":[${files}],\"kind\":${quote(descriptor.kind)},\"logicalId\":${quote(descriptor.logicalId)},\"schemaVersion\":${descriptor.schemaVersion}}`,
+    `{\"compatibility\":${compatibility},\"fileEntries\":[${entries}],\"files\":[${files}],\"kind\":${quote(descriptor.kind)},\"logicalId\":${quote(descriptor.logicalId)},\"schemaVersion\":${descriptor.schemaVersion}}`,
   );
 }
 

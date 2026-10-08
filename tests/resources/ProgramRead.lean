@@ -20,7 +20,7 @@ public def main (args : List String) : IO Unit := do
   let bundle ← IO.ofExcept <| (Pack.decode (← IO.FS.readBinFile path)).mapError reprStr
   let program ← Program.read path root
   require (program.bundle.contentId == bundle.contentId) "persisted identity differs"
-  require (!program.exports.isEmpty) "positive fixture requires actual root exports"
+  require (!program.exports.isEmpty) "positive fixture requires actual root interface exports"
   require (program.members.size + 2 == bundle.files.size) "inventory differs"
   for member in program.members do
     require ((bundle.file? member.file.path).map (·.bytes) == some member.file.bytes)

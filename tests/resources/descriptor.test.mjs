@@ -34,11 +34,11 @@ const emptySha256 =
 const abcSha256 =
   "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
 const identity =
-  "31aa0de3db1b738af032d0a1c98074426f9b0cad7657d79035c62284d87c2d8e";
+  "a9fbcfec93dbdd836248902deeb6b4fb7b4fe83f64ce9983104c0a945f6811e5";
 
 function runtime(overrides = {}) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     logicalId: "test/λ😀\n\u0001",
     kind: "runtime",
     compatibility: {
@@ -63,7 +63,6 @@ function runtime(overrides = {}) {
       { role: "runtimeModule", path: "runtime.js" },
       { role: "wasm", path: "runtime.wasm" },
     ],
-    exports: [],
     ...overrides,
   };
 }
@@ -85,15 +84,16 @@ for (const { paths, code } of portablePaths) {
   });
 }
 
-test("canonical v1 identity and Unicode/control spelling match Lean", async () => {
+test("canonical v2 identity and Unicode/control spelling match Lean", async () => {
   const encoded = new TextDecoder().decode(encodeDescriptor(runtime()));
   assert.equal(encoded.includes("\\u000a\\u0001"), true);
   assert.equal(encoded.includes("λ😀"), true);
+  assert.equal(encoded.includes('"exports"'), false);
   assert.equal(await descriptorContentId(runtime()), identity);
   assert.equal(await sha256Hex(new TextEncoder().encode("abc")), abcSha256);
 });
 
-test("normalizes inventories by UTF-8 path and role order", () => {
+test("normalizes inventories by UTF-8 path and file-entry role order", () => {
   const input = runtime({
     files: [
       {
@@ -132,7 +132,7 @@ test("normalizes inventories by UTF-8 path and role order", () => {
   assert.notEqual(normalized, input);
 });
 
-test("uses UTF-8 lexical order for Unicode export roles", () => {
+test("schema v2 has no descriptor export table", () => {
   const program = runtime({
     kind: "program",
     files: [
@@ -144,14 +144,16 @@ test("uses UTF-8 lexical order for Unicode export roles", () => {
       },
     ],
     fileEntries: [{ role: "programSet", path: "program.json" }],
-    exports: [
-      { role: "\u{10000}", declaration: "Test.astral", interfaceId: "test-v1" },
-      { role: "\ue000", declaration: "Test.private", interfaceId: "test-v1" },
-    ],
   });
-  assert.deepEqual(
-    validateDescriptor(program).exports.map(({ role }) => role),
-    ["\ue000", "\u{10000}"],
+  const normalized = validateDescriptor(program);
+  assert.equal(Object.hasOwn(normalized, "exports"), false);
+  assert.throws(
+    () => validateDescriptor({ ...program, exports: [] }),
+    /INVALID_DESCRIPTOR/,
+  );
+  assert.throws(
+    () => validateDescriptor({ ...program, schemaVersion: 1 }),
+    /SCHEMA_VERSION/,
   );
 });
 
@@ -194,10 +196,10 @@ test("reserves the envelope's complete root namespace, not nested filenames", ()
   assert.doesNotThrow(() => validateDescriptor(descriptor));
 });
 
-test("rejects representative v1 schema, metadata, path, and role failures", () => {
+test("rejects representative schema-v2 metadata, path, and role failures", () => {
   const cases = [
     [runtime({ extra: true }), "INVALID_DESCRIPTOR"],
-    [runtime({ schemaVersion: 0 }), "SCHEMA_VERSION"],
+    [runtime({ schemaVersion: 1 }), "SCHEMA_VERSION"],
     [
       runtime({
         compatibility: {
@@ -252,12 +254,8 @@ test("rejects representative v1 schema, metadata, path, and role failures", () =
     ],
     [runtime({ fileEntries: [] }), "MISSING_ROLE"],
     [
-      runtime({
-        exports: [
-          { role: "run", declaration: "Test.run", interfaceId: "test-v1" },
-        ],
-      }),
-      "RUNTIME_EXPORTS",
+      runtime({ exports: [] }),
+      "INVALID_DESCRIPTOR",
     ],
     [
       runtime({

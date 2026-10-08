@@ -10,7 +10,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 export function checkNativeProfileRejection({
   client,
@@ -25,10 +25,14 @@ export function checkNativeProfileRejection({
   for (const name of [
     "program",
     "resources",
-    "vir-resources",
     "lean-toolchain",
   ])
-    cpSync(join(client, name), join(cold, name), { recursive: true });
+    cpSync(join(client, name), join(cold, name), {
+      recursive: true,
+      // Staging now lives under the carrier source root; copy source only for
+      // this cold rejection fixture, not its warm prepared resource bytes.
+      filter: (source) => basename(source) !== ".vir-generated",
+    });
   const config = readFileSync(join(client, "lakefile.lean"), "utf8");
   const requirements = config.match(/require lean_vir from "[^"]+"/g) ?? [];
   assert.equal(requirements.length, 1, "native-profile fixture requires one VIR dependency");
@@ -53,7 +57,7 @@ export function checkNativeProfileRejection({
       providerSources: ["provider.c"],
     }),
   );
-  const stage = join(client, ".vir-generated/ClientResources.virres");
+  const stage = join(client, "resources/.vir-generated/ClientResources.virres");
   const output = join(
     client,
     "build with spaces/vir/resources/programs/ClientResources.virres",
@@ -71,7 +75,6 @@ export function checkNativeProfileRejection({
   };
   const before = retained.map(snapshot);
   const tool = join(producer, ".lake/build/bin/vir_resource_program");
-  const recipe = join(client, "vir-resources/ClientResources.json");
   const compatibility = join(producer, "vir-resources/compatibility.json");
   for (const [label, value] of [
     ["empty", ""],
@@ -81,20 +84,18 @@ export function checkNativeProfileRejection({
     const cases = [
       ["warm", client, "lake", ["build", "ClientResources:virResourcePack"]],
       ["cold", cold, "lake", ["build", "ClientResources:virResourcePack"]],
-      ["plan", client, tool, ["plan", recipe, compatibility, client]],
       [
         "build",
         client,
         tool,
         [
           "build",
-          recipe,
+          "Client.Program",
           compatibility,
           join(
             client,
             "build with spaces/vir/programs/Client/Program.virprogram",
           ),
-          client,
           join(dir, "unexpected.virres"),
         ],
       ],
@@ -126,7 +127,7 @@ export function checkNativeProfileRejection({
         "rejection mutated existing outputs",
       );
       assert.equal(
-        existsSync(join(cold, ".vir-generated/ClientResources.virres")),
+        existsSync(join(cold, "resources/.vir-generated/ClientResources.virres")),
         false,
       );
       assert.equal(existsSync(join(dir, "unexpected.virres")), false);

@@ -84,7 +84,42 @@ run_cmd do
       throwError "unexpected ordinary imports for {name}: {runtimeImports}"
 `);
 run("lake", ["env", "lean", "Phases.lean"], "carrier-import-phases");
-const expected = "31aa0de3db1b738af032d0a1c98074426f9b0cad7657d79035c62284d87c2d8e";
+const expected = "a9fbcfec93dbdd836248902deeb6b4fb7b4fe83f64ce9983104c0a945f6811e5";
+// Contextual and explicit includes share the prepared-pack decoder/embedder.
+// This isolated reader test prepares its input explicitly; the owning-library
+// campaign tests automatic context preparation through real Lake jobs.
+mkdirSync(join(project, ".vir-generated/inputs"), { recursive: true });
+writeFileSync(join(project, ".vir-generated/inputs/KeyCarrier.path"),
+  join(project, "pack.virres"));
+writeFileSync(join(project, "KeyCarrier.lean"), `module
+public import Vir.Resources.Embed
+public def keyed : Vir.Resources.Bundle := include_vir_program
+#eval IO.println keyed.contentId
+`);
+assert.match(run("lake", ["env", "lean", "KeyCarrier.lean"],
+  "contextual-input"), new RegExp(expected));
+writeFileSync(join(project, "MissingCarrier.lean"), `module
+import Vir.Resources.Embed
+def missing : Vir.Resources.Bundle := include_vir_program
+`);
+assert.match(run("lake", ["env", "lean", "MissingCarrier.lean"],
+  "missing-context-preparation", 1), /VIR_RESOURCE_NOT_PREPARED.*MissingCarrier/s);
+const setup = JSON.parse(readFileSync(join(project,
+  "compiled output/ir/Carrier.setup.json")));
+assert.equal(setup.name, "Carrier");
+writeFileSync(join(project, "wrong-module.setup.json"),
+  JSON.stringify({ ...setup, name: "Wrong.KeyCarrier" }));
+assert.match(run("lake", ["env", "lean", "--setup", "wrong-module.setup.json",
+  "KeyCarrier.lean"], "same-basename-wrong-module", 1), /CARRIER_SUFFIX_MISMATCH/);
+writeFileSync(join(project, "key-module.setup.json"),
+  JSON.stringify({ ...setup, name: "KeyCarrier" }));
+// Raw Lean invoked elsewhere cannot infer this owning module from its cwd.
+// Supply the authoritative setup, as ordinary Lake module builds do.
+assert.match(run("elan", ["run",
+  readFileSync(join(root, "lean-toolchain"), "utf8").trim(),
+  "lake", "--dir", project, "env", "lean", "--setup",
+  join(project, "key-module.setup.json"), join(project, "KeyCarrier.lean")],
+  "library-key-other-cwd", 0, "/tmp"), new RegExp(expected));
 const executable = join(project, "compiled output/bin/check");
 assert.equal(run(executable, [], "native").trim(), expected);
 renameSync(join(project, "pack.virres"), join(project, "pack.retained"));

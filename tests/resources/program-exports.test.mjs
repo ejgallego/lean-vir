@@ -7,19 +7,12 @@ import {
 import { interfaceSignatureKey } from "../../web/src/runtime/interface-manifest.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 
-test("roles bind exact declarations despite colliding convenience aliases", () => {
+test("fully qualified declarations bind entries, never convenience aliases", () => {
   const wrong = { entry: "Test.wrong", id: "Test.right", jsName: "Test.right" };
   const right = { entry: "Test.right", id: "right", jsName: "right" };
-  const roles = resolveProgramExports(
-    [{ role: "run", declaration: right.entry }],
-    [wrong, right],
-  );
-  assert.equal(roles.get("run"), right);
-  assert.throws(
-    () =>
-      resolveProgramExports([{ role: "run", declaration: "right" }], [right]),
-    /missing/,
-  );
+  const declarations = resolveProgramExports([wrong, right]);
+  assert.equal(declarations.get("Test.right"), right);
+  assert.equal(declarations.has("right"), false);
 });
 
 test("dependency-only declarations are not root entrypoints", () => {
@@ -27,23 +20,22 @@ test("dependency-only declarations are not root entrypoints", () => {
     { exports: [{ entry: "Dependency.run" }] },
     { exports: [{ entry: "Root.run" }] },
   ];
+  const expected = snapshotExpectedExports({
+    "Dependency.run": {
+      args: [],
+      result: { type: "Nat", interfaceTag: 0 },
+      effect: "pure",
+    },
+  });
   assert.throws(
-    () =>
-      resolveProgramExports(
-        [{ role: "run", declaration: "Dependency.run" }],
-        manifests.at(-1).exports,
-      ),
+    () => resolveProgramExports(manifests.at(-1).exports, expected),
     /missing program export Dependency.run/,
   );
 });
 
 test("ambiguous root declarations fail instead of first-wins selection", () => {
   assert.throws(
-    () =>
-      resolveProgramExports(
-        [{ role: "run", declaration: "Root.run" }],
-        [{ entry: "Root.run" }, { entry: "Root.run" }],
-      ),
+    () => resolveProgramExports([{ entry: "Root.run" }, { entry: "Root.run" }]),
     /ambiguous/,
   );
 });
@@ -138,28 +130,16 @@ for (const [label, change] of [
   ],
 ])
   test(`actual ABI comparison rejects ${label}`, () => {
-    const requirement = {
-      role: "format",
-      declaration: "Root.format",
-      interfaceId: "format-v1",
-    };
     const signature = { args: [nat], result: record, effect: "pure" };
-    const expected = snapshotExpectedExports({
-      format: {
-        declaration: requirement.declaration,
-        interfaceId: requirement.interfaceId,
-        signature,
-      },
-    });
+    const expected = snapshotExpectedExports({ "Root.format": signature });
     const result = structuredClone(record);
     change(result);
     assert.throws(
       () =>
         resolveProgramExports(
-          [requirement],
           [
             {
-              entry: requirement.declaration,
+              entry: "Root.format",
               args: [{ name: "n", type: nat }],
               result,
               effect: "pure",

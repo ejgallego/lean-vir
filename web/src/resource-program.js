@@ -14,7 +14,6 @@ import {
 import {
   resolveProgramExports,
   snapshotExpectedExports,
-  checkExpectedExportMetadata,
 } from "./resources/program-exports.js";
 import { assertResourceCompatibility } from "./resources/compatibility.js";
 
@@ -83,7 +82,11 @@ async function fetchBounded(url, limit, signal, mediaType = null) {
     ?.split(";")[0]
     .trim()
     .toLowerCase();
-  if (mediaType !== null && type !== mediaType) {
+  // Static hosts also use this JavaScript response MIME. The declared
+  // inventory and its byte/hash checks remain unchanged.
+  const javascriptAlias =
+    mediaType === "text/javascript" && type === "application/javascript";
+  if (mediaType !== null && type !== mediaType && !javascriptAlias) {
     await response.body?.cancel();
     throw new Error(
       `resource ${url}: expected Content-Type ${mediaType}, got ${type}`,
@@ -306,9 +309,6 @@ export async function createProgram(options) {
       fetchManifest(runtimeUrl, "runtime", controller.signal, perform),
       fetchManifest(programUrl, "program", controller.signal, perform),
     ]);
-    await perform("program-validation", () =>
-      checkExpectedExportMetadata(expected, programManifest.descriptor.exports),
-    );
     await perform("compatibility", () => {
       if (
         JSON.stringify(runtimeManifest.descriptor.compatibility) !==
@@ -372,8 +372,7 @@ export async function createProgram(options) {
         );
       }
     }
-    resolveProgramExports(
-      program.descriptor.exports,
+    const rootDeclarations = resolveProgramExports(
       manifests.at(-1).exports,
       expected,
     );
@@ -384,11 +383,18 @@ export async function createProgram(options) {
     });
     // Use the installed entries (including their runtime call-index cache), not
     // structurally equivalent entries parsed during the preflight above.
-    const exports = resolveProgramExports(
-      program.descriptor.exports,
+    phase = "program-validation";
+    const installedDeclarations = resolveProgramExports(
       runtime.interfaceManifest.exports,
       expected,
     );
+    const declarations = new Map();
+    for (const declaration of rootDeclarations.keys()) {
+      const entry = installedDeclarations.get(declaration);
+      if (entry === undefined)
+        throw new Error(`missing installed program export ${declaration}`);
+      declarations.set(declaration, entry);
+    }
     checkStopped();
     detach(); // Final check and ownership handoff have no intervening await.
     let disposed = false;
@@ -400,11 +406,11 @@ export async function createProgram(options) {
             ? "active"
             : "failed";
       },
-      call(role, ...args) {
+      call(declaration, ...args) {
         if (disposed) throw new Error("program has been disposed");
-        const entry = exports.get(role);
+        const entry = declarations.get(declaration);
         if (entry === undefined)
-          throw new Error(`unknown program export role ${role}`);
+          throw new Error(`unknown program export ${declaration}`);
         return runtime.callEntry(entry, args);
       },
       dispose() {
@@ -416,7 +422,7 @@ export async function createProgram(options) {
           // A retained closed facade must not keep the Wasm heap reachable,
           // including when runtime cleanup reports an error.
           runtime = null;
-          exports.clear();
+          declarations.clear();
         }
       },
     });

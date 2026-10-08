@@ -78,7 +78,7 @@ const members = [
 ];
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const descriptor = validateDescriptor({
-  schemaVersion: 1,
+  schemaVersion: 2,
   logicalId: "lean-vir/runtime",
   kind: "runtime",
   compatibility: profile,
@@ -92,7 +92,6 @@ const descriptor = validateDescriptor({
     { role: "runtimeModule", path: "runtime.js" },
     { role: "wasm", path: "runtime.wasm" },
   ],
-  exports: [],
 });
 const contentId = await descriptorContentId(descriptor);
 // Refuse an existing destination: failed runs remain inspectable, never overwritten.

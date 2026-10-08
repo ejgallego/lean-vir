@@ -83,7 +83,6 @@ private def checkValidatedBundle (bundle : Bundle) (root : String) : Except Stri
   require (bundle.descriptor.kind == .program &&
     bundle.descriptor.logicalId == "vir-compiled/" ++ root &&
     bundle.descriptor.compatibility == Build.currentCompatibility &&
-    bundle.descriptor.exports.isEmpty &&
     bundle.descriptor.fileEntries == #[{ role := "programSet", path := "program.irpkg-set.json" }])
     "invalid compiled program identity"
   let some set := bundle.file? "program.irpkg-set.json" | throw "missing package set"

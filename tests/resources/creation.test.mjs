@@ -49,12 +49,59 @@ const entry = {
   effect: "pure",
 };
 const expected = () => ({
-  run: {
-    declaration: "Root.run",
-    interfaceId: "test-run-v1",
-    signature: { args: [], result: { ...nat }, effect: "pure" },
-  },
+  "Root.run": { args: [], result: { ...nat }, effect: "pure" },
 });
+function withResponseType(s, pathname, type, body = undefined) {
+  s.fetchOverride = async (url) => {
+    const response = s.respond(url);
+    if (new URL(url).pathname !== pathname) return response;
+    const headers = new Headers(response.headers);
+    if (type === null) headers.delete("content-type");
+    else headers.set("content-type", type);
+    return new Response(body ?? response.body, { headers });
+  };
+}
+
+for (const type of [
+  "text/javascript", "text/javascript; charset=utf-8",
+  "application/javascript", "Application/JavaScript; charset=UTF-8",
+]) {
+  test(`JavaScript response MIME ${type} admits an intact runtime`, async () =>
+    fixture(async (s) => {
+      withResponseType(s, "/runtime/runtime.js", type);
+      s.creation.resolve(s.runtime);
+      const program = await createProgram(s.options);
+      assert.equal(s.instances, 1);
+      assert.equal(program.call("Root.run"), 42n);
+      program.dispose();
+      assert.equal(s.disposed, 1);
+    }));
+}
+
+for (const type of ["text/html", "text/plain", "application/json", "application/octet-stream", null]) {
+  test(`JavaScript response MIME ${type} rejects before instantiation`, async () =>
+    fixture(async (s) => {
+      withResponseType(s, "/runtime/runtime.js", type);
+      await assert.rejects(createProgram(s.options), (error) =>
+        error.phase === "resource-fetch" && /Content-Type/.test(error.cause.message));
+      assert.equal(s.instances, 0);
+    }));
+}
+
+test("JavaScript alias does not admit an incorrect Wasm MIME", async () =>
+  fixture(async (s) => {
+    withResponseType(s, "/runtime/runtime.wasm", "application/javascript");
+    await assert.rejects(createProgram(s.options), (error) =>
+      error.phase === "resource-fetch" && /Content-Type/.test(error.cause.message));
+    assert.equal(s.instances, 0);
+  }));
+
+test("JavaScript alias retains payload integrity checks", async () =>
+  fixture(async (s) => {
+    withResponseType(s, "/runtime/runtime.js", "application/javascript", "export []");
+    await assert.rejects(createProgram(s.options), (error) => error.phase === "integrity");
+    assert.equal(s.instances, 0);
+  }));
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((a, b) => {
@@ -88,7 +135,7 @@ async function fixture(body) {
           ]
         : [["set.json", "{}", "application/json"]];
     const descriptor = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       logicalId: `test/${kind}`,
       kind,
       compatibility,
@@ -111,21 +158,6 @@ async function fixture(body) {
               { role: "wasm", path: "runtime.wasm" },
             ]
           : [{ role: "programSet", path: "set.json" }],
-      exports:
-        kind === "runtime"
-          ? []
-          : [
-              {
-                role: "run",
-                declaration: "Root.run",
-                interfaceId: "test-run-v1",
-              },
-              {
-                role: "extra",
-                declaration: "Root.extra",
-                interfaceId: "extra-v1",
-              },
-            ],
     };
     inventory.set(`/${kind}/bundle.json`, {
       mediaType: "application/json",
@@ -172,6 +204,12 @@ async function fixture(body) {
         exports: [
           structuredClone(entry),
           { ...entry, entry: "Root.extra", id: "extra", jsName: "extra" },
+          {
+            ...entry,
+            entry: "Dependency.hidden",
+            id: "hidden",
+            jsName: "hidden",
+          },
         ],
       },
       callEntry() {
@@ -226,12 +264,11 @@ function trackedController() {
   return { controller, listeners };
 }
 
-test("wrong ABI is rejected at admission, not ignored or instantiated (semantic red)", async () =>
+test("wrong ABI is rejected before runtime creation", async () =>
   fixture(async (s) => {
     const exports = expected();
-    exports.run.signature.result = { type: "String", interfaceTag: 3 };
-    // Non-enumerable own options reach the old two-key loader, exposing ignored
-    // expectations rather than merely its unsupported-option guard.
+    exports["Root.run"].result = { type: "String", interfaceTag: 3 };
+    // The public option is recognized by own-property presence, not enumeration.
     Object.defineProperty(s.options, "expectedExports", { value: exports });
     s.creation.resolve(s.runtime);
     await assert.rejects(
@@ -241,7 +278,7 @@ test("wrong ABI is rejected at admission, not ignored or instantiated (semantic 
     assert.equal(s.instances, 0);
   }));
 
-test("abort during deferred creation disposes the late instance instead of handing it off (semantic red)", async () =>
+test("abort during deferred creation disposes the late instance instead of handing it off", async () =>
   fixture(async (s) => {
     const controller = new AbortController(),
       reason = { cancelled: true };
@@ -261,46 +298,34 @@ test("abort during deferred creation disposes the late instance instead of handi
 
 for (const [name, change] of [
   [
-    "missing role",
+    "missing declaration",
     (e) => {
-      e.missing = e.run;
-      delete e.run;
-    },
-  ],
-  [
-    "wrong ID",
-    (e) => {
-      e.run.interfaceId = "test-run-v2";
-    },
-  ],
-  [
-    "wrong declaration",
-    (e) => {
-      e.run.declaration = "Dependency.run";
+      e["Dependency.run"] = e["Root.run"];
     },
   ],
   [
     "convenience alias",
     (e) => {
-      e.run.declaration = "run";
+      e.run = e["Root.run"];
+      delete e["Root.run"];
     },
   ],
   [
     "argument count",
     (e) => {
-      e.run.signature.args.push(nat);
+      e["Root.run"].args.push(nat);
     },
   ],
   [
     "result type",
     (e) => {
-      e.run.signature.result = { type: "String", interfaceTag: 3 };
+      e["Root.run"].result = { type: "String", interfaceTag: 3 };
     },
   ],
   [
     "effect",
     (e) => {
-      e.run.signature.effect = "io";
+      e["Root.run"].effect = "io";
     },
   ],
 ])
@@ -314,21 +339,10 @@ for (const [name, change] of [
       );
       assert.equal(s.instances, 0);
       assert.equal(s.calls, 0);
-      if (
-        [
-          "missing role",
-          "wrong ID",
-          "wrong declaration",
-          "convenience alias",
-        ].includes(name)
-      )
-        assert.ok(
-          s.requests.every((r) => r.path.endsWith("bundle.json")),
-          "metadata mismatch needs no payloads",
-        );
+      assert.ok(s.requests.some((r) => r.path === "/program/set.json"));
     }));
 
-test("correct subset, extra roles and reordered keys admit; mutation after await cannot weaken the snapshot", async () =>
+test("expected full name and signature snapshot survive caller mutation", async () =>
   fixture(async (s) => {
     const exports = expected(),
       saved = structuredClone(exports);
@@ -336,33 +350,35 @@ test("correct subset, extra roles and reordered keys admit; mutation after await
     s.runtime.interfaceManifest.exports[0].args = [
       { name: "other display name", type: nat },
     ];
-    exports.run.signature.args = [
+    exports["Root.run"].args = [
       { interfaceTag: 0, type: "Nat", diagnostics: { ignored: true } },
     ];
     const pending = createProgram({ ...s.options, expectedExports: exports });
-    exports.run.declaration = "not the snapshotted declaration";
-    exports.run.signature.args[0].interfaceTag = 3;
+    exports["Root.run"].args[0].interfaceTag = 3;
     await s.started.promise;
     s.creation.resolve(s.runtime);
     const program = await pending;
-    assert.equal(program.call("run"), 42n);
+    assert.equal(program.call("Root.run"), 42n);
+    assert.throws(
+      () => program.call("Dependency.hidden"),
+      /unknown program export Dependency.hidden/,
+    );
+    assert.throws(() => program.call("run"), /unknown program export run/);
     assert.equal(program.status, "active");
     program.dispose();
     program.dispose();
     assert.equal(s.disposed, 1);
-    assert.equal(saved.run.declaration, "Root.run");
+    assert.deepEqual(saved, {
+      "Root.run": { args: [], result: { ...nat }, effect: "pure" },
+    });
   }));
 
 for (const value of [
   null,
   [],
-  { run: {} },
+  { "Root.run": {} },
   {
-    run: {
-      declaration: "Root.run",
-      interfaceId: "test-run-v1",
-      signature: { args: [], result: nat },
-    },
+    "Root.run": { args: [], result: nat },
   },
 ])
   test(`malformed expectation rejects before I/O: ${JSON.stringify(value)}`, async () =>
@@ -475,7 +491,7 @@ test("post-handoff abort owns nothing; explicit throwing disposal is terminal an
     assert.equal(listeners.size, 0);
     assert.equal(s.timers.size, 0);
     controller.abort();
-    assert.equal(program.call("run"), 42n);
+    assert.equal(program.call("Root.run"), 42n);
     assert.equal(s.disposed, 0);
     s.runtime.dispose = () => {
       s.disposed++;
@@ -541,7 +557,7 @@ test("non-cancellation error preserves raw primary cause and secondary cleanup, 
       createProgram({ ...s.options, signal: controller.signal }),
       (e) =>
         e.name === "Error" &&
-        e.phase === "runtime-creation" &&
+        e.phase === "program-validation" &&
         e.cause === raw &&
         Object.hasOwn(e, "cleanupError") &&
         e.cleanupError === undefined,
@@ -595,7 +611,7 @@ for (const order of [
       await rejectedA;
       const program = await pendingB;
       assert.deepEqual(disposed, [1, 0]);
-      assert.equal(program.call("run"), 42n);
+      assert.equal(program.call("Root.run"), 42n);
       program.dispose();
       assert.deepEqual(disposed, [1, 1]);
     }));
@@ -623,12 +639,33 @@ test("same arity with wrong argument type rejects at admission", async () =>
   fixture(async (s) => {
     s.manifest.exports[0].args = [{ name: "n", type: nat }];
     const exports = expected();
-    exports.run.signature.args = [{ type: "String", interfaceTag: 3 }];
+    exports["Root.run"].args = [{ type: "String", interfaceTag: 3 }];
     await assert.rejects(
       createProgram({ ...s.options, expectedExports: exports }),
       (e) => e.phase === "program-validation",
     );
     assert.equal(s.instances, 0);
+  }));
+
+test("installed interface is checked again and rejected instances are disposed", async () =>
+  fixture(async (s) => {
+    s.creation.resolve({
+      ...s.runtime,
+      interfaceManifest: {
+        exports: [
+          {
+            ...entry,
+            result: { type: "String", interfaceTag: 3 },
+          },
+        ],
+      },
+    });
+    await assert.rejects(
+      createProgram({ ...s.options, expectedExports: expected() }),
+      (error) => error.phase === "program-validation",
+    );
+    assert.equal(s.instances, 1);
+    assert.equal(s.disposed, 1);
   }));
 
 test("abort at the final installed-interface boundary cannot race a successful handoff", async () =>

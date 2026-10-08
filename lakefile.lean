@@ -376,7 +376,7 @@ target virRuntimePack (pkg) : System.FilePath := do
         addTrace (← computeTrace (System.FilePath.mk source))
       addLeanTrace
       let cache := pkg.buildDir / "vir/resources/runtime" / s!"{contentId}.virres"
-      let stage := pkg.dir / ".vir-generated/VirResourceRuntime.virres"
+      let stage := pkg.srcDir / ".vir-generated/VirResourceRuntime.virres"
       -- Check the full profile before installation, in the same acquisition pass.
       proc { cmd := tool.toString, args := #["acquire", profile.toString, contentId, source,
         cache.toString, stage.toString] }
@@ -401,28 +401,30 @@ private def resourceLibraryStem (lib : LeanLib) : Except String String := do
     throw "virResourcePack requires a library name usable as one filename"
   return stem
 
-/-- Resolve only independent program inputs; never fetch the carrier's modules
-or extra dependencies while producing the prerequisite for that carrier. -/
+/-- Resolve independent program inputs without compiling the carrier or fetching
+its extra dependencies. Source-only module collection supplies inclusion inputs. -/
 library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
   -- Enforce this before any cache lookup. Resource runtime capabilities come
   -- from the locked bundle, not an ambient custom native-provider selection.
   if (← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST").isSome then
     error "VIR_RESOURCE_NATIVE_PROFILE_UNSUPPORTED: unset VIR_NATIVE_EXTERN_MANIFEST; resource programs require the locked runtime profile"
   let stem ← IO.ofExcept (resourceLibraryStem lib)
-  let recipe ← inputTextFile (lib.pkg.dir / "vir-resources" / s!"{stem}.json")
+  -- A bare module key is a typed Module input in stock Lake, not a request for
+  -- its default compilation facet. Select it here before requesting compilation.
+  let selections := lib.config.needs.filterMap fun
+    | .module name => some (Lean.Name.anonymous, name)
+    | .packageModule pkg name => some (pkg, name)
+    | _ => none
+  let #[(pkgName, moduleName)] := selections
+    | error s!"virResourcePack requires exactly one program module key in `{lib.name}` needs"
+  unless pkgName.isAnonymous || pkgName == lib.pkg.baseName || pkgName == lib.pkg.keyName do
+    error s!"VIR resource program `{moduleName}` must belong to `{lib.pkg.prettyName}`"
+  let some mod := lib.pkg.findModule? moduleName
+    | error s!"VIR resource program module `{moduleName}` is not Lake-registered in `{lib.pkg.prettyName}`"
   let profile ← virResourceCompatibility.fetch
   let tool ← vir_resource_program.fetch
   let packTool ← vir_resource_pack.fetch
-  tool.bindM fun tool => packTool.bindM fun packTool => profile.bindM fun profile =>
-  recipe.bindM fun recipe => do
-    let planText ← captureProc {
-      cmd := tool.toString
-      args := #["plan", recipe.toString, profile.toString, lib.pkg.dir.toString] }
-    let plan ← IO.ofExcept (Lean.Json.parse planText)
-    let moduleName ← IO.ofExcept <| plan.getObjValAs? String "module"
-    let supportPaths ← IO.ofExcept <| plan.getObjValAs? (Array String) "supportFiles"
-    let some mod ← findModule? moduleName.toName
-      | error s!"VIR resource program module `{moduleName}` is not Lake-registered"
+  tool.bindM fun tool => packTool.bindM fun packTool => profile.bindM fun profile => do
     if sameResourceLibrary mod.lib lib then
       error s!"VIR resource cycle: program `{moduleName}` belongs to its carrier library `{lib.name}`"
     let imports ← mod.transImports.fetch
@@ -430,13 +432,21 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
       for imported in imports do
         if sameResourceLibrary imported.lib lib then
           error s!"VIR resource cycle: `{moduleName}` imports carrier module `{imported.name}` in `{lib.name}`"
+      -- Lake's source-only collection also includes local imported modules;
+      -- this does not compile a carrier or wait for its extra dependencies.
+      let carriers ← (← lib.modules.fetch).await
+      let carrierInputs := carriers.filterMap fun carrier => do
+        let owner ← lib.pkg.findModule? carrier.name
+        guard (sameResourceLibrary owner.lib lib)
+        return carrier.filePath (lib.srcDir / ".vir-generated/inputs") "path"
       -- Source-only transImports was checked before requesting compilation, so
       -- the common carrier/program cycle produces a diagnostic, not a job wait.
       let program ← (mod.facet `virProgram).fetch
-      let support ← supportPaths.mapM fun path => inputBinFile (lib.pkg.dir / System.FilePath.mk path)
-      let support := Job.collectArray support "VIR resource support files"
-      program.bindM fun program => support.mapM fun _ => do
-        addPureTrace "virResourcePack/v2" "VIR resource producer contract"
+      program.mapM fun program => do
+        -- A bare module input carries no trace. Include its selected Name,
+        -- even if two choices have identical compilation traces/paths.
+        addPureTrace moduleName.toString "VIR program selection"
+        addPureTrace "virResourcePack/v3" "VIR resource producer contract"
         let output := lib.pkg.buildDir / "vir/resources/programs" / s!"{stem}.virres"
         for path in #[output, output.addExtension "trace", output.addExtension "hash"] do
           checkResourceOutput path
@@ -445,14 +455,16 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
           createParentDirs output
           proc {
             cmd := tool.toString
-            args := #["build", recipe.toString, profile.toString, program.toString,
-              lib.pkg.dir.toString, output.toString], env := ← getAugmentedEnv }
-        let stage := lib.pkg.dir / ".vir-generated" / s!"{stem}.virres"
+            args := #["build", moduleName.toString, profile.toString,
+              program.toString, output.toString], env := ← getAugmentedEnv }
+        let stage := lib.srcDir / ".vir-generated" / s!"{stem}.virres"
         -- Always repair/verify staging, even when Lake returns a cached artifact
         -- somewhere other than output. No restoration of conventional IR paths.
         discard <| captureProc {
           cmd := packTool.toString
-          args := #["stage", profile.toString, artifact.path.toString, stage.toString] }
+          args := #["stage", profile.toString, artifact.path.toString, stage.toString] ++
+            carrierInputs.map (·.toString) }
         addTrace inputTrace
         addTrace (← computeTrace stage)
+        for input in carrierInputs do addTrace (← computeTrace input)
         return artifact.path

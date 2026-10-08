@@ -42,12 +42,6 @@ structure FileEntry where
   path : String
   deriving BEq, Repr, Inhabited
 
-structure ProgramExport where
-  role : String
-  declaration : String
-  interfaceId : String
-  deriving BEq, Repr, Inhabited
-
 structure Descriptor where
   schemaVersion : Nat
   logicalId : String
@@ -55,7 +49,6 @@ structure Descriptor where
   compatibility : Compatibility
   files : Array FileInfo
   fileEntries : Array FileEntry
-  exports : Array ProgramExport
   deriving BEq, Repr, Inhabited
 
 /-- An owned inventory of bytes, never deferred filesystem lookups. -/
@@ -85,8 +78,5 @@ def Bundle.file? (bundle : Bundle) (path : String) : Option File :=
 
 def Bundle.entryPath? (bundle : Bundle) (role : String) : Option String :=
   (bundle.descriptor.fileEntries.find? (·.role == role)).map (·.path)
-
-def Bundle.exportName? (bundle : Bundle) (role : String) : Option String :=
-  (bundle.descriptor.exports.find? (·.role == role)).map (·.declaration)
 
 end Vir.Resources

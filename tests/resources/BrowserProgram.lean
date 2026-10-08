@@ -16,3 +16,8 @@ public def Vir.Resources.Test.prettyScore : Nat :=
 @[vir_export]
 public def Vir.Resources.Test.leanError : IO Unit :=
   throw (IO.userError "resource recoverable error")
+
+-- Startup markers remain callable exports, not an automatic creation action.
+@[vir_startup]
+public def Vir.Resources.Test.manualStartup : IO Unit :=
+  throw (IO.userError "startup requires an explicit call")

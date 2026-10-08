@@ -9,10 +9,10 @@ public import Vir.Resources.Validate
 import Lean.Data.Json.Parser
 import Lean.Data.Json.FromToJson.Basic
 
-/-! Internal v1 container: eight magic/version bytes, a little-endian u32
-descriptor length, canonical descriptor bytes, then payloads in descriptor path
-order. Each payload's length comes from the descriptor, not a second inventory.
-No archive paths or links are materialized by decoding. -/
+/-! Internal v1 framing: eight magic/version bytes, a little-endian u32
+descriptor length, canonical v2 descriptor bytes, then payloads in descriptor
+path order. Each payload's length comes from the descriptor, not a second
+inventory. No archive paths or links are materialized by decoding. -/
 
 namespace Vir.Resources.Pack
 open Lean
@@ -34,12 +34,6 @@ private def parseFileInfo (j : Json) : Except String FileInfo := do
 private def parseEntry (j : Json) : Except String FileEntry := do
   return { role := ← j.getObjValAs? String "role", path := ← j.getObjValAs? String "path" }
 
-private def parseExport (j : Json) : Except String ProgramExport := do
-  return {
-    role := ← j.getObjValAs? String "role"
-    declaration := ← j.getObjValAs? String "declaration"
-    interfaceId := ← j.getObjValAs? String "interfaceId" }
-
 private def parseDescriptor (j : Json) : Except String Descriptor := do
   let kind ← match ← j.getObjValAs? String "kind" with
     | "runtime" => pure BundleKind.runtime
@@ -51,10 +45,9 @@ private def parseDescriptor (j : Json) : Except String Descriptor := do
     kind
     compatibility := ← parseCompatibility (← j.getObjVal? "compatibility")
     files := ← (← (← j.getObjVal? "files").getArr?).mapM parseFileInfo
-    fileEntries := ← (← (← j.getObjVal? "fileEntries").getArr?).mapM parseEntry
-    exports := ← (← (← j.getObjVal? "exports").getArr?).mapM parseExport }
+    fileEntries := ← (← (← j.getObjVal? "fileEntries").getArr?).mapM parseEntry }
 
-/-- Decode a complete canonical v1 descriptor, including schema and size checks.
+/-- Decode a complete canonical v2 descriptor, including schema and size checks.
 Duplicate/unknown keys, alternative number spellings, unsorted inventories and
 lossy UTF-8 decoding cannot be accepted. Producers can call this before reading
 any payload bytes. -/

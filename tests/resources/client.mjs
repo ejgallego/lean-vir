@@ -138,11 +138,38 @@ if (published) {
   assert.ok(!existsSync(join(evidence, "absent-cache.virres")));
   assert.ok(!existsSync(join(evidence, "absent-stage.virres")));
 }
-const programStage = join(client, ".vir-generated/ClientResources.virres");
+const programStage = join(client, "resources/.vir-generated/ClientResources.virres");
+const carrierInput = join(client, "resources/.vir-generated/inputs/Client/Resources.path");
 const programFirst = readFileSync(programStage);
-const first = [snapshot(programStage), snapshot(runtimeStage)];
+assert.equal(readFileSync(carrierInput, "utf8"), programStage);
+const clientConfig = join(client, "lakefile.lean");
+const originalConfig = readFileSync(clientConfig, "utf8");
+for (const [label, change, diagnostic] of [
+  ["missing-selection", text => replaceFixture(text, "`+Client.Program, ", ""),
+    /exactly one program module key/],
+  ["duplicate-selection", text => replaceFixture(text, "`+Client.Program, ",
+    "`+Client.Program, `+Client.Alternative, "),
+    /exactly one program module key/],
+  ["foreign-module", text => replaceFixture(text, "`+Client.Program, ", "`+Vir.Attributes, "),
+    /not Lake-registered in/],
+  ["foreign-package", text => replaceFixture(text, "`+Client.Program, ", "`@lean_vir/+Vir.Attributes, "),
+    /must belong to/],
+  ["carrier-as-root", text => replaceFixture(text, "`+Client.Program, ", "`+Client.Resources, "),
+    /VIR resource cycle/],
+]) {
+  writeFileSync(clientConfig, change(originalConfig));
+  run(leaf, label, "lake", ["build", "generate-site"], diagnostic);
+  assert.deepEqual(readFileSync(programStage), programFirst, "rejection preserves prepared program");
+}
+writeFileSync(clientConfig, originalConfig);
+writeFileSync(clientConfig, replaceFixture(originalConfig,
+  "`+Client.Program, ", "`@client_fixture/+Client.Program, "));
+build("qualified-selection");
+assert.deepEqual(readFileSync(programStage), programFirst);
+writeFileSync(clientConfig, originalConfig);
+const first = [snapshot(programStage), snapshot(runtimeStage), snapshot(carrierInput)];
 build("warm");
-assert.deepEqual([snapshot(programStage), snapshot(runtimeStage)], first);
+assert.deepEqual([snapshot(programStage), snapshot(runtimeStage), snapshot(carrierInput)], first);
 assert.doesNotMatch(
   readFileSync(join(evidence, "warm.log"), "utf8"),
   /Built.*(?:Client|Main|Runtime)/,
@@ -152,6 +179,10 @@ build("repair-stage");
 assert.deepEqual(readFileSync(programStage), programFirst);
 writeFileSync(programStage, "corrupt staged pack");
 build("repair-corrupt-stage");
+assert.deepEqual(readFileSync(programStage), programFirst);
+unlinkSync(carrierInput);
+build("repair-context-input");
+assert.equal(readFileSync(carrierInput, "utf8"), programStage);
 assert.deepEqual(readFileSync(programStage), programFirst);
 
 const programSource = join(client, "program/Client/Program.lean");
@@ -186,7 +217,7 @@ writeFileSync(programSource, initialSource);
 build("restored");
 
 // Native publication now needs only compiled/link prerequisites, not raw packs.
-renameSync(programStage, join(client, ".vir-generated/retained.virres"));
+renameSync(programStage, join(client, "resources/.vir-generated/retained.virres"));
 const destination = join(evidence, "relocated-site");
 run(
   "/tmp",

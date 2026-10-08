@@ -87,9 +87,9 @@ const compatibility = {
   virVersion: VIR_COMPATIBILITY_VERSION,
 };
 const inventory = new Map();
-async function bundle(kind, entries, fileEntries, exports) {
+async function bundle(kind, entries, fileEntries) {
   const descriptor = validateDescriptor({
-    schemaVersion: 1,
+    schemaVersion: 2,
     logicalId: `vir/test/${kind}`,
     kind,
     compatibility,
@@ -100,7 +100,6 @@ async function bundle(kind, entries, fileEntries, exports) {
       sha256: digest(bytes),
     })),
     fileEntries,
-    exports,
   });
   const envelope = {
     contentId: await descriptorContentId(descriptor),
@@ -136,7 +135,6 @@ const runtime = await bundle(
     { role: "runtimeModule", path: "runtime.js" },
     { role: "wasm", path: "runtime.wasm" },
   ],
-  [],
 );
 const setBytes = await readFile(join(programDir, "set.json"));
 const set = JSON.parse(setBytes);
@@ -153,18 +151,6 @@ const program = await bundle(
     )),
   ],
   [{ role: "programSet", path: "set.json" }],
-  [
-    {
-      role: "score",
-      declaration: "Vir.Resources.Test.prettyScore",
-      interfaceId: "vir-test-score-v1",
-    },
-    {
-      role: "leanError",
-      declaration: "Vir.Resources.Test.leanError",
-      interfaceId: "vir-test-error-v1",
-    },
-  ],
 );
 for (const [path, { bytes }] of inventory) {
   const destination = join(output, "site", path);
@@ -222,7 +208,10 @@ const server = createServer((req, res) => {
     return;
   }
   res.writeHead(item.status ?? 200, {
-    "content-type": item.mediaType,
+    // Match GitHub Pages: the declared text/javascript inventory is served
+    // using its application/javascript response alias, including bootstrap.
+    "content-type": item.mediaType === "text/javascript"
+      ? "application/javascript" : item.mediaType,
     "content-length": item.bytes.length,
     ...item.headers,
   });
@@ -244,20 +233,28 @@ try {
       const options = {runtimeManifestUrl: new URL('runtime/bundle.json', location.href),
         programManifestUrl: new URL('program/bundle.json', location.href)};
       const controller = new AbortController();
-      const checkedOptions = {...options, signal: controller.signal, expectedExports: {
-        score: {declaration: 'Vir.Resources.Test.prettyScore', interfaceId: 'vir-test-score-v1',
-          signature: {args: [], result: {type: 'Nat', interfaceTag: 0}, effect: 'pure'}}
-      }};
+      const checkedOptions = {
+        ...options,
+        signal: controller.signal,
+        expectedExports: {
+          'Vir.Resources.Test.prettyScore': {
+            args: [],
+            result: {type: 'Nat', interfaceTag: 0},
+            effect: 'pure',
+          },
+        },
+      };
       const first = await createProgram(checkedOptions);
       controller.abort(); // A handed-off instance belongs to the facade, not this signal.
       const second = await createProgram(options);
       // Assert native result types here; CDP carries only JSON observations.
-      const values = [first.call('score'), second.call('score')];
-      let unknown = false; try {first.call('missing')} catch(e) {unknown = /unknown.*role/.test(e.message)};
+      const score = 'Vir.Resources.Test.prettyScore';
+      const values = [first.call(score), second.call(score)];
+      let unknown = false; try {first.call('missing')} catch(e) {unknown = /unknown.*program export/.test(e.message)};
       first.dispose(); first.dispose();
-      let disposed = false; try {first.call('score')} catch(e) {disposed = /disposed/.test(e.message)};
-      values.push(second.call('score')); second.dispose();
-      const remounted = await createProgram(options); values.push(remounted.call('score')); remounted.dispose();
+      let disposed = false; try {first.call(score)} catch(e) {disposed = /disposed/.test(e.message)};
+      values.push(second.call(score)); second.dispose();
+      const remounted = await createProgram(options); values.push(remounted.call(score)); remounted.dispose();
       globalThis.openResourceProgram = (extra = {}) => createProgram({...options, ...extra});
       return {correctValues: values.map(value => value === 6093n), unknown, disposed};
     })()`,
@@ -268,7 +265,7 @@ try {
       disposed: true,
     });
     outcomes.push(
-      `${prefix}: role call, independent instance, disposal, remount PASS`,
+      `${prefix}: JavaScript MIME alias, full-name call, independent instance, disposal, remount PASS`,
     );
   }
   const browserVersion = await cdp.send("Browser.getVersion");
@@ -294,7 +291,9 @@ try {
       try { const program = await openResourceProgram({signal: controller.signal}); handedOff = true; program.dispose(); }
       catch (error) { name = error.name; cause = error.cause; }
       const fresh = await openResourceProgram();
-      let value; try { value = fresh.call('score'); } finally { fresh.dispose(); }
+      let value;
+      try { value = fresh.call('Vir.Resources.Test.prettyScore'); }
+      finally { fresh.dispose(); }
       globalThis.cancelledCreationMemories = memories;
       return {handedOff, name, cause, created: memories.length, correctValue: value === 6093n};
     } finally { WebAssembly.Instance = original; }
@@ -324,38 +323,48 @@ try {
     try {
       program = await openResourceProgram(); peer = await openResourceProgram();
       const initial = program.status;
+      let startupError = false;
+      try { program.call('Vir.Resources.Test.manualStartup'); }
+      catch (e) { startupError = /startup requires an explicit call/.test(e.message); }
+      const afterStartup = program.status;
       let ioError = false;
-      try { program.call('leanError'); } catch (e) { ioError = /resource recoverable error/.test(e.message); }
+      try { program.call('Vir.Resources.Test.leanError'); }
+      catch (e) { ioError = /resource recoverable error/.test(e.message); }
       const afterIo = program.status;
-      const afterIoValue = program.call('score');
-      let invalidRole = false;
-      try { program.call('missing'); } catch { invalidRole = true; }
+      const score = 'Vir.Resources.Test.prettyScore';
+      const afterIoValue = program.call(score);
+      let invalidName = false;
+      try { program.call('missing'); } catch { invalidName = true; }
       const afterInvalidRole = program.status;
       const immutable = !Reflect.set(program, 'status', 'disposed') && program.status === 'active';
       trapNext = true;
       let failure;
-      try { program.call('score'); } catch (error) { failure = error; }
+      try { program.call(score); } catch (error) { failure = error; }
       const failed = program.status;
       const callsAtFailure = boundaryCalls;
       let retired = false;
-      try { program.call('score'); } catch (error) { retired = error.cause === failure; }
+      try { program.call(score); } catch (error) { retired = error.cause === failure; }
       const noReplay = boundaryCalls === callsAtFailure;
-      const peerState = peer.status, peerValue = peer.call('score');
+      const peerState = peer.status, peerValue = peer.call(score);
+      let dependencyHidden = false;
+      try { program.call('Vir.Fixtures.FormatPretty.formatPrettyScore'); }
+      catch (e) { dependencyHidden = /unknown program export/.test(e.message); }
       program.dispose(); program.dispose();
       const disposed = program.status;
       fresh = await openResourceProgram();
-      return {initial, ioError, afterIo, afterIoCorrect: afterIoValue === 6093n, invalidRole, afterInvalidRole,
+      return {initial, startupError, afterStartup, ioError, afterIo, afterIoCorrect: afterIoValue === 6093n, invalidName, dependencyHidden, afterInvalidRole,
         immutable, realTrap: failure instanceof WebAssembly.RuntimeError, failed,
         retired, noReplay, peerState, peerCorrect: peerValue === 6093n, disposed,
-        freshState: fresh.status, freshCorrect: fresh.call('score') === 6093n};
+        freshState: fresh.status, freshCorrect: fresh.call(score) === 6093n};
     } finally {
       program?.dispose(); peer?.dispose(); fresh?.dispose();
       WebAssembly.Instance = original;
     }
   })()`);
   assert.deepEqual(status, {
-    initial: "active", ioError: true, afterIo: "active", afterIoCorrect: true,
-    invalidRole: true, afterInvalidRole: "active", immutable: true,
+    initial: "active", startupError: true, afterStartup: "active", ioError: true,
+    afterIo: "active", afterIoCorrect: true, invalidName: true, dependencyHidden: true,
+    afterInvalidRole: "active", immutable: true,
     realTrap: true, failed: "failed", retired: true, noReplay: true,
     peerState: "active", peerCorrect: true, disposed: "disposed",
     freshState: "active", freshCorrect: true,
@@ -436,14 +445,36 @@ try {
     /incompatible/,
     "compatibility",
   );
-  const missingExport = await changed(
-    (d) => (d.exports[0].declaration = "Missing.export"),
+  const missingExport = await evaluate(cdp, `(async () => {
+    const expectedExports = {'Missing.export': {
+      args: [], result: {type: 'Nat', interfaceTag: 0}, effect: 'pure'}};
+    try { await openResourceProgram({expectedExports}); return {unexpected: true}; }
+    catch (error) { return {message: error.cause?.message, phase: error.phase}; }
+  })()`);
+  assert.match(missingExport.message, /missing program export Missing\.export/);
+  assert.equal(missingExport.phase, "program-validation");
+  assert.equal(await evaluate(cdp, "resourceInstances"), 0);
+  outcomes.push("unknown expected declaration: reject before runtime instantiation PASS");
+  await rejected(
+    "JavaScript MIME",
+    (path) => path === "runtime/runtime.js"
+      ? { ...inventory.get(path), mediaType: "text/plain" } : null,
+    /Content-Type/,
+    "resource-fetch",
   );
   await rejected(
-    "actual export",
-    (path) => (path === "program/bundle.json" ? missingExport : null),
-    /missing program export/,
-    "program-validation",
+    "JavaScript alias integrity",
+    (path) => path === "runtime/runtime.js"
+      ? { ...inventory.get(path), bytes: Buffer.alloc(compiled.outputFiles[0].contents.length) } : null,
+    /integrity mismatch/,
+    "integrity",
+  );
+  await rejected(
+    "JavaScript alias is not Wasm MIME",
+    (path) => path === "runtime/runtime.wasm"
+      ? { ...inventory.get(path), mediaType: "application/javascript" } : null,
+    /Content-Type/,
+    "resource-fetch",
   );
   await rejected(
     "Wasm integrity",
@@ -514,8 +545,8 @@ try {
   );
   assert.equal(requests.includes("/elsewhere"), false);
   const strict = await evaluate(cdp, `(async () => {
-    const expectation = {score: {declaration: 'Vir.Resources.Test.prettyScore',
-      interfaceId: 'vir-test-score-v1', signature: {args: [], result: {type: 'String', interfaceTag: 3}, effect: 'pure'}}};
+    const expectation = {'Vir.Resources.Test.prettyScore':
+      {args: [], result: {type: 'String', interfaceTag: 3}, effect: 'pure'}};
     let phase;
     try { await openResourceProgram({expectedExports: expectation}); }
     catch (error) { phase = error.phase; }

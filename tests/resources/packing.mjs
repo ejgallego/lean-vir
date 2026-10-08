@@ -71,7 +71,6 @@ writeFileSync(join(payloadRoot, "runtime.js"), js);
 writeFileSync(join(payloadRoot, "runtime.wasm"), wasm);
 const descriptor = {
   compatibility,
-  exports: [],
   fileEntries: [
     { path: "runtime.js", role: "runtimeModule" },
     { path: "runtime.wasm", role: "wasm" },
@@ -92,13 +91,14 @@ const descriptor = {
   ],
   kind: "runtime",
   logicalId: "native-pack-test",
-  schemaVersion: 1,
+  schemaVersion: 2,
 };
 const descriptorBytes = Buffer.from(canonical(descriptor));
 const contentId = sha(
-  Buffer.concat([Buffer.from("vir-resource-bundle-v1\n"), descriptorBytes]),
+  Buffer.concat([Buffer.from("vir-resource-bundle-v2\n"), descriptorBytes]),
 );
 const writeDescriptor = (value) => writeFileSync(descriptorPath, value);
+const altered = (value) => writeDescriptor(Buffer.from(canonical(value)));
 writeDescriptor(descriptorBytes);
 invoke("cold");
 const pack = readFileSync(output);
@@ -116,7 +116,7 @@ assert.equal(
   contentId,
   sha(
     Buffer.concat([
-      Buffer.from("vir-resource-bundle-v1\n"),
+      Buffer.from("vir-resource-bundle-v2\n"),
       pack.subarray(12, 12 + descriptorBytes.length),
     ]),
   ),
@@ -127,7 +127,13 @@ const after = statSync(output, { bigint: true });
 assert.equal(after.ino, before.ino);
 assert.equal(after.mtimeNs, before.mtimeNs);
 
-const altered = (value) => writeDescriptor(Buffer.from(canonical(value)));
+altered({ ...descriptor, schemaVersion: 1 });
+invoke("legacy-schema", descriptorPath, payloadRoot, output, /SCHEMA_VERSION/);
+assert.deepEqual(readFileSync(output), pack);
+altered({ ...descriptor, exports: [] });
+invoke("legacy-export-table", descriptorPath, payloadRoot, output, /NONCANONICAL_DESCRIPTOR/);
+assert.deepEqual(readFileSync(output), pack);
+writeDescriptor(descriptorBytes);
 for (const path of ["bundle.json/child", "BUNDLE.JSON/child/nested"]) {
   altered({
     ...descriptor,
@@ -217,7 +223,7 @@ invoke(
 writeDescriptor(
   Buffer.from(
     replaceFixture(descriptorBytes.toString("utf8"),
-      '"schemaVersion":1}', '"schemaVersion":1,"schemaVersion":1}'),
+      '"schemaVersion":2}', '"schemaVersion":2,"schemaVersion":2}'),
   ),
 );
 invoke(
