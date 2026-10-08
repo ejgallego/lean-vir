@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 import * as React from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -84,7 +85,7 @@ async function runFatalRecovery(wasmModule, irPackageSet) {
     check(exports.vir_resource_roots_active() === 0 &&
       exports.vir_resource_roots_reusable() === 0,
       "browser disposal clears the Wasm table after trap");
-    check(state.leanObjectHandleCells.size === 0 && bad.liveCallbacks.size === 0,
+    check(state.leanObjectHandleCells.size === 0 && countLiveCallbacks(bad.hostState) === 0,
       "browser disposal releases JavaScript roots after trap");
     for (const runtime of [good, recovered = await factory.createRuntime({ irPackageSet })]) {
       runtime.call("HostInterop.callbackRoundTrip", 3);
@@ -166,7 +167,7 @@ async function runReactChurn(createRuntime) {
     );
     await collectUntil(
       () =>
-        runtime.liveCallbacks.size === 0 &&
+        countLiveCallbacks(runtime.hostState) === 0 &&
         runtime.hostState.leanObjectHandleCells.size === 0,
       "React render foreign-root recovery",
     );

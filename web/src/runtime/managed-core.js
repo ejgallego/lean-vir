@@ -7,7 +7,6 @@ Author: Emilio J. Gallego Arias
 import { validateInterfaceManifest } from "./interface-manifest.js";
 import { validateIrPackageSetMembers } from "./ir-package.js";
 import { encodePackageContract } from "./package-contract.js";
-import { releaseCallbackRoots } from "./callbacks.js";
 import { RuntimeCallTiming } from "./call-timing.js";
 import {
   asError,
@@ -48,7 +47,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     this.startupError = null;
     this.disposed = false;
     this.disposing = false;
-    this.liveCallbacks = new Set();
     this.hostState?.attachRuntime(this);
     this.hostState?.attach(this.exports);
 
@@ -88,11 +86,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
         "VirRuntime already owns an IR package set; create a fresh runtime for another generation",
       );
     }
-    if (this.liveCallbacks.size !== 0) {
-      throw new Error(
-        "VirRuntime cannot install an IR package set while callbacks are live; create a fresh runtime",
-      );
-    }
     const packageBytes = validateIrPackageSetMembers(packages, {
       members: packageSet?.members ?? null,
     }).bytes;
@@ -105,11 +98,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     if (this.hasPackageState()) {
       throw new Error(
         "VirRuntime already owns an IR package set; create a fresh runtime for another generation",
-      );
-    }
-    if (this.liveCallbacks.size !== 0) {
-      throw new Error(
-        "VirRuntime cannot install an IR package set while callbacks are live; create a fresh runtime",
       );
     }
     this.requireFunction("vir_begin_ir_package_set");
@@ -344,8 +332,11 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     }
 
     const cache = this.callCacheFor(entry);
-    const plan = this.objectCallPlanFor(entry, cache);
-    if (plan === null || !this.hasObjectValueExports()) {
+    if (cache.objectCallSupported === undefined) {
+      cache.objectCallSupported = this.objectResultSupported(entry.result) &&
+        entry.args.every((arg) => this.objectArgumentSupported(arg.type));
+    }
+    if (!cache.objectCallSupported || !this.hasObjectValueExports()) {
       throw new Error(
         `object ABI does not support interface entry ${entry.entry}`,
       );
@@ -354,8 +345,8 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     try {
       const marshalStarted = timing?.beginPhase();
       try {
-        for (let index = 0; index < plan.args.length; index++) {
-          const arg = plan.args[index];
+        for (let index = 0; index < entry.args.length; index++) {
+          const arg = entry.args[index];
           argObjs.push(
             this.makeObjectValue(
               arg.type,
@@ -373,7 +364,7 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
         argObjs,
         (resultObj) =>
           this.liftObjectValue(
-            plan.resultType,
+            entry.result,
             resultObj,
             `${entry.entry} result`,
           ),
@@ -382,28 +373,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     } finally {
       this.releaseOwnedObjects(argObjs);
     }
-  }
-
-  objectCallPlanFor(entry, cache) {
-    if (cache.objectCallPlan !== undefined) {
-      return cache.objectCallPlan;
-    }
-    const resultType = entry.result;
-    if (
-      !this.objectResultSupported(resultType) ||
-      !entry.args.every((arg) => this.objectArgumentSupported(arg.type))
-    ) {
-      cache.objectCallPlan = null;
-      return null;
-    }
-    // Preparation resolves the actual boxed declaration. The binary contract
-    // independently checks its boundary requirement; display aliases and
-    // target provenance cannot establish executable declaration availability.
-    cache.objectCallPlan = {
-      args: entry.args,
-      resultType,
-    };
-    return cache.objectCallPlan;
   }
 
   usizeMaxValue() {
@@ -517,43 +486,13 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     return runtimeBoundaries.get(this).subscribe(listener);
   }
 
-  trackCallback(callback) {
-    this.liveCallbacks.add(callback);
-  }
-
-  untrackCallback(callback) {
-    this.liveCallbacks.delete(callback);
-  }
-
-  releaseClosure(rootId) {
-    this.exports.vir_closure_release?.(rootId);
-  }
-
   dispose() {
     if (this.disposed || this.disposing) return;
     this.disposing = true;
-    const errors = [];
     try {
-      collectCleanupError(errors, () => this.teardownPackageResources());
+      this.hostState?.dispose();
     } finally {
       this.markDisposed();
-    }
-    throwCollectedErrors(errors, "VirRuntime disposal failed");
-  }
-
-  teardownPackageResources() {
-    const errors = [];
-    collectCleanupError(errors, () => this.hostState?.dispose());
-    collectCleanupError(errors, () => this.releaseLiveCallbacks());
-    throwCollectedErrors(errors, "VirRuntime package resource teardown failed");
-  }
-
-  releaseLiveCallbacks() {
-    const callbacks = Array.from(this.liveCallbacks);
-    try {
-      releaseCallbackRoots(callbacks);
-    } finally {
-      this.liveCallbacks.clear();
     }
   }
 
@@ -570,7 +509,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
 const abandonedCleanupExports = new Set([
   "vir_obj_dec",
   "vir_free_bytes",
-  "vir_closure_release",
   "vir_abort_ir_package_set",
 ]);
 

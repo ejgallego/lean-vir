@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { INTERFACE_TAG } from "../../src/runtime/interface-tags.js";
+import { constructorValue } from "../../src/runtime/vir-value-normalizers.js";
 
 const JSON_INPUT_INTERFACE_TAGS = new Set([
   INTERFACE_TAG.EXPR,
@@ -74,11 +75,10 @@ export function defaultValueForType(type, selfType = null, depth = 0) {
     case INTERFACE_TAG.STRUCTURE:
       return defaultStructureValue(type, depth);
     case INTERFACE_TAG.TAGGED_UNION:
-      return defaultTaggedUnionValue(type);
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      return defaultCustomInductiveValue(type, depth);
+      return constructorTemplate(type, type.constructors[0], depth);
     case INTERFACE_TAG.SIMPLE_ENUM:
-      return type?.constructors?.[0]?.jsName ?? "";
+      return type.constructors[0].jsName;
     default:
       return "";
   }
@@ -96,31 +96,13 @@ function defaultStructureValue(type, depth = 0) {
   return value;
 }
 
-function defaultTaggedUnionValue(type) {
-  const ctor = type?.constructors?.[0];
-  if (!ctor) return { kind: "", value: null };
-  return {
-    kind: ctor.jsName ?? ctor.name,
-    value: defaultValueForType(ctor.type),
-  };
-}
-
-function defaultCustomInductiveValue(type, depth = 0) {
-  const ctor = type?.constructors?.[0];
-  if (!ctor) return { kind: "", value: null };
-  const kind = ctor.jsName ?? ctor.name;
-  if ((ctor.fields ?? []).length === 0) {
-    return { kind };
+// Editable suggestion for admitted descriptors; recursive positions may need edits.
+export function constructorTemplate(type, ctor, depth = 0) {
+  if (type.interfaceTag === INTERFACE_TAG.TAGGED_UNION) {
+    return constructorValue(type, ctor, defaultValueForType(ctor.type));
   }
-  if ((ctor.fields ?? []).length === 1) {
-    return {
-      kind,
-      value: defaultValueForType(ctor.fields[0].type, type, depth + 1),
-    };
-  }
-  const fields = {};
-  for (const field of ctor.fields ?? []) {
-    fields[field.name] = defaultValueForType(field.type, type, depth + 1);
-  }
-  return { kind, fields };
+  const values = Object.fromEntries(ctor.fields.map((field) => [
+    field.name, defaultValueForType(field.type, type, depth + 1),
+  ]));
+  return constructorValue(type, ctor, values);
 }
