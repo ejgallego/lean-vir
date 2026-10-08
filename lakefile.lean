@@ -424,8 +424,7 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
   let profile ← virResourceCompatibility.fetch
   let tool ← vir_resource_program.fetch
   let packTool ← vir_resource_pack.fetch
-  tool.bindM fun tool => packTool.bindM fun packTool => profile.bindM fun profile =>
-  do
+  tool.bindM fun tool => packTool.bindM fun packTool => profile.bindM fun profile => do
     if sameResourceLibrary mod.lib lib then
       error s!"VIR resource cycle: program `{moduleName}` belongs to its carrier library `{lib.name}`"
     let imports ← mod.transImports.fetch
@@ -433,6 +432,13 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
       for imported in imports do
         if sameResourceLibrary imported.lib lib then
           error s!"VIR resource cycle: `{moduleName}` imports carrier module `{imported.name}` in `{lib.name}`"
+      -- Lake's source-only collection also includes local imported modules;
+      -- this does not compile a carrier or wait for its extra dependencies.
+      let carriers ← (← lib.modules.fetch).await
+      let carrierInputs := carriers.filterMap fun carrier => do
+        let owner ← lib.pkg.findModule? carrier.name
+        guard (sameResourceLibrary owner.lib lib)
+        return carrier.filePath (lib.srcDir / ".vir-generated/inputs") "path"
       -- Source-only transImports was checked before requesting compilation, so
       -- the common carrier/program cycle produces a diagnostic, not a job wait.
       let program ← (mod.facet `virProgram).fetch
@@ -456,7 +462,9 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
         -- somewhere other than output. No restoration of conventional IR paths.
         discard <| captureProc {
           cmd := packTool.toString
-          args := #["stage", profile.toString, artifact.path.toString, stage.toString] }
+          args := #["stage", profile.toString, artifact.path.toString, stage.toString] ++
+            carrierInputs.map (·.toString) }
         addTrace inputTrace
         addTrace (← computeTrace stage)
+        for input in carrierInputs do addTrace (← computeTrace input)
         return artifact.path

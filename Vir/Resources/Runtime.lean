@@ -10,4 +10,4 @@ public import Vir.Resources.Embed
 
 /-- Complete runtime bytes prepared by this module's library prerequisite. -/
 public def Vir.Resources.Runtime.bundle : Vir.Resources.Bundle :=
-  include_vir_library VirResourceRuntime
+  include_vir_bundle "../../.vir-generated/VirResourceRuntime.virres"

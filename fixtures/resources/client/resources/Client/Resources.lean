@@ -3,4 +3,4 @@ module
 public import Vir.Resources.Embed
 
 public def Client.Resources.bundle : Vir.Resources.Bundle :=
-  include_vir_library ClientResources
+  include_vir_program

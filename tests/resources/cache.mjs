@@ -63,7 +63,7 @@ writeFileSync(
       '  srcDir := "resources"',
       "  roots := #[]",
       "  globs := #[.one `Client.OtherResources]",
-      "  needs := #[`@client_fixture/OtherResources:virResourcePack]",
+      "  needs := #[`+Client.Program, `@client_fixture/OtherResources:virResourcePack]",
       "",
     ].join("\n"),
 );
@@ -72,14 +72,8 @@ const originalCarrier = readFileSync(
   "utf8",
 );
 const renamedCarrier = replaceFixture(originalCarrier, "Client.Resources", "Client.OtherResources");
-const carrier = replaceFixture(renamedCarrier,
-  "include_vir_library ClientResources", "include_vir_library OtherResources");
+const carrier = renamedCarrier;
 writeFileSync(join(client, "resources/Client/OtherResources.lean"), carrier);
-// Register the second carrier using the same package-local typed target.
-const initialConfig = readFileSync(config, "utf8");
-const registration = "return Job.pure #[(`ClientResources, `Client.Program)]";
-writeFileSync(config, replaceFixture(initialConfig, registration,
-  "return Job.pure #[(`ClientResources, `Client.Program), (`OtherResources, `Client.Program)]"));
 const umbrella = join(client, "Client.lean");
 const withImport = replaceFixture(readFileSync(umbrella, "utf8"),
   "public import Client.Resources",
@@ -335,11 +329,11 @@ assert.deepEqual(
   packs,
 );
 
-// A pure registration has no file result to hash. Changing the selected root
+// A bare Module input has no file result to hash. Changing the selected root
 // must invalidate packaging, without recompiling the unchanged selected program.
 const configBefore = readFileSync(config, "utf8");
-const originalRegistration = "(`ClientResources, `Client.Program)";
-const alternativeRegistration = "(`ClientResources, `Client.Alternative)";
+const originalRegistration = "`+Client.Program, `@client_fixture/ClientResources:virResourcePack";
+const alternativeRegistration = "`+Client.Alternative, `@client_fixture/ClientResources:virResourcePack";
 writeFileSync(config, replaceFixture(configBefore, originalRegistration, alternativeRegistration));
 build("registration-change");
 assert.notDeepEqual(readFileSync(stages[1]), packs[1]);

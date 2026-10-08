@@ -57,6 +57,7 @@ for (const [index, [name, stem,
     // A quoted dot is one module component in the stock Name registration,
     // native root adapter and generated package ownership, not dot splitting.
     config = replaceFixture(config, "`Client.Program", "`Client.«Program.with.dots»", "all");
+    config = replaceFixture(config, "`+Client.Program", "`+Client.«Program.with.dots»");
     renameSync(join(sourceRoot, "program/Client/Program.lean"),
       join(sourceRoot, "program/Client/Program.with.dots.lean"));
   }
@@ -70,8 +71,6 @@ for (const [index, [name, stem,
     carrierPath = destination;
   }
   writeFileSync(configPath, config);
-  writeFileSync(carrierPath, replaceFixture(readFileSync(carrierPath, "utf8"),
-    "include_vir_library ClientResources", `include_vir_library ${name}`));
   let previous;
   for (const phase of ["cold", "warm"]) {
     const result = spawnSync("elan", ["run",

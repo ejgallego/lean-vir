@@ -44,26 +44,22 @@ private def embedPrepared (resolved : System.FilePath) : TermElabM Expr := do
   | .ok bundle => return toExpr bundle
 
 /-- Embed an explicitly prepared source-relative pack. Low-level tools can use
-this form without a library recipe; ordinary clients use include_vir_library. -/
+this form without library preparation; ordinary clients use include_vir_program. -/
 elab "include_vir_bundle " path:str : term => do
   let source := System.FilePath.mk (← readThe Lean.Core.Context).fileName
   let relative := System.FilePath.mk path.getString
   if relative.isAbsolute then throwError "include_vir_bundle expects a source-relative path"
   embedPrepared (source.parent.getD "." / relative)
 
-/-- Embed the pack prepared by the named owning library's virResourcePack
-prerequisite. The key is a literal Lake library name, not a Lean declaration.
-Elaboration reads prepared bytes only; it never resolves Lake jobs or builds. -/
-elab "include_vir_library " key:ident : term => do
-  -- Name.toString is also the facet's resourceLibraryStem spelling authority.
-  let stem := key.getId.toString
-  unless !stem.isEmpty && stem != "." && stem != ".." &&
-      !stem.contains '/' && !stem.contains '\\' && !stem.contains '\x00' do
-    throwError "include_vir_library requires a library name usable as one filename"
+/-- Embed the program prepared for this module by its library's virResourcePack
+prerequisite. No library or filename key is part of the source API. Elaboration
+reads prepared inputs only; it never resolves Lake jobs or builds. -/
+elab "include_vir_program" : term => do
+  let moduleName := (← getEnv).mainModule
   let source := (System.FilePath.mk (← readThe Lean.Core.Context).fileName).normalize
   -- Match Lean/Lake's complete semantic module suffix, including quoted Name
   -- components. Never split printed names, search ancestors or guess a root.
-  let suffix := (Lean.modToFilePath "." (← getEnv).mainModule "lean").components.drop 1
+  let suffix := (Lean.modToFilePath "." moduleName "lean").components.drop 1
   let components := source.components
   unless components.length ≥ suffix.length &&
       components.drop (components.length - suffix.length) == suffix do
@@ -71,9 +67,10 @@ elab "include_vir_library " key:ident : term => do
   let mut root := source
   for _ in [:suffix.length] do
     root := root.parent.getD "."
-  let prepared := root / ".vir-generated" / s!"{stem}.virres"
-  unless ← prepared.pathExists do
-    throwError "VIR_RESOURCE_NOT_PREPARED: {stem}; build the owning library with its virResourcePack prerequisite (expected {prepared})"
+  let input := Lean.modToFilePath (root / ".vir-generated/inputs") moduleName "path"
+  unless ← input.pathExists do
+    throwError "VIR_RESOURCE_NOT_PREPARED: {moduleName}; build the owning library with its virResourcePack prerequisite (expected {input})"
+  let prepared := System.FilePath.mk (← IO.FS.readFile input)
   embedPrepared prepared
 
 end

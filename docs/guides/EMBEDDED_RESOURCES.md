@@ -50,7 +50,7 @@ import Lake
 open Lake DSL
 
 require lean_vir from git
-  "https://github.com/ejgallego/lean-vir" @ "37d2eb99f85f58b295dbf67996b0b7492366bd8e"
+  "https://github.com/ejgallego/lean-vir" @ "VIR_REVISION"
 
 package greeting_app
 
@@ -63,10 +63,7 @@ lean_lib ClientResources where
   srcDir := "resources"
   roots := #[]
   globs := #[.one `Client.Resources]
-  needs := #[`@greeting_app/ClientResources:virResourcePack]
-
-target virPrograms (_pkg) : Array (Lean.Name × Lean.Name) := do
-  return Job.pure #[(`ClientResources, `Client.Program)]
+  needs := #[`+Client.Program, `@greeting_app/ClientResources:virResourcePack]
 
 lean_lib Client where
   roots := #[]
@@ -92,8 +89,11 @@ meta import Vir.Attributes
 public def Client.Program.greet (name : String) : String := "Hello, " ++ name
 ```
 
-The package-local `virPrograms` target selects the owning library and one
-registered program module. The generated root interface supplies all public
+Use the selected VIR revision in the dependency pin. In the resource library's
+`needs`, the bare `+Client.Program` key selects the registered program module;
+it is a typed Module input, not a request for a compilation facet. The library's
+`virResourcePack` prerequisite prepares it after checking the import graph.
+The generated root interface supplies all public
 `@[vir_export]` and callable `@[vir_startup]` declarations; imported declarations
 remain dependencies, not additional call entrypoints. Creation does not execute
 startup hooks. No JSON recipe, export aliases or handwritten interface IDs are
@@ -106,11 +106,11 @@ module
 public import Vir.Resources.Embed
 
 public def Client.Resources.bundle : Vir.Resources.Bundle :=
-  include_vir_library ClientResources
+  include_vir_program
 ```
 
-The key is the registered owning library's literal name, not a Lean declaration
-or the carrier module name. Its `virResourcePack` prerequisite prepares the
+Inclusion uses the program prepared for this module's owning library. There is
+no library-name or filename argument to repeat. The prerequisite prepares the
 bytes before elaboration; the include never downloads or builds anything.
 Custom source/build directories require no generated-path changes. In
 `Client.lean`, combine it with the precompiled runtime:

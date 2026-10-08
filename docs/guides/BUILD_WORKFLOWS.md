@@ -44,11 +44,10 @@ The two carrier branches meet in `ResourceSet`; program packaging does not
 depend on acquiring the Wasm runtime. The steps below describe the implementation
 in [lakefile.lean](../../lakefile.lean), not commands the application must run.
 
-1. **Select.** Fetch the owning package's stock `virPrograms` target, an array of
-   owner-library/program-module Name pairs, plus the compatibility and native
-   producer jobs. Use Lake's registered typed result formatter; no unbuilt VIR
-   module is imported into the client lakefile. Reject missing/duplicate owners
-   and roots belonging to another package.
+1. **Select.** Read the one bare Module key in the owning library's stock `needs`
+   field, plus the compatibility and native producer jobs. The key retains Lean's
+   semantic Name; no registration table or unbuilt VIR helper import is needed.
+   Reject missing/ambiguous selections and roots belonging to another package.
 2. **Check the graph.** Resolve the root with Lake's `findModule?`; unregistered
    modules fail. Fetch `transImports` and reject direct or transitive imports of
    the carrier library before requesting compiled program artifacts.
@@ -57,8 +56,8 @@ in [lakefile.lean](../../lakefile.lean), not commands the application must run.
    add `allArtsTrace`. Lake owns compilation/cache retrieval and returns the real
    artifact locations; the producer does not reconstruct conventional paths.
    Acquiring the import graph does not mean shipping every declaration in it.
-4. **Trace the build.** Explicitly trace normalized registration values: a pure
-   target's returned value does not itself carry a content trace. Jobs retain tool,
+4. **Trace the build.** Explicitly trace the selected module Name: the bare
+   Module input does not itself carry a content trace. Jobs retain tool,
    compatibility, Lean identity and full implementation/location traces.
 5. **Build or restore two separate results.** The shared program facet uses
    `buildArtifactUnlessUpToDate` for a canonical selected program.
@@ -70,10 +69,13 @@ in [lakefile.lean](../../lakefile.lean), not commands the application must run.
 6. **Stage even on a hit.** Use the artifact path returned by Lake, which may be in
    its cache rather than the conventional output directory. Validate and repair
    `.vir-generated/<Library>.virres` under the owning library's source directory.
-   Preserve the semantic input trace and add the stage's content trace before returning the artifact
-   path. The library-key include derives the same source root from the complete
-   module-relative source filename, not the caller's working directory.
-7. **Embed.** `include_vir_library LibraryName` validates the prepared pack and
+   Prepare module-specific private input locators from Lake's source-only library
+   collection, including local imported modules. Different libraries sharing a
+   source directory remain distinct. Preserve the semantic input trace and add
+   the prepared inputs' traces before returning the artifact path. Inclusion derives
+   the same source root from the complete module-relative source filename,
+   not the caller's working directory.
+7. **Embed.** `include_vir_program` consumes this module's prepared input, validates the pack and
    generates owned Lean values. It performs no acquisition or subprocess build. The compiled
    native application can run without reopening the pack or producer checkout.
 
