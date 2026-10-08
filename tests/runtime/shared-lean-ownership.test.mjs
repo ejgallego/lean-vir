@@ -7,6 +7,7 @@ import test from "node:test";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { VirHostState } from "../../web/src/runtime/host-state.js";
 import { INTERFACE_TAG as T } from "../../web/src/runtime/interface-tags.js";
+import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
 
 const type = { args: [], result: { interfaceTag: T.UNIT }, effect: "pure" };
 
@@ -105,4 +106,57 @@ test("argument conversion cannot enter a callback whose owner retired during pre
   assert.equal(entered, 0);
   assert.deepEqual(decrements, [100, 200], "untransferred arguments are still released");
   runtime.dispose();
+});
+
+test("provider cleanup can create callbacks, but the retirement sweep closes acquisition", () => {
+  const { runtime, state, decrements } = harness();
+  let callback;
+  state.ownsDefaultHostBindings = true;
+  state.defaultBindings = {
+    [VIR_HOST_DISPOSE]() {
+      assert.equal(runtime.disposing, true);
+      assert.equal(state.disposing, true);
+      callback = runtime.liftObjectFunction(type, 100, "cleanup callback");
+      assert.equal(callback(), 100);
+      assert.throws(() => runtime.makeLeanObjectHandleResource(200, "cleanup JSL"), /inactive host state/);
+      const cell = runtime.leanCallbackCell(callback, "cleanup callback");
+      const untrack = cell.onRelease;
+      cell.onRelease = () => {
+        assert.throws(() => runtime.liftObjectFunction(type, 300, "late callback"), /inactive host state/);
+        untrack();
+      };
+    },
+  };
+  runtime.dispose();
+  assert.throws(() => callback(), /disposed runtime/);
+  assert.deepEqual(decrements, [200, 100, 300]);
+  assert.equal(state.leanObjectHandleCells.size, 0);
+  assert.equal(state.liveCallbackCount, 0);
+});
+
+test("signed Wasm i32 addresses are canonicalized without coercing invalid pointers", () => {
+  // A real export produces the signed JS representation, without a 2 GiB heap.
+  const wasm = new WebAssembly.Instance(new WebAssembly.Module(Uint8Array.of(
+    0, 97, 115, 109, 1, 0, 0, 0,
+    1, 5, 1, 0x60, 0, 1, 0x7f,
+    3, 2, 1, 0,
+    7, 11, 1, 7, 112, 111, 105, 110, 116, 101, 114, 0, 0,
+    10, 10, 1, 8, 0, 0x41, 0x80, 0x80, 0x80, 0x80, 0x78, 0x0b,
+  )));
+  const signed = wasm.exports.pointer();
+  assert.equal(signed, -0x80000000);
+  const { runtime, increments, decrements } = harness();
+  for (const input of [signed, -1, 1, 0x7fffffff, 0x80000000, 0xffffffff]) {
+    const callback = runtime.liftObjectFunction(type, input, "pointer callback");
+    const jsl = runtime.makeLeanObjectHandleResource(input, "pointer JSL");
+    assert.equal(callback(), input >>> 0);
+    assert.equal(runtime.leanObjectHandleCell(jsl, "pointer JSL").object, input >>> 0);
+  }
+  for (const input of [0, -0x80000001, 0x100000000, 1.5, NaN, Infinity, "1", null, undefined]) {
+    assert.throws(() => runtime.liftObjectFunction(type, input, "bad pointer"), /live Lean object pointer/);
+    assert.throws(() => runtime.makeLeanObjectHandleResource(input, "bad pointer"), /live Lean object pointer/);
+  }
+  runtime.dispose();
+  assert.equal(increments.length, 12, "invalid inputs never reach the native retain");
+  assert.deepEqual(decrements, increments);
 });

@@ -633,7 +633,7 @@ The full Lean-side declaration list is maintained in
 `docs/guides/LEAN_VIR_LIBRARY.md`. The JavaScript target map, custom binding examples,
 and resource lifetime rules are maintained in `docs/reference/HOST_BINDINGS.md`.
 
-The built-in `common.*` and `browser.*` targets do not require a
+The built-in `js.*` and `browser.*` targets do not require a
 `hostBindings` option:
 
 ```js
@@ -698,7 +698,7 @@ def bumpFromJs (n : Nat) : Lean.Vir.RuntimeM Nat := do
 ```
 
 Bind custom targets when constructing the runtime. User bindings override the
-default `common.*`, `browser.*`, and `react.*` bindings:
+default `js.*`, `browser.*`, and `react.*` bindings:
 
 ```js
 const vir = await createVirRuntime({

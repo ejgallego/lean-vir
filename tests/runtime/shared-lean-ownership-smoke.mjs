@@ -5,6 +5,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
+import { createCommonHostBindings } from "../../web/src/host/vir-common-host-bindings.js";
+import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
 import { assert, createRuntimeModuleProject, join, readFile } from "./shared.mjs";
 
 const directory = await mkdtemp(join(tmpdir(), "vir-shared-ownership-"));
@@ -21,6 +23,7 @@ try {
   ]);
   assert.equal(generated.status, 0, `${generated.stderr}\n${generated.stdout}`);
   const irPackageSet = [await readFile(packagePath)];
+  const hostPackageBytes = await readFile(new URL("../../web/public/demo-host.irpkg", import.meta.url));
 
   for (const profile of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
     const wasmBytes = await readFile(new URL(`../../web/public/${profile}`, import.meta.url));
@@ -97,6 +100,46 @@ try {
     } finally {
       runtime.dispose(); other?.dispose();
     }
+
+    for (const throws of [false, true]) {
+      const sentinel = new Error("provider cleanup sentinel");
+      let disposingRuntime, cleanupResult, retained;
+      disposingRuntime = await createVirRuntime({
+        wasmBytes, irPackageSet: [hostPackageBytes],
+        hostBindings: {
+          "test.callNatCallback": (input, callback) => {
+            if (disposingRuntime.hostState.disposing) retained = callback;
+            return callback(input);
+          },
+        },
+        defaultHostBindings: () => ({
+          ...createCommonHostBindings(),
+          [VIR_HOST_DISPOSE]() {
+            assert.equal(disposingRuntime.disposing, true);
+            assert.equal(disposingRuntime.hostState.disposing, true);
+            cleanupResult = disposingRuntime.call("HostInterop.callbackRoundTrip", 3);
+            if (throws) throw sentinel;
+          },
+        }),
+      });
+      const state = disposingRuntime.hostState;
+      const wasm = disposingRuntime.exports;
+      try {
+        assert.equal(disposingRuntime.call("HostInterop.callbackRoundTrip", 3), 10n);
+        if (throws) assert.throws(() => disposingRuntime.dispose(), error => error === sentinel);
+        else disposingRuntime.dispose();
+        assert.equal(cleanupResult, 10n, "fresh callback conversion completes the provider cleanup effect");
+        assert.equal(disposingRuntime.disposed, true);
+        assert.equal(disposingRuntime.failure, null);
+        assert.equal(state.leanObjectHandleCells.size, 0);
+        assert.equal(state.liveCallbackCount, 0);
+        assert.equal(wasm.vir_resource_roots_active(), 0);
+        assert.throws(() => retained(3), /disposed runtime/);
+      } finally {
+        disposingRuntime.dispose();
+      }
+    }
+    console.log(`${profile}: provider cleanup creates and terminally retires fresh callbacks PASS`);
   }
 } finally {
   await rm(directory, { recursive: true, force: true });

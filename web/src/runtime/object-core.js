@@ -38,10 +38,15 @@ const leanObjectHandleFinalizer =
     : null;
 
 function normalizeObjectPointer(value, label) {
-  if (!Number.isInteger(value) || value <= 0 || value > 0xffffffff) {
+  // Wasm i32 exports return signed numbers; pointer-array reads are unsigned.
+  if (!Number.isInteger(value) || value < -0x80000000 || value > 0xffffffff) {
     throw new Error(`${label} must be a live Lean object pointer`);
   }
-  return value >>> 0;
+  const object = value >>> 0;
+  if (object === 0) {
+    throw new Error(`${label} must be a live Lean object pointer`);
+  }
+  return object;
 }
 
 function releaseLeanObjectHandleCell(cell, fromFinalizer = false) {

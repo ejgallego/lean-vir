@@ -173,7 +173,11 @@ native JavaScript functions acquire no Lean lifetime.
 
 A live value strongly retains its original runtime generation: the Wasm instance
 and host state containing its Lean payload. Collection releases the foreign root
-through a best-effort finalizer; explicit disposal releases it deterministically.
+through a best-effort finalizer; explicit disposal of a healthy generation releases
+it deterministically. After a fatal failure, native cleanup is quarantined:
+disposal invalidates the carriers and clears the permitted JavaScript resource
+roots, while abandoned Lean heap objects are reclaimed with the Wasm instance.
+See the [object ABI ownership contract](OBJECT_ABI.md#ownership) for that boundary.
 Calling a Lean callback after disposal fails before entering its Lean body.
 If invoked as a Promise reaction, that failure rejects the resulting Promise.
 Hard disposal prevents Lean entry; it does not guarantee cancellation or quiet
@@ -187,6 +191,12 @@ metadata could anchor a runtime whose externref table points back to the targets
 A wholly unreachable generation can be collected without running every foreign
 finalizer; this is not a collector for mixed Lean/JS cycles inside a runtime
 still owned elsewhere.
+
+During healthy disposal, runtime-owned providers run before retained Lean values
+are released. Their synchronous Lean cleanup may convert temporary callbacks;
+those cells join the same terminal cleanup. JSL acquisition remains closed during
+disposal. Before the final cell snapshot, acquisition closes for callbacks too,
+so release hooks cannot leave newly acquired cells outside the retirement sweep.
 
 Finalizer diagnostics store only bounded text, not error objects or failed
 payload graphs that could keep Lean-backed values alive.

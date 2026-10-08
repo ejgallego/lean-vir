@@ -65,7 +65,9 @@ JavaScript closure that calls its explicit Lean `invoke...` boundary with the
 opaque function carrier.
 
 JavaScript reachability and terminal runtime disposal retain their current
-meaning. Canceling a timeout does not release a separately reachable carrier or
+meaning; see [Lean-backed value lifetimes](../reference/HOST_BINDINGS.md#lean-backed-javascript-values)
+for provider-cleanup admission and healthy versus failed retirement.
+Canceling a timeout does not release a separately reachable carrier or
 interrupt a synchronous Lean call. This split adds no per-value public disposal,
 cycle collection or post-trap interpreter re-entry. The existing four permitted
 retirement-safe Wasm exports and native-cleanup quarantine are unchanged.
