@@ -83,16 +83,9 @@ function updateRuntimeControls() {
   reloadRuntimeButton.hidden = !failed;
   reloadRuntimeButton.disabled =
     packageLoadPending || currentPackageSource === null;
-  if (reloadingFailedRuntime) {
-    entrySelect.disabled = true;
-    for (const field of inputFields.querySelectorAll("[data-input-index]")) {
-      field.disabled = true;
-    }
-  } else {
-    entrySelect.disabled = false;
-    for (const field of inputFields.querySelectorAll("[data-input-index]")) {
-      field.disabled = false;
-    }
+  entrySelect.disabled = reloadingFailedRuntime;
+  for (const field of inputFields.querySelectorAll("[data-input-index], [data-constructor-index]")) {
+    field.disabled = reloadingFailedRuntime;
   }
 }
 
@@ -513,6 +506,7 @@ function restoreRunnerState(state) {
     if (field === null) continue;
     field.value = saved.value;
     field.checked = saved.checked;
+    field.dispatchEvent(new Event("input", { bubbles: true }));
   }
 }
 

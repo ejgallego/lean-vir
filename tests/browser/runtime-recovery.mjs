@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { basePath, evaluate, navigate, waitForReady, waitForStatus } from "./harness.mjs";
 import { setInputValueAndDispatch, waitForBrowserState } from "./page-actions.mjs";
-import { runSelectedEntry } from "./dev-runner.mjs";
+import { runnerCaseFromManifest, runSelectedEntry } from "./dev-runner.mjs";
 import {
   defaultPackageFile,
   wasmPublicFile,
@@ -350,6 +350,71 @@ export async function smokeRunnerFatalRecovery(cdp, origin) {
     assert.equal(reloaded.input, failed.input);
     assert.equal(reloaded.calls, failed.calls, "reload must not replay the failed entry");
     assert.equal(await runSelectedEntry(cdp), "34");
+
+    for (const spec of [
+      {
+        entry: "Vir.Fixtures.ListOption.sumScore",
+        value: { kind: "inr", value: 7 }, result: "70",
+      },
+      {
+        entry: "Vir.Fixtures.RecursiveTypes.treeRootScore",
+        value: { kind: "branch", fields: {
+          left: { kind: "leaf", value: 4 }, right: { kind: "leaf", value: 5 },
+        } }, result: "309",
+      },
+    ]) {
+      const { url } = await runnerCaseFromManifest("fixtures-basic.irpkg", spec.entry, {});
+      await navigate(cdp, `${origin}${basePath}${url}`);
+      await waitForReady(cdp);
+      const input = JSON.stringify(spec.value);
+      await evaluate(cdp, `(() => {
+        const field = document.querySelector('[data-input-index="0"]');
+        field.value = ${JSON.stringify(input)};
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        window.__virTestTrapNextResolvedCall = true;
+        document.querySelector("#dev-run-entry").click();
+      })()`);
+      await waitForStatus(cdp, "Trap");
+      const calls = await evaluate(cdp, "window.__virTestResolvedCalls");
+      let disabled;
+      try {
+        disabled = await evaluate(cdp, `(() => {
+          window.__virTestRecoveryOriginalFetch = window.fetch;
+          window.fetch = async (...args) => {
+            await new Promise(resolve => window.__virTestResumeRecoveryFetch = resolve);
+            return window.__virTestRecoveryOriginalFetch(...args);
+          };
+          document.querySelector("#dev-reload-runtime").click();
+          return {
+            field: document.querySelector('[data-input-index="0"]').disabled,
+            constructor: document.querySelector('[data-constructor-index="0"]').disabled,
+          };
+        })()`);
+      } finally {
+        await evaluate(cdp, `(() => {
+          window.__virTestResumeRecoveryFetch?.();
+          window.fetch = window.__virTestRecoveryOriginalFetch ?? window.fetch;
+        })()`);
+      }
+      const restored = await waitForBrowserState(cdp, `(() => {
+        const field = document.querySelector('[data-input-index="0"]');
+        const constructor = document.querySelector('[data-constructor-index="0"]');
+        return {
+          ready: document.querySelector("#status")?.textContent?.trim() === "Ready" &&
+            !document.querySelector("#dev-run-entry").disabled,
+          text: field.value, kind: constructor.value,
+          fieldDisabled: field.disabled, constructorDisabled: constructor.disabled,
+          calls: window.__virTestResolvedCalls,
+        };
+      })()`, { timeoutMessage: "runner did not restore its constructor input" });
+      assert.deepEqual(disabled, { field: true, constructor: true });
+      assert.equal(restored.text, input);
+      assert.equal(restored.kind, spec.value.kind);
+      assert.equal(restored.fieldDisabled, false);
+      assert.equal(restored.constructorDisabled, false);
+      assert.equal(restored.calls, calls, "reload must not replay the constructor entry");
+      assert.equal(await runSelectedEntry(cdp), spec.result);
+    }
   } finally {
     await removeTrap();
   }
