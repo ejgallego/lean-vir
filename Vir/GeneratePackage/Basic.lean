@@ -6,13 +6,13 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.GeneratePackage.PackageSet
+public import Vir.Package.Set
 
 public import Lean.Compiler.IR.CompilerM
-public import Vir.GeneratePackage.CachedImports
-public import Vir.GeneratePackage.NativeExterns
-public import Vir.Interface.Model
-public import Vir.IRDependencies
+public import Vir.Compiler.CachedImports
+public import Vir.Compiler.NativeExterns
+public import Vir.Compiler.Interface.Model
+public import Vir.Compiler.IRDependencies
 
 public section
 

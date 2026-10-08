@@ -17,5 +17,5 @@ boundary. The stable entry points are the npm commands documented in
   runtime's object ABI manifest.
 
 Generated headers stay below `build/generated/`. Shim implementation sources
-remain under `wasm/upstream_shim/`, and Lean-side declarations remain under
-`Vir/GeneratePackage/`.
+remain under `wasm/upstream_shim/`. Lean's native-extern policy is in
+`Vir/Compiler/NativeExterns.lean`; shared wire tags are in `Vir/Package/IRTags.lean`.

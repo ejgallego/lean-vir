@@ -8,8 +8,8 @@ module
 
 public import Vir.GeneratePackage.Closure
 public import Vir.Host
-public import Vir.HostValidation
-public import Vir.InterfaceValidation
+public import Vir.Compiler.HostValidation
+public import Vir.Compiler.InterfaceValidation
 
 public section
 

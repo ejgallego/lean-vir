@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.GeneratePackage.Interface.Collect
-public import Vir.GeneratePackage.PackageFormat
+public import Vir.Package.Format
 
 public section
 

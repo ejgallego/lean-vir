@@ -9,9 +9,9 @@ module
 public import Lean.LabelAttribute
 import Lean.Compiler.Options
 import Lean.OriginalConstKind
-import Vir.ExportValidation
-import Vir.Interface.Classify.Signature
-import Vir.InterfaceValidation
+import Vir.Compiler.ExportValidation
+import Vir.Compiler.Interface.Classify.Signature
+import Vir.Compiler.InterfaceValidation
 
 public section
 

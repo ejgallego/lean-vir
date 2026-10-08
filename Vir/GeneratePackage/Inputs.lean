@@ -8,7 +8,7 @@ module
 
 import Lean.Compiler.InitAttr
 import Lean.LabelAttribute
-import Vir.ExportValidation
+import Vir.Compiler.ExportValidation
 public import Vir.GeneratePackage.Basic
 
 public section

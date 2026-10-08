@@ -4,8 +4,8 @@ public import Vir.Resources
 public import Vir.Resources.Build
 public import Vir.Resources.Embed
 public meta import Vir.Attributes
-public meta import Vir.Interface.Classify.Signature
-public meta import Vir.GeneratePackage
+public meta import Vir.Compiler.Interface.Classify.Signature
+public meta import Vir.Compiler.Interface.Encode
 
 set_option compiler.postponeCompile false
 
@@ -36,3 +36,8 @@ public def NativeClient.descriptor : Vir.Resources.Descriptor := {
   schemaVersion := 2, logicalId := "native-client/encoder", kind := .program,
   compatibility := Vir.Resources.Build.currentCompatibility,
   files := #[], fileEntries := #[] }
+
+-- This must be available without importing the generator implementation.
+run_meta do
+  unless Vir.Interface.InterfaceType.nat.toJson == "{\"type\":\"Nat\",\"interfaceTag\":0}" do
+    Lean.throwError "unexpected independently loaded interface encoding"

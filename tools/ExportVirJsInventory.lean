@@ -5,10 +5,10 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Lean.Meta
-import Vir.GeneratePackage.Interface.Encode
-import Vir.GeneratePackage.Json
+import Vir.Compiler.Interface.Encode
+import Vir.Package.Json
 import Vir.GeneratePackage.Surface
-import Vir.HostValidation
+import Vir.Compiler.HostValidation
 
 open Lean
 

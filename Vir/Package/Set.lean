@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 module
 
 import Lean.Data.Json.Printer
-public import Vir.GeneratePackage.PackageFormat
+public import Vir.Package.Format
 
 public section
 namespace Vir.GeneratePackage

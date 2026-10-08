@@ -133,7 +133,7 @@ The shared package-set serializer preserves field order and member bytes.
 | Resource `createProgram` and the Wasm package loader | Verified resource admission, requested root export/signature binding, actual IR decoding and runtime installation checks | Kernel checking of arbitrary generated IR or a proof of formatter semantics |
 
 The native resource adapter intentionally extracts metadata using the existing
-`Vir.GeneratePackage.PackageFormat` constants. The browser interface validator
+`Vir.Package.Format` constants. The browser interface validator
 and Wasm IR decoder remain authorities for their respective representations; do
 not mistake the adapter's interface-section reader for another full IR parser or
 import the compiler/interpreter into lightweight acquisition tools to make it one.

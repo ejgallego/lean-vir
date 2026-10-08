@@ -8,9 +8,9 @@ module
 
 public import Lean.Compiler.LCNF.Main
 public import Lean.Compiler.LCNF.ToImpureType
-public import Vir.Interface.Classify.Error
-public import Vir.Interface.Model
-public import Vir.InterfaceValidation
+public import Vir.Compiler.Interface.Classify.Error
+public import Vir.Compiler.Interface.Model
+public import Vir.Compiler.InterfaceValidation
 
 public section
 

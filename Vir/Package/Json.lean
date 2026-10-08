@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.GeneratePackage.Basic
+public import Lean.Data.Json.Printer
 
 public section
 

@@ -11,7 +11,7 @@ public import Lean.Data.Json.Basic
 public import Vir.Resources.Types
 public import Vir.NativePayload
 import Vir.Resources.Pack
-import Vir.GeneratePackage.PackageFormat
+import Vir.Package.Format
 
 /-! Native-only support for bounded resource preparation.
 

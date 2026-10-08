@@ -6,7 +6,8 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.GeneratePackage.Json
+public import Vir.Compiler.Interface.Model
+public import Vir.Package.Json
 
 public section
 

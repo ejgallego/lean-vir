@@ -138,12 +138,12 @@ module. The map below groups shared policy separately from orchestration;
 
 | Boundary | Source owners |
 | --- | --- |
-| Targets and acquisition | [`Basic`](../../Vir/GeneratePackage/Basic.lean) defines targets, collected declarations and limits. [`Inputs`](../../Vir/GeneratePackage/Inputs.lean) owns compiled/live acquisition, `DeclIndex`, markers, fallback adapters, declaration ownership, on-demand import-all environments and collision diagnostics. [`CachedImports`](../../Vir/GeneratePackage/CachedImports.lean) shares raw artifacts while preserving independent import contexts. |
-| Names and dependency closure | [`LeanName`](../../Vir/LeanName.lean) parses strict dotted names for tools and clients. [`IRDependencies`](../../Vir/IRDependencies.lean) walks IR references and formats dependency paths; [`Closure`](../../Vir/GeneratePackage/Closure.lean) resolves roots and collects typed IR. [`ExternFallback`](../../Vir/ExternFallback.lean) owns transparent extern-body clones and recursion rejection. |
-| Native and host metadata | [`NativeExterns`](../../Vir/GeneratePackage/NativeExterns.lean) owns VIR's registration policy; resolved compiler metadata and wrappers remain with [native tooling](../../scripts/native/README.md). [`HostMetadata`](../../Vir/HostMetadata.lean) is the single encoder/decoder of VIR targets in Lean extern symbols. [`Host`](../../Vir/Host.lean) retains attribute-validated signatures in compiled metadata, including private imports. |
-| Interface policy | [`Interface.Model`](../../Vir/Interface/Model.lean) defines descriptors, effects, layouts and boundaries. [`InterfaceValidation`](../../Vir/InterfaceValidation.lean) owns typed binder/startup preflight, effects and abbreviation reduction. [`ExportValidation`](../../Vir/ExportValidation.lean) checks visible compiled closures and defers opaque imports; [`Attributes`](../../Vir/Attributes.lean) owns declaration-kind/postponed-compilation handling. |
-| Classification and collection | [`Interface.Classify`](../../Vir/Interface/Classify) separates typed errors, helpers, type/layout classification and signature analysis. [`HostValidation`](../../Vir/HostValidation.lean) shares host signature/boundary policy between attributes and packaging. [`Interface.Collect`](../../Vir/GeneratePackage/Interface/Collect.lean) adds boxed-boundary, call-summary, duplicate and host-import collection checks. |
-| Encoding | [`PackageFormat`](../../Vir/GeneratePackage/PackageFormat.lean) owns format identities, versions and section kinds. [`PackageIRTags`](../../Vir/GeneratePackage/PackageIRTags.lean) owns Name/IR tags. [`Interface.Encode`](../../Vir/GeneratePackage/Interface/Encode.lean), [`Manifest.Encode`](../../Vir/GeneratePackage/Manifest/Encode.lean), [`Json`](../../Vir/GeneratePackage/Json.lean) and [`Emit`](../../Vir/GeneratePackage/Emit.lean) encode descriptors, metadata and package bytes. |
+| Targets and acquisition | [`Basic`](../../Vir/GeneratePackage/Basic.lean) defines targets, collected declarations and limits. [`Inputs`](../../Vir/GeneratePackage/Inputs.lean) owns compiled/live acquisition, `DeclIndex`, markers, fallback adapters, declaration ownership, on-demand import-all environments and collision diagnostics. [`CachedImports`](../../Vir/Compiler/CachedImports.lean) shares raw artifacts while preserving independent import contexts. |
+| Names and dependency closure | [`LeanName`](../../Vir/Package/Name.lean) parses strict dotted names for tools and clients. [`IRDependencies`](../../Vir/Compiler/IRDependencies.lean) walks IR references and formats dependency paths; [`Closure`](../../Vir/GeneratePackage/Closure.lean) resolves roots and collects typed IR. [`ExternFallback`](../../Vir/ExternFallback.lean) owns transparent extern-body clones and recursion rejection. |
+| Native and host metadata | [`NativeExterns`](../../Vir/Compiler/NativeExterns.lean) owns VIR's registration policy; resolved compiler metadata and wrappers remain with [native tooling](../../scripts/native/README.md). [`HostMetadata`](../../Vir/Compiler/HostMetadata.lean) is the single encoder/decoder of VIR targets in Lean extern symbols. [`Host`](../../Vir/Host.lean) retains attribute-validated signatures in compiled metadata, including private imports. |
+| Interface policy | [`Interface.Model`](../../Vir/Compiler/Interface/Model.lean) defines descriptors, effects, layouts and boundaries. [`InterfaceValidation`](../../Vir/Compiler/InterfaceValidation.lean) owns typed binder/startup preflight, effects and abbreviation reduction. [`ExportValidation`](../../Vir/Compiler/ExportValidation.lean) checks visible compiled closures and defers opaque imports; [`Attributes`](../../Vir/Attributes.lean) owns declaration-kind/postponed-compilation handling. |
+| Classification and collection | [`Interface.Classify`](../../Vir/Compiler/Interface/Classify) separates typed errors, helpers, type/layout classification and signature analysis. [`HostValidation`](../../Vir/Compiler/HostValidation.lean) shares host signature/boundary policy between attributes and packaging. [`Interface.Collect`](../../Vir/GeneratePackage/Interface/Collect.lean) adds boxed-boundary, call-summary, duplicate and host-import collection checks. |
+| Encoding | [`PackageFormat`](../../Vir/Package/Format.lean) owns format identities, versions and section kinds. [`PackageIRTags`](../../Vir/Package/IRTags.lean) owns Name/IR tags. [`Interface.Encode`](../../Vir/Compiler/Interface/Encode.lean), [`Manifest.Encode`](../../Vir/GeneratePackage/Manifest/Encode.lean), [`Json`](../../Vir/Package/Json.lean) and [`Emit`](../../Vir/GeneratePackage/Emit.lean) encode descriptors, metadata and package bytes. |
 | Output | [`Manifest`](../../Vir/GeneratePackage/Manifest.lean) assembles metadata/interface diagnostics, [`Report`](../../Vir/GeneratePackage/Report.lean) renders them, and [`Run`](../../Vir/GeneratePackage/Run.lean) orchestrates generation and filesystem writes. |
 
 ## Data flow and initialization
@@ -159,7 +159,7 @@ module. The map below groups shared policy separately from orchestration;
    ownership, acquiring newly reached owners until the closure is complete or
    no more IR is available. Explicit extern fallbacks supply an original-name
    adapter whose closure reaches the compiled reference body.
-4. `Interface.collectHostImports` repeats typed `Vir.HostValidation` when the
+4. `Interface.collectHostImports` repeats typed `Vir.Compiler.HostValidation` when the
    declaration is visible. Private imports with hidden types use the signature
    captured by the existing attribute, including in live snapshots without
    filesystem acquisition. Raw externs without attribute data require visible
@@ -222,7 +222,7 @@ Supported layouts and descriptor fields are specified in
 
 ## Version changes
 
-[`PackageFormat`](../../Vir/GeneratePackage/PackageFormat.lean) owns Lean's binary,
+[`PackageFormat`](../../Vir/Package/Format.lean) owns Lean's binary,
 manifest and package-set versions and descriptor identity.
 [`package-versions.mjs`](../../scripts/packages/package-versions.mjs) owns the
 JavaScript expectations for binary, manifest and runtime ABI compatibility.

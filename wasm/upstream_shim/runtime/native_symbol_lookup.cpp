@@ -17,7 +17,7 @@ Author: Emilio J. Gallego Arias
 #include "runtime/native_symbol_lookup.h"
 #include "util/name.h"
 
-// Generated from Vir/GeneratePackage/NativeExterns.lean nativeExterns.
+// Generated from Vir/Compiler/NativeExterns.lean nativeExterns.
 #include "native_symbols_registry.inc"
 // Generated at build time by vir_native_wrappers using Lean's compiler pipeline.
 #include "native_wrappers_registry.inc"

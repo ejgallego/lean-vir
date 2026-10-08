@@ -6,9 +6,9 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.GeneratePackage.Interface.Encode
+public import Vir.Compiler.Interface.Encode
 public import Vir.GeneratePackage.Manifest
-public import Vir.LeanName
+public import Vir.Package.Name
 
 public section
 

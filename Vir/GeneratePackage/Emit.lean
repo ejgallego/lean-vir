@@ -7,8 +7,8 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.GeneratePackage.Manifest.Encode
-public import Vir.GeneratePackage.PackageFormat
-public import Vir.GeneratePackage.PackageIRTags
+public import Vir.Package.Format
+public import Vir.Package.IRTags
 
 public section
 

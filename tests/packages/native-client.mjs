@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,7 +23,7 @@ for (const path of ["Vir", "Vir.lean", "tools", "lakefile.lean", "lake-manifest.
   cpSync(join(root, path), join(producer, path), { recursive: true });
 }
 mkdirSync(client);
-for (const path of ["lakefile.lean", "NativeClient.lean", "Main.lean"]) {
+for (const path of ["lakefile.lean", "NativeClient.lean", "GeneratorClient.lean", "Main.lean"]) {
   cpSync(join(root, "fixtures/native-client", path), join(client, path));
 }
 cpSync(join(root, "lean-toolchain"), join(client, "lean-toolchain"));
@@ -42,6 +42,10 @@ function run(args, name) {
   return result.stdout;
 }
 run(["lake", "--no-cache", "build"], "cold-build");
+const modules = ["Vir", ...readdirSync(join(producer, "Vir"), { recursive: true })
+  .filter((path) => path.endsWith(".lean"))
+  .map((path) => "Vir." + path.slice(0, -5).replaceAll("/", ".").replaceAll("\\", "."))];
+run(["lake", "run", "checkOwners", ...modules], "module-owners");
 const output = run([join(client, ".lake/build/bin/native_client")], "native-output");
 const [greeting, numeric, descriptorText] = output.trim().split("\n");
 assert.equal(greeting, "Hello, native 🌍");
@@ -54,6 +58,7 @@ assert.deepEqual(descriptor.compatibility,
   JSON.parse(readFileSync(join(producer, "vir-resources/compatibility.json"))));
 
 // Use Lake's returned executable, not a reconstructed dependency build path.
+run(["lake", "--no-cache", "build", "GeneratorClient"], "generator-meta-client");
 const generator = run(["lake", "query", "@lean_vir/vir_irpkg"], "generator-build").trim();
 run(["lake", "env", generator, join(evidence, "client.irpkg"), join(evidence, "report.md"),
   "--target-marked-module", "NativeClient"], "generator-run");

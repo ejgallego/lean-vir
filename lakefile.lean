@@ -32,30 +32,29 @@ target infoviewBundle (pkg) : System.FilePath := do
     return mixTrace entryTrace (mixTrace errorsTrace (mixTrace scriptTrace (mixTrace packageTrace lockTrace)))) fun _ =>
     runNpmScript root "build:infoview"
 
+/-- Browser bindings have explicit ownership; native APIs are separate. -/
 @[default_target]
 lean_lib Vir where
-  roots := #[`Vir]
-
-/-- Package generation uses both compiler metadata and resource-core hashing.
-Keep its shared library separate from those dependencies to avoid a cycle. -/
-lean_lib VirPackage where
   roots := #[]
-  globs := #[.one `Vir.GeneratePackage, .submodules `Vir.GeneratePackage,
-    .one `Vir.ClientNativeExternManifest]
+  globs := #[.one `Vir, .one `Vir.Runtime, .andSubmodules `Vir.Js,
+    .andSubmodules `Vir.Browser, .andSubmodules `Vir.React,
+    .andSubmodules `Vir.ProofWidgets, .submodules `Vir.Examples]
 
-/-- Lake loads whole owning libraries for native-precompiled imports. Assign
-compiler APIs to a native-only owner instead of the JavaScript-bound umbrella.
-Register these leaves after VirPackage so they override its generator glob;
-resource owners below keep their existing assignments. Module names stay put. -/
+/-- Pure package metadata shared by compilation, generation and resources. -/
+lean_lib VirPackageFormat where
+  roots := #[]
+  globs := #[.submodules `Vir.Package]
+
+/-- Native compiler APIs and the public authoring attributes. No browser externs. -/
 lean_lib VirCompiler where
   roots := #[]
-  globs := #[.one `Vir.Attributes, .one `Vir.ExternFallback,
-    .one `Vir.ExportValidation, .one `Vir.Host, .one `Vir.HostMetadata,
-    .one `Vir.HostValidation, .one `Vir.IRDependencies, .one `Vir.LeanName,
-    .one `Vir.InterfaceValidation, .submodules `Vir.Interface,
-    .one `Vir.GeneratePackage.NativeExterns, .one `Vir.GeneratePackage.PackageSet,
-    .one `Vir.GeneratePackage.PackageFormat, .one `Vir.GeneratePackage.PackageIRTags,
-    .one `Vir.GeneratePackage.CachedImports]
+  globs := #[.submodules `Vir.Compiler, .one `Vir.Attributes,
+    .one `Vir.Host, .one `Vir.ExternFallback]
+
+/-- Package generation depends on compiler metadata and resource preparation. -/
+lean_lib VirPackage where
+  roots := #[]
+  globs := #[.andSubmodules `Vir.GeneratePackage]
 
 /-- Resource data/tools must never depend on the optional runtime carrier. -/
 lean_lib VirResourceCore where

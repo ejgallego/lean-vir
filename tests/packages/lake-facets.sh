@@ -280,7 +280,7 @@ printf '%s\n' \
   'module' \
   '' \
   'meta import Vir.Attributes' \
-  'public import Vir.HostValidation' \
+  'public import Vir.Compiler.HostValidation' \
   '' \
   '#check vir_export' \
   '#check vir_startup' \
