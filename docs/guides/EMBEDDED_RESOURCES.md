@@ -1,49 +1,30 @@
-# Run Lean in a web application
+# Client guide
 
-This example builds a plain greeting function in your own Lake project, publishes
-its files, and calls it from JavaScript. It uses the existing resource workflow;
-no DOM bindings, React, editor integration or repository npm setup is required.
-Those conveniences remain [experimental](../SUPPORT.md).
+The workflow is: **declare the program in its owning library's Lake setup,
+embed the prepared value, then publish its files with the application's asset
+writer**. Applications using that library run their ordinary Lake command.
+They do not discover producer paths, invoke packaging scripts or build Wasm.
 
-An application deploys two things: its **program** (compiled Lean declarations)
-and the matching **runtime** (the JavaScript loader and Wasm interpreter). Lake
-builds the program and acquires the exact precompiled runtime independently.
-It can compile native Lean producer tools; it never builds Wasm on an application
-cache miss. HTTPS runtime acquisition uses Lake's standard download operation,
-which needs `curl` and uses its normal host configuration.
+Lake builds the Lean program and independently acquires the exact precompiled
+JavaScript/Wasm runtime selected by the VIR dependency. Use that dependency's
+`lean-toolchain`; anonymous HTTPS acquisition requires `curl`. An empty cache
+downloads the locked runtime; warm use needs no download. A missing runtime is
+an acquisition error, not a request to build it from source.
 
-The first release is still under review. The Lean-name source is published for
-review in PR217 and selects its matching content-named public runtime.
-[Qualification and limits](../development/RESOURCE_ACCEPTANCE.md)
-are recorded separately. When changing the VIR revision, use its `lean-toolchain`
-and runtime lock together.
+## 1. Select the program
 
-The public runtime source must be usable without credentials. The complete
-downloaded pack is checked before replacing either the cache or the carrier's
-prepared input; warm use needs no runtime download.
+In the browser program module, mark the public declarations JavaScript may call:
 
-## Client-library setup
+```lean
+module
+meta import Vir.Attributes
 
-Create this layout in a new project:
-
-```text
-greeting-app/
-  lean-toolchain
-  lakefile.lean
-  program/Client/Program.lean
-  resources/Client/Resources.lean
-  Client.lean
-  Main.lean
+@[vir_export]
+public def Client.Program.greet (name : String) : String := "Hello, " ++ name
 ```
 
-Put this in `lean-toolchain`:
-
-```text
-leanprover/lean4:v4.34.0
-```
-
-In `lakefile.lean`, declare the dependency, the program and resource libraries,
-and the native publisher:
+Register that module in a library separate from the module embedding its output.
+For a small project, the relevant part of `lakefile.lean` is:
 
 ```lean
 import Lake
@@ -55,51 +36,26 @@ require lean_vir from git
 package greeting_app
 
 lean_lib ClientProgram where
-  srcDir := "program"
-  roots := #[]
-  globs := #[.one `Client.Program]
+  roots := #[`Client.Program]
 
 lean_lib ClientResources where
-  srcDir := "resources"
-  roots := #[]
-  globs := #[.one `Client.Resources]
+  roots := #[`Client.Resources]
   needs := #[`+Client.Program, `@greeting_app/ClientResources:virResourcePack]
-
-lean_lib Client where
-  roots := #[]
-  globs := #[.one `Client]
-
-lean_exe «generate-site» where
-  root := `Main
 ```
 
-Keep these library registrations disjoint: a broad `Client` root would also
-claim `Client.Program` and `Client.Resources` under the wrong source directory.
-Keep the program separate from its resource carrier so it does not import the
-files produced by its own build. Larger programs can import other modules;
-register them with the appropriate library, keeping one composition root.
+Replace `VIR_REVISION` with the selected source revision. Existing application
+and asset libraries can own these modules; no wrapper library is required.
+Keep their ownership disjoint: a later broad `Client` library root would also
+claim both modules. The program must not import its own resource carrier.
 
-Write the greeting in `program/Client/Program.lean`:
+The bare `+Client.Program` key is the one program selection. In stock Lake it
+returns the registered Module, not a compilation facet; `virResourcePack` checks
+the graph and prepares the program before the resource library compiles.
+There is no registration table, JSON recipe or extra helper import.
 
-```lean
-module
-meta import Vir.Attributes
+## 2. Embed it in the library
 
-@[vir_export]
-public def Client.Program.greet (name : String) : String := "Hello, " ++ name
-```
-
-Use the selected VIR revision in the dependency pin. In the resource library's
-`needs`, the bare `+Client.Program` key selects the registered program module;
-it is a typed Module input, not a request for a compilation facet. The library's
-`virResourcePack` prerequisite prepares it after checking the import graph.
-The generated root interface supplies all public
-`@[vir_export]` and callable `@[vir_startup]` declarations; imported declarations
-remain dependencies, not additional call entrypoints. Creation does not execute
-startup hooks. No JSON recipe, export aliases or handwritten interface IDs are
-needed.
-
-Embed the prepared program in `resources/Client/Resources.lean`:
+In `Client/Resources.lean` (or the existing asset module):
 
 ```lean
 module
@@ -109,72 +65,52 @@ public def Client.Resources.bundle : Vir.Resources.Bundle :=
   include_vir_program
 ```
 
-Inclusion uses the program prepared for this module's owning library. There is
-no library-name or filename argument to repeat. The prerequisite prepares the
-bytes before elaboration; the include never downloads or builds anything.
-Keep that preparation prerequisite configured: inclusion reads the prepared
-input, not the current Lake configuration, and does not detect its later removal.
-Custom source/build directories require no generated-path changes. In
-`Client.lean`, combine it with the precompiled runtime:
+Inclusion takes no library-name or path argument. It reads the input prepared
+for this module, using the same decoder as explicit bundle inclusion. It does
+not download resources or launch a build. Custom source/build directories and
+quoted module names do not require a different recipe.
+
+Keep the preparation prerequisite configured. Inclusion reads prepared input;
+it does not inspect Lake configuration or detect later removal of that prerequisite.
+
+## 3. Publish through the existing asset writer
+
+The native application imports the carrier and the precompiled runtime carrier:
 
 ```lean
-module
-public import Vir.Resources
-public import Vir.Resources.Runtime
-public import Client.Resources
+import Client.Resources
+import Vir.Resources
+import Vir.Resources.Runtime
 
-public def Client.resources : Vir.Resources.ResourceSet := {
-  runtime := Vir.Resources.Runtime.bundle
-  programs := #[Client.Resources.bundle]
-}
-```
-
-An existing application library can own this setup and expose its resource set
-instead. Its users then need only its ordinary build and publication command.
-
-## Application and browser
-
-Write this small publisher in `Main.lean`. `forSite` prepares the complete file
-inventory and loader paths; the publisher writes those files to its output root:
-
-```lean
-import Client
-
-def main (args : List String) : IO Unit := do
-  let [output] := args | throw <| IO.userError "usage: generate-site OUTPUT"
-  let site ← IO.ofExcept <| (Client.resources.forSite "").mapError reprStr
-  unless site.programManifests.size == 1 do
-    throw <| IO.userError "This application requires exactly one program"
-  let directory := System.FilePath.mk output
+def writeVirAssets (directory : System.FilePath) : IO Vir.Resources.SiteFiles := do
+  let resources : Vir.Resources.ResourceSet := {
+    runtime := Vir.Resources.Runtime.bundle
+    programs := #[Client.Resources.bundle] }
+  let site ← IO.ofExcept <| (resources.forSite "lib/vir").mapError reprStr
   for file in site.files do
     let path := directory / file.path
     IO.FS.createDirAll (path.parent.getD directory)
     IO.FS.writeBinFile path file.bytes
-  IO.println s!"runtimeModule: {site.runtimeModule}"
-  IO.println s!"runtimeManifest: {site.runtimeManifest}"
-  IO.println s!"programManifest: {site.programManifests[0]!}"
+  return site
 ```
 
-From the project directory, run:
+Use the application's existing asset writer in place of that small filesystem
+loop when it has one. `forSite` returns all files and their loader paths; the
+host does not re-encode manifests or construct content-ID directories.
+It checks and deduplicates the resource set once and preserves payload bytes.
+It performs no IO. The host owns filename conflicts, stale files and failures;
+publication is not promised to be transactional.
 
-```sh
-lake exe generate-site site
-```
+`site.runtimeModule`, `site.runtimeManifest` and `site.programManifests[0]!`
+are output-relative paths for this one-program example. Supply them to the page
+as URLs relative to the published site's root, including its deployment prefix.
+Other hosts can supply multiple programs without changing the file writer.
 
-The first build acquires the locked runtime from its public release; warm builds
-reuse it. An unavailable runtime reports an acquisition failure rather than
-selecting another revision or compiling Wasm. Do not set
-`VIR_NATIVE_EXTERN_MANIFEST` for this resource workflow.
+## 4. Load and call from JavaScript
 
-The command creates the bundles under `site/` and prints three output-relative
-loader paths. Create `site/main.js` below, replacing each placeholder with its
-corresponding printed path. The exactly-one-program check belongs to this example
-application; `forSite` also handles resource sets with multiple programs.
+With the three URLs supplied by the page's publisher:
 
 ```js
-const runtimeModuleUrl = new URL("./RUNTIME_MODULE_PATH", import.meta.url);
-const runtimeManifestUrl = new URL("./RUNTIME_MANIFEST_PATH", import.meta.url);
-const programManifestUrl = new URL("./PROGRAM_MANIFEST_PATH", import.meta.url);
 const { createProgram } = await import(runtimeModuleUrl.href);
 const program = await createProgram({ runtimeManifestUrl, programManifestUrl });
 try {
@@ -184,80 +120,20 @@ try {
 }
 ```
 
-Create `site/index.html`:
+Call by fully qualified Lean declaration name. VIR generates the callable
+interface from root `@[vir_export]` and `@[vir_startup]` declarations; startup
+hooks are callable, not automatically executed. Separate `createProgram` calls
+have independent Lean runtime state. The facade exposes `status`, `call` and
+`dispose`; [optional contracts and lifecycle](RESOURCE_LIFETIME.md) describe
+expectations and pending-creation cancellation.
 
-```html
-<!doctype html>
-<html lang="en">
-  <meta charset="utf-8">
-  <title>VIR greeting</title>
-  <p>Open the browser console to see the Lean greeting.</p>
-  <script type="module" src="./main.js"></script>
-</html>
-```
+Serve the whole output over HTTP(S) with JavaScript, JSON and Wasm content types.
+Keep each bundle's manifest and payloads together. The output can move or be
+served under a nested URL without a Lean build directory.
 
-Serve `site/` over HTTP(S), using a static server with JavaScript, JSON and Wasm
-content types. For example, if Python 3 is installed:
-
-```sh
-python3 -m http.server --directory site 8000
-```
-
-Open `http://localhost:8000/`; the console prints `Hello, world`. Copy the whole
-`site/` directory when deploying. Its URLs resolve relative to `main.js`, so the
-directory can move or be served under a nested prefix without a Lean build tree.
-Keep all bundle payloads, including notices and package members, together.
-
-Creation and calls can fail. Dispose a created program even after failure; a
-terminal runtime failure needs a fresh instance. Do not automatically replay an
-effectful call. Separate `createProgram` calls have independent Lean runtime state.
-
-The current resource facade offers `status`, `call` and `dispose`. Custom host
-bindings and low-level object access use the underlying [JavaScript runtime API](JS_API.md),
-not extra options to `createProgram`. Explicit JSON converters are
-[planned for 0.1.1](../SUPPORT.md#planned-for-011).
-
-## Publication paths and guarantees
-
-A publisher calls `Client.resources.forSite "lib/vir"` and writes the returned
-`SiteFiles.files` through its ordinary asset writer. An empty prefix selects the
-output root. The helper validates the resource set once, deduplicates bundles,
-and prepares complete payloads and `bundle.json` envelopes under their
-content IDs. It does no IO, downloading or producer-path discovery. Returned paths
-are output-relative; spelling is preserved, not normalized. The host owns writing,
-namespace conflicts with its other assets, stale files and publication failures;
-the helper does not make the output transactional. Payload bytes, descriptor/content
-identity and bundle-relative paths are preserved. File enumeration order and the
-outer envelope's JSON whitespace/key spelling are not API guarantees.
-
-`runtimeModule`, `runtimeManifest` and `programManifests` give the corresponding
-loader paths. Program manifests retain the input program order, including repeated
-references; the file inventory contains each bundle once. Hosts that need one
-program check that policy themselves. The resulting site is movable and needs no
-Lean build directory. Keep paths relative to each manifest and all members intact.
-Within each bundle, the root `bundle.json` name is reserved, including descendants
-such as `bundle.json/child`; a nested payload such as `assets/bundle.json` is allowed.
-That reservation does not apply to the host's output prefix: `bundle.json/vir` is
-a valid destination directory because bundle files live below their content IDs.
-
-The returned paths are relative to the site's output root, not necessarily the
-current page. The publisher rebases them for nested pages or supplies the output
-root's URL (including any deployment prefix). They are not Lean build paths.
-
-## Further integration details
-
-- [Optional contracts and lifecycle](RESOURCE_LIFETIME.md): independently reviewed
-  callable expectations, cancellation and overlapping UI loads.
-- [Build internals](BUILD_WORKFLOWS.md): dependencies, caching and source/runtime
-  compatibility; these are not extra first-run steps.
-- [Existing three-package fixture](../../fixtures/resources/): a client library
-  consumed by a separate publisher, used by the resource acceptance harness.
-
-Registration uses semantic Lean Names, including quoted components. The owning
-library name must still be usable as one private staging filename.
-
-`Bundle` holds one program or runtime's files and descriptor; `ResourceSet` groups
-the runtime and programs a publisher uses. `.virres` is their build-time carrier,
-while `.irpkg` is the inner compiler output. Applications consume the compiled
-values rather than discover these artifacts in VIR's build directory. The
-[resource reference](../development/RESOURCE_BUNDLES.md) owns the format details.
+The [complete three-package fixture](../../fixtures/resources/) demonstrates a
+client library consumed by a separate native publisher. [Build internals](BUILD_WORKFLOWS.md)
+account for retained tooling and private staging; they are not extra setup steps.
+The first release is under review; [qualification](../development/RESOURCE_ACCEPTANCE.md)
+records executed results and limits. DOM/React/editor conveniences are
+[experimental](../SUPPORT.md), not requirements of this workflow.

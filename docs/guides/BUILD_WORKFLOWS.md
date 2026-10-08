@@ -18,14 +18,15 @@ different input source; see [Infoview](INFOVIEW.md).
 
 ## How resource preparation builds its inputs
 
-The carrier library declares `needs := #[@package/CarrierLibrary:virResourcePack]`.
+The carrier library declares a bare program Module key and its preparation facet:
+``needs := #[`+Program.Module, `@package/CarrierLibrary:virResourcePack]``.
 This establishes ordering **and** a traced prerequisite before its source includes
 the prepared pack. Program and carrier modules belong to separate registered
 libraries so packaging the program cannot depend on compiling its own carrier.
 
 ```text
 registered program + transitive imports ── full compiled artifacts ──┐
-typed registration + compatibility + native producer tools ─────┤
+typed module selection + compatibility + native producer tools ────┤
                                                                   ↓
                                                         virResourcePack
                                                                   ↓
@@ -97,16 +98,15 @@ pack tool to acquire the exact content identity:
 3. Validate the complete pack and compatibility before installation; restore
    cache/stage without writing through existing hard links.
 
-The previous contract's lock named a public release asset; the Lean-name
-successor still needs its matching public distribution. Once selected, an empty runtime cache downloads
-and verifies those exact bytes. `source: "-"` remains an available-only selection,
+The current lock names a content-addressed public release asset. An empty runtime
+cache downloads and verifies those exact bytes. `source: "-"` is an available-only selection,
 not a download source. There is no implicit SDK installation, npm invocation,
 GitHub authentication, WASI installation, or local runtime build. HTTPS acquisition
 uses `curl`; packing runtime distributions is a separate maintainer operation.
 
 ## Shared core, separate public contracts
 
-`virResourcePack` **does not fetch `+Module:vir`, `:virSdk`, or `:virInputs`**.
+`virResourcePack` **does not fetch `+Module:vir` or `:virSdk`**.
 Both program adapters depend on the internal `virProgram` facet instead.
 
 | Boundary             | Package facet                                                                     | Resource facet                                                        |
@@ -166,6 +166,10 @@ an explicit matched capability/profile contract, not merely passing this variabl
 - The older application staging and public resolved-input proposals, PR161 and
   PR184, are closed in favor of library-owned resources. The first release is
   still under review; existing demo and maintainer tooling has not all migrated.
+- `virPrograms`, handwritten resource recipes/export tables and
+  `include_vir_library LibraryName` are removed. Select the program in the
+  existing library's `needs` and use `include_vir_program`; there is no alias.
+  No public `:virInputs` facet or `virWebAssets` composition API is exposed.
 - The standalone generator remains compiled-module tooling, not a legacy source
   loader. Non-module developments and source-file package loading are unsupported.
 - Experimental live editor snapshots remain a distinct input contract. No optimization may
@@ -183,3 +187,16 @@ the [contributor harness](../HARNESS.md) before changing or removing their calle
 See the [generator reference](../reference/GENERATE_PACKAGE.md) for selection modes
 and removed source flags. Closing old proposals does not delete their retained
 source or evidence.
+
+| Retained entry point | Why it remains / current caller |
+| --- | --- |
+| `include_vir_program` + library `virResourcePack` | The application path: one configured program and its prepared carrier value. |
+| `include_vir_bundle "relative/path"` | Explicit prepared-input primitive used by VIR's runtime carrier and reader tests; not another application setup recipe. |
+| Module `:vir` and package `:virSdk` | Loose compiler output and older-host/runtime development; facet/package/SDK tests still exercise them. They share acquisition/generation with resource preparation. |
+| `virProgram`, `vir_program`, `virPrepare`, native resource tools | Internal jobs and adapters; called by Lake, repository producers and tests. Not additional client configuration APIs. |
+| Repository npm/catalog scripts | Hosted demos, fixtures, benchmarks and distribution, with callers in the [tool inventory](../../scripts/packages/README.md). |
+| Editor snapshots and component/widget loaders | Experimental editor/UI integration with authoritative live environments; not disk-root replacements or a second supported application workflow. |
+
+Removing a retained adapter requires migrating its caller and checking the same
+bytes/behavior. New client integrations use the application path above rather
+than assembling build outputs or wrapping repository scripts.
