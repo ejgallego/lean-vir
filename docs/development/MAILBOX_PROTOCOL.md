@@ -208,12 +208,24 @@ the standard workflow, record a decision as an `update` when the thread remains
 active, or as a `completion` when the request asked only for an investigation
 or decision. The requester can accept a completed decision with `closure`.
 
+These states are optional, not a required conversation sequence. Do not send
+claim, acceptance or closure messages merely to advance a status label; use the
+board for routine status. A substantive ownership transfer or decision still
+needs an explicit handoff.
+
 The checker warns when standard workflow messages bypass a requested claim,
 ownership, routing, transition, or disposition conventions. These warnings are
 coordination advice, not transport failures. The Markdown body remains the
 authoritative place to explain intent and any deliberate exception.
 
 ## Ownership and archival
+
+Ownership is task-scoped. Agent names and historical claims do not establish
+permanent subsystem ownership or veto power. Use the current assignment and Git
+state to identify an active overlap; completion ends the task's write reservation,
+though an explicitly recorded publication or cleanup action may remain pending.
+Route ambiguity to the coordinator once rather than seeking every former owner's
+agreement.
 
 Lane checkpoints use the optional `owner`, `worktree`, `branch`, `base`, `head`,
 `worktree-state` and `publication` fields. The body supplies write scope,
@@ -230,6 +242,39 @@ A thread can be archived only when **every** branch ends in `closed` or
 `archive/<thread-id>/`; completed-but-unclosed and active free-form threads stay
 in the active mailbox. Archiving a thread does not remove its source worktree.
 Archived messages are deletable only after their outcome is retained durably.
+
+## Concise Checkpoints
+
+Use the mailbox for durable evidence, not a copy of every command transcript.
+At a meaningful handoff, the notification and the top of the evidence record
+should normally answer only:
+
+```text
+Outcome: ready, blocked, landed, or no-action
+Head/PR: exact commit and public review surface when applicable
+Decision: one action needed, or none
+Evidence: one durable file or report
+```
+
+Keep logs, hash inventories, repeated test output, and detailed rationale in
+the linked evidence. Do not send acknowledgement-only messages, unchanged CI
+updates, or duplicate completion reports. A real blocker or a decision that
+changes scope remains worth an immediate message.
+
+The board is the current status surface; a board/mailbox update does not by
+itself require a separate notification. Work quietly between action boundaries:
+do not announce routine claims, build/CI starts, or unchanged progress. Use
+`codex queue` only to wake or assign a specific owner, or to deliver a handoff
+that needs that owner's action. Batch independent status into one coordinator
+digest; notify the human when review/decision is needed or a material blocker
+changes the plan.
+
+Consult only owners affected by overlapping edits or shared-contract changes.
+Do not seek unrelated owners' agreement or repeat permission already granted.
+An assigned liaison can handle intake and handoffs directly; the coordinator
+handles priorities, conflicts and decisions rather than relaying every exchange.
+Keep one CI owner per PR; avoid duplicate watches and routine receipt echoes.
+Independent substantive review remains useful and does not transfer ownership.
 
 ## Commands
 
