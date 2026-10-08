@@ -208,7 +208,7 @@ export function withObjectValues(Base) {
         case INTERFACE_TAG.STRUCTURE:
           return this.makeObjectStructureValue(type, value, label);
         case INTERFACE_TAG.TAGGED_UNION:
-          return this.makeObjectTaggedUnionValue(type, value, label);
+          return this.makeObjectTaggedUnionValue(type, value, label, selfType);
         case INTERFACE_TAG.CUSTOM_INDUCTIVE:
           return this.makeObjectCustomInductiveValue(type, value, label);
         default:
@@ -242,7 +242,7 @@ export function withObjectValues(Base) {
         case INTERFACE_TAG.STRUCTURE:
           return this.liftObjectStructureValue(type, obj, label);
         case INTERFACE_TAG.TAGGED_UNION:
-          return this.liftObjectTaggedUnionValue(type, obj, label);
+          return this.liftObjectTaggedUnionValue(type, obj, label, selfType);
         case INTERFACE_TAG.CUSTOM_INDUCTIVE:
           return this.liftObjectCustomInductiveValue(type, obj, label);
         default:
@@ -351,7 +351,8 @@ export function withObjectValues(Base) {
       );
     }
 
-    makeObjectTaggedUnionValue(type, value, label) {
+    makeObjectTaggedUnionValue(type, value, label, selfType = null) {
+      // Sum/Except carry the enclosing recursive owner through their payload.
       const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
       const field = taggedUnionField(ctor);
       return this.makeObjectCtorFromLayout(
@@ -360,7 +361,7 @@ export function withObjectValues(Base) {
         [field],
         { [field.name]: payload },
         label,
-        type,
+        selfType,
       );
     }
 
@@ -1360,7 +1361,7 @@ export function withObjectValues(Base) {
       return flattenStructureSubobjects(type, values);
     }
 
-    liftObjectTaggedUnionValue(type, obj, label) {
+    liftObjectTaggedUnionValue(type, obj, label, selfType = null) {
       const tag = this.exports.vir_obj_tag(obj);
       const ctor = taggedUnionConstructorAt(type, tag, label);
       const field = taggedUnionField(ctor);
@@ -1372,7 +1373,7 @@ export function withObjectValues(Base) {
           obj,
           plan.fields[0],
           `${label}.${ctor.jsName}`,
-          type,
+          selfType,
         ),
       };
     }
