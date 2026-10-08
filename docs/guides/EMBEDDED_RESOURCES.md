@@ -112,6 +112,8 @@ public def Client.Resources.bundle : Vir.Resources.Bundle :=
 Inclusion uses the program prepared for this module's owning library. There is
 no library-name or filename argument to repeat. The prerequisite prepares the
 bytes before elaboration; the include never downloads or builds anything.
+Keep that preparation prerequisite configured: inclusion reads the prepared
+input, not the current Lake configuration, and does not detect its later removal.
 Custom source/build directories require no generated-path changes. In
 `Client.lean`, combine it with the precompiled runtime:
 
