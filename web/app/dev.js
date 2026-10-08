@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import "./style.css";
 import {
+  constructorTemplate,
   inputDefault,
   interfaceInputTag,
   isJsonInputTag,
@@ -82,16 +83,9 @@ function updateRuntimeControls() {
   reloadRuntimeButton.hidden = !failed;
   reloadRuntimeButton.disabled =
     packageLoadPending || currentPackageSource === null;
-  if (reloadingFailedRuntime) {
-    entrySelect.disabled = true;
-    for (const field of inputFields.querySelectorAll("[data-input-index]")) {
-      field.disabled = true;
-    }
-  } else {
-    entrySelect.disabled = false;
-    for (const field of inputFields.querySelectorAll("[data-input-index]")) {
-      field.disabled = false;
-    }
+  entrySelect.disabled = reloadingFailedRuntime;
+  for (const field of inputFields.querySelectorAll("[data-input-index], [data-constructor-index]")) {
+    field.disabled = reloadingFailedRuntime;
   }
 }
 
@@ -195,8 +189,8 @@ function renderInputFields(entry) {
     if (input.type?.interfaceTag === INTERFACE_TAG.SIMPLE_ENUM) {
       for (const ctor of input.type?.constructors ?? []) {
         const option = document.createElement("option");
-        option.value = ctor.jsName ?? ctor.name;
-        option.textContent = ctor.jsName ?? ctor.name;
+        option.value = ctor.jsName;
+        option.textContent = ctor.jsName;
         field.append(option);
       }
       field.value = inputDefault(input);
@@ -242,8 +236,62 @@ function renderInputFields(entry) {
       field.setAttribute("aria-describedby", hint.id);
       label.append(hint);
     }
-    inputFields.append(label);
+    if (input.type.interfaceTag === INTERFACE_TAG.TAGGED_UNION ||
+        input.type.interfaceTag === INTERFACE_TAG.CUSTOM_INDUCTIVE) {
+      const group = document.createElement("div");
+      group.className = "dev-constructor-input";
+      group.append(constructorControl(input, index, field), label);
+      inputFields.append(group);
+    } else {
+      inputFields.append(label);
+    }
   }
+}
+
+function constructorControl(input, index, field) {
+  const type = input.type;
+  const label = document.createElement("label");
+  label.className = "dev-field";
+  const caption = document.createElement("span");
+  caption.textContent = `Constructor for ${input.name}`;
+  const select = document.createElement("select");
+  select.id = `${field.id}-constructor`;
+  select.dataset.constructorIndex = String(index);
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Choose a constructor";
+  placeholder.disabled = true;
+  select.append(placeholder);
+  for (const ctor of type.constructors) {
+    const option = document.createElement("option");
+    option.value = ctor.jsName;
+    option.textContent = ctor.jsName;
+    select.append(option);
+  }
+  const syncSelection = () => {
+    try {
+      const value = JSON.parse(field.value);
+      select.value = type.constructors.some((ctor) => ctor.jsName === value?.kind)
+        ? value.kind : "";
+    } catch {
+      select.value = "";
+    }
+  };
+  field.addEventListener("input", syncSelection);
+  select.addEventListener("change", () => {
+    const ctor = type.constructors.find((ctor) => ctor.jsName === select.value);
+    if (ctor === undefined) return;
+    field.value = JSON.stringify(constructorTemplate(type, ctor), null, 2);
+    syncSelection();
+  });
+  syncSelection();
+  const hint = document.createElement("small");
+  hint.className = "dev-field-hint";
+  hint.id = `${select.id}-hint`;
+  hint.textContent = "Choosing a constructor replaces this input with an editable JSON template. Recursive placeholders may need editing before running.";
+  select.setAttribute("aria-describedby", hint.id);
+  label.append(caption, select, hint);
+  return label;
 }
 
 function inputOverride(entry, input, index) {
@@ -458,6 +506,7 @@ function restoreRunnerState(state) {
     if (field === null) continue;
     field.value = saved.value;
     field.checked = saved.checked;
+    field.dispatchEvent(new Event("input", { bubbles: true }));
   }
 }
 

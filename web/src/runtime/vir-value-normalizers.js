@@ -5,7 +5,6 @@ Author: Emilio J. Gallego Arias
 */
 
 import {
-  customInductiveShape,
   requireCustomInductiveConstructors,
   requireStructureFields,
   requireTaggedUnionConstructors,
@@ -86,7 +85,7 @@ export function normalizeTaggedUnion(value, type, label) {
   }
   const constructors = requireTaggedUnionConstructors(type, label);
   const index = constructors.findIndex(
-    (ctor) => (ctor.jsName ?? ctor.name) === value.kind,
+    (ctor) => ctor.jsName === value.kind,
   );
   if (index < 0) {
     throw new Error(`${label} has unknown tagged-union constructor ${value.kind}`);
@@ -164,7 +163,7 @@ function customInductiveNormalizationPlan(type) {
   const constructorsByName = new Map();
   for (const constructorPlan of constructorPlans) {
     constructorsByName.set(
-      constructorPlan.ctor.jsName ?? constructorPlan.ctor.name,
+      constructorPlan.ctor.jsName,
       constructorPlan,
     );
   }
@@ -177,13 +176,27 @@ function customInductiveNormalizationPlan(type) {
   return plan;
 }
 
+function customInductiveShape(ctor) {
+  // The normalization plan has already validated the constructor metadata.
+  const kind = JSON.stringify(ctor.jsName);
+  const fields = ctor.fields;
+  if (fields.length === 0) {
+    return `{ kind: ${kind} }`;
+  }
+  if (fields.length === 1) {
+    return `{ kind: ${kind}, value }`;
+  }
+  return `{ kind: ${kind}, fields: { ${fields.map((field) => field.name).join(", ")} } }`;
+}
+
+// Enum helpers consume admitted descriptors and check only per-call values.
 export function normalizeEnum(value, type, label) {
-  const constructors = type?.constructors ?? [];
   if (typeof value !== "string") {
     throw new Error(`${label} must be an enum constructor name`);
   }
+  const constructors = type.constructors;
   const index = constructors.findIndex(
-    (ctor) => (ctor.jsName ?? ctor.name) === value,
+    (ctor) => ctor.jsName === value,
   );
   if (index < 0) {
     throw new Error(`${label} has unknown enum constructor ${value}`);
@@ -192,11 +205,11 @@ export function normalizeEnum(value, type, label) {
 }
 
 export function enumValue(type, index) {
-  const ctor = type?.constructors?.[index];
-  if (ctor === undefined) {
+  const constructors = type.constructors;
+  if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
     throw new Error(`result enum index ${index} is out of range`);
   }
-  return ctor.jsName ?? ctor.name ?? String(index);
+  return constructors[index].jsName;
 }
 
 function flattenedSubobjectFieldsPresent(value, type) {

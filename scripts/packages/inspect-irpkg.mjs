@@ -143,8 +143,8 @@ function descriptorSummary(type) {
 function customInductiveConstructors(type) {
   return (type.constructors ?? []).map((ctor) => {
     const fields = ctor.fields ?? [];
-    if (fields.length === 0) return `${ctor.jsName ?? ctor.name}()`;
-    return `${ctor.jsName ?? ctor.name}(${fields
+    if (fields.length === 0) return `${ctor.jsName}()`;
+    return `${ctor.jsName}(${fields
       .map((field) => `${field.name}: ${descriptorLabel(field.type)}`)
       .join(", ")})`;
   });

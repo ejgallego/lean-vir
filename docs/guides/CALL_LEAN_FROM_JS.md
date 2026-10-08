@@ -102,6 +102,13 @@ Open:
 http://127.0.0.1:5173/dev.html?package=my-app.irpkg
 ```
 
+For top-level tagged-union and custom-inductive inputs, choose a constructor to
+fill an editable JSON template. Choosing another constructor replaces that input.
+Edit nested constructors and payloads in JSON; the selector follows recognized
+top-level `kind` values.
+Templates are starting points, not guaranteed runnable defaults. Recursive
+positions can contain `null` placeholders that need editing before running.
+
 If the package lives outside `web/public/`, open `/dev.html` and use the
 `.irpkg` file picker instead.
 

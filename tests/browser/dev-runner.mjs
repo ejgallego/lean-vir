@@ -273,9 +273,9 @@ export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
   const expectedControls = info.manifest.exports.map((entry) => ({
     id: entry.id,
     inputTags: entry.args.map((arg) => interfaceInputTag(arg.type)),
-    enumOptionCounts: entry.args.map((arg) =>
+    enumOptions: entry.args.map((arg) =>
       interfaceInputTag(arg.type) === "SELECT"
-        ? (arg.type.constructors ?? []).length
+        ? arg.type.constructors.map((ctor) => ({ value: ctor.jsName, text: ctor.jsName }))
         : null,
     ),
   }));
@@ -289,13 +289,62 @@ export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
       return {
         id: select.value,
         inputTags: Array.from(document.querySelectorAll("[data-input-index]")).map((field) => field.tagName),
-        enumOptionCounts: Array.from(document.querySelectorAll("[data-input-index]")).map((field) =>
-          field.tagName === "SELECT" ? field.options.length : null),
+        enumOptions: Array.from(document.querySelectorAll("[data-input-index]")).map((field) =>
+          field.tagName === "SELECT"
+            ? Array.from(field.options).map((option) => ({ value: option.value, text: option.textContent }))
+            : null),
       };
     });
   })()`,
   );
   assert.deepEqual(renderedControls, expectedControls);
+}
+
+export async function smokeConstructorTemplates(cdp, origin) {
+  for (const spec of [
+    {
+      entry: "Vir.Fixtures.ListOption.sumScore", kind: "inr",
+      template: { kind: "inr", value: 0 },
+      edited: { kind: "inr", value: 7 }, result: "70",
+    },
+    {
+      entry: "Vir.Fixtures.RecursiveTypes.treeRootScore", kind: "branch",
+      template: { kind: "branch", fields: {
+        left: { kind: "leaf", value: 0 }, right: { kind: "leaf", value: 0 },
+      } },
+      edited: { kind: "leaf", value: 9 }, result: "109",
+    },
+    {
+      entry: "Vir.Fixtures.RecursiveTypes.jsonRootScore", kind: "null",
+      template: { kind: "null" }, edited: { kind: "null" }, result: "1",
+    },
+  ]) {
+    const { url } = await runnerCaseFromManifest("fixtures-basic.irpkg", spec.entry, {});
+    await navigate(cdp, `${origin}${basePath}${url}`);
+    await waitForReady(cdp);
+    const template = await evaluate(cdp, `(() => {
+      const select = document.querySelector('[data-constructor-index="0"]');
+      select.value = ${JSON.stringify(spec.kind)};
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      return JSON.parse(document.querySelector('[data-input-index="0"]').value);
+    })()`);
+    assert.deepEqual(template, spec.template);
+    const selected = await evaluate(cdp, `(() => {
+      const field = document.querySelector('[data-input-index="0"]');
+      field.value = ${JSON.stringify(JSON.stringify(spec.edited))};
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      return document.querySelector('[data-constructor-index="0"]').value;
+    })()`);
+    assert.equal(selected, spec.edited.kind);
+    assert.equal(await runSelectedEntry(cdp), spec.result);
+    const incomplete = await evaluate(cdp, `(() => {
+      const field = document.querySelector('[data-input-index="0"]');
+      field.value = "{";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      return { text: field.value, choice: document.querySelector('[data-constructor-index="0"]').value };
+    })()`);
+    assert.deepEqual(incomplete, { text: "{", choice: "" });
+  }
 }
 
 export async function prepareNegativePackages() {

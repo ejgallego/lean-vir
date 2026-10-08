@@ -177,18 +177,6 @@ function constructorAt(type, index, label, requireConstructors, kindLabel) {
   return constructors[index];
 }
 
-export function customInductiveShape(ctor) {
-  const kind = JSON.stringify(ctor.jsName ?? ctor.name ?? "?");
-  const fields = ctor.fields ?? [];
-  if (fields.length === 0) {
-    return `{ kind: ${kind} }`;
-  }
-  if (fields.length === 1) {
-    return `{ kind: ${kind}, value }`;
-  }
-  return `{ kind: ${kind}, fields: { ${fields.map((field) => field.name).join(", ")} } }`;
-}
-
 export function normalizeUint32(value, label) {
   if (!Number.isInteger(value) || value < 0 || value > 0xffffffff) {
     throw new Error(`${label} must be an integer in 0..4294967295`);

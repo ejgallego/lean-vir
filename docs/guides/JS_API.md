@@ -525,7 +525,12 @@ JavaScript number and preserve NaN, infinities, and signed zero across the
 opaque `Lean.Vir.Js Float` resource boundary.
 
 Nullary inductive enums use their generated JavaScript constructor name in both
-directions.
+directions. For example, the Lean constructor `Example.Color.red` has the
+JavaScript value `"red"`. The manifest's required `jsName` field determines that
+spelling, also used for tagged-union and custom-inductive `kind` values.
+Constructor `name` identifies the Lean declaration and `tag` records its numeric
+ordinal; neither is a JavaScript value alias. See the
+[descriptor format](../reference/IRPKG_FORMAT.md#interface-descriptors).
 
 Options use `null` for `none` and the bare inner value for `some`. Products use
 `{ fst, snd }` in both directions. Arrays and lists use JavaScript arrays,
@@ -539,15 +544,15 @@ and multi-field constructors accept and return `{ kind, fields }`.
 Constructor fields whose Lean type is `optParam α default` use the same
 JavaScript representation as `α`; they are still explicit fields in the
 canonical constructor object when the runtime constructor stores them.
-For example, a recursive `Tree Nat` value with constructors
-`leaf (value : Nat)` and `branch (left right : Tree Nat)` is:
+For a recursive `Tree Nat` with constructors
+`leaf (value : Nat)` and `branch (left right : Tree Nat)`, a lifted value is:
 
 ```js
 {
   kind: "branch",
   fields: {
-    left: { kind: "leaf", value: 4 },
-    right: { kind: "leaf", value: 5 },
+    left: { kind: "leaf", value: 4n },
+    right: { kind: "leaf", value: 5n },
   },
 }
 ```

@@ -510,4 +510,26 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.kind,
     "recursiveSelf",
   );
+
+  const spellingSource = join(freshDir, "ConstructorSpelling.lean");
+  const spellingPackage = join(freshDir, "constructor-spelling.irpkg");
+  await writeRuntimeFixture(spellingSource, "ConstructorSpelling.lean");
+  await generateIrPackage("ConstructorSpelling", spellingSource, spellingPackage);
+  const spellingRuntime = await factory.createRuntime({
+    irPackageSet: [await readFile(spellingPackage)],
+  });
+  try {
+    const spellingType = manifestEntry(spellingRuntime.interfaceManifest, "constructorSpellingIdentity").args[0].type;
+    assert.deepEqual(spellingType.constructors, [
+      { name: "ConstructorSpelling.plain", jsName: "plain", tag: 0 },
+      { name: "ConstructorSpelling.constructor", jsName: "constructor", tag: 1 },
+    ]);
+    assert.equal(spellingRuntime.call("constructorSpellingIdentity", "constructor"), "constructor");
+    assert.throws(
+      () => spellingRuntime.call("constructorSpellingIdentity", "ConstructorSpelling.constructor"),
+      /unknown enum constructor/,
+    );
+  } finally {
+    spellingRuntime.dispose();
+  }
 }
