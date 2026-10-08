@@ -8,6 +8,7 @@ module
 
 public import Vir.Compiler.Interface.Encode
 public import Vir.GeneratePackage.Manifest
+public import Vir.Package.Json
 public import Vir.Package.Name
 
 public section

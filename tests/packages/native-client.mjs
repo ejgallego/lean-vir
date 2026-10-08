@@ -11,7 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { interfaceSignatureKey } from "../../web/src/runtime/interface-manifest.js";
-import { snapshotExpectedExports } from "../../web/src/resources/program-exports.js";
+import { snapshotExpectedExports, resolveProgramExports } from "../../web/src/resources/program-exports.js";
+import { readIrPackageInfo } from "../../web/src/runtime/ir-package.js";
 
 // Independent producer and cold native-precompiled consumer: a developer's
 // dependency cache could conceal accidental umbrella imports. Retain evidence.
@@ -33,23 +34,35 @@ const lakefile = join(client, "lakefile.lean");
 writeFileSync(lakefile, readFileSync(lakefile, "utf8").replace('"../.."', '"../producer"'));
 console.log(`native client evidence: ${evidence}`);
 
-function run(args, name) {
+function run(args, name, expectedStatus = 0) {
   const result = spawnSync(args[0], args.slice(1), {
     cwd: client, encoding: "utf8", timeout: 300000, maxBuffer: 8 * 1024 * 1024,
   });
   const output = (result.stdout ?? "") + (result.stderr ?? "");
   writeFileSync(join(evidence, name + ".log"), output);
   assert.ifError(result.error);
-  assert.equal(result.status, 0, `${name} failed; evidence: ${evidence}\n${output.slice(-6000)}`);
+  assert.equal(result.status, expectedStatus, `${name} failed; evidence: ${evidence}\n${output.slice(-6000)}`);
   return result.stdout;
 }
 run(["lake", "--no-cache", "build"], "cold-build");
+// The compiler API exposes interface methods, not package JSON helpers.
+const visibility = join(client, "CodecVisibility.lean");
+writeFileSync(visibility, "module\npublic meta import Vir.Compiler.Interface.Encode\n" +
+  "#check Vir.GeneratePackage.jsonString\n");
+assert.match(run(["lake", "env", "lean", visibility], "codec-private-json", 1),
+  /error\(lean.unknownIdentifier\): Unknown identifier.*Vir\.GeneratePackage\.jsonString/);
+writeFileSync(visibility, "module\npublic meta import Vir.Compiler.Interface.Encode\n" +
+  "public meta import Vir.Package.Json\n#check Vir.GeneratePackage.jsonString\n");
+run(["lake", "env", "lean", visibility], "codec-explicit-json");
 const modules = ["Vir", ...readdirSync(join(producer, "Vir"), { recursive: true })
   .filter((path) => path.endsWith(".lean"))
   .map((path) => "Vir." + path.slice(0, -5).replaceAll("/", ".").replaceAll("\\", "."))];
 run(["lake", "run", "checkOwners", ...modules], "module-owners");
 const output = run([join(client, ".lake/build/bin/native_client")], "native-output");
-const [greeting, numeric, descriptorText, greetingSignature, numericSignature] = output.trim().split("\n");
+const lines = output.trim().split("\n");
+assert.equal(lines.length, 9);
+const [greeting, numeric, descriptorText, greetingSignature, numericSignature,
+  nullarySignature, multipleSignature, effectfulSignature, nestedSignature] = lines;
 assert.equal(greeting, "Hello, native 🌍");
 assert.equal(numeric, "18014398509481986");
 const descriptor = JSON.parse(descriptorText);
@@ -61,6 +74,10 @@ assert.deepEqual(descriptor.compatibility,
 const expectedExports = {
   "NativeClient.greet": JSON.parse(greetingSignature),
   "NativeClient.double": JSON.parse(numericSignature),
+  "NativeClient.nullary": JSON.parse(nullarySignature),
+  "NativeClient.multiple": JSON.parse(multipleSignature),
+  "NativeClient.effectful": JSON.parse(effectfulSignature),
+  "NativeClient.nested": JSON.parse(nestedSignature),
 };
 const signatures = snapshotExpectedExports(expectedExports);
 for (const [declaration, type, tag] of [
@@ -71,6 +88,20 @@ for (const [declaration, type, tag] of [
     "caller arguments contain types only, without parameter display names");
   assert.equal(signatures.get(declaration),
     interfaceSignatureKey({ args: [expectedType], result: expectedType, effect: "pure" }));
+}
+
+const nat = { type: "Nat", interfaceTag: 0 };
+const string = { type: "String", interfaceTag: 3 };
+const unit = { type: "Unit", interfaceTag: 22 };
+const nested = { type: "Array Option Nat", interfaceTag: 16, kind: "array",
+  element: { type: "Option Nat", interfaceTag: 18, kind: "option", element: nat } };
+for (const [declaration, args, result, effect] of [
+  ["NativeClient.nullary", [], unit, "pure"],
+  ["NativeClient.multiple", [string, nat], nat, "pure"],
+  ["NativeClient.effectful", [], unit, "io"],
+  ["NativeClient.nested", [nested], nested, "pure"],
+]) {
+  assert.deepEqual(expectedExports[declaration], { args, result, effect });
 }
 
 // Use Lake's returned executable, not a reconstructed dependency build path.
@@ -85,4 +116,16 @@ run(["lake", "env", generator, join(evidence, "client.irpkg"), join(evidence, "r
 assert.ok(readFileSync(join(evidence, "client.irpkg")).length > 0);
 const report = readFileSync(join(evidence, "report.md"), "utf8");
 assert.ok(report.includes("NativeClient.greet") && report.includes("NativeClient.double"));
+// Expectations were computed from declarations before this manifest existed.
+// Check admission against the real generated root, including negative ABI cases.
+const manifest = readIrPackageInfo(readFileSync(join(evidence, "client.irpkg"))).manifest;
+assert.equal(resolveProgramExports(manifest.exports, signatures).size, 6);
+for (const [declaration, changed] of [
+  ["NativeClient.multiple", { ...expectedExports["NativeClient.multiple"], args: [nat, string] }],
+  ["NativeClient.effectful", { ...expectedExports["NativeClient.effectful"], effect: "pure" }],
+  ["NativeClient.nested", { ...expectedExports["NativeClient.nested"], result: nat }],
+]) {
+  assert.throws(() => resolveProgramExports(manifest.exports,
+    snapshotExpectedExports({ [declaration]: changed })), /does not match expected callable signature/);
+}
 console.log("PASS cold native-precompiled client: markers, classifier, resource imports, native calls and generator");

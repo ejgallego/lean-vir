@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.Compiler.Interface.Model
-public import Vir.Package.Json
+import Vir.Package.Json
 
 public section
 

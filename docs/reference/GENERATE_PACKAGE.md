@@ -67,8 +67,9 @@ would expose unrelated targets' declarations and private metadata. Neither
 visibility flags nor extension state are shared between these contexts.
 
 `CachedImports` is a narrow adapter of the pinned Lean import algorithm at
-exported level with interpretation IR. Lean 4.33 has no overlapping-import
-artifact cache hook; the adapter uses `import all Lean.Environment` for its
+exported level with interpretation IR. It originated with Lean 4.33 and was
+checked against the pinned 4.34 importer, which still has no overlapping-import
+artifact cache hook. The adapter uses `import all Lean.Environment` for its
 internal acquisition types/readers and ordinary `finalizeImport`. On toolchain
 changes, compare it with upstream `importModulesCore` and run the import-cache
 equivalence tests. `CompiledImportCache.empty` fixes the resolved artifact map

@@ -187,9 +187,10 @@ it). This job carries implementation contents as well as their resolved paths;
 serializing its result must not replace that semantic dependency trace. -/
 private def fetchVirCompiledSetup
     (mod : Module) (imports : Array Module) : FetchM (Job Lean.ModuleSetup) := do
-  -- Lean 4.33's importAllArts facet returns exportInfo.arts, not allArts,
-  -- despite using allArtsTrace. Extract both explicitly so private artifact
-  -- groups reach the generator as well as participating in invalidation.
+  -- The importAllArts behavior first observed in Lean 4.33 still holds in
+  -- pinned 4.34: it returns exportInfo.arts despite using allArtsTrace.
+  -- Extract allArts explicitly so private artifact groups reach the generator
+  -- as well as participating in invalidation.
   let jobs ← (imports.push mod).mapM fun input => do
     (← input.exportInfo.fetch).mapM fun info => do
       addTrace info.allArtsTrace

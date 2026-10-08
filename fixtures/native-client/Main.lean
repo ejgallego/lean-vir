@@ -6,3 +6,7 @@ def main : IO Unit := do
   IO.println (String.fromUTF8! (Vir.Resources.encodeDescriptor NativeClient.descriptor))
   IO.println NativeClient.greetSignature
   IO.println NativeClient.doubleSignature
+  IO.println NativeClient.nullarySignature
+  IO.println NativeClient.multipleSignature
+  IO.println NativeClient.effectfulSignature
+  IO.println NativeClient.nestedSignature

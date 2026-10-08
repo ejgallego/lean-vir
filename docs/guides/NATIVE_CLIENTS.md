@@ -34,6 +34,38 @@ Construct this expectation from the author's declaration type independently of
 the produced manifest. Parameter display names belong to manifest metadata and
 do not participate in the caller's expected ABI.
 
+For example, an elaborator can embed an independent expectation as a Lean String:
+
+```lean
+elab "expected_signature% " entry:ident : term => do
+  let info ← Lean.getConstInfo entry.getId
+  let .ok signature ← Vir.Interface.analyzeExportInterface info.type
+    | Lean.throwError "cannot classify expected interface for {entry}"
+  return Lean.mkStrLit signature.toExpectedSignatureJson
+```
+
+`expected_signature% MyProgram.greet` classifies that declaration before any
+manifest is read. The document renderer can transport the resulting JSON value
+to its generated JavaScript:
+
+```js
+const program = await createProgram({
+  runtimeManifestUrl, programManifestUrl,
+  expectedExports: {
+    "MyProgram.greet": JSON.parse(greetSignature),
+  },
+});
+```
+
+The two manifest URLs come from the application publication workflow;
+`greetSignature` is the emitted Lean String, not a manifest field.
+The runtime compares validated type shapes, argument order and effect, rather
+than JSON property order or arbitrary metadata. Nested canonical descriptors
+retain constructor names and layouts; function parameter display names do not
+change signature identity. Import `Vir.Package.Json` directly when writing a
+custom package encoder; the compiler expectation codec exposes its interface
+methods without re-exporting the package JSON helpers.
+
 ## Native library boundary
 
 Lake loads whole owning shared libraries for native-precompiled imports. A
@@ -103,7 +135,10 @@ npm run test:native-client
 The test copies an independent producer and cold client, checks native-loaded
 markers, signatures and independent interface encoding, links/executes Unicode
 String and exact large Nat calls and current descriptor encoding, then checks a
-separate generator meta client and runs the native package generator. Lake checks
+separate generator meta client and runs the native package generator. Independent
+expectations for nullary, multiple-argument, effectful and nested signatures are
+checked against the generated root; changed argument order, effect and result
+types fail admission. Lake checks
 that every VIR module has exactly one library owner. The test uses
 Lean and Node, acquires no runtime pack and builds no Wasm. Logs and outputs are
 retained in the printed evidence directory. CI runs the same test.

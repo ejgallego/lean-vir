@@ -66,3 +66,22 @@ elab "expected_signature% " entry:ident : term => do
 
 public def NativeClient.greetSignature : String := expected_signature% NativeClient.greet
 public def NativeClient.doubleSignature : String := expected_signature% NativeClient.double
+
+
+-- These declarations exercise the generic codec beyond bounded unary forms.
+@[vir_export]
+public def NativeClient.nullary : Unit := ()
+
+@[vir_export]
+public def NativeClient.multiple (text : String) (count : Nat) : Nat := text.length + count
+
+@[vir_export]
+public def NativeClient.effectful : IO Unit := pure ()
+
+@[vir_export]
+public def NativeClient.nested (values : Array (Option Nat)) : Array (Option Nat) := values
+
+public def NativeClient.nullarySignature : String := expected_signature% NativeClient.nullary
+public def NativeClient.multipleSignature : String := expected_signature% NativeClient.multiple
+public def NativeClient.effectfulSignature : String := expected_signature% NativeClient.effectful
+public def NativeClient.nestedSignature : String := expected_signature% NativeClient.nested
