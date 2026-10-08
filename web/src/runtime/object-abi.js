@@ -4,11 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import {
-  normalizeUint32,
-  requireStructureFields,
-  requireTypeField,
-} from "./vir-codec.js";
+import { normalizeUint32 } from "./vir-codec.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
 import { enumValue, normalizeEnum } from "./vir-value-normalizers.js";
 import {
@@ -23,53 +19,24 @@ const MAX_UINT64 = 0xffffffffffffffffn;
 const objectLayoutPlanCache = new WeakMap();
 
 export function objectArgumentSupported(type, selfType = null) {
-  const tag = type?.interfaceTag;
-  switch (tag) {
-    case INTERFACE_TAG.RECURSIVE_SELF:
-      return selfType !== null;
-    case INTERFACE_TAG.UNIT:
-    case INTERFACE_TAG.RESOURCE:
-    case INTERFACE_TAG.BOOL:
-    case INTERFACE_TAG.NAT:
-    case INTERFACE_TAG.INT:
-    case INTERFACE_TAG.STRING:
-    case INTERFACE_TAG.UINT8:
-    case INTERFACE_TAG.UINT16:
-    case INTERFACE_TAG.UINT32:
-    case INTERFACE_TAG.UINT64:
-    case INTERFACE_TAG.USIZE:
-    case INTERFACE_TAG.BYTE_ARRAY:
-    case INTERFACE_TAG.FLOAT:
-    case INTERFACE_TAG.FLOAT32:
-    case INTERFACE_TAG.EXPR:
-    case INTERFACE_TAG.SIMPLE_ENUM:
-      return true;
-    case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
-      return objectArgumentSupported(requireTypeField(type, "element", "object argument"), selfType);
-    case INTERFACE_TAG.PROD:
-      return objectArgumentSupported(requireTypeField(type, "fst", "object argument"), selfType) &&
-        objectArgumentSupported(requireTypeField(type, "snd", "object argument"), selfType);
-    case INTERFACE_TAG.STRUCTURE:
-      return objectStructureSupported(type, objectArgumentSupported);
-    case INTERFACE_TAG.TAGGED_UNION:
-      return objectTaggedUnionSupported(type, objectArgumentSupported, selfType);
-    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      return objectCustomInductiveSupported(type, objectArgumentSupported);
-    default:
-      return false;
-  }
+  return objectTypeSupported(type, false, selfType);
 }
 
 export function objectResultSupported(type, selfType = null) {
-  const tag = type?.interfaceTag;
-  switch (tag) {
+  return objectTypeSupported(type, true, selfType);
+}
+
+// One descriptor traversal; automatic functions are results only. These helpers
+// consume admitted descriptors, not another independently validated type grammar.
+function objectTypeSupported(type, result, selfType) {
+  const fieldSupported = result ? objectResultSupported : objectArgumentSupported;
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType !== null;
+    case INTERFACE_TAG.FUNCTION:
+      return result;
     case INTERFACE_TAG.UNIT:
     case INTERFACE_TAG.RESOURCE:
-    case INTERFACE_TAG.FUNCTION:
     case INTERFACE_TAG.BOOL:
     case INTERFACE_TAG.NAT:
     case INTERFACE_TAG.INT:
@@ -88,23 +55,22 @@ export function objectResultSupported(type, selfType = null) {
     case INTERFACE_TAG.ARRAY:
     case INTERFACE_TAG.LIST:
     case INTERFACE_TAG.OPTION:
-      return objectResultSupported(requireTypeField(type, "element", "object result"), selfType);
+      return fieldSupported(type.element, selfType);
     case INTERFACE_TAG.PROD:
-      return objectResultSupported(requireTypeField(type, "fst", "object result"), selfType) &&
-        objectResultSupported(requireTypeField(type, "snd", "object result"), selfType);
+      return fieldSupported(type.fst, selfType) && fieldSupported(type.snd, selfType);
     case INTERFACE_TAG.STRUCTURE:
-      return objectStructureSupported(type, objectResultSupported);
+      return objectStructureSupported(type, fieldSupported);
     case INTERFACE_TAG.TAGGED_UNION:
-      return objectTaggedUnionSupported(type, objectResultSupported, selfType);
+      return objectTaggedUnionSupported(type, fieldSupported, selfType);
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      return objectCustomInductiveSupported(type, objectResultSupported);
+      return objectCustomInductiveSupported(type, fieldSupported);
     default:
       return false;
   }
 }
 
 function objectStructureSupported(type, fieldSupported) {
-  const fields = requireStructureFields(type, "object structure");
+  const fields = type.fields;
   const trivial = trivialStructureField(type, fields);
   if (trivial !== null) {
     return fieldSupported(trivial.type, type);
@@ -168,18 +134,10 @@ export function objectLayoutSlotsFromPlan(plan) {
 }
 
 export function objectLayoutPlan(owner, fields, label) {
-  const cacheable = owner !== null && (typeof owner === "object" || typeof owner === "function");
-  let cachedPlans;
-  if (cacheable) {
-    cachedPlans = objectLayoutPlanCache.get(owner);
-    if (cachedPlans !== undefined) {
-      for (const plan of cachedPlans) {
-        if (objectLayoutPlanMatches(plan, fields)) {
-          return plan;
-        }
-      }
-    }
-  }
+  // Each immutable layout owner has one field layout. Tagged unions may pass
+  // fresh synthetic field arrays, but their admitted constructor is the same.
+  const cached = objectLayoutPlanCache.get(owner);
+  if (cached !== undefined) return cached;
 
   const counts = objectRuntimeCounts(owner, label);
   const fieldPlans = [];
@@ -234,44 +192,8 @@ export function objectLayoutPlan(owner, fields, label) {
     scalarByteSize: counts.scalarByteSize,
     fields: fieldPlans,
   };
-  if (!cacheable) {
-    return plan;
-  }
-  if (cachedPlans === undefined) {
-    objectLayoutPlanCache.set(owner, [plan]);
-  } else {
-    cachedPlans.push(plan);
-  }
+  objectLayoutPlanCache.set(owner, plan);
   return plan;
-}
-
-function objectLayoutPlanMatches(plan, fields) {
-  if (plan.fields.length !== fields.length) {
-    return false;
-  }
-  for (let index = 0; index < fields.length; index++) {
-    if (!sameLayoutField(plan.fields[index].field, fields[index])) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function sameLayoutField(lhs, rhs) {
-  return lhs === rhs || (
-    lhs?.name === rhs?.name &&
-    lhs?.type === rhs?.type &&
-    sameLayout(lhs?.layout, rhs?.layout)
-  );
-}
-
-function sameLayout(lhs, rhs) {
-  return lhs === rhs || (
-    lhs?.kind === rhs?.kind &&
-    lhs?.index === rhs?.index &&
-    lhs?.offset === rhs?.offset &&
-    lhs?.size === rhs?.size
-  );
 }
 
 function objectRuntimeCounts(owner, label) {
