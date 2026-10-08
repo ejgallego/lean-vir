@@ -24,6 +24,7 @@ import {
   writeObjectScalarField,
 } from "./object-abi.js";
 import {
+  constructorValue,
   enumValue,
   flattenStructureSubobjects,
   normalizeArray,
@@ -208,7 +209,7 @@ export function withObjectValues(Base) {
         case INTERFACE_TAG.STRUCTURE:
           return this.makeObjectStructureValue(type, value, label);
         case INTERFACE_TAG.TAGGED_UNION:
-          return this.makeObjectTaggedUnionValue(type, value, label);
+          return this.makeObjectTaggedUnionValue(type, value, label, selfType);
         case INTERFACE_TAG.CUSTOM_INDUCTIVE:
           return this.makeObjectCustomInductiveValue(type, value, label);
         default:
@@ -242,7 +243,7 @@ export function withObjectValues(Base) {
         case INTERFACE_TAG.STRUCTURE:
           return this.liftObjectStructureValue(type, obj, label);
         case INTERFACE_TAG.TAGGED_UNION:
-          return this.liftObjectTaggedUnionValue(type, obj, label);
+          return this.liftObjectTaggedUnionValue(type, obj, label, selfType);
         case INTERFACE_TAG.CUSTOM_INDUCTIVE:
           return this.liftObjectCustomInductiveValue(type, obj, label);
         default:
@@ -351,7 +352,8 @@ export function withObjectValues(Base) {
       );
     }
 
-    makeObjectTaggedUnionValue(type, value, label) {
+    makeObjectTaggedUnionValue(type, value, label, selfType = null) {
+      // Sum/Except carry the enclosing recursive owner through their payload.
       const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
       const field = taggedUnionField(ctor);
       return this.makeObjectCtorFromLayout(
@@ -360,7 +362,7 @@ export function withObjectValues(Base) {
         [field],
         { [field.name]: payload },
         label,
-        type,
+        selfType,
       );
     }
 
@@ -1360,28 +1362,29 @@ export function withObjectValues(Base) {
       return flattenStructureSubobjects(type, values);
     }
 
-    liftObjectTaggedUnionValue(type, obj, label) {
+    liftObjectTaggedUnionValue(type, obj, label, selfType = null) {
       const tag = this.exports.vir_obj_tag(obj);
       const ctor = taggedUnionConstructorAt(type, tag, label);
       const field = taggedUnionField(ctor);
       const plan = objectLayoutPlan(ctor, [field], label);
-      return {
-        kind: ctor.jsName,
-        value: this.liftObjectLayoutField(
+      return constructorValue(
+        type,
+        ctor,
+        this.liftObjectLayoutField(
           ctor,
           obj,
           plan.fields[0],
           `${label}.${ctor.jsName}`,
-          type,
+          selfType,
         ),
-      };
+      );
     }
 
     liftObjectCustomInductiveValue(type, obj, label) {
       const tag = this.exports.vir_obj_tag(obj);
       const ctor = customInductiveConstructorAt(type, tag, label);
       if (ctor.fields.length === 0) {
-        return { kind: ctor.jsName };
+        return constructorValue(type, ctor, null);
       }
       const plan = objectLayoutPlan(
         ctor,
@@ -1399,18 +1402,10 @@ export function withObjectValues(Base) {
           type,
         );
       }
-      return ctor.fields.length === 1
-        ? {
-            kind: ctor.jsName,
-            value: values[ctor.fields[0].name],
-          }
-        : {
-            kind: ctor.jsName,
-            fields: values,
-          };
+      return constructorValue(type, ctor, values);
     }
 
-    liftObjectLayoutField(owner, obj, fieldPlan, label, selfType = owner) {
+    liftObjectLayoutField(owner, obj, fieldPlan, label, selfType) {
       const field = fieldPlan.field;
       switch (fieldPlan.kind) {
         case "object": {

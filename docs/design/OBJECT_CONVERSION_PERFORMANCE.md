@@ -19,11 +19,11 @@ path repeated the following work for every recursive custom-inductive node:
 - allocate allowed-key and expected-field sets.
 
 `normalizeCustomInductive` now stores a `WeakMap` plan keyed by the manifest
-type object. The plan retains the constructor-array identity, constructor name
-map, diagnostic shapes, and validation sets. Installed manifest descriptors are
-read-only runtime metadata; replacing `type.constructors` defensively
-invalidates the entry, but arbitrary in-place descriptor mutation is not
-supported. Per-value kind, key, field-presence, and payload checks remain on
+type object. The plan retains the constructor name map, diagnostic shapes, and
+validation sets. Installed manifest descriptors are immutable runtime metadata;
+each admitted type object owns one plan, with no descriptor-mutation invalidation
+policy. Constructor metadata is checked at manifest admission. Per-value kind,
+key, field-presence, and payload checks remain on
 every call, with the same diagnostics.
 
 ## Workloads and measurements

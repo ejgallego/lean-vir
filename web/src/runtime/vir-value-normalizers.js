@@ -4,11 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import {
-  requireCustomInductiveConstructors,
-  requireStructureFields,
-  requireTaggedUnionConstructors,
-} from "./vir-codec.js";
+import { requireStructureFields } from "./vir-codec.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
 
 const customInductiveNormalizationPlanCache = new WeakMap();
@@ -83,7 +79,7 @@ export function normalizeTaggedUnion(value, type, label) {
   if (typeof value.kind !== "string") {
     throw new Error(`${label} must specify tagged-union kind`);
   }
-  const constructors = requireTaggedUnionConstructors(type, label);
+  const constructors = type.constructors;
   const index = constructors.findIndex(
     (ctor) => ctor.jsName === value.kind,
   );
@@ -95,6 +91,22 @@ export function normalizeTaggedUnion(value, type, label) {
     throw new Error(`${label}.${match.ctor.jsName} is missing value`);
   }
   return { ...match, payload: value.value };
+}
+
+// Build the canonical shape from a tagged payload or custom-inductive field record.
+// Constructor names and fields come from admitted descriptors.
+export function constructorValue(type, ctor, payload) {
+  const kind = ctor.jsName;
+  if (type.interfaceTag === INTERFACE_TAG.TAGGED_UNION) {
+    return { kind, value: payload };
+  }
+  if (ctor.fields.length === 0) {
+    return { kind };
+  }
+  if (ctor.fields.length === 1) {
+    return { kind, value: payload[ctor.fields[0].name] };
+  }
+  return { kind, fields: payload };
 }
 
 export function normalizeCustomInductive(value, type, label) {
@@ -141,11 +153,11 @@ export function normalizeCustomInductive(value, type, label) {
 
 function customInductiveNormalizationPlan(type) {
   const cached = customInductiveNormalizationPlanCache.get(type);
-  if (cached?.constructors === type?.constructors) {
+  if (cached !== undefined) {
     return cached;
   }
 
-  const constructors = requireCustomInductiveConstructors(type, "custom inductive");
+  const constructors = type.constructors;
   const constructorPlans = constructors.map((ctor, index) => {
     const fieldCount = ctor.fields.length;
     return {
@@ -168,7 +180,6 @@ function customInductiveNormalizationPlan(type) {
     );
   }
   const plan = {
-    constructors,
     constructorsByName,
     expectedShapes: constructorPlans.map(({ expectedShape }) => expectedShape).join(" | "),
   };
@@ -177,7 +188,7 @@ function customInductiveNormalizationPlan(type) {
 }
 
 function customInductiveShape(ctor) {
-  // The normalization plan has already validated the constructor metadata.
+  // Constructor metadata was validated at manifest admission.
   const kind = JSON.stringify(ctor.jsName);
   const fields = ctor.fields;
   if (fields.length === 0) {

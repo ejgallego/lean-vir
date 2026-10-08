@@ -6,9 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import {
   normalizeUint32,
-  requireCustomInductiveConstructors,
   requireStructureFields,
-  requireTaggedUnionConstructors,
   requireTypeField,
 } from "./vir-codec.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
@@ -56,7 +54,7 @@ export function objectArgumentSupported(type, selfType = null) {
     case INTERFACE_TAG.STRUCTURE:
       return objectStructureSupported(type, objectArgumentSupported);
     case INTERFACE_TAG.TAGGED_UNION:
-      return objectTaggedUnionSupported(type, objectArgumentSupported);
+      return objectTaggedUnionSupported(type, objectArgumentSupported, selfType);
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return objectCustomInductiveSupported(type, objectArgumentSupported);
     default:
@@ -97,7 +95,7 @@ export function objectResultSupported(type, selfType = null) {
     case INTERFACE_TAG.STRUCTURE:
       return objectStructureSupported(type, objectResultSupported);
     case INTERFACE_TAG.TAGGED_UNION:
-      return objectTaggedUnionSupported(type, objectResultSupported);
+      return objectTaggedUnionSupported(type, objectResultSupported, selfType);
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return objectCustomInductiveSupported(type, objectResultSupported);
     default:
@@ -114,13 +112,13 @@ function objectStructureSupported(type, fieldSupported) {
   return objectLayoutSupported(type, fields, fieldSupported, type);
 }
 
-function objectTaggedUnionSupported(type, fieldSupported) {
-  return requireTaggedUnionConstructors(type, "object tagged union").every((ctor) =>
-    objectLayoutSupported(ctor, [taggedUnionField(ctor)], fieldSupported, type));
+function objectTaggedUnionSupported(type, fieldSupported, selfType) {
+  return type.constructors.every((ctor) =>
+    objectLayoutSupported(ctor, [taggedUnionField(ctor)], fieldSupported, selfType));
 }
 
 function objectCustomInductiveSupported(type, fieldSupported) {
-  return requireCustomInductiveConstructors(type, "object custom inductive").every((ctor) => {
+  return type.constructors.every((ctor) => {
     if (ctor.fields.length === 0) {
       const counts = objectRuntimeCounts(ctor, "object custom inductive");
       return counts.objectFieldCount === 0 && counts.usizeFieldCount === 0 && counts.scalarByteSize === 0;

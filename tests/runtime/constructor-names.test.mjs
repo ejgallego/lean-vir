@@ -15,6 +15,10 @@ import {
 } from "../../web/src/runtime/vir-value-normalizers.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import {
+  customInductiveConstructorAt,
+  taggedUnionConstructorAt,
+} from "../../web/src/runtime/vir-codec.js";
+import {
   constructorTemplate,
   defaultValueForType,
   interfaceInputTag,
@@ -69,6 +73,24 @@ test("tagged-union kinds use JS spelling without Lean-name aliases", () => {
     () => normalizeTaggedUnion({ ...value, kind: "Example.Choice.left" }, taggedType, "value"),
     /unknown tagged-union constructor/,
   );
+});
+
+test("constructor result ordinals remain numeric and within the admitted table", () => {
+  const customType = {
+    type: "Example.Empty", name: "Example.Empty", kind: "customInductive",
+    interfaceTag: INTERFACE_TAG.CUSTOM_INDUCTIVE,
+    constructors: [{ name: "Example.Empty.empty", jsName: "empty", tag: 0,
+      objectFieldCount: 0, usizeFieldCount: 0, scalarByteSize: 0, fields: [] }],
+  };
+  for (const [lookup, descriptor] of [
+    [taggedUnionConstructorAt, taggedType],
+    [customInductiveConstructorAt, customType],
+  ]) {
+    assert.equal(lookup(descriptor, 0, "result"), descriptor.constructors[0]);
+    for (const ordinal of [-1, 1, 0.5, NaN, "0"]) {
+      assert.throws(() => lookup(descriptor, ordinal, "result"), /constructor index is out of range/);
+    }
+  }
 });
 
 test("browser input defaults use the same constructor names as normalization", () => {
