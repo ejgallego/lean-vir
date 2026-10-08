@@ -409,33 +409,23 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
   if (← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST").isSome then
     error "VIR_RESOURCE_NATIVE_PROFILE_UNSUPPORTED: unset VIR_NATIVE_EXTERN_MANIFEST; resource programs require the locked runtime profile"
   let stem ← IO.ofExcept (resourceLibraryStem lib)
-  let some config := lib.pkg.findTargetConfig? `virPrograms
-    | error s!"missing `virPrograms` target in `{lib.pkg.prettyName}`; register owner library and program module Names"
-  let registrations ← (lib.pkg.target `virPrograms).fetch
+  -- A bare module key is a typed Module input in stock Lake, not a request for
+  -- its default compilation facet. Select it here before requesting compilation.
+  let selections := lib.config.needs.filterMap fun
+    | .module name => some (Lean.Name.anonymous, name)
+    | .packageModule pkg name => some (pkg, name)
+    | _ => none
+  let #[(pkgName, moduleName)] := selections
+    | error s!"virResourcePack requires exactly one program module key in `{lib.name}` needs"
+  unless pkgName.isAnonymous || pkgName == lib.pkg.baseName || pkgName == lib.pkg.keyName do
+    error s!"VIR resource program `{moduleName}` must belong to `{lib.pkg.prettyName}`"
+  let some mod := lib.pkg.findModule? moduleName
+    | error s!"VIR resource program module `{moduleName}` is not Lake-registered in `{lib.pkg.prettyName}`"
   let profile ← virResourceCompatibility.fetch
   let tool ← vir_resource_program.fetch
   let packTool ← vir_resource_pack.fetch
   tool.bindM fun tool => packTool.bindM fun packTool => profile.bindM fun profile =>
-  registrations.bindM fun registrations => do
-    -- Use the registered target's typed formatter, not an unchecked CustomData
-    -- cast or an import of an unbuilt VIR helper into client configuration.
-    let json ← IO.ofExcept <| Lean.Json.parse (config.format .json registrations)
-    let entries ← IO.ofExcept <| Lean.fromJson? (α := Array (Lean.Name × Lean.Name)) json
-    let mut owners : Array Lean.Name := #[]
-    for (owner, root) in entries do
-      if owner.isAnonymous || root.isAnonymous then
-        error "virPrograms requires nonanonymous owner library and program module Names"
-      if owners.contains owner then
-        error s!"duplicate virPrograms registration for owner `{owner}`"
-      unless (lib.pkg.findLeanLib? owner).isSome do
-        error s!"virPrograms owner library `{owner}` is not registered in `{lib.pkg.prettyName}`"
-      owners := owners.push owner
-    let some (_, moduleName) := entries.find? (·.1 == lib.name)
-      | error s!"missing virPrograms registration for owner `{lib.name}` in `{lib.pkg.prettyName}`"
-    let some mod ← findModule? moduleName
-      | error s!"VIR resource program module `{moduleName}` is not Lake-registered"
-    unless mod.pkg.keyName == lib.pkg.keyName do
-      error s!"virPrograms module `{moduleName}` is not owned by `{lib.pkg.prettyName}`"
+  do
     if sameResourceLibrary mod.lib lib then
       error s!"VIR resource cycle: program `{moduleName}` belongs to its carrier library `{lib.name}`"
     let imports ← mod.transImports.fetch
@@ -447,9 +437,9 @@ library_facet virResourcePack (lib : LeanLib) : System.FilePath := do
       -- the common carrier/program cycle produces a diagnostic, not a job wait.
       let program ← (mod.facet `virProgram).fetch
       program.mapM fun program => do
-        -- Job.pure carries no trace. Include the normalized registration value,
+        -- A bare module input carries no trace. Include its selected Name,
         -- even if two choices have identical compilation traces/paths.
-        addPureTrace (Lean.Json.compress (Lean.toJson entries)) "VIR program registration"
+        addPureTrace moduleName.toString "VIR program selection"
         addPureTrace "virResourcePack/v3" "VIR resource producer contract"
         let output := lib.pkg.buildDir / "vir/resources/programs" / s!"{stem}.virres"
         for path in #[output, output.addExtension "trace", output.addExtension "hash"] do

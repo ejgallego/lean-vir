@@ -143,16 +143,16 @@ const programFirst = readFileSync(programStage);
 const clientConfig = join(client, "lakefile.lean");
 const originalConfig = readFileSync(clientConfig, "utf8");
 for (const [label, change, diagnostic] of [
-  ["missing-target", text => replaceFixture(text, "target virPrograms", "target unrelatedPrograms"),
-    /missing `virPrograms` target/],
-  ["missing-owner", text => replaceFixture(text, "#[(`ClientResources, `Client.Program)]", "#[]"),
-    /missing virPrograms registration/],
-  ["duplicate-owner", text => replaceFixture(text, "#[(`ClientResources, `Client.Program)]",
-    "#[(`ClientResources, `Client.Program), (`ClientResources, `Client.Alternative)]"),
-    /duplicate virPrograms registration/],
-  ["foreign-module", text => replaceFixture(text, "`Client.Program)]", "`Vir.Attributes)]"),
-    /not owned by/],
-  ["carrier-as-root", text => replaceFixture(text, "`Client.Program)]", "`Client.Resources)]"),
+  ["missing-selection", text => replaceFixture(text, "`+Client.Program, ", ""),
+    /exactly one program module key/],
+  ["duplicate-selection", text => replaceFixture(text, "`+Client.Program, ",
+    "`+Client.Program, `+Client.Alternative, "),
+    /exactly one program module key/],
+  ["foreign-module", text => replaceFixture(text, "`+Client.Program, ", "`+Vir.Attributes, "),
+    /not Lake-registered in/],
+  ["foreign-package", text => replaceFixture(text, "`+Client.Program, ", "`@lean_vir/+Vir.Attributes, "),
+    /must belong to/],
+  ["carrier-as-root", text => replaceFixture(text, "`+Client.Program, ", "`+Client.Resources, "),
     /VIR resource cycle/],
 ]) {
   writeFileSync(clientConfig, change(originalConfig));
