@@ -59,6 +59,10 @@ assert.deepEqual(descriptor.compatibility,
 
 // Use Lake's returned executable, not a reconstructed dependency build path.
 run(["lake", "--no-cache", "build", "GeneratorClient"], "generator-meta-client");
+const generatorSetup = JSON.parse(readFileSync(
+  join(client, ".lake/build/ir/GeneratorClient.setup.json"), "utf8"));
+assert.ok(generatorSetup.dynlibs.every((path) => !/VirResource(Core|Embed|Runtime)/.test(path)),
+  "native generation must not load resource preparation or carriers");
 const generator = run(["lake", "query", "@lean_vir/vir_irpkg"], "generator-build").trim();
 run(["lake", "env", generator, join(evidence, "client.irpkg"), join(evidence, "report.md"),
   "--target-marked-module", "NativeClient"], "generator-run");

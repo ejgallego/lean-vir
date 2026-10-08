@@ -214,4 +214,14 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
         ("interfaceTag", jsonNat ty.interfaceTag)
       ]
 
+/-- Encode a named argument without depending on generator metadata. -/
+def InterfaceArg.toJson (arg : InterfaceArg) : String :=
+  jsonObject #[
+    ("name", jsonString arg.name),
+    ("type", arg.type.toJson)
+  ]
+
+def InterfaceEffect.toJson (effect : InterfaceEffect) : String :=
+  jsonString effect.label
+
 end Vir.Interface

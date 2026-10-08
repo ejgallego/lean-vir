@@ -32,7 +32,10 @@ target infoviewBundle (pkg) : System.FilePath := do
     return mixTrace entryTrace (mixTrace errorsTrace (mixTrace scriptTrace (mixTrace packageTrace lockTrace)))) fun _ =>
     runNpmScript root "build:infoview"
 
-/-- Browser bindings have explicit ownership; native APIs are separate. -/
+/- Lake roots claim all descendants, even when globs build only the root.
+Use explicit owners so native imports never load the browser library by accident.
+The cold native-client regression checks one owner for every Vir module. -/
+/-- Browser bindings and example support; native APIs have separate owners. -/
 @[default_target]
 lean_lib Vir where
   roots := #[]
@@ -40,10 +43,10 @@ lean_lib Vir where
     .andSubmodules `Vir.Browser, .andSubmodules `Vir.React,
     .andSubmodules `Vir.ProofWidgets, .submodules `Vir.Examples]
 
-/-- Pure package metadata shared by compilation, generation and resources. -/
+/-- Pure format, JSON, Name and hashing utilities shared by native libraries. -/
 lean_lib VirPackageFormat where
   roots := #[]
-  globs := #[.submodules `Vir.Package]
+  globs := #[.submodules `Vir.Package, .one `Vir.Hash]
 
 /-- Native compiler APIs and the public authoring attributes. No browser externs. -/
 lean_lib VirCompiler where
@@ -51,7 +54,7 @@ lean_lib VirCompiler where
   globs := #[.submodules `Vir.Compiler, .one `Vir.Attributes,
     .one `Vir.Host, .one `Vir.ExternFallback]
 
-/-- Package generation depends on compiler metadata and resource preparation. -/
+/-- Native package generation, independent of resource preparation and carriers. -/
 lean_lib VirPackage where
   roots := #[]
   globs := #[.andSubmodules `Vir.GeneratePackage]
@@ -60,7 +63,7 @@ lean_lib VirPackage where
 lean_lib VirResourceCore where
   roots := #[]
   globs := #[.one `Vir.BinaryLiteral, .one `Vir.Resources, .one `Vir.Resources.Types,
-    .one `Vir.Hash, .one `Vir.Resources.Validate, .one `Vir.Resources.Site, .one `Vir.Resources.Pack,
+    .one `Vir.Resources.Validate, .one `Vir.Resources.Site, .one `Vir.Resources.Pack,
     .one `Vir.Resources.Build, .one `Vir.Resources.Program, .one `Vir.NativePayload]
 
 lean_lib VirResourceEmbed where

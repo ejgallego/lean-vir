@@ -1,8 +1,18 @@
 # Native-precompiled clients
 
+This guide covers experimental build-time APIs on VIR's pinned Lean toolchain.
+For application setup, use the [resource workflow](EMBEDDED_RESOURCES.md).
+
 Native document elaborators and compiler tools can use VIR's markers, interface
 classifier, package generator and resource APIs with `precompileModules := true`.
-Use narrow module imports:
+Enable native precompilation in the consumer's Lake package:
+
+```lean
+package my_document where
+  precompileModules := true
+```
+
+Then import the compiler APIs at meta time in the document module:
 
 ```lean
 module
@@ -22,13 +32,13 @@ meta-import `Vir.GeneratePackage`. Ordinary applications use the
 Lake loads whole owning shared libraries for native-precompiled imports. A
 narrow import must therefore have an owner without JavaScript-only externs.
 `VirCompiler` owns marker/classifier/host metadata, interface encoding and import
-caching. `VirPackageFormat` owns pure format, JSON and Name utilities.
-`VirPackage` owns package generation, which also uses resource-core hashing.
+caching. `VirPackageFormat` owns pure format, JSON, Name and hashing utilities.
+`VirPackage` owns package generation without loading resource preparation.
 Their dependency graph is:
 
 ```text
 VirPackage       -> VirCompiler
-VirPackage       -> VirResourceCore
+VirPackage       -> VirPackageFormat
 VirCompiler      -> VirPackageFormat
 VirResourceCore  -> VirPackageFormat
 VirResourceEmbed -> VirResourceCore
@@ -38,8 +48,9 @@ Arrows point from importer to dependency. Compiler, shared-format and generator
 implementations have separate module prefixes. The browser umbrella explicitly
 owns its entrypoint and binding prefixes, so library ownership does not depend
 on registration order. Interface encoding imports its model and JSON utilities
-directly, without loading package generation. Resource acquisition, embedding
-and optional runtime ownership retain their separate boundaries.
+directly, including named arguments and effects, without loading package generation.
+Resource acquisition, embedding and optional runtime ownership retain their
+separate boundaries.
 
 This is not a native guarantee for the `Vir` umbrella, browser or React modules:
 those still contain JavaScript-only externs. Program generation stays independent
@@ -82,7 +93,8 @@ npm run test:native-client
 
 The test copies an independent producer and cold client, checks native-loaded
 markers, signatures and independent interface encoding, links/executes Unicode
-String and exact large Nat calls
-and current descriptor encoding, then runs the native package generator. It uses
+String and exact large Nat calls and current descriptor encoding, then checks a
+separate generator meta client and runs the native package generator. Lake checks
+that every VIR module has exactly one library owner. The test uses
 Lean and Node, acquires no runtime pack and builds no Wasm. Logs and outputs are
 retained in the printed evidence directory. CI runs the same test.

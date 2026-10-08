@@ -30,6 +30,20 @@ run_meta do
     unless argument.type == expected &&
         signature.result == expected && signature.effect == .pure do
       Lean.throwError "unexpected interface for {name}"
+    let .ok encoded := Lean.Json.parse argument.toJson
+      | Lean.throwError "invalid native-loaded argument encoding"
+    let .ok encodedName := encoded.getObjValAs? String "name"
+      | Lean.throwError "missing native-loaded argument name"
+    let .ok encodedType := encoded.getObjVal? "type"
+      | Lean.throwError "missing native-loaded argument type"
+    let .ok encodedLabel := encodedType.getObjValAs? String "type"
+      | Lean.throwError "missing native-loaded argument type label"
+    let .ok encodedTag := encodedType.getObjValAs? Nat "interfaceTag"
+      | Lean.throwError "missing native-loaded argument type tag"
+    unless encodedName == argument.name && encodedLabel == expected.label &&
+        encodedTag == expected.interfaceTag &&
+        signature.effect.toJson == "\"pure\"" do
+      Lean.throwError "unexpected native-loaded argument/effect encoding"
 
 -- Encoding data uses the current schema/compatibility, not a frozen fixture pin.
 public def NativeClient.descriptor : Vir.Resources.Descriptor := {

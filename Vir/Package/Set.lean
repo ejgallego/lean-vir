@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 module
 
-import Lean.Data.Json.Printer
+import Vir.Package.Json
 public import Vir.Package.Format
 
 public section
@@ -31,19 +31,20 @@ structure Member where
   sha256 : String
 
 private def encodeMember (member : Member) : String :=
-  let quote := Lean.Json.renderString
-  "{\"module\":" ++ quote member.moduleName ++
-  ",\"role\":" ++ quote member.role.label ++
-  ",\"path\":" ++ quote member.path ++
-  ",\"byteLength\":" ++ toString member.byteLength ++
-  ",\"sha256\":" ++ quote member.sha256 ++ "}"
+  jsonObject #[
+    ("module", jsonString member.moduleName),
+    ("role", jsonString member.role.label),
+    ("path", jsonString member.path),
+    ("byteLength", jsonNat member.byteLength),
+    ("sha256", jsonString member.sha256)]
 
 /-- Canonical generator field order and trailing newline. Used for both generated
 sets and path-only adaptation; neither operation changes member bytes. -/
 def encode (members : Array Member) : String :=
-  "{\"format\":" ++ Lean.Json.renderString packageSetFormat ++
-  ",\"version\":" ++ toString currentPackageSetVersion ++
-  ",\"packages\":[" ++ String.intercalate "," (members.map encodeMember).toList ++ "]}\n"
+  jsonObject #[
+    ("format", jsonString packageSetFormat),
+    ("version", jsonNat currentPackageSetVersion),
+    ("packages", jsonArray (members.map encodeMember))] ++ "\n"
 
 end PackageSet
 end Vir.GeneratePackage
