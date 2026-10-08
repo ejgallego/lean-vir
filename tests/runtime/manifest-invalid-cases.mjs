@@ -433,6 +433,32 @@ export const invalidManifestCases = [
     pattern: /constructors must be a non-empty array/,
   },
   {
+    name: "tagged constructor missing jsName at admission",
+    mutate: (manifest) => {
+      manifest.exports[0].result = {
+        type: "Sum Nat Nat", interfaceTag: 21, kind: "taggedUnion", name: "Sum",
+        constructors: [{
+          name: "Sum.inl", tag: 0, objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0,
+          type: { type: "Nat", interfaceTag: 0 }, layout: { kind: "object", index: 0 },
+        }],
+      };
+    },
+    pattern: /constructors\[0\]\.jsName must be a non-empty string/,
+  },
+  {
+    name: "custom constructor missing jsName at admission",
+    mutate: (manifest) => {
+      manifest.exports[0].result = {
+        type: "Empty", interfaceTag: 25, kind: "customInductive", name: "Empty",
+        constructors: [{
+          name: "Empty.empty", tag: 0,
+          objectFieldCount: 0, usizeFieldCount: 0, scalarByteSize: 0, fields: [],
+        }],
+      };
+    },
+    pattern: /constructors\[0\]\.jsName must be a non-empty string/,
+  },
+  {
     name: "empty tagged union constructors",
     mutate: (manifest) => {
       manifest.exports[0].result = {

@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { INTERFACE_TAG } from "../../src/runtime/interface-tags.js";
+import { constructorValue } from "../../src/runtime/vir-value-normalizers.js";
 
 const JSON_INPUT_INTERFACE_TAGS = new Set([
   INTERFACE_TAG.EXPR,
@@ -97,23 +98,11 @@ function defaultStructureValue(type, depth = 0) {
 
 // Editable suggestion for admitted descriptors; recursive positions may need edits.
 export function constructorTemplate(type, ctor, depth = 0) {
-  const kind = ctor.jsName;
   if (type.interfaceTag === INTERFACE_TAG.TAGGED_UNION) {
-    return { kind, value: defaultValueForType(ctor.type) };
+    return constructorValue(type, ctor, defaultValueForType(ctor.type));
   }
-  const fields = ctor.fields;
-  if (fields.length === 0) {
-    return { kind };
-  }
-  if (fields.length === 1) {
-    return {
-      kind,
-      value: defaultValueForType(fields[0].type, type, depth + 1),
-    };
-  }
-  const values = {};
-  for (const field of fields) {
-    values[field.name] = defaultValueForType(field.type, type, depth + 1);
-  }
-  return { kind, fields: values };
+  const values = Object.fromEntries(ctor.fields.map((field) => [
+    field.name, defaultValueForType(field.type, type, depth + 1),
+  ]));
+  return constructorValue(type, ctor, values);
 }

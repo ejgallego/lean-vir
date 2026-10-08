@@ -24,6 +24,7 @@ import {
   writeObjectScalarField,
 } from "./object-abi.js";
 import {
+  constructorValue,
   enumValue,
   flattenStructureSubobjects,
   normalizeArray,
@@ -1366,23 +1367,24 @@ export function withObjectValues(Base) {
       const ctor = taggedUnionConstructorAt(type, tag, label);
       const field = taggedUnionField(ctor);
       const plan = objectLayoutPlan(ctor, [field], label);
-      return {
-        kind: ctor.jsName,
-        value: this.liftObjectLayoutField(
+      return constructorValue(
+        type,
+        ctor,
+        this.liftObjectLayoutField(
           ctor,
           obj,
           plan.fields[0],
           `${label}.${ctor.jsName}`,
           selfType,
         ),
-      };
+      );
     }
 
     liftObjectCustomInductiveValue(type, obj, label) {
       const tag = this.exports.vir_obj_tag(obj);
       const ctor = customInductiveConstructorAt(type, tag, label);
       if (ctor.fields.length === 0) {
-        return { kind: ctor.jsName };
+        return constructorValue(type, ctor, null);
       }
       const plan = objectLayoutPlan(
         ctor,
@@ -1400,18 +1402,10 @@ export function withObjectValues(Base) {
           type,
         );
       }
-      return ctor.fields.length === 1
-        ? {
-            kind: ctor.jsName,
-            value: values[ctor.fields[0].name],
-          }
-        : {
-            kind: ctor.jsName,
-            fields: values,
-          };
+      return constructorValue(type, ctor, values);
     }
 
-    liftObjectLayoutField(owner, obj, fieldPlan, label, selfType = owner) {
+    liftObjectLayoutField(owner, obj, fieldPlan, label, selfType) {
       const field = fieldPlan.field;
       switch (fieldPlan.kind) {
         case "object": {

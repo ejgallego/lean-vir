@@ -51,14 +51,6 @@ export function requireTypeField(type, field, label) {
   return child;
 }
 
-function requireStructureCount(type, field, label) {
-  const value = type?.[field];
-  if (!Number.isInteger(value) || value < 0) {
-    throw new Error(`${label} has invalid manifest structure ${field}`);
-  }
-  return value;
-}
-
 function requireStructureFieldLayout(layout, label) {
   if (layout?.kind === "object" && Number.isInteger(layout.index) && layout.index >= 0) {
     return;
@@ -87,59 +79,6 @@ export function requireStructureFields(type, label) {
   return type.fields;
 }
 
-export function requireTaggedUnionConstructors(type, label) {
-  if (!Array.isArray(type?.constructors) || type.constructors.length === 0) {
-    throw new Error(`${label} is missing manifest tagged-union constructors`);
-  }
-  for (const ctor of type.constructors) {
-    const ctorLabel = requireConstructorHeader(ctor, label, "tagged-union");
-    if (!ctor.type ||
-        !Number.isInteger(ctor.type.interfaceTag)) {
-      throw new Error(`${label} has an invalid manifest tagged-union constructor`);
-    }
-    requireStructureFieldLayout(ctor.layout, ctorLabel);
-  }
-  return type.constructors;
-}
-
-export function requireCustomInductiveConstructors(type, label) {
-  if (!Array.isArray(type?.constructors) || type.constructors.length === 0) {
-    throw new Error(`${label} is missing manifest custom inductive constructors`);
-  }
-  for (const ctor of type.constructors) {
-    const ctorLabel = requireConstructorHeader(ctor, label, "custom inductive");
-    if (!Array.isArray(ctor.fields)) {
-      throw new Error(`${label} has an invalid manifest custom inductive constructor`);
-    }
-    if (ctor.fields.length === 0 &&
-        (ctor.objectFieldCount !== 0 || ctor.usizeFieldCount !== 0 || ctor.scalarByteSize !== 0)) {
-      throw new Error(`${ctorLabel} has no fields but non-zero runtime field counts`);
-    }
-    for (const field of ctor.fields) {
-      if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.interfaceTag)) {
-        throw new Error(`${ctorLabel} has an invalid manifest custom inductive field`);
-      }
-      requireStructureFieldLayout(field.layout, `${ctorLabel}.${field.name}`);
-    }
-  }
-  return type.constructors;
-}
-
-function requireConstructorHeader(ctor, label, kindLabel) {
-  if (typeof ctor?.name !== "string" || typeof ctor?.jsName !== "string") {
-    throw new Error(`${label} has an invalid manifest ${kindLabel} constructor`);
-  }
-  const ctorLabel = `${label}.${ctor.jsName}`;
-  requireRuntimeCounts(ctor, ctorLabel);
-  return ctorLabel;
-}
-
-function requireRuntimeCounts(type, label) {
-  requireStructureCount(type, "objectFieldCount", label);
-  requireStructureCount(type, "usizeFieldCount", label);
-  requireStructureCount(type, "scalarByteSize", label);
-}
-
 export function requireFunctionArgs(type, label) {
   requireInterfaceEffect(type?.effect, `${label} effect`);
   if (!Array.isArray(type?.args)) {
@@ -161,16 +100,17 @@ export function requireFunctionResult(type, label) {
   return result;
 }
 
+// Admitted constructor tables are immutable; only the result ordinal is dynamic.
 export function taggedUnionConstructorAt(type, index, label) {
-  return constructorAt(type, index, label, requireTaggedUnionConstructors, "tagged-union");
+  return constructorAt(type, index, label, "tagged-union");
 }
 
 export function customInductiveConstructorAt(type, index, label) {
-  return constructorAt(type, index, label, requireCustomInductiveConstructors, "custom inductive");
+  return constructorAt(type, index, label, "custom inductive");
 }
 
-function constructorAt(type, index, label, requireConstructors, kindLabel) {
-  const constructors = requireConstructors(type, label);
+function constructorAt(type, index, label, kindLabel) {
+  const constructors = type.constructors;
   if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
     throw new Error(`${label} ${kindLabel} constructor index is out of range`);
   }
