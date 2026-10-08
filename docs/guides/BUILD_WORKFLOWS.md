@@ -18,14 +18,15 @@ different input source; see [Infoview](INFOVIEW.md).
 
 ## How resource preparation builds its inputs
 
-The carrier library declares `needs := #[@package/CarrierLibrary:virResourcePack]`.
+The carrier library declares a bare program Module key and its preparation facet:
+``needs := #[`+Program.Module, `@package/CarrierLibrary:virResourcePack]``.
 This establishes ordering **and** a traced prerequisite before its source includes
 the prepared pack. Program and carrier modules belong to separate registered
 libraries so packaging the program cannot depend on compiling its own carrier.
 
 ```text
 registered program + transitive imports ── full compiled artifacts ──┐
-typed registration + compatibility + native producer tools ─────┤
+typed module selection + compatibility + native producer tools ────┤
                                                                   ↓
                                                         virResourcePack
                                                                   ↓
@@ -44,11 +45,10 @@ The two carrier branches meet in `ResourceSet`; program packaging does not
 depend on acquiring the Wasm runtime. The steps below describe the implementation
 in [lakefile.lean](../../lakefile.lean), not commands the application must run.
 
-1. **Select.** Fetch the owning package's stock `virPrograms` target, an array of
-   owner-library/program-module Name pairs, plus the compatibility and native
-   producer jobs. Use Lake's registered typed result formatter; no unbuilt VIR
-   module is imported into the client lakefile. Reject missing/duplicate owners
-   and roots belonging to another package.
+1. **Select.** Read the one bare Module key in the owning library's stock `needs`
+   field, plus the compatibility and native producer jobs. The key retains Lean's
+   semantic Name; no registration table or unbuilt VIR helper import is needed.
+   Reject missing/ambiguous selections and roots belonging to another package.
 2. **Check the graph.** Resolve the root with Lake's `findModule?`; unregistered
    modules fail. Fetch `transImports` and reject direct or transitive imports of
    the carrier library before requesting compiled program artifacts.
@@ -57,8 +57,8 @@ in [lakefile.lean](../../lakefile.lean), not commands the application must run.
    add `allArtsTrace`. Lake owns compilation/cache retrieval and returns the real
    artifact locations; the producer does not reconstruct conventional paths.
    Acquiring the import graph does not mean shipping every declaration in it.
-4. **Trace the build.** Explicitly trace normalized registration values: a pure
-   target's returned value does not itself carry a content trace. Jobs retain tool,
+4. **Trace the build.** Explicitly trace the selected module Name: the bare
+   Module input does not itself carry a content trace. Jobs retain tool,
    compatibility, Lean identity and full implementation/location traces.
 5. **Build or restore two separate results.** The shared program facet uses
    `buildArtifactUnlessUpToDate` for a canonical selected program.
@@ -70,10 +70,13 @@ in [lakefile.lean](../../lakefile.lean), not commands the application must run.
 6. **Stage even on a hit.** Use the artifact path returned by Lake, which may be in
    its cache rather than the conventional output directory. Validate and repair
    `.vir-generated/<Library>.virres` under the owning library's source directory.
-   Preserve the semantic input trace and add the stage's content trace before returning the artifact
-   path. The library-key include derives the same source root from the complete
-   module-relative source filename, not the caller's working directory.
-7. **Embed.** `include_vir_library LibraryName` validates the prepared pack and
+   Prepare module-specific private input locators from Lake's source-only library
+   collection, including local imported modules. Different libraries sharing a
+   source directory remain distinct. Preserve the semantic input trace and add
+   the prepared inputs' traces before returning the artifact path. Inclusion derives
+   the same source root from the complete module-relative source filename,
+   not the caller's working directory.
+7. **Embed.** `include_vir_program` consumes this module's prepared input, validates the pack and
    generates owned Lean values. It performs no acquisition or subprocess build. The compiled
    native application can run without reopening the pack or producer checkout.
 
@@ -95,16 +98,15 @@ pack tool to acquire the exact content identity:
 3. Validate the complete pack and compatibility before installation; restore
    cache/stage without writing through existing hard links.
 
-The previous contract's lock named a public release asset; the Lean-name
-successor still needs its matching public distribution. Once selected, an empty runtime cache downloads
-and verifies those exact bytes. `source: "-"` remains an available-only selection,
+The current lock names a content-addressed public release asset. An empty runtime
+cache downloads and verifies those exact bytes. `source: "-"` is an available-only selection,
 not a download source. There is no implicit SDK installation, npm invocation,
 GitHub authentication, WASI installation, or local runtime build. HTTPS acquisition
 uses `curl`; packing runtime distributions is a separate maintainer operation.
 
 ## Shared core, separate public contracts
 
-`virResourcePack` **does not fetch `+Module:vir`, `:virSdk`, or `:virInputs`**.
+`virResourcePack` **does not fetch `+Module:vir` or `:virSdk`**.
 Both program adapters depend on the internal `virProgram` facet instead.
 
 | Boundary             | Package facet                                                                     | Resource facet                                                        |
@@ -164,6 +166,10 @@ an explicit matched capability/profile contract, not merely passing this variabl
 - The older application staging and public resolved-input proposals, PR161 and
   PR184, are closed in favor of library-owned resources. The first release is
   still under review; existing demo and maintainer tooling has not all migrated.
+- `virPrograms`, handwritten resource recipes/export tables and
+  `include_vir_library LibraryName` are removed. Select the program in the
+  existing library's `needs` and use `include_vir_program`; there is no alias.
+  No public `:virInputs` facet or `virWebAssets` composition API is exposed.
 - The standalone generator remains compiled-module tooling, not a legacy source
   loader. Non-module developments and source-file package loading are unsupported.
 - Experimental live editor snapshots remain a distinct input contract. No optimization may
@@ -181,3 +187,16 @@ the [contributor harness](../HARNESS.md) before changing or removing their calle
 See the [generator reference](../reference/GENERATE_PACKAGE.md) for selection modes
 and removed source flags. Closing old proposals does not delete their retained
 source or evidence.
+
+| Retained entry point | Why it remains / current caller |
+| --- | --- |
+| `include_vir_program` + library `virResourcePack` | The application path: one configured program and its prepared carrier value. |
+| `include_vir_bundle "relative/path"` | Explicit prepared-input primitive used by VIR's runtime carrier and reader tests; not another application setup recipe. |
+| Module `:vir` and package `:virSdk` | Loose compiler output and older-host/runtime development; facet/package/SDK tests still exercise them. They share acquisition/generation with resource preparation. |
+| `virProgram`, `vir_program`, `virPrepare`, native resource tools | Internal jobs and adapters; called by Lake, repository producers and tests. Not additional client configuration APIs. |
+| Repository npm/catalog scripts | Hosted demos, fixtures, benchmarks and distribution, with callers in the [tool inventory](../../scripts/packages/README.md). |
+| Editor snapshots and component/widget loaders | Experimental editor/UI integration with authoritative live environments; not disk-root replacements or a second supported application workflow. |
+
+Removing a retained adapter requires migrating its caller and checking the same
+bytes/behavior. New client integrations use the application path above rather
+than assembling build outputs or wrapping repository scripts.

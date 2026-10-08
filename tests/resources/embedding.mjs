@@ -85,26 +85,25 @@ run_cmd do
 `);
 run("lake", ["env", "lean", "Phases.lean"], "carrier-import-phases");
 const expected = "a9fbcfec93dbdd836248902deeb6b4fb7b4fe83f64ce9983104c0a945f6811e5";
-// The library key is literal, not a Lean constant or the current module name.
-// Both include forms use the same prepared bytes and embedding operation.
-mkdirSync(join(project, ".vir-generated"));
-for (const key of ["CarrierResources", "Carrier.Library", "«Library key»"]) {
-  writeFileSync(join(project, `.vir-generated/${key}.virres`),
-    readFileSync(join(project, "pack.virres")));
-  writeFileSync(join(project, "KeyCarrier.lean"), `module
+// Contextual and explicit includes share the prepared-pack decoder/embedder.
+// This isolated reader test prepares its input explicitly; the owning-library
+// campaign tests automatic context preparation through real Lake jobs.
+mkdirSync(join(project, ".vir-generated/inputs"), { recursive: true });
+writeFileSync(join(project, ".vir-generated/inputs/KeyCarrier.path"),
+  join(project, "pack.virres"));
+writeFileSync(join(project, "KeyCarrier.lean"), `module
 public import Vir.Resources.Embed
-public def keyed : Vir.Resources.Bundle := include_vir_library ${key}
+public def keyed : Vir.Resources.Bundle := include_vir_program
 #eval IO.println keyed.contentId
 `);
-  assert.match(run("lake", ["env", "lean", "KeyCarrier.lean"],
-    `library-key-${key}`), new RegExp(expected));
-}
+assert.match(run("lake", ["env", "lean", "KeyCarrier.lean"],
+  "contextual-input"), new RegExp(expected));
 writeFileSync(join(project, "MissingCarrier.lean"), `module
 import Vir.Resources.Embed
-def missing : Vir.Resources.Bundle := include_vir_library MissingResources
+def missing : Vir.Resources.Bundle := include_vir_program
 `);
 assert.match(run("lake", ["env", "lean", "MissingCarrier.lean"],
-  "missing-library-preparation", 1), /VIR_RESOURCE_NOT_PREPARED.*MissingResources/s);
+  "missing-context-preparation", 1), /VIR_RESOURCE_NOT_PREPARED.*MissingCarrier/s);
 const setup = JSON.parse(readFileSync(join(project,
   "compiled output/ir/Carrier.setup.json")));
 assert.equal(setup.name, "Carrier");

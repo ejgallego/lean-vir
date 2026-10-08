@@ -79,15 +79,17 @@ private def acquire (compatibilityPath : FilePath) (expected source : String)
 private def runtimePlan (compatibilityPath lockPath root : FilePath) : IO Unit :=
   Build.runtimePlan compatibilityPath lockPath root
 
-private def stage (compatibilityPath packPath outputPath : FilePath) : IO Unit := do
+private def stage (compatibilityPath packPath outputPath : FilePath)
+    (carrierInputs : List String) : IO Unit := do
   let contentId ← Build.stage compatibilityPath packPath outputPath
+    (carrierInputs.toArray.map FilePath.mk)
   IO.println contentId
 
 def usage : String :=
   "usage: vir_resource_pack pack DESCRIPTOR ROOT OUT\n" ++
   "       vir_resource_pack acquire COMPAT CONTENT_ID SOURCE CACHE STAGE [--offline]\n" ++
   "       vir_resource_pack runtime-plan COMPAT LOCK OWNERROOT\n" ++
-  "       vir_resource_pack stage COMPAT PACK OUT\n" ++
+  "       vir_resource_pack stage COMPAT PACK OUT [CARRIER_INPUT ...]\n" ++
   "SOURCE is a local pack, anonymous HTTPS URL, or '-' (available bytes only).\n" ++
   "Transport never overrides CONTENT_ID or the tool's exact Lean build identity."
 
@@ -103,6 +105,6 @@ def main (args : List String) : IO Unit := do
     Vir.ResourcePack.acquire compatibility expected source cache stage true
   | ["runtime-plan", compatibility, lock, root] =>
     Vir.ResourcePack.runtimePlan compatibility lock root
-  | ["stage", compatibility, pack, out] =>
-    Vir.ResourcePack.stage compatibility pack out
+  | "stage" :: compatibility :: pack :: out :: carrierInputs =>
+    Vir.ResourcePack.stage compatibility pack out carrierInputs
   | _ => throw <| IO.userError Vir.ResourcePack.usage

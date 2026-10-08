@@ -310,17 +310,14 @@ lean_lib ClientResources where
   srcDir := "resources"
   roots := #[]
   globs := #[.one `Client.Resources]
-  needs := #[`@client_fixture/ClientResources:virResourcePack]
+  needs := #[`+Client.Program, `@client_fixture/ClientResources:virResourcePack]
 ```
 
-The owning package declares a stock typed target, importing only Lake:
-
-```lean
-target virPrograms (_pkg) : Array (Lean.Name × Lean.Name) := do
-  return Job.pure #[(`ClientResources, `Client.Program)]
-```
-
-One registered root per owning library; no handwritten recipe, alias, logical ID,
+The one bare Module key in `needs` is the selection connection. Stock Lake returns
+its typed registered Module without starting a compilation facet; the resource
+facet checks the graph before fetching the canonical compiled program.
+One registered root per owning library; no registration target, helper import,
+handwritten recipe, alias, logical ID,
 interface ID or export list. Logical identity is the selected module's name.
 The canonical root `vir_export ∪ vir_startup` inventory supplies callable names;
 imported markers do not become root entrypoints. Startup hooks are callable but
@@ -328,8 +325,10 @@ not automatically executed.
 
 The facet stages `.vir-generated/ClientResources.virres` under the owning
 library's `srcDir` (here `resources`). `resources/Client/Resources.lean` embeds it
-with `include_vir_library ClientResources`, using the literal registered library
-name. The include strips the complete canonical module suffix from the actual
+with `include_vir_program`, using the module-specific private locator prepared by
+the facet. Lake's source-only library module collection supplies those contexts;
+this works for local imported carrier modules, not only library roots. The include
+strips the complete canonical module suffix from the actual
 source filename to derive that same source root; mismatches reject without an
 ancestor search, working-directory guess or alternate-path fallback.
 The library's ordinary prerequisite owns preparation and tracing. Explicit

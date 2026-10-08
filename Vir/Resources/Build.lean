@@ -160,7 +160,8 @@ def runtimePlan (compatibilityPath lockPath root : FilePath) : IO Unit := do
   IO.println (Json.compress <| Json.mkObj [
     ("contentId", toJson contentId), ("source", toJson source)])
 
-def stage (compatibilityPath packPath outputPath : FilePath) : IO String := do
+def stage (compatibilityPath packPath outputPath : FilePath)
+    (carrierInputs : Array FilePath := #[]) : IO String := do
   let expected ← compatibility compatibilityPath
   let bytes ← readInput packPath packLimit "PACK_LIMIT"
   let bundle ← fromResource (Pack.decode bytes)
@@ -168,6 +169,10 @@ def stage (compatibilityPath packPath outputPath : FilePath) : IO String := do
     fail "INCOMPATIBLE"
       s!"bundle {bundle.descriptor.logicalId} has {repr bundle.descriptor.compatibility}; expected {repr expected}"
   atomicInstall outputPath bytes
+  -- Private compiler inputs, not bundle metadata or publication files. Share
+  -- the same atomic/no-op writer rather than another staging implementation.
+  for input in carrierInputs do
+    atomicInstall input outputPath.toString.toUTF8
   return bundle.contentId
 
 end Vir.Resources.Build
