@@ -450,6 +450,9 @@ object behind a `Lean.Vir.JSL α` resource instead of decoding it to JavaScript.
 The JSL payload is an ordinary self-owning JavaScript object.
 Ordinary Lean references and JavaScript references use their respective native
 reachability rules; VIR does not expose a separate JSL retain/release protocol.
+
+For a complete model-and-function example using the public program facade, see
+[Keep application state in Lean](OPAQUE_LEAN_STATE.md).
 The retained Lean value is released when JavaScript collects the object on a
 host with finalization support, or synchronously when the package/runtime is
 disposed. Host imports may additionally receive Lean function values as

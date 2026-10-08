@@ -137,3 +137,6 @@ account for retained tooling and private staging; they are not extra setup steps
 The first release is under review; [qualification](../development/RESOURCE_ACCEPTANCE.md)
 records executed results and limits. DOM/React/editor conveniences are
 [experimental](../SUPPORT.md), not requirements of this workflow.
+
+For Lean-owned models and captured functions, see
+[opaque Lean state and explicit invocation](OPAQUE_LEAN_STATE.md).
