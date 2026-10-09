@@ -74,7 +74,7 @@ run this setup sequence.
 distribution and repository tooling behind the application workflow.
 For custom JavaScript hosts and explicit object/host-binding APIs, see the
 [runtime API reference](docs/guides/JS_API.md) and
-[matching runtime/SDK assets](docs/guides/CALL_LEAN_FROM_JS.md).
+[SDK acquisition](docs/guides/PACKAGES.md#install-the-browser-sdk).
 
 [Documentation](docs/README.md) links the API guides, implementation references,
 examples, and validation instructions.
