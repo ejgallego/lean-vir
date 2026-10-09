@@ -12,3 +12,7 @@ Use the stable `npm run bench*` commands from the repository root. Focused
 contract tests for the repository harness live in `tests/benchmarks/`; generic
 build helpers remain under `scripts/`, while shared package models live under
 `scripts/packages/`.
+
+The focused [native codec comparison](NATIVE_CODECS.md) keeps public-call timing,
+fresh-runtime observations, and directional conversion cases separate. It consumes
+frozen SDKs and packages; preparing packages is an explicit command.
