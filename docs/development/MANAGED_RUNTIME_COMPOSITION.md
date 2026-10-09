@@ -40,7 +40,9 @@ Conversion consumes the installed, validated and deeply frozen manifest directly
 repeat it for each field, element or callback. Argument and result support share
 one traversal, with automatic functions permitted only in the result direction.
 Layout plans and constructor-name lookups are derived once per immutable owner;
-changing an internal descriptor after admission is unsupported.
+layout fields come from that owner rather than a separate caller-supplied list.
+Only metadata is cached: each conversion allocates fresh slots for its owned Lean
+references. Changing an internal descriptor after admission is unsupported.
 
 This distinction applies to metadata, not application values. Each call still
 checks JavaScript value shapes and numeric bounds, returned constructor tags,

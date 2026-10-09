@@ -28,13 +28,13 @@ export function objectResultSupported(type, selfType = null) {
 
 // One descriptor traversal; automatic functions are results only. These helpers
 // consume admitted descriptors, not another independently validated type grammar.
-function objectTypeSupported(type, result, selfType) {
-  const fieldSupported = result ? objectResultSupported : objectArgumentSupported;
+function objectTypeSupported(type, isResult, selfType) {
+  const fieldSupported = isResult ? objectResultSupported : objectArgumentSupported;
   switch (type?.interfaceTag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType !== null;
     case INTERFACE_TAG.FUNCTION:
-      return result;
+      return isResult;
     case INTERFACE_TAG.UNIT:
     case INTERFACE_TAG.RESOURCE:
     case INTERFACE_TAG.BOOL:
@@ -75,12 +75,13 @@ function objectStructureSupported(type, fieldSupported) {
   if (trivial !== null) {
     return fieldSupported(trivial.type, type);
   }
-  return objectLayoutSupported(type, fields, fieldSupported, type);
+  return objectLayoutSupported(type, fieldSupported, type);
 }
 
 function objectTaggedUnionSupported(type, fieldSupported, selfType) {
+  // The constructor owns storage, but its payload retains the enclosing recursive type.
   return type.constructors.every((ctor) =>
-    objectLayoutSupported(ctor, [taggedUnionField(ctor)], fieldSupported, selfType));
+    objectLayoutSupported(ctor, fieldSupported, selfType));
 }
 
 function objectCustomInductiveSupported(type, fieldSupported) {
@@ -89,14 +90,14 @@ function objectCustomInductiveSupported(type, fieldSupported) {
       const counts = objectRuntimeCounts(ctor, "object custom inductive");
       return counts.objectFieldCount === 0 && counts.usizeFieldCount === 0 && counts.scalarByteSize === 0;
     }
-    return objectLayoutSupported(ctor, ctor.fields, fieldSupported, type);
+    return objectLayoutSupported(ctor, fieldSupported, type);
   });
 }
 
-function objectLayoutSupported(owner, fields, fieldSupported, selfType) {
+function objectLayoutSupported(owner, fieldSupported, selfType) {
   let plan;
   try {
-    plan = objectLayoutPlan(owner, fields, "object layout");
+    plan = objectLayoutPlan(owner, "object layout");
   } catch {
     return false;
   }
@@ -117,15 +118,8 @@ function objectFieldPlanSupported(fieldPlan, fieldSupported, selfType) {
   }
 }
 
-export function taggedUnionField(ctor) {
-  return {
-    name: ctor.jsName,
-    type: ctor.type,
-    layout: ctor.layout,
-  };
-}
-
 export function objectLayoutSlotsFromPlan(plan) {
+  // Slots own per-call Lean references. Cache metadata, never these mutable buffers.
   return {
     objectFields: Array(plan.objectFieldCount).fill(0),
     usizeFields: Array(plan.usizeFieldCount).fill(0n),
@@ -133,13 +127,16 @@ export function objectLayoutSlotsFromPlan(plan) {
   };
 }
 
-export function objectLayoutPlan(owner, fields, label) {
-  // Each immutable layout owner has one field layout. Tagged unions may pass
-  // fresh synthetic field arrays, but their admitted constructor is the same.
+export function objectLayoutPlan(owner, label) {
+  // A structure/custom constructor owns fields; a Sum/Except constructor owns
+  // one payload. Derive that layout only on a cache miss from the admitted owner.
   const cached = objectLayoutPlanCache.get(owner);
   if (cached !== undefined) return cached;
 
   const counts = objectRuntimeCounts(owner, label);
+  const fields = owner.fields ?? [{
+    name: owner.jsName, type: owner.type, layout: owner.layout,
+  }];
   const fieldPlans = [];
   const seenObjects = new Set();
   const seenUSize = new Set();
@@ -148,7 +145,7 @@ export function objectLayoutPlan(owner, fields, label) {
     const fieldLabel = `${label}.${field.name ?? "field"}`;
     switch (field.layout.kind) {
       case "object": {
-        const index = objectLayoutIndex(owner, field.layout, fieldLabel);
+        const index = objectLayoutIndex(counts, field.layout);
         if (index === null) {
           throw new Error(`${fieldLabel} has unsupported object ABI layout`);
         }
@@ -160,7 +157,7 @@ export function objectLayoutPlan(owner, fields, label) {
         break;
       }
       case "usize": {
-        const index = usizeLayoutIndex(owner, field.layout, fieldLabel);
+        const index = usizeLayoutIndex(counts, field.layout);
         if (index === null) {
           throw new Error(`${fieldLabel} has unsupported object ABI layout`);
         }
@@ -210,21 +207,20 @@ function objectRuntimeCounts(owner, label) {
   return { objectFieldCount, usizeFieldCount, scalarByteSize };
 }
 
-function objectLayoutIndex(owner, layout, label) {
-  if (layout?.kind !== "object" || !Number.isInteger(layout.index)) {
+function objectLayoutIndex(counts, layout) {
+  if (!Number.isInteger(layout.index)) {
     return null;
   }
-  const { objectFieldCount } = objectRuntimeCounts(owner, label);
-  return layout.index >= 0 && layout.index < objectFieldCount ? layout.index : null;
+  return layout.index >= 0 && layout.index < counts.objectFieldCount ? layout.index : null;
 }
 
-function usizeLayoutIndex(owner, layout, label) {
-  if (layout?.kind !== "usize" || !Number.isInteger(layout.index)) {
+function usizeLayoutIndex(counts, layout) {
+  if (!Number.isInteger(layout.index)) {
     return null;
   }
-  const { objectFieldCount, usizeFieldCount } = objectRuntimeCounts(owner, label);
-  const index = layout.index - objectFieldCount;
-  return index >= 0 && index < usizeFieldCount ? index : null;
+  // Native indices include the object-field prefix; the USize buffer does not.
+  const index = layout.index - counts.objectFieldCount;
+  return index >= 0 && index < counts.usizeFieldCount ? index : null;
 }
 
 function scalarLayoutOffset(layout, scalarByteSize, label) {

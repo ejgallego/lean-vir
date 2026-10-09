@@ -41,24 +41,6 @@ export class BinaryWriter {
   }
 }
 
-// Descriptors reaching conversion have been validated and frozen at admission.
-// Constructor indices come from live Lean values and still need a bounds check.
-export function taggedUnionConstructorAt(type, index, label) {
-  return constructorAt(type, index, label, "tagged-union");
-}
-
-export function customInductiveConstructorAt(type, index, label) {
-  return constructorAt(type, index, label, "custom inductive");
-}
-
-function constructorAt(type, index, label, kindLabel) {
-  const constructors = type.constructors;
-  if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
-    throw new Error(`${label} ${kindLabel} constructor index is out of range`);
-  }
-  return constructors[index];
-}
-
 export function normalizeUint32(value, label) {
   if (!Number.isInteger(value) || value < 0 || value > 0xffffffff) {
     throw new Error(`${label} must be an integer in 0..4294967295`);

@@ -5,30 +5,30 @@ when Lean owns the model and its transformations, and JavaScript needs only
 small display results. This example uses existing APIs.
 
 The [tested Lean example](../../fixtures/runtime/ManagedCore.lean) provides these
-operations. In your program recipe, map each role to its declaration:
+operations, called by their fully qualified Lean declaration names:
 
-| Program role | Lean declaration | Result |
-| --- | --- | --- |
-| `build` | `ManagedCore.buildHeld` | Opaque array carrier |
-| `advance` | `ManagedCore.advanceHeld` | New array carrier |
-| `summarize` | `ManagedCore.summarizeHeld` | Size/sum string |
-| `holdSummary` | `ManagedCore.makeSummaryHeld` | Opaque captured-function carrier |
-| `invokeSummary` | `ManagedCore.invokeSummaryHeld` | Captured model's summary |
+| Lean declaration | Result |
+| --- | --- |
+| `ManagedCore.buildHeld` | Opaque array carrier |
+| `ManagedCore.advanceHeld` | New array carrier |
+| `ManagedCore.summarizeHeld` | Size/sum string |
+| `ManagedCore.makeSummaryHeld` | Opaque captured-function carrier |
+| `ManagedCore.invokeSummaryHeld` | Captured model's summary |
 
 Use the [normal application setup](EMBEDDED_RESOURCES.md) and its public
 `createProgram` facade. Lean keeps the array and applies the captured function:
 
 ```js
 try {
-  let original = program.call("build", 10);
-  let advanced = program.call("advance", original, 1);
-  const later = program.call("holdSummary", advanced);
+  let original = program.call("ManagedCore.buildHeld", 10);
+  let advanced = program.call("ManagedCore.advanceHeld", original, 1);
+  const later = program.call("ManagedCore.makeSummaryHeld", advanced);
 
-  console.log(program.call("summarize", original)); // "10:45"
-  console.log(program.call("summarize", advanced)); // "10:55"
+  console.log(program.call("ManagedCore.summarizeHeld", original)); // "10:45"
+  console.log(program.call("ManagedCore.summarizeHeld", advanced)); // "10:55"
   original = null;
   advanced = null;
-  console.log(program.call("invokeSummary", later)); // "10:55"
+  console.log(program.call("ManagedCore.invokeSummaryHeld", later)); // "10:55"
 } finally {
   program.dispose();
 }
@@ -42,9 +42,11 @@ The captured function can outlive the model's JavaScript carrier.
 While the program is active, JavaScript can schedule a named Lean invocation:
 
 ```js
-const heldFunction = program.call("holdSummary", program.call("build", 10));
+const heldFunction = program.call(
+  "ManagedCore.makeSummaryHeld", program.call("ManagedCore.buildHeld", 10),
+);
 const timer = setTimeout(() => {
-  console.log(program.call("invokeSummary", heldFunction));
+  console.log(program.call("ManagedCore.invokeSummaryHeld", heldFunction));
 }, 0);
 ```
 

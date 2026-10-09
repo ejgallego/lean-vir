@@ -4,10 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import {
-  customInductiveConstructorAt,
-  taggedUnionConstructorAt,
-} from "./vir-codec.js";
 import { interfaceEffectRuntimeTag } from "./interface-effects.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
 import {
@@ -16,11 +12,11 @@ import {
   objectLayoutPlan,
   objectLayoutSlotsFromPlan,
   readObjectScalarField as readObjectScalarFieldValue,
-  taggedUnionField,
   writeObjectScalarField,
 } from "./object-abi.js";
 import {
   constructorValue,
+  customInductiveConstructorAt,
   enumValue,
   flattenStructureSubobjects,
   normalizeArray,
@@ -30,6 +26,7 @@ import {
   normalizePair,
   normalizeStructure,
   normalizeTaggedUnion,
+  taggedUnionConstructorAt,
 } from "./vir-value-normalizers.js";
 import {
   normalizeBoundedUnsignedDecimal,
@@ -341,7 +338,6 @@ export function withObjectValues(Base) {
       return this.makeObjectCtorFromLayout(
         0,
         type,
-        fields,
         record,
         label,
         type,
@@ -351,12 +347,10 @@ export function withObjectValues(Base) {
     makeObjectTaggedUnionValue(type, value, label, selfType = null) {
       // Sum/Except carry the enclosing recursive owner through their payload.
       const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
-      const field = taggedUnionField(ctor);
       return this.makeObjectCtorFromLayout(
         index,
         ctor,
-        [field],
-        { [field.name]: payload },
+        { [ctor.jsName]: payload },
         label,
         selfType,
       );
@@ -374,15 +368,14 @@ export function withObjectValues(Base) {
       return this.makeObjectCtorFromLayout(
         index,
         ctor,
-        ctor.fields,
         fields,
         label,
         type,
       );
     }
 
-    makeObjectCtorFromLayout(tag, owner, fields, values, label, selfType) {
-      const plan = objectLayoutPlan(owner, fields, label);
+    makeObjectCtorFromLayout(tag, owner, values, label, selfType) {
+      const plan = objectLayoutPlan(owner, label);
       const layout = objectLayoutSlotsFromPlan(plan);
       try {
         for (const fieldPlan of plan.fields) {
@@ -1341,7 +1334,7 @@ export function withObjectValues(Base) {
           ),
         };
       }
-      const plan = objectLayoutPlan(type, fields, label);
+      const plan = objectLayoutPlan(type, label);
       const values = {};
       for (const fieldPlan of plan.fields) {
         const field = fieldPlan.field;
@@ -1359,8 +1352,7 @@ export function withObjectValues(Base) {
     liftObjectTaggedUnionValue(type, obj, label, selfType = null) {
       const tag = this.exports.vir_obj_tag(obj);
       const ctor = taggedUnionConstructorAt(type, tag, label);
-      const field = taggedUnionField(ctor);
-      const plan = objectLayoutPlan(ctor, [field], label);
+      const plan = objectLayoutPlan(ctor, label);
       return constructorValue(
         type,
         ctor,
@@ -1382,7 +1374,6 @@ export function withObjectValues(Base) {
       }
       const plan = objectLayoutPlan(
         ctor,
-        ctor.fields,
         `${label}.${ctor.jsName}`,
       );
       const values = {};
