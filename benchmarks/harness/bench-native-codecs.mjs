@@ -59,11 +59,7 @@ async function freshRuntime(version, wasm) {
   const runtimeStart = performance.now();
   const runtime = await factory.createRuntime({ irPackageSet: [version.packageBytes] });
   const runtimeMs = performance.now() - runtimeStart;
-  // Optional local experiment. Installation is outside runtime creation and
-  // call timing; the cold first-call observation still includes lazy binding.
-  const installationStart = performance.now();
-  if (version.install) version.install(runtime);
-  return { runtime, factoryMs, runtimeMs, installationMs: performance.now() - installationStart };
+  return { runtime, factoryMs, runtimeMs };
 }
 
 async function loadVersion(version, wasm, wasmFile) {
@@ -79,13 +75,6 @@ async function loadVersion(version, wasm, wasmFile) {
   const start = performance.now();
   const { createVirRuntimeFactory } = await import(new URL("js/vir-runtime-node.js", sdk));
   const importMs = performance.now() - start;
-  let experiment;
-  if (version.experiment !== undefined) {
-    assert.equal(version.experiment, "native-value-interface");
-    const module = new URL("native-value-interface-snapshot.mjs", import.meta.url);
-    const { installNativeValueInterfacePrototype } = await import(module);
-    experiment = { install: installNativeValueInterfacePrototype };
-  }
   const { readIrPackageInfo, IR_PACKAGE_SECTION } = await import(
     new URL("js/runtime/ir-package.js", sdk));
   const packageBytes = await readFile(version.package);
@@ -95,7 +84,7 @@ async function loadVersion(version, wasm, wasmFile) {
     .map(section => ({ kind: section.kind, sha256: sha256(packageBytes.subarray(
       section.offset, section.offset + section.byteLength)) }));
   return {
-    ...version, ...experiment, createFactory: createVirRuntimeFactory, packageBytes,
+    ...version, createFactory: createVirRuntimeFactory, packageBytes,
     identity: { label: version.label, artifact, packageSha256: sha256(packageBytes),
       nativeSections, importMs, manifestBytes: info.package.sections.find(
         section => section.kind === IR_PACKAGE_SECTION.INTERFACE_MANIFEST).byteLength },
@@ -145,14 +134,6 @@ export async function runNativeCodecComparison(config) {
       fixture: sha256(await readFile(fixture)),
       harness: await Promise.all([import.meta.url, new URL("native-codec-values.mjs", import.meta.url),
         new URL("bench-utils.mjs", import.meta.url),
-        ...(Object.values(config).some(value => value?.experiment === "native-value-interface")
-          ? [new URL("native-value-interface-prototype.mjs", import.meta.url),
-             new URL("native-value-interface-snapshot.mjs", import.meta.url),
-             new URL("constructor-value-interface-prototype.mjs", import.meta.url),
-             new URL("../../web/src/runtime/primitive-value-normalizers.js", import.meta.url),
-             new URL("../../web/src/runtime/object-abi.js", import.meta.url),
-             new URL("../../web/src/runtime/object-boundary.js", import.meta.url),
-             new URL("../../web/src/runtime/interface-tags.js", import.meta.url)] : []),
       ].map(async path => ({
           path: String(path), sha256: sha256(await readFile(new URL(path))),
         }))),
@@ -173,9 +154,9 @@ export async function runNativeCodecComparison(config) {
       for (let round = 0; round < config.coldRounds; round++) {
         const order = round % 2 === 0 ? ["control", "candidate"] : ["candidate", "control"];
         for (const [sequence, id] of order.entries()) {
-          const { runtime, factoryMs, runtimeMs, installationMs } = await freshRuntime(versions[id], wasm);
+          const { runtime, factoryMs, runtimeMs } = await freshRuntime(versions[id], wasm);
           const host = runtime.hostState;
-          const trial = { id, corpus, size, round, sequence, factoryMs, runtimeMs, installationMs, cases: [] };
+          const trial = { id, corpus, size, round, sequence, factoryMs, runtimeMs, cases: [] };
           report.cold.push(trial);
           try {
             for (const [index, testCase] of cases.entries()) {

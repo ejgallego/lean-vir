@@ -175,24 +175,26 @@ The generator embeds the recursive interface type tree in section 5. Its
 | Manifest | `version`, `artifact: "lean-vir-ir-package"`, `metadata`, `exports`, `hostImports`, `diagnostics`. |
 | Metadata | `generator`, `packageFormatVersion`, `manifestVersion`, `leanVersion`, `leanToolchain`, `leanGithash`, `targets`, optional `packageSetMember: { module, role }`. |
 | Target | Exactly one origin field: compiled `module` or live-snapshot `source`; plus `mode`, `roots`, `resolvedRoots`. Source is document provenance, not a source-loading request. |
-| Export | full Lean call key `entry`, structural `nameKey`, diagnostic `source`, `args`, descriptor `result`, `effect`, Boolean `startup`. Each argument is `{ name, type: <descriptor> }`. |
-| Host import | `slot`, display `name`, structural `nameKey`, `source`, JS `target`, `boundary`, generated Wasm `symbol`, IR `arity`, `erasedPrefixArgs`, `args`, descriptor `result`, `effect`. |
+| Export | full Lean call key `entry`, structural `nameKey`, diagnostic `source`, `args`, result pair, `effect`, Boolean `startup`. Each argument is `{ name, type: <BoundaryInterface> }`. |
+| Host import | `slot`, display `name`, structural `nameKey`, `source`, JS `target`, `boundary`, generated Wasm `symbol`, IR `arity`, `erasedPrefixArgs`, named arguments with `BoundaryInterface` pairs, result pair, `effect`. |
 | Diagnostic | `name`, `source`, `reason`. |
 
-The current manifest version is 11 and every generated package must use it.
+The current manifest version is 12 and every generated package must use it.
 Every export carries an explicit Boolean `startup` field. Volatile generation
 time is omitted from embedded metadata; only the adjacent Markdown report
 records wall-clock generation time.
 
 Version 11 retires export `id`, export `jsName`, and the `exportsByName` runtime
-facade. Each full Lean `entry` is the sole public call key; constructor `jsName`
-labels and provider identifiers retain their meanings.
+facade. Each full Lean `entry` is the sole public call key; provider identifiers
+retain their meanings. Manifest 12 places constructor spellings in the selected
+value interface rather than on native constructor metadata.
 
-Version 10 retired the dedicated List/Option/Prod tags. Option and List use
-compiler-derived generic constructor layouts, Prod uses a generic structure
-layout, and `recursiveRef` carries a lexical `depth` through complete aggregate
-scopes. The JS codec resolves these bindings once, including through nested
-containers. Version 9 added `nameKey` to exports and host imports. It is the machine identity
+Version 10 retired the dedicated numeric List/Option/Prod categories. Option
+and List use compiler-derived generic constructor layouts, Prod uses a generic
+structure layout, and `{ ref: depth }` carries a lexical reference through
+aggregate scopes. Version 12 represents native layout and selected JavaScript
+mapping as a `{ native, value }` pair. Version 9 added `nameKey` to exports and
+host imports. It is the machine identity
 compared with the independently decoded binary Name. The full Lean `entry`
 selects the public callable; native dispatch uses its structural identity.
 Host import `name` is diagnostic display text. The runtime independently checks arity, effect,
@@ -211,9 +213,9 @@ Wasm. The pinned Wasm decoder derives the canonical key from its decoded Lean
 `Name`; the contract succeeds only when those structural identities agree.
 These checks use structural keys rather than parsing display names.
 
-Manifest 11 is the only supported schema. The current SDK contract is runtime
+Manifest 12 is the only supported schema. The current SDK contract is runtime
 ABI 4 with package format 11, so regenerate `.irpkg` members and descriptors
-with the manifest-11 generator and install the matching JavaScript and Wasm SDK
+with the manifest-12 generator and install the matching JavaScript and Wasm SDK
 artifacts together when the generator or runtime revision changes.
 
 The modes are `explicit`, `packageOnly`, `all`, `marked` and `markedModule`.
@@ -251,76 +253,166 @@ and [host bindings](HOST_BINDINGS.md) for authoring and lifetime rules.
 
 ## Interface descriptors
 
-The table below specifies accepted descriptor shapes, including those used by
-experimental automatic conversion of records and custom inductives. Official
-support follows the [support scope](../SUPPORT.md); accepting a descriptor does
-not extend that promise.
+Manifest 12 represents each exported or imported argument and result as one
+`{ native, value }` pair. An argument retains its parameter name as
+`{ name, type: <pair> }`; an entry result is the pair directly. The compiler
+derives native representation facts and a default JavaScript mapping together.
+Native field types and storage live in compiler metadata. The value interface
+selects a JavaScript representation and refers to those fields without
+duplicating their types or physical layout.
 
-Every descriptor has `type` (the applied Lean type label) and `interfaceTag`.
-Compound descriptors also have the `kind` and payload below. The numeric tags
-are package ABI, owned by
-[`Interface.Encode`](../../Vir/Compiler/Interface/Encode.lean) and checked
-against [`interface-tags.js`](../../web/src/runtime/interface-tags.js) by
-`npm run check:package-abi`. JS constant names in this table have the prefix
-`INTERFACE_TAG.`; unlisted tags are unsupported.
+This reference specifies admitted shapes, including metadata used by the
+experimental structural converter. Official support follows the
+[support scope](../SUPPORT.md); accepting a descriptor does not extend that
+promise. Pair validation happens at manifest admission. Optional conversion
+binds admitted pairs into cached codecs; ordinary calls and opaque reference
+passage do not require structural conversion.
 
-| Tag | JS constant | Lean type / kind | Payload beyond `type` and `interfaceTag` |
-| ---: | --- | --- | --- |
-| 0 | `NAT` | `Nat` | None. |
-| 1 | `INT` | `Int` | None. |
-| 2 | `BOOL` | `Bool` | None. |
-| 3 | `STRING` | `String` | None. |
-| 4 | `UINT8` | `UInt8` | None. |
-| 5 | `UINT16` | `UInt16` | None. |
-| 6 | `UINT32` | `UInt32` | None. |
-| 7 | `UINT64` | `UInt64` | None. |
-| 8 | `USIZE` | `USize` | None. |
-| 9 | `BYTE_ARRAY` | `ByteArray` | None. |
-| 10 | `FLOAT` | `Float` | None. |
-| 11 | `FLOAT32` | `Float32` | None. |
-| 14 | `SIMPLE_ENUM` | Nullary enum / `simpleEnum` | `constructors: [{ name, jsName, tag }]`. |
-| 15 | `EXPR` | `Lean.Expr` | None; caller value is a structural expression object. |
-| 16 | `ARRAY` | `Array α` / `array` | `element` descriptor. |
-| 20 | `STRUCTURE` | Structure / `structure` | `name`, layout counts, `fields`, optional `trivialFieldIndex`. |
-| 21 | `TAGGED_UNION` | `Sum` / `Except` / `taggedUnion` | `name`, `constructors` with payload descriptor and layout. |
-| 22 | `UNIT` | `Unit` | None. |
-| 23 | `RESOURCE` | Opaque JS resource / `resource` | Resource `name`. |
-| 24 | `FUNCTION` | Callback / `function` | `args: [{ name, type }]`, descriptor `result`, `effect`. |
-| 25 | `CUSTOM_INDUCTIVE` | Non-indexed inductive / `customInductive` | `name`, `constructors` with field descriptors/layouts. |
-| 26 | `RECURSIVE_REF` | Lexical recursive reference / `recursiveRef` | Referenced owner `name` and nonnegative `depth` (0 is the innermost aggregate). |
-| 27 | `LEAN_OBJECT` | Retained Lean object / `leanObject` | No additional payload. |
+```text
+BoundaryInterface = { native: DescriptorRef, value: ValueInterface }
+DescriptorRef     = NativeDescriptor | { ref: depth }
+NativeDescriptor  = { type: NativeType, metadata?: CompilerMetadata }
+```
+
+`depth` is a nonnegative lexical reference into enclosing constructor metadata.
+It is not a native type, JavaScript value or declaration-name lookup. Recursive
+value positions use `{ tag: "recursive" }` and bind to the corresponding
+native reference.
+
+### Native types and compiler metadata
+
+`native.type` selects a core operation and ownership class. It does not have
+separate categories for records, arrays, enums, products, options, lists,
+tagged unions, functions or expressions; those are Lean objects with compiler
+facts where an optional codec needs them.
+
+| Native type tag | Additional type field | Meaning |
+| --- | --- | --- |
+| `nat`, `int`, `string`, `byteArray` | — | Existing native integer, text and byte operations. |
+| `unsigned` | `width`: `8`, `16`, `32`, `64`, or `"usize"` | Native unsigned integer operation. |
+| `float` | `width`: `32` or `64` | Native floating-point operation. |
+| `leanObject` | — | Lean-owned object; layout metadata is optional. |
+| `resource` | — | JavaScript-rooted resource with its distinct release policy. |
+
+Compiler metadata is optional. `declaration` identifies or labels the Lean
+type; `constructors` describes object layouts; `arrayElement` identifies a
+compiler-confirmed native Lean array element; and `signature` describes a
+callable. A signature contains native `args`, native `result` and `effect`.
+Native fields and signature positions hold `DescriptorRef` values, not
+JavaScript mappings.
 
 ### Constructor and field layouts
 
-Layout counts are `objectFieldCount`, `usizeFieldCount` and `scalarByteSize`.
-Each field has `name`, descriptor `type` and one `layout` record:
+Each constructor's array position is its runtime ordinal. A constructor record
+does not duplicate an ordinal or a JavaScript spelling:
+
+| Representation | Fields | Additional data |
+| --- | --- | --- |
+| `immediate` | Empty array | No runtime fields; the table position is the ordinal. |
+| `object` | Stored fields | `storage` counts and each field's `location`. |
+| `identity` | One native field | Compiler-confirmed one-field wrapper without object-layout counts. |
+
+`storage` contains `objectFieldCount`, `usizeFieldCount` and `scalarByteSize`.
+Native fields contain `name` and `type: DescriptorRef`; stored fields also
+contain a physical location:
 
 ```text
-{ kind: "object", index }
-{ kind: "usize", index }
-{ kind: "scalar", size, offset }
+{ tag: "object", index }
+{ tag: "usize", index }
+{ tag: "scalar", size, offset }
 ```
 
-Structure fields may also have `subobject: true` for inherited parents.
-Parent fields remain explicit subobjects in the descriptor so layout matches
-Lean, while callers use flattened object keys. `trivialFieldIndex` represents
-a one-runtime-field wrapper, including direct scalar wrappers, without changing
-its JavaScript object shape.
+The `index` addresses the corresponding object or usize buffer. Scalar `size`
+and `offset` locate bytes within the constructor's scalar storage. These are
+compiler-owned facts; consumers do not reconstruct allocation sizes from the
+subset or order of visible fields. A structure's inherited parent stays a
+native field with its own type, storage and location. The selected value
+interface can expose inherited members as flattened JavaScript keys using
+logical field paths.
 
-Tagged-union constructor records have `name`, `jsName`, `tag`, payload `type`,
-`layout` and all three layout counts. Custom-inductive constructor records have
-`name`, `jsName`, `tag`, all three counts and a `fields` array. Constructor tags
-are their array indices. This metadata places direct scalar payloads in the
-same constructor slots compiled Lean expects.
+### Value interfaces
 
-Structures may be non-indexed parameterized instances with supported fields,
-including direct scalars, enums and inherited parents. Direct recursive
-structures are supported; recursive inherited structures are not. Non-indexed
-custom inductives may have nullary or runtime-payload constructors and direct
-recursive references through supported containers. Constructor fields of type
-`optParam α default` are described as `α` and remain explicit fields when
-stored by the runtime layout. Reducible aliases are accepted when they expose
-a supported outer type shape.
+`value.tag` selects the JavaScript representation. Constructor spellings and
+field keys live here, not on the native constructor table. A native descriptor
+can be paired with another explicit mapping, but a particular pair admits only
+its selected spelling and shape.
+
+| Value tag | Selected JavaScript shape |
+| --- | --- |
+| `bigint`, `number`, `safeInteger` | BigInt, Number, or a checked safe-integer Number mapping. |
+| `string`, `bytes`, `unit` | String, `Uint8Array`, or the unit mapping (`undefined`). |
+| `boolean` | `false` and `true` constructor ordinals. |
+| `enum` | `cases` string spellings in native constructor order. |
+| `record` | `fields: [{ key, path, value }]` mappings into one native constructor. |
+| `variant` | `cases: [{ kind, payload, ... }]` spellings and constructor payload mappings. |
+| `sequence` | An element mapping and optional linked `chain`; arrays and linked lists lift to JavaScript arrays. |
+| `recursive` | Reuse the mapping bound to the referenced native descriptor. |
+| `jsReference`, `leanReference` | Exact JavaScript resource and opaque Lean-object views. |
+| `function` | Per-argument mappings and a result mapping, paired with native signature metadata. |
+| `expr` | The explicit structural `Lean.Expr` representation. |
+
+A record or named variant field mapping has a JavaScript `key`, a logical
+`path`, and a nested `value` interface. Path components index declaration-order
+native fields. A path can cross inherited parent fields; these logical indices
+are independent of the physical `location.index` values used to access Lean
+storage. Value mappings refer to the native fields without copying their types
+or layouts.
+
+Each `variant.cases` entry aligns by position with one native constructor and
+contains a JavaScript `kind` plus one payload form: `none`, `value`, or named
+`fields`. Enum `cases` similarly align by position with immediate constructors.
+There is no second numeric `tag` field in either table: the array position is
+the native ordinal, while `kind` or the enum string is the selected JS spelling.
+
+`sequence` maps a dense JavaScript array. For a native Array, `metadata.arrayElement`
+supplies its element descriptor. A linked traversal instead selects `nil`,
+`cons`, `head` and `tail` positions through its `chain`; the codec reads their
+physical layout from native metadata. The native type remains `leanObject` in
+both cases. Callback `signature.args` and `signature.result` are native
+descriptor references with an effect label. A `function` value interface
+separately selects each argument and result mapping.
+
+For example, the native layout and the JS view for an Option-like type are
+separate parts of the same pair:
+
+```json
+{
+  "native": {
+    "type": { "tag": "leanObject" },
+    "metadata": {
+      "declaration": "Option",
+      "constructors": [
+        { "name": "Option.none", "representation": "immediate", "fields": [] },
+        {
+          "name": "Option.some",
+          "representation": "object",
+          "storage": { "objectFieldCount": 1, "usizeFieldCount": 0, "scalarByteSize": 0 },
+          "fields": [
+            {
+              "name": "val",
+              "type": { "type": { "tag": "nat" } },
+              "location": { "tag": "object", "index": 0 }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "value": {
+    "tag": "variant",
+    "cases": [
+      { "kind": "none", "payload": "none" },
+      { "kind": "some", "payload": "value", "value": { "tag": "bigint" } }
+    ]
+  }
+}
+```
+
+Constructor positions supply ordinals; the `kind` strings provide the JS
+spellings. The selected tagged Option mapping preserves `none`, `some none`
+and `some ()` as distinct values. See the
+[JavaScript value reference](../guides/JS_API.md#calls-and-manifest) for
+application-facing shapes.
 
 Top-level `Float`, `Float32`, `UInt64` and trivial wrappers over them require a
 compiler-generated `_boxed` declaration for wasm32 calls. Generation includes
@@ -354,12 +446,12 @@ The [supported-input review assumptions](../development/REVIEW_ASSUMPTIONS.md)
 apply: cooperative users/developers and trusted generated packages. Unsupported
 artifact manipulation has undefined behavior, not a promised rejection contract.
 
-Before exposing entries, JavaScript validates export argument/result trees,
-host descriptors and metadata. It rejects unsupported tags, malformed recursive
-children, invalid enum constructors, inconsistent field layouts, invalid
-`trivialFieldIndex` and duplicate export names. Generation additionally rejects
-cross-target declaration collisions; selecting the same export through multiple
-targets is deduplicated by its Lean declaration name.
+Before exposing entries, JavaScript validates export argument/result pairs,
+host pairs and metadata. It rejects incompatible native/value mappings,
+malformed recursive references, invalid constructor and field mappings,
+inconsistent storage descriptions, and duplicate export names. Generation
+additionally rejects cross-target declaration collisions; selecting the same
+export through multiple targets is deduplicated by its Lean declaration name.
 
 The mandatory [manifest/binary comparison](#manifest-and-binary-agreement)
 already rejects disagreements in ordered export and host-call metadata at load

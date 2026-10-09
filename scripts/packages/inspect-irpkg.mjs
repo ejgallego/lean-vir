@@ -9,7 +9,6 @@ import {
   formatInterfaceType,
   manifestDiagnostics,
 } from "../../web/src/runtime/interface-manifest.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { formatPackageTarget } from "../../web/src/runtime/package-targets.js";
 import { readIrPackageFile } from "./irpkg-format.mjs";
 
@@ -126,71 +125,54 @@ function printDescriptorDetails(args, result) {
   }
 }
 
-function descriptorSummary(type) {
-  switch (type?.interfaceTag) {
-    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      return `customInductive ${type.name ?? type.type ?? "?"} { ${customInductiveConstructors(type).join(", ")} }`;
-    case INTERFACE_TAG.STRUCTURE:
-      if (!containsRecursiveReference(type)) return null;
-      return `structure ${type.name ?? type.type ?? "?"} { ${(type.fields ?? [])
-        .map((field) => `${field.name}: ${descriptorLabel(field.type)}`)
-        .join(", ")} }`;
-    default:
-      return containsRecursiveReference(type) ? descriptorLabel(type) : null;
+function descriptorSummary(pair) {
+  const native = pair?.native;
+  const value = pair?.value;
+  if (native?.ref !== undefined) return descriptorLabel(native);
+  if (native?.metadata?.constructors !== undefined &&
+      (value?.tag === "variant" || containsRecursiveReference(native))) {
+    const name = native.metadata.declaration ?? "LeanObject";
+    return `leanObject ${name} { ${nativeConstructors(native).join(", ")} } / value ${value?.tag ?? "?"}`;
   }
+  if (containsRecursiveReference(native)) {
+    return `${descriptorLabel(native)} / value ${value?.tag ?? "?"}`;
+  }
+  return null;
 }
 
-function customInductiveConstructors(type) {
-  return (type.constructors ?? []).map((ctor) => {
+function nativeConstructors(native) {
+  return (native.metadata?.constructors ?? []).map((ctor) => {
     const fields = ctor.fields ?? [];
-    if (fields.length === 0) return `${ctor.jsName}()`;
-    return `${ctor.jsName}(${fields
+    if (fields.length === 0) return `${ctor.name}()`;
+    return `${ctor.name}(${fields
       .map((field) => `${field.name}: ${descriptorLabel(field.type)}`)
       .join(", ")})`;
   });
 }
 
-function descriptorLabel(type) {
-  switch (type?.interfaceTag) {
-    case INTERFACE_TAG.RECURSIVE_REF:
-      return `recursiveRef ${type.name} depth ${type.depth}`;
-    case INTERFACE_TAG.ARRAY:
-      return `Array<${descriptorLabel(type.element)}>`;
-    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      return `customInductive ${type.name ?? type.type ?? "?"}`;
-    case INTERFACE_TAG.STRUCTURE:
-      return `structure ${type.name ?? type.type ?? "?"}`;
-    case INTERFACE_TAG.LEAN_OBJECT:
-      return type.type ?? "LeanObject";
-    default:
-      return formatInterfaceType(type);
+function descriptorLabel(descriptor) {
+  if (descriptor?.ref !== undefined) return `recursiveRef depth ${descriptor.ref}`;
+  const type = descriptor?.type;
+  const metadata = descriptor?.metadata;
+  switch (type?.tag) {
+    case "unsigned": return `unsigned${type.width}`;
+    case "float": return `float${type.width}`;
+    case "leanObject": return metadata?.declaration ?? "LeanObject";
+    case "resource": return `resource ${metadata?.declaration ?? "?"}`;
+    default: return type?.tag ?? "?";
   }
 }
 
-function containsRecursiveReference(type) {
-  switch (type?.interfaceTag) {
-    case INTERFACE_TAG.RECURSIVE_REF:
-      return true;
-    case INTERFACE_TAG.ARRAY:
-      return containsRecursiveReference(type.element);
-    case INTERFACE_TAG.STRUCTURE:
-      return (type.fields ?? []).some((field) =>
-        containsRecursiveReference(field.type),
-      );
-    case INTERFACE_TAG.TAGGED_UNION:
-      return (type.constructors ?? []).some((ctor) =>
-        containsRecursiveReference(ctor.type),
-      );
-    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      return (type.constructors ?? []).some((ctor) =>
-        (ctor.fields ?? []).some((field) => containsRecursiveReference(field.type)),
-      );
-    case INTERFACE_TAG.FUNCTION:
-      return (
-        (type.args ?? []).some((arg) => containsRecursiveReference(arg.type)) ||
-        containsRecursiveReference(type.result)
-      );
-    default:
-      return false;
-  }
+function containsRecursiveReference(descriptor, seen = new Set()) {
+  if (descriptor?.ref !== undefined) return true;
+  if (descriptor === null || typeof descriptor !== "object" || seen.has(descriptor)) return false;
+  seen.add(descriptor);
+  const metadata = descriptor.metadata;
+  if (metadata === undefined) return false;
+  if ((metadata.constructors ?? []).some((ctor) =>
+    (ctor.fields ?? []).some((field) => containsRecursiveReference(field.type, seen)))) return true;
+  if (metadata.arrayElement !== undefined && containsRecursiveReference(metadata.arrayElement, seen)) return true;
+  const signature = metadata.signature;
+  return signature !== undefined &&
+    ([...signature.args, signature.result].some((child) => containsRecursiveReference(child, seen)));
 }

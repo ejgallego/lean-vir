@@ -23,7 +23,11 @@ import { createInfoviewHostBindings } from "../../web/src/host/vir-infoview-host
 import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collection-bindings.js";
 import { VirHostState } from "../../web/src/runtime/host-state.js";
 import { HOST_IMPORT_BOUNDARY } from "../../web/src/runtime/interface-manifest.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+import {
+  objectConstructor,
+  objectBoundary,
+  resourceBoundary,
+} from "../support/interface-fixtures.mjs";
 
 {
   const events = [];
@@ -195,17 +199,14 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
       return value;
     },
   });
-  const resourceResult = {
-    type: "Lean.Vir.Js (Lean.Vir.Js.Promise.Value α)",
-    interfaceTag: INTERFACE_TAG.RESOURCE,
-    kind: "resource",
-    name: "Lean.Vir.Js",
-  };
-  const structuralResult = {
-    type: "Test.Result",
-    interfaceTag: INTERFACE_TAG.STRUCTURE,
-    kind: "structure",
-  };
+  const resourceResult = resourceBoundary();
+  const structuralResult = objectBoundary(
+    "Test.Result",
+    [objectConstructor("Test.Result.mk", {
+      objectFieldCount: 0, usizeFieldCount: 0, scalarByteSize: 0,
+    }, [])],
+    { tag: "record", fields: [] },
+  );
   hostState.setManifest({
     hostImports: [
       {

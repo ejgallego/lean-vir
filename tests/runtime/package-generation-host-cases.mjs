@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { primitiveBoundary } from "../support/interface-fixtures.mjs";
 import { runNativeValuesSmoke } from "./native-values-cases.mjs";
 import {
   readIrPackageInfo,
@@ -18,6 +19,15 @@ import {
   readFile,
   writeRuntimeFixture,
 } from "./shared.mjs";
+
+function assertBoundaryPair(boundary, nativeTag, valueTag) {
+  assert.equal(boundary?.native?.type?.tag, nativeTag);
+  assert.equal(boundary?.value?.tag, valueTag);
+}
+
+function assertNativeTag(boundary, nativeTag) {
+  assert.equal(boundary?.native?.type?.tag, nativeTag);
+}
 
 export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   await runNativeValuesSmoke({ freshDir, wasmBytes });
@@ -99,7 +109,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
         entry.arity += 1;
         entry.args.push({
           name: "extra",
-          type: { type: "Nat", interfaceTag: 0 },
+          type: primitiveBoundary("nat", "bigint"),
         });
       },
     ],
@@ -118,7 +128,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
         entry.effect = "pure";
         entry.args.push({
           name: "world",
-          type: { type: "Nat", interfaceTag: 0 },
+          type: primitiveBoundary("nat", "bigint"),
         });
       },
     ],
@@ -192,42 +202,32 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     )?.effect,
     "runtime",
   );
-  assert.equal(
+  assertBoundaryPair(
     hostRuntime.interfaceManifest.hostImports.find(
       (entry) => entry.target === "test.react.value",
-    )?.result?.type,
-    "Js",
+    )?.result,
+    "resource",
+    "jsReference",
   );
-  assert.equal(
-    hostRuntime.interfaceManifest.hostImports.find(
-      (entry) => entry.target === "test.react.value",
-    )?.boundary,
-    "hostResource",
-  );
-  assert.equal(
+  assertBoundaryPair(
     hostRuntime.interfaceManifest.hostImports.find(
       (entry) => entry.target === "test.runtime.value",
-    )?.result?.type,
-    "Js",
-  );
-  assert.equal(
-    hostRuntime.interfaceManifest.hostImports.find(
-      (entry) => entry.target === "test.runtime.value",
-    )?.boundary,
-    "hostResource",
+    )?.result,
+    "resource",
+    "jsReference",
   );
   const fixtureEchoImport = hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "test.runtime.echoString",
   );
   assert.equal(fixtureEchoImport?.effect, "runtime");
-  assert.equal(fixtureEchoImport?.boundary, "hostResource");
-  assert.equal(fixtureEchoImport?.args[0]?.type?.type, "Js");
-  assert.equal(fixtureEchoImport?.result?.type, "Js");
+  assertBoundaryPair(fixtureEchoImport?.args[0]?.type, "resource", "jsReference");
+  assertBoundaryPair(fixtureEchoImport?.result, "resource", "jsReference");
   const nullableOfImport = hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "js.nullable.of",
   );
   assert.equal(nullableOfImport?.effect, "runtime");
-  assert.equal(nullableOfImport?.boundary, "hostResource");
+  assertBoundaryPair(nullableOfImport?.args[0]?.type, "resource", "jsReference");
+  assertBoundaryPair(nullableOfImport?.result, "resource", "jsReference");
   assert.equal(hostRuntime.call("freshEchoBang", "ok"), "ok!");
   assert.equal(hostRuntime.call("freshTitleRoundtrip", "Lean.Vir"), "Lean.Vir");
   assert.equal(hostRuntime.call("freshReactValue"), 7n);
@@ -269,19 +269,18 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(jsIdImport?.effect, "runtime");
   assert.equal(jsIdImport?.arity, 3);
   assert.equal(jsIdImport?.erasedPrefixArgs, 1);
-  assert.equal(jsIdImport?.boundary, "hostResource");
   assert.equal(jsIdImport?.args.length, 1);
-  assert.equal(jsIdImport?.args[0]?.type?.type, "Js");
+  assertBoundaryPair(jsIdImport?.args[0]?.type, "resource", "jsReference");
+  assertBoundaryPair(jsIdImport?.result, "resource", "jsReference");
   const jsLengthImport = jsObjectRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "test.js.length",
   );
   assert.equal(jsLengthImport?.effect, "runtime");
   assert.equal(jsLengthImport?.arity, 3);
   assert.equal(jsLengthImport?.erasedPrefixArgs, 1);
-  assert.equal(jsLengthImport?.boundary, "hostResource");
   assert.equal(jsLengthImport?.args.length, 1);
-  assert.equal(jsLengthImport?.args[0]?.type?.name, "Lean.Vir.Js");
-  assert.equal(jsLengthImport?.result?.type, "Js");
+  assertBoundaryPair(jsLengthImport?.args[0]?.type, "resource", "jsReference");
+  assertBoundaryPair(jsLengthImport?.result, "resource", "jsReference");
   const jsArray = [10, 20, 30];
   const jsArrayAlias = jsObjectRuntime.call("freshJsIdNat", jsArray);
   assert.equal(jsArrayAlias, jsArray);
@@ -319,15 +318,13 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const leanRefToJsImport = leanRefRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "js.leanRef",
   );
-  assert.equal(leanRefToJsImport?.boundary, "objectHandle");
-  assert.equal(leanRefToJsImport?.args[0]?.type?.kind, "leanObject");
-  assert.equal(leanRefToJsImport?.result?.type, "Js");
+  assertNativeTag(leanRefToJsImport?.args[0]?.type, "leanObject");
+  assertBoundaryPair(leanRefToJsImport?.result, "resource", "jsReference");
   const leanRefFromJsImport = leanRefRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "js.leanRef.value",
   );
-  assert.equal(leanRefFromJsImport?.boundary, "objectHandle");
-  assert.equal(leanRefFromJsImport?.args[0]?.type?.type, "Js");
-  assert.equal(leanRefFromJsImport?.result?.kind, "leanObject");
+  assertBoundaryPair(leanRefFromJsImport?.args[0]?.type, "resource", "jsReference");
+  assertNativeTag(leanRefFromJsImport?.result, "leanObject");
   assert.deepEqual(
     leanRefRuntime.interfaceManifest.hostImports
       .filter((entry) => entry.target.startsWith("js.leanRef"))
@@ -371,9 +368,8 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     customJsValueRuntime.interfaceManifest.hostImports.find(
       (entry) => entry.target === "test.payload",
     );
-  assert.equal(customPayloadImport?.boundary, "explicitConversion");
-  assert.equal(customPayloadImport?.args[0]?.type?.kind, "structure");
-  assert.equal(customPayloadImport?.result?.type, "Js");
+  assertBoundaryPair(customPayloadImport?.args[0]?.type, "leanObject", "record");
+  assertBoundaryPair(customPayloadImport?.result, "resource", "jsReference");
   assert.deepEqual(
     customJsValueRuntime.call("Vir.Fixtures.CustomJsValue.makePayload"),
     {
@@ -401,7 +397,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     );
   assert.equal(externalBadgeImport?.effect, "react");
   assert.equal(externalBadgeImport?.args.length, 0);
-  assert.equal(externalBadgeImport?.result?.type, "Js");
+  assertBoundaryPair(externalBadgeImport?.result, "resource", "jsReference");
   assert.equal(
     reactExternalRuntime.interfaceManifest.hostImports.find(
       (entry) => entry.target === "react.node.createElement",

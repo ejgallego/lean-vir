@@ -58,11 +58,6 @@ export const runtimeTests = Object.freeze(
       file: "react-host-bindings-smoke.mjs",
       group: "pure",
     },
-    {
-      id: "custom-inductive-normalization",
-      file: "custom-inductive-normalization-smoke.mjs",
-      group: "pure",
-    },
     { id: "resource-roots", file: "resource-roots-smoke.mjs", group: "pure", nodeArgs: ["--expose-gc"] },
     { id: "object-abi", file: "object-abi-smoke.mjs", group: "pure" },
     { id: "fixed-width", file: "fixed-width-smoke.mjs", group: "pure" },

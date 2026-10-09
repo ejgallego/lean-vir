@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compileConstructorValueInterface } from "../../benchmarks/harness/constructor-value-interface-prototype.mjs";
+import { compileConstructorValueInterface } from "../../web/src/runtime/constructor-value-interface.js";
 
 const objectType = (declaration, constructors) => ({
   type: { tag: "leanObject" }, metadata: { declaration, constructors },

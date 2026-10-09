@@ -8,6 +8,9 @@ import {
   INTERFACE_MANIFEST_VERSION,
   validateInterfaceManifest,
 } from "../../web/src/runtime/interface-manifest.js";
+import { primitiveBoundary } from "../support/interface-fixtures.mjs";
+
+const nat = () => primitiveBoundary("nat", "bigint");
 
 function manifest() {
   return {
@@ -16,7 +19,7 @@ function manifest() {
     exports: ["a", "b"].map((name, index) => ({
       entry: `${name}.entry`,
       nameKey: index === 0 ? "s61/" : "s62/",
-      args: [], result: { type: "Nat", interfaceTag: 0 },
+      args: [], result: nat(),
       effect: "pure", startup: false,
     })),
   };
@@ -33,8 +36,8 @@ function hostImport(slot, symbol) {
     symbol,
     arity: 2,
     erasedPrefixArgs: 0,
-    args: [{ name: "value", type: { type: "Nat", interfaceTag: 0 } }],
-    result: { type: "Nat", interfaceTag: 0 },
+    args: [{ name: "value", type: nat() }],
+    result: nat(),
     effect: "runtime",
   };
 }

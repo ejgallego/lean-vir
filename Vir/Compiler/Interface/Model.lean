@@ -92,6 +92,7 @@ inductive InterfaceType where
 
 structure TaggedUnionVariant where
   constructorName : Name
+  fieldName : String
   payloadType : InterfaceType
   payloadLayout : FieldLayout
   storage : ConstructorStorage
@@ -118,6 +119,7 @@ structure StructureField where
   deriving BEq, Repr
 
 structure StructureDescriptor where
+  constructorName : Name
   /-- Index into fields of the value representing Lean's trivial wrapper.
   This is a declaration/projection-order index, not a runtime storage slot. -/
   trivialField? : Option Nat

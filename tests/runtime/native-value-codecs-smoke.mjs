@@ -61,36 +61,16 @@ try {
       const call = (name, ...args) =>
         runtime.call(`NativeValueCodecs.${name}`, ...args);
       try {
-        const retiredTags = new Set([17, 18, 19]);
-        function check(type) {
-          if (type && typeof type === "object") {
-            assert.ok(!retiredTags.has(type.interfaceTag));
-            for (const child of Object.values(type)) check(child);
-          }
-        }
-        check(runtime.interfaceManifest.exports);
         const tree = runtime.findManifestEntry("NativeValueCodecs.identity")
           .args[0].type;
-        const fields = tree.constructors[1].fields;
-        const optionalRef = fields[0].type.constructors[1].fields[0].type;
-        const consFields = fields[1].type.constructors[1].fields;
-        const pairRef = fields[2].type.fields[1].type;
+        const fields = tree.native.metadata.constructors[1].fields;
+        const optionalRef = fields[0].type.metadata.constructors[1].fields[0].type;
+        const consFields = fields[1].type.metadata.constructors[1].fields;
+        const pairRef = fields[2].type.metadata.constructors[0].fields[1].type;
         for (const ref of [optionalRef, consFields[0].type, pairRef])
-          assert.deepEqual(
-            [ref.name, ref.depth],
-            ["NativeValueCodecs.Tree", 1],
-          );
-        assert.deepEqual(
-          [consFields[1].type.name, consFields[1].type.depth],
-          ["List", 0],
-        );
-        assert.deepEqual(
-          [
-            fields[3].type.constructors[0].type.name,
-            fields[3].type.constructors[0].type.depth,
-          ],
-          ["NativeValueCodecs.Tree", 0],
-        );
+          assert.deepEqual(ref, { ref: 1 });
+        assert.deepEqual(consFields[1].type, { ref: 0 });
+        assert.deepEqual(fields[3].type.metadata.constructors[0].fields[0].type, { ref: 1 });
         assert.deepEqual(call("sample"), value);
         assert.equal(call("score", value), 47n);
         assert.deepEqual(call("identity", value), value);

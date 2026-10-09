@@ -8,8 +8,8 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 import { repositoryRootUrl as repoRoot } from "../../scripts/repository-paths.mjs";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
+import { resourceBoundary, unitBoundary } from "../support/interface-fixtures.mjs";
 
 const buildDir = new URL("build/infoview-smoke/", repoRoot);
 await mkdir(buildDir, { recursive: true });
@@ -98,8 +98,8 @@ assert.equal(
 );
 const factoryEntry = validateWidgetComponentEntry(runtime, "VirNativeInfoview.createComponent");
 for (const incompatible of [
-  { ...factoryEntry, args: [{ type: { interfaceTag: INTERFACE_TAG.RESOURCE } }] },
-  { ...factoryEntry, result: { interfaceTag: INTERFACE_TAG.UNIT } },
+  { ...factoryEntry, args: [{ name: "root", type: resourceBoundary() }] },
+  { ...factoryEntry, result: unitBoundary() },
 ]) {
   assert.throws(
     () => validateWidgetComponentEntry({ findManifestEntry: () => incompatible }, "invalid-factory"),

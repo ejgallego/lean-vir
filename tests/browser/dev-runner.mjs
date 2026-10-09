@@ -274,8 +274,8 @@ export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
     id: entry.entry,
     inputTags: entry.args.map((arg) => interfaceInputTag(arg.type)),
     enumOptions: entry.args.map((arg) =>
-      interfaceInputTag(arg.type) === "SELECT"
-        ? arg.type.constructors.map((ctor) => ({ value: ctor.jsName, text: ctor.jsName }))
+      arg.type.value?.tag === "enum"
+        ? arg.type.value.cases.map((name) => ({ value: name, text: name }))
         : null,
     ),
   }));
@@ -329,7 +329,8 @@ export async function smokeConstructorTemplates(cdp, origin) {
     await waitForReady(cdp);
     const template = await evaluate(cdp, `(() => {
       const select = document.querySelector('[data-constructor-index="0"]');
-      select.value = ${JSON.stringify(spec.kind)};
+      select.value = Array.from(select.options).find((option) =>
+        option.textContent === ${JSON.stringify(spec.kind)}).value;
       select.dispatchEvent(new Event("change", { bubbles: true }));
       return JSON.parse(document.querySelector('[data-input-index="0"]').value);
     })()`);
@@ -338,7 +339,8 @@ export async function smokeConstructorTemplates(cdp, origin) {
       const field = document.querySelector('[data-input-index="0"]');
       field.value = ${JSON.stringify(JSON.stringify(spec.edited))};
       field.dispatchEvent(new Event("input", { bubbles: true }));
-      return document.querySelector('[data-constructor-index="0"]').value;
+      return document.querySelector('[data-constructor-index="0"]')
+        .selectedOptions[0]?.textContent ?? "";
     })()`);
     assert.equal(selected, spec.edited.kind);
     assert.equal(await runSelectedEntry(cdp), spec.result);

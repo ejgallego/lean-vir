@@ -8,6 +8,16 @@ import assert from "node:assert/strict";
 
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
+import {
+  immediateConstructor,
+  objectBoundary,
+} from "../support/interface-fixtures.mjs";
+
+const unit = objectBoundary(
+  "Unit",
+  [immediateConstructor("Unit.unit")],
+  { tag: "unit" },
+);
 
 function entry(name, startup) {
   return {
@@ -15,7 +25,7 @@ function entry(name, startup) {
     nameKey: `s${Buffer.from(name).toString("hex")}/`,
     source: "StartupRuntime.lean",
     args: [],
-    result: { type: "Unit", interfaceTag: 22 },
+    result: unit,
     effect: "dom",
     startup,
   };

@@ -79,17 +79,11 @@ generator, generate an SDK, replace runtime pins, or run timings. Commit source
 changes and prepare the matching SDKs separately before recording an accepted
 comparison. `run` performs no builds.
 
-The local draft-pair experiment can be selected with
-`"experiment": "native-value-interface"` on a variant. It uses the generic SDK
-and its existing fixture package. Before calls, it installs a different cached
-value-codec binder; normal entry lookup, ownership, native dispatch and disposal
-remain in use. Installation is recorded separately. Lazy descriptor snapshot and
-binding remain included in first-call observations, outside warmed call timing.
-The snapshot expresses the admitted producer metadata in the draft grammar;
-it is an experimental input adapter, not a second supported manifest format.
-The driver records the experiment sources and their imported ABI helpers. No
-claim about new manifest size, native producer integration or public API readiness
-follows from this experiment.
+The driver uses the ordinary public call path for each independently retained
+SDK/package pair. The producer/runtime migration emits the pair directly;
+no snapshot adapter or benchmark-specific binder is installed. Cold first-call
+observations include lazy binding; warmed calls reuse the admitted cached plan.
+The shared fixture and Wasm/native program sections remain comparison controls.
 
 The driver verifies all SDK payload hashes, one shared Wasm hash, matching Lean
 toolchains and identical non-manifest native package sections before timing.
@@ -158,10 +152,10 @@ unchanged text/byte paths have small deltas, so these figures should guide sourc
 inspection, not serve as precise forecasts. They describe the prototype, not a
 speedup already present in the production generic-container codec.
 
-These timings precede the draft's core-tag reduction. The current prototype
+These timings precede the draft's core-tag reduction. The migrated format
 uses primitives, Lean objects, and resources; constructor, native-array and
-callable facts are optional codec metadata. The grammar revision retains the
-same conversion algorithms and makes no new speed claim.
+callable facts are optional codec metadata. The earlier figures remain historical
+prototype evidence, not measurements of the emitted format.
 
 The representative next comparison is an actual caller's complete encode/call/
 decode workflow, including the materialization it chooses. A JSL boundary can

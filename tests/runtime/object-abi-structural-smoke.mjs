@@ -5,7 +5,6 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { assert, manifestEntry, readRuntimeArtifacts } from "./shared.mjs";
 
 const { wasmBytes, defaultPackageBytes, leanPackageBytes } =
@@ -271,14 +270,14 @@ const floatScaleEntry = manifestEntry(
   runtime.interfaceManifest,
   "Vir.Fixtures.InterfaceShapes.floatScale",
 );
-assert.equal(floatScaleEntry.args[0].type.interfaceTag, INTERFACE_TAG.FLOAT);
-assert.equal(floatScaleEntry.result.interfaceTag, INTERFACE_TAG.FLOAT);
+assert.deepEqual(floatScaleEntry.args[0].type.native.type, { tag: "float", width: 64 });
+assert.deepEqual(floatScaleEntry.result.native.type, { tag: "float", width: 64 });
 const float32Entry = manifestEntry(
   runtime.interfaceManifest,
   "Vir.Fixtures.InterfaceShapes.float32Roundtrip",
 );
-assert.equal(float32Entry.args[0].type.interfaceTag, INTERFACE_TAG.FLOAT32);
-assert.equal(float32Entry.result.interfaceTag, INTERFACE_TAG.FLOAT32);
+assert.deepEqual(float32Entry.args[0].type.native.type, { tag: "float", width: 32 });
+assert.deepEqual(float32Entry.result.native.type, { tag: "float", width: 32 });
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", { kind: "none" }),
   { kind: "some", value: 0n },
@@ -435,13 +434,14 @@ const profileStatsEntry = manifestEntry(
   runtime.interfaceManifest,
   "Vir.Fixtures.InterfaceShapes.profileStatsBump",
 );
-assert.equal(profileStatsEntry.args[0].type.objectFieldCount, 1);
-assert.equal(profileStatsEntry.args[0].type.usizeFieldCount, 1);
-assert.equal(profileStatsEntry.args[0].type.scalarByteSize, 17);
+const profileStatsCtor = profileStatsEntry.args[0].type.native.metadata.constructors[0];
+assert.equal(profileStatsCtor.storage.objectFieldCount, 1);
+assert.equal(profileStatsCtor.storage.usizeFieldCount, 1);
+assert.equal(profileStatsCtor.storage.scalarByteSize, 17);
 assert.deepEqual(
-  profileStatsEntry.args[0].type.fields.map((field) => [
+  profileStatsCtor.fields.map((field) => [
     field.name,
-    field.layout.kind,
+    field.location.tag,
   ]),
   [
     ["enabled", "scalar"],
@@ -488,24 +488,21 @@ const boxNatEntry = manifestEntry(
   "Vir.Fixtures.InterfaceShapes.boxNatBump",
 );
 assert.equal(
-  boxNatEntry.args[0].type.type,
-  "Vir.Fixtures.InterfaceShapes.Box Nat",
+  boxNatEntry.args[0].type.native.metadata.declaration,
+  "Vir.Fixtures.InterfaceShapes.Box",
 );
-assert.equal(boxNatEntry.args[0].type.trivialFieldIndex, 0);
+assert.equal(boxNatEntry.args[0].type.native.metadata.constructors[0].representation, "identity");
 const boxUInt32Entry = manifestEntry(
   runtime.interfaceManifest,
   "Vir.Fixtures.InterfaceShapes.boxUInt32Bump",
 );
 assert.equal(
-  boxUInt32Entry.args[0].type.type,
-  "Vir.Fixtures.InterfaceShapes.Box UInt32",
+  boxUInt32Entry.args[0].type.native.metadata.declaration,
+  "Vir.Fixtures.InterfaceShapes.Box",
 );
-assert.equal(boxUInt32Entry.args[0].type.trivialFieldIndex, 0);
-assert.equal(
-  boxUInt32Entry.args[0].type.fields[0].type.interfaceTag,
-  INTERFACE_TAG.UINT32,
-);
-assert.equal(boxUInt32Entry.args[0].type.fields[0].layout.kind, "object");
+const boxUInt32Ctor = boxUInt32Entry.args[0].type.native.metadata.constructors[0];
+assert.equal(boxUInt32Ctor.representation, "identity");
+assert.deepEqual(boxUInt32Ctor.fields[0].type.type, { tag: "unsigned", width: 32 });
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
     value: 41,
@@ -519,15 +516,12 @@ const boxUInt64Entry = manifestEntry(
   "Vir.Fixtures.InterfaceShapes.boxUInt64Bump",
 );
 assert.equal(
-  boxUInt64Entry.args[0].type.type,
-  "Vir.Fixtures.InterfaceShapes.Box UInt64",
+  boxUInt64Entry.args[0].type.native.metadata.declaration,
+  "Vir.Fixtures.InterfaceShapes.Box",
 );
-assert.equal(boxUInt64Entry.args[0].type.trivialFieldIndex, 0);
-assert.equal(
-  boxUInt64Entry.args[0].type.fields[0].type.interfaceTag,
-  INTERFACE_TAG.UINT64,
-);
-assert.equal(boxUInt64Entry.args[0].type.fields[0].layout.kind, "object");
+const boxUInt64Ctor = boxUInt64Entry.args[0].type.native.metadata.constructors[0];
+assert.equal(boxUInt64Ctor.representation, "identity");
+assert.deepEqual(boxUInt64Ctor.fields[0].type.type, { tag: "unsigned", width: 64 });
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt64Bump", {
     value: "18446744073709551615",
@@ -541,15 +535,17 @@ const uint32BoxEntry = manifestEntry(
   "Vir.Fixtures.InterfaceShapes.uint32BoxBump",
 );
 assert.equal(
-  uint32BoxEntry.args[0].type.type,
+  uint32BoxEntry.args[0].type.native.metadata.declaration,
   "Vir.Fixtures.InterfaceShapes.UInt32Box",
 );
-assert.equal(uint32BoxEntry.args[0].type.trivialFieldIndex, 0);
-assert.equal(
-  uint32BoxEntry.args[0].type.fields[0].type.interfaceTag,
-  INTERFACE_TAG.UINT32,
-);
-assert.equal(uint32BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
+const uint32BoxCtor = uint32BoxEntry.args[0].type.native.metadata.constructors[0];
+assert.equal(uint32BoxCtor.representation, "identity");
+assert.deepEqual(uint32BoxCtor.fields[0].type.type, { tag: "unsigned", width: 32 });
+assert.deepEqual(uint32BoxEntry.args[0].type.value.fields[0], {
+  key: "value",
+  path: [0],
+  value: { tag: "number" },
+});
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
     value: 41,
@@ -563,15 +559,17 @@ const uint64BoxEntry = manifestEntry(
   "Vir.Fixtures.InterfaceShapes.uint64BoxBump",
 );
 assert.equal(
-  uint64BoxEntry.args[0].type.type,
+  uint64BoxEntry.args[0].type.native.metadata.declaration,
   "Vir.Fixtures.InterfaceShapes.UInt64Box",
 );
-assert.equal(uint64BoxEntry.args[0].type.trivialFieldIndex, 0);
-assert.equal(
-  uint64BoxEntry.args[0].type.fields[0].type.interfaceTag,
-  INTERFACE_TAG.UINT64,
-);
-assert.equal(uint64BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
+const uint64BoxCtor = uint64BoxEntry.args[0].type.native.metadata.constructors[0];
+assert.equal(uint64BoxCtor.representation, "identity");
+assert.deepEqual(uint64BoxCtor.fields[0].type.type, { tag: "unsigned", width: 64 });
+assert.deepEqual(uint64BoxEntry.args[0].type.value.fields[0], {
+  key: "value",
+  path: [0],
+  value: { tag: "bigint" },
+});
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.uint64BoxBump", {
     value: "18446744073709551615",
@@ -643,15 +641,12 @@ const extendedProfileEntry = manifestEntry(
   "Vir.Fixtures.InterfaceShapes.extendedProfileBump",
 );
 assert.deepEqual(
-  extendedProfileEntry.args[0].type.fields.map((field) => [
-    field.name,
-    field.subobject === true,
-  ]),
-  [
-    ["toProfileBase", true],
-    ["score", false],
-    ["tags", false],
-  ],
+  extendedProfileEntry.args[0].type.value.fields.map(({ key, path }) => [key, path]),
+  [["nickname", [0, 0]], ["active", [0, 1]], ["visits", [0, 2]], ["score", [1]], ["tags", [2]]],
+);
+assert.deepEqual(
+  extendedProfileEntry.args[0].type.native.metadata.constructors[0].fields.map(({ name }) => name),
+  ["toProfileBase", "score", "tags"],
 );
 assert.deepEqual(
   runtime.call(
@@ -679,7 +674,7 @@ assert.throws(
       toProfileBase: { nickname: "nested", active: true, visits: 1 },
       ...extendedProfileInput,
     }),
-  /mixes toProfileBase with flattened inherited fields/,
+  /profile\.toProfileBase is unexpected/,
 );
 assert.throws(
   () =>
@@ -687,7 +682,7 @@ assert.throws(
       nickname: "lean",
       points: 4,
     }),
-  /profileScore argument profile is missing field tags/,
+  /profile\.tags is missing/,
 );
 
 assert.throws(
@@ -708,7 +703,7 @@ assert.throws(
       ...profileStatsInput,
       tier: 1,
     }),
-  /must be an enum constructor name/,
+  /stats\.tier has unknown enum value/,
 );
 assert.throws(
   () => runtime.call("Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip", [1, 2]),
@@ -716,11 +711,11 @@ assert.throws(
 );
 assert.throws(
   () => runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSum", [4, 5]),
-  /must be an object/,
+  /argument pair must be a record/,
 );
 assert.throws(
   () => runtime.call("Vir.Fixtures.ListOption.sumScore", { inl: 12 }),
-  /must specify tagged-union kind/,
+  /sumScore argument arg1 must specify variant kind/,
 );
 assert.throws(
   () => leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", "Nat"),

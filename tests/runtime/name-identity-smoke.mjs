@@ -26,7 +26,7 @@ try {
   assert.equal(generated.status, 0, `${generated.stderr}\n${generated.stdout}`);
   const bytes = await readFile(path);
   const info = readIrPackageInfo(bytes);
-  assert.equal(info.manifest.version, 11);
+  assert.equal(info.manifest.version, 12);
   const factory = createVirRuntimeFactory({ wasmBytes: await readFile(new URL("../../web/public/vir-upstream.wasm", import.meta.url)) });
   const key = parts => parts.map(part => typeof part === "string"
     ? `s${Buffer.from(part, "utf8").toString("hex")}/` : `n${part.num}/`).join("");
@@ -98,7 +98,7 @@ try {
   });
   await test("old manifests reject before initialization and permit a current-package retry", async () => {
     const canonical = replaceIrPackageManifest(bytes, info.manifest);
-    for (const version of [6, 7, 8, 9, 10]) {
+    for (const version of [6, 7, 8, 9, 10, 11]) {
       const legacy = structuredClone(info.manifest);
       legacy.version = legacy.metadata.manifestVersion = version;
       // Bypass the writer's current-schema validation. Changing only the two
@@ -114,7 +114,7 @@ try {
       try {
         assert.throws(
           () => runtime.loadIrPackageSetBytes([oldPackage]),
-          /version: 11.*regenerate packages with the matching SDK/,
+          /version: 12.*regenerate packages with the matching SDK/,
         );
         assert.equal(finishes, 0);
         assert.equal(runtime.packageDeclCount(), 0);

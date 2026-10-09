@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collection-bindings.js";
 import { VirRuntime } from "../../web/src/runtime/core.js";
+import { arrayBoundary, nativeDescriptor } from "../support/interface-fixtures.mjs";
 
 test("literal construction defines own data properties; ordinary assignment and push stay native", () => {
   const b = createJsCollectionHostBindings();
@@ -99,7 +100,7 @@ test("structural array lifting creates dense own elements and releases borrowed 
       __proto__: null, value: pointer, writable: true, enumerable: true, configurable: true,
     }),
   };
-  const type = { type: "Array String", interfaceTag: 16, element: { type: "String", interfaceTag: 3 } };
+  const type = arrayBoundary(nativeDescriptor("string"), { tag: "string" });
   const originalLift = runtime.readObjectString;
   const previous = Object.getOwnPropertyDescriptor(Array.prototype, "0");
   let setterCalls = 0;

@@ -1,23 +1,20 @@
 # Native descriptors and JavaScript value interfaces
 
-Status: proposed successor to the generic-container foundation in PR #233.
-The [typed contract and examples](native-value-interfaces.ts) and
-[executable binder](../../benchmarks/harness/native-value-interface-prototype.mjs)
-are review artifacts. The producer still emits the existing admitted descriptors;
-the pair grammar is not a supported manifest or public binding API yet.
+Status: producer/runtime migration implemented locally for PR #233.
+The [typed contract and examples](native-value-interfaces.ts) describe the emitted
+pair. The [binder](../../web/src/runtime/native-value-codecs.js) consumes admitted
+compiler metadata directly in optional object conversion; scalar operations and
+reference ownership remain available in the managed composition.
 
-The prototype binds chosen spellings and field mappings directly to native
-storage, uses iterative chain traversal, and reuses runtime allocation/ownership.
-It covers the fixture's primitives, enum/Bool/Unit, object and packed fields,
-arrays and recursive constructor values. Nested paths/inheritance,
-function/Expr/opaque-object views, producer emission and admission remain open.
+The compiler emits the native facts and the default JavaScript view together.
+There is no snapshot adapter, compatibility reader, or runtime declaration-name
+selection. The binder covers primitives, enum/Bool/Unit, packed fields, inherited
+records, arrays, recursive constructor values, expression conversion and callable
+results. Public custom-leaf construction remains a separate API decision.
 
-The [benchmark input adapter](../../benchmarks/harness/native-value-interface-snapshot.mjs)
-snapshots admitted metadata into the proposed grammar once, including recursive
-depth adjustment across formerly transparent tagged unions. It stays outside the
-runtime and preserves the ordinary call path. See
-[performance and slow paths](../../benchmarks/NATIVE_CODECS.md#performance-and-slow-paths)
-for the measurements' limits and the current cost model.
+See [performance and slow paths](../../benchmarks/NATIVE_CODECS.md#performance-and-slow-paths)
+for measured limits and the cost model. This source migration needs a matching
+runtime/program release before consumer adoption.
 
 VIR should describe a Lean value's compiled representation once and allow
 different codecs to use that description. A JavaScript shape and a traversal
@@ -177,7 +174,7 @@ A `function` view requires signature metadata, including the execution effect;
 its binding checks the actual boundary role as well as shape compatibility.
 An `expr` view selects the specialized expression codec after admission confirms
 the compiler-owned type identity is `Lean.Expr`. Neither operation needs a core
-function or expression tag. The prototype does not implement these views yet.
+function or expression tag. These codecs retain the existing callable and expression operations.
 
 In particular, `JSL α` remains `Js (LeanRef.Handle α)`: its boundary is a
 `resource` descriptor with a `jsReference` view, and its payload type is opaque.
@@ -319,7 +316,7 @@ scope/lifetime and custom-leaf call operations of the public construction seam
 remain a subsequent contract. This document is not a dependency release for
 consumer integration.
 
-## First implementation slice
+## Migration and qualification
 
 Reduce the core type set to primitives, Lean objects, and resources. Move
 constructor layouts, signatures, and recursion references into optional
@@ -332,8 +329,9 @@ Before adopting that slice, qualify enums/Bool/Unit, trivial and inherited
 records, nested Options, both List views, and Tree through Option/List/Prod and
 Sum/Except. Preserve callback and failure/reuse cases. Migration is a breaking
 contract change with one matching runtime revision, not compatibility adapters.
-No profile numbers, lock files, or released runtime bytes are changed by this
-draft.
+The local source cut uses manifest 12 / combined compatibility 6, preserving
+ABI 4 and binary package format 11. Runtime publication, lock selection, and
+consumer adoption remain separately owned.
 
 Performance evaluation should distinguish schema unification from codec
 implementation. Compare the same value interface and full call boundary before
@@ -341,6 +339,6 @@ and after, then separately compare alternate interfaces. Retain the current
 regression measurements; a smaller schema alone is not evidence of faster
 conversion. The existing List specialization remains a useful algorithm to reuse.
 
-The retained timing screens predate this core-tag revision. The executable
-prototype now uses the revised grammar with the same allocation and traversal
-algorithms; this revision makes no new speed claim and adds no timing campaign.
+Earlier retained timing screens used the prototype and predate producer
+migration. Fresh comparisons must use the emitted pair through the ordinary
+runtime call path, with matched SDK/program identities and correctness checks.

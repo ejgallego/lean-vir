@@ -232,7 +232,7 @@ manifest and package-set versions and descriptor identity.
 [`package-versions.mjs`](../../scripts/packages/package-versions.mjs) owns the
 JavaScript expectations for binary, manifest and runtime ABI compatibility.
 `npm run check:package-abi` checks identities, versions and sections across
-Lean/Lake/C++/JS, plus interface tags and host-boundary tables.
+Lean/Lake/C++/JS, plus host-boundary tables.
 
 | Version | Bump for an incompatible change to | Update together |
 | --- | --- | --- |
@@ -245,7 +245,7 @@ Runtime ABI is SDK metadata, not embedded package metadata. The same artifact
 metadata records exact build-time React/ReactDOM versions from
 `package-lock.json` for the optional React host. ABI 4 is the current SDK
 contract: loader success status and declaration counts remain separate,
-including for successful empty packages. It requires manifest 9, package
+including for successful empty packages. It requires manifest 12, package
 format 11, and matching JavaScript/Wasm artifacts. Installed manifest metadata
 remains deeply frozen; installers reject older ABIs before replacing an SDK.
 When the generator or runtime revision changes, regenerate the package set and
