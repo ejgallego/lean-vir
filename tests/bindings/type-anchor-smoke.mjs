@@ -132,8 +132,6 @@ declare function schedule(value: number): void;
     metadata: {},
     exports: [
       {
-        id: "bump",
-        jsName: "bump",
         entry: "Demo.bump",
         nameKey: "s44656d6f/s62756d70/",
         source: "Demo.lean",
@@ -146,8 +144,6 @@ declare function schedule(value: number): void;
         effect: "pure",
       },
       {
-        id: "getLabel",
-        jsName: "getLabel",
         entry: "Demo.getLabel",
         nameKey: "s44656d6f/s6765744c6162656c/",
         source: "Demo.lean",

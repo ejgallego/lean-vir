@@ -108,12 +108,12 @@ export async function smokeRuntimeDemo(cdp, origin) {
   assert.equal(state.mood, "happy");
   assert.deepEqual(state.packageItems.map((item) => item.href), [
     "dev.html?package=local-quickstart.irpkg&entry=QuickstartApp.Program.total",
-    `dev.html?package=${defaultPackageFile}&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump`,
-    `dev.html?package=${hostPackageFile}&entry=HostInterop_titleHandshake`,
+    `dev.html?package=${defaultPackageFile}&entry=Vir.Fixtures.InterfaceShapes.profileStatsBump`,
+    `dev.html?package=${hostPackageFile}&entry=HostInterop.titleHandshake`,
     "react.html",
     "format.html?case=list&width=12",
-    `dev.html?package=${leanPackageFile}&entry=Vir_Fixtures_ExprPrinter_exprKindScore`,
-    `dev.html?package=${boundaryPackageFile}&entry=Vir_Fixtures_Boundary_floatScaleScore`,
+    `dev.html?package=${leanPackageFile}&entry=Vir.Fixtures.ExprPrinter.exprKindScore`,
+    `dev.html?package=${boundaryPackageFile}&entry=Vir.Fixtures.Boundary.floatScaleScore`,
   ]);
   assert.ok(state.packageItems[0].text.includes("Explicit-root developer package from the shared tutorial source"));
   assert.ok(state.packageItems[1].text.includes("Basic, list/option, interface shapes"));

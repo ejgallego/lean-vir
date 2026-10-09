@@ -138,6 +138,20 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(aliasIoEntry.effect, "io");
   assert.equal(aliasIoEntry.result.type, "Nat");
 
+  const duplicateSource = join(freshDir, "DuplicateExportNames.lean");
+  const duplicatePackage = join(freshDir, "duplicate-entry-names.irpkg");
+  await writeRuntimeFixture(duplicateSource, "DuplicateExportNames.lean");
+  await generateIrPackage("DuplicateExportNames", duplicateSource, duplicatePackage);
+  const duplicateRuntime = await factory.createRuntime({ irPackageSet: [await readFile(duplicatePackage)] });
+  try {
+    assert.deepEqual(new Set(duplicateRuntime.interfaceManifest.exports.map(entry => entry.entry)), new Set(["Duplicate.entry", "Duplicate_entry"]));
+    assert.equal(duplicateRuntime.call("Duplicate.entry", 10), 11n);
+    assert.equal(duplicateRuntime.call("Duplicate_entry", 10), 12n);
+    assert.equal("exportsByName" in duplicateRuntime, false);
+    assert.throws(() => duplicateRuntime.call("entry", 10), /interface entry not found/);
+    assert.throws(() => duplicateRuntime.call("Duplicate__entry", 10), /interface entry not found/);
+  } finally { duplicateRuntime.dispose(); }
+
   const escapedSource = join(freshDir, "EscapedCallNames.lean");
   const escapedPackage = join(freshDir, "escaped-call-names.irpkg");
   await writeRuntimeFixture(escapedSource, "EscapedCallNames.lean");
@@ -149,19 +163,17 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     escapedRuntime.interfaceManifest,
     "«foo.bar»",
   );
-  assert.equal(dottedEntry.id, "_foo_bar_");
-  assert.equal(dottedEntry.jsName, "_foo_bar_");
+  assert.equal(Object.hasOwn(dottedEntry, "id"), false);
+  assert.equal(Object.hasOwn(dottedEntry, "jsName"), false);
   assert.equal(escapedRuntime.call(dottedEntry.entry, 3), 4n);
-  assert.equal(escapedRuntime.call(dottedEntry.id, 4), 5n);
-  assert.equal(escapedRuntime.call(dottedEntry.jsName, 5), 6n);
-  assert.equal(escapedRuntime.exportsByName[dottedEntry.jsName](6), 7n);
+  assert.throws(() => escapedRuntime.call("_foo_bar_", 4), /interface entry not found/);
+  assert.equal("exportsByName" in escapedRuntime, false);
   const numericTextEntry = manifestEntry(
     escapedRuntime.interfaceManifest,
     "Numeric.«1»",
   );
   assert.equal(escapedRuntime.call(numericTextEntry.entry, 7), 9n);
-  assert.equal(escapedRuntime.call(numericTextEntry.id, 8), 10n);
-  assert.equal(escapedRuntime.call(numericTextEntry.jsName, 9), 11n);
+  assert.throws(() => escapedRuntime.call("Numeric__1_", 8), /interface entry not found/);
   for (const [entry, increment] of [
     ["café", 3],
     ["αβ₁", 4],
@@ -185,7 +197,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(freshAliasEntry.result.type, "Nat");
   assert.equal(freshRuntime.call("freshAliasBump", 3), 12n);
   assert.equal(freshRuntime.call("freshBump", 35), 42n);
-  assert.equal(freshRuntime.exportsByName.freshBump(1), 8n);
+  assert.equal(freshRuntime.call("freshBump", 1), 8n);
   assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), 15n);
   assert.equal(freshRuntime.call("freshPairSum", { fst: 7, snd: 8 }), 15n);
   assert.equal(

@@ -121,7 +121,7 @@ function finishPackageLoad(token) {
 
 function selectedInterfaceEntry() {
   return (
-    interfaceEntries.find((entry) => entry.id === entrySelect.value) ?? null
+    interfaceEntries.find((entry) => entry.entry === entrySelect.value) ?? null
   );
 }
 
@@ -129,13 +129,10 @@ function selectEntryFromQuery() {
   const entryId = requestedEntry;
   if (!entryId) return;
   const match = interfaceEntries.find(
-    (entry) =>
-      entry.id === entryId ||
-      entry.jsName === entryId ||
-      entry.entry === entryId,
+    (entry) => entry.entry === entryId,
   );
   if (match) {
-    entrySelect.value = match.id;
+    entrySelect.value = match.entry;
   }
   requestedEntry = null;
 }
@@ -332,10 +329,10 @@ function renderManifestEntries(entries) {
   entrySelect.replaceChildren();
   for (const entry of interfaceEntries) {
     const option = document.createElement("option");
-    option.value = entry.id;
+    option.value = entry.entry;
     const effect = formatInterfaceEffectPrefix(entry.effect);
     const signature = `${entry.args.map((arg) => formatInterfaceType(arg.type)).join(", ") || "()"} -> ${effect}${formatInterfaceType(entry.result)}`;
-    option.textContent = `${entry.jsName} / ${signature}`;
+    option.textContent = `${entry.entry} / ${signature}`;
     entrySelect.append(option);
   }
   selectEntryFromQuery();
@@ -352,7 +349,7 @@ function entryUrl(entry) {
   if (currentPackageSource?.packageQuery != null) {
     url.searchParams.set("package", currentPackageSource.packageQuery);
   }
-  url.searchParams.set("entry", entry.id);
+  url.searchParams.set("entry", entry.entry);
   return url;
 }
 
@@ -495,7 +492,7 @@ function captureRunnerState() {
 }
 
 function restoreRunnerState(state) {
-  if (!interfaceEntries.some((entry) => entry.id === state.entryId)) return;
+  if (!interfaceEntries.some((entry) => entry.entry === state.entryId)) return;
   entrySelect.value = state.entryId;
   renderInputFields(selectedInterfaceEntry());
   for (const [index, saved] of state.inputs.entries()) {

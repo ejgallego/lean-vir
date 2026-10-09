@@ -42,8 +42,6 @@ const { createProgram } = await import(
 const nat = { type: "Nat", interfaceTag: 0 };
 const entry = {
   entry: "Root.run",
-  id: "run",
-  jsName: "run",
   args: [],
   result: nat,
   effect: "pure",
@@ -183,7 +181,7 @@ async function fixture(body) {
       metadata: { leanGithash: compatibility.leanRevision },
       exports: [
         structuredClone(entry),
-        { ...entry, entry: "Root.extra", id: "extra", jsName: "extra" },
+        { ...entry, entry: "Root.extra" },
       ],
     },
     factory() {
@@ -203,12 +201,10 @@ async function fixture(body) {
       interfaceManifest: {
         exports: [
           structuredClone(entry),
-          { ...entry, entry: "Root.extra", id: "extra", jsName: "extra" },
+          { ...entry, entry: "Root.extra" },
           {
             ...entry,
             entry: "Dependency.hidden",
-            id: "hidden",
-            jsName: "hidden",
           },
         ],
       },

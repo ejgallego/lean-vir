@@ -245,7 +245,7 @@ function collectLeanDescriptors(manifest) {
     const descriptor = {
       kind: "export",
       lean: entry.entry,
-      label: entry.jsName ?? entry.entry,
+      label: entry.entry,
       source: entry.source,
       shape: {
         kind: "function",
@@ -255,8 +255,6 @@ function collectLeanDescriptors(manifest) {
       },
     };
     addLeanDescriptor(descriptors, entry.entry, descriptor);
-    addLeanDescriptor(descriptors, entry.id, descriptor);
-    addLeanDescriptor(descriptors, entry.jsName, descriptor);
     exportsByEntry.set(entry.entry, { entry, descriptor });
     collectLeanTypes(descriptors, entry.result);
     for (const arg of entry.args ?? []) collectLeanTypes(descriptors, arg.type);

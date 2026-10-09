@@ -404,7 +404,7 @@ keys and redirects, validates canonical identity and every declared payload,
 checks exact compatibility, then delegates complete package-set validation and
 loading to the existing interpreter. The set can only read members present in
 the verified outer inventory. Full Lean names are resolved against actual package
-root exports and bound to exact installed entries, not `id`/`jsName` aliases.
+root exports and bound to exact installed Lean entries.
 Dependency-only exports do not become call entrypoints. No PrettyM protocol or
 Slides policy is built into this API.
 

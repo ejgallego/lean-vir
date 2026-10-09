@@ -261,17 +261,17 @@ export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
   assert.equal(state.packageName, packageFile);
   assert.deepEqual(
     state.options.map((option) => option.value),
-    info.manifest.exports.map((entry) => entry.id),
+    info.manifest.exports.map((entry) => entry.entry),
   );
   for (const [index, entry] of info.manifest.exports.entries()) {
     assert.ok(
-      state.options[index].text.includes(entry.jsName),
-      `missing ${entry.jsName} in option label`,
+      state.options[index].text.includes(entry.entry),
+      `missing ${entry.entry} in option label`,
     );
   }
 
   const expectedControls = info.manifest.exports.map((entry) => ({
-    id: entry.id,
+    id: entry.entry,
     inputTags: entry.args.map((arg) => interfaceInputTag(arg.type)),
     enumOptions: entry.args.map((arg) =>
       interfaceInputTag(arg.type) === "SELECT"
@@ -399,10 +399,10 @@ export async function runnerCaseFromManifest(packageFile, entryName, expected) {
   );
   assert.ok(entry, `${packageFile} manifest does not export ${entryName}`);
   return {
-    url: `dev.html?package=${encodeURIComponent(packageFile)}&entry=${encodeURIComponent(entry.id)}`,
+    url: `dev.html?package=${encodeURIComponent(packageFile)}&entry=${encodeURIComponent(entry.entry)}`,
     expected: {
       packageName: packageFile,
-      entry: entry.id,
+      entry: entry.entry,
       entryCount: info.manifest.exports.length,
       ...expected,
     },

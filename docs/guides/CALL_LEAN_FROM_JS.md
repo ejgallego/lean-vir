@@ -137,9 +137,10 @@ console.log(classified); // { kind: "inr", value: 5n }
 console.log(validated); // { kind: "ok", value: "Hello, Lean" }
 ```
 
-`vir.call(name, ...args)` accepts a manifest `entry`, `id`, or `jsName` alias.
-The producer uses the Lean declaration name for `entry`. All aliases share
-[one unambiguous namespace](JS_API.md#calls-and-manifest).
+`vir.call(entry, ...args)` uses the full Lean declaration name in the manifest's
+`entry` field. See [calls and manifest](JS_API.md#calls-and-manifest) for the
+manifest11 / resource compatibility5 migration from export aliases and generated
+methods. Constructor labels and provider identifiers are unchanged.
 
 For diagnostic phase attribution, `vir.callTimed(name, ...args)` performs the
 same synchronous call and returns `{ value, timings }`. See
@@ -153,7 +154,7 @@ companion artifact while debugging, serve `vir-upstream.dev.wasm` next to
 You can also call generated methods by JavaScript name:
 
 ```js
-console.log(vir.exportsByName.MyApp_total([2, 3, 5, 8]));
+console.log(vir.call("MyApp.total", [2, 3, 5, 8]));
 ```
 
 ## Sum And Except Values
