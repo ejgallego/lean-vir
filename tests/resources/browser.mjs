@@ -13,7 +13,7 @@ import { readFile, writeFile, mkdir, mkdtemp } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import * as esbuild from "esbuild";
+import { buildRuntimeModule } from "../../scripts/resources/runtime-module.mjs";
 import { measureResourceRetention } from "./retention.mjs";
 import {
   descriptorContentId,
@@ -56,22 +56,7 @@ const generated = execFileSync(
   { cwd: root, encoding: "utf8" },
 );
 await writeFile(join(output, "generator.log"), generated);
-const compiled = await esbuild.build({
-  entryPoints: [join(root, "web/src/resource-program.js")],
-  bundle: true,
-  format: "esm",
-  platform: "browser",
-  target: "es2022",
-  write: false,
-  metafile: true,
-  legalComments: "inline",
-  outfile: "runtime.js",
-});
-assert.deepEqual(
-  Object.values(compiled.metafile.outputs).flatMap((o) => o.imports),
-  [],
-  "runtime must not acquire untracked JavaScript dependencies",
-);
+const compiled = await buildRuntimeModule(root);
 const wasm = await readFile(join(root, "web/public/vir-upstream.wasm"));
 const buildIdentity = JSON.parse(
   await readFile(join(root, "build/upstream-probe/wasm-build-identity.json")),
@@ -219,11 +204,17 @@ const server = createServer((req, res) => {
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const origin = `http://127.0.0.1:${server.address().port}`;
+const noticePaths = ["LICENSE", "NOTICE", "lean-LICENSE", "lean-LICENSES"]
+  .map((name) => `runtime/${name}`);
 let chromium, cdp;
 const outcomes = [];
 try {
   chromium = await launchChromium();
   cdp = await openChromiumPage(chromium);
+  // Distribution notices remain present, but unavailable notice responses must
+  // not participate in program startup. Exercise the actual minimized module.
+  override = (path) => noticePaths.includes(path)
+    ? { ...inventory.get(path), status: 503 } : null;
   for (const prefix of ["/", "/talk/nested/"]) {
     await navigate(cdp, origin + prefix);
     const result = await evaluate(
@@ -256,18 +247,24 @@ try {
       values.push(second.call(score)); second.dispose();
       const remounted = await createProgram(options); values.push(remounted.call(score)); remounted.dispose();
       globalThis.openResourceProgram = (extra = {}) => createProgram({...options, ...extra});
-      return {correctValues: values.map(value => value === 6093n), unknown, disposed};
+      return {correctValues: values.map(value => value === 6093n), unknown, disposed,
+        loaderName: createProgram.name};
     })()`,
     );
     assert.deepEqual(result, {
       correctValues: [true, true, true, true],
       unknown: true,
       disposed: true,
+      loaderName: "createProgram",
     });
     outcomes.push(
       `${prefix}: JavaScript MIME alias, full-name call, independent instance, disposal, remount PASS`,
     );
   }
+  assert.equal(requests.some((path) => noticePaths.some((notice) =>
+    path === `/${notice}` || path === `/talk/nested/${notice}`)), false);
+  override = null;
+  outcomes.push("minimized runtime: diagnostic name retained, no notice startup requests PASS");
   const browserVersion = await cdp.send("Browser.getVersion");
   await measureResourceRetention(cdp, async (observations) => {
     await writeFile(join(output, "retention.json"), JSON.stringify({

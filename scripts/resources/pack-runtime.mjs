@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import * as esbuild from "esbuild";
+import { buildRuntimeModule } from "./runtime-module.mjs";
 import { assertResourceCompatibility } from "../../web/src/resources/compatibility.js";
 import {
   descriptorContentId,
@@ -44,22 +44,7 @@ if (identity.profile !== "release")
   );
 const wasm = await readFile(wasmPath);
 if (!WebAssembly.validate(wasm)) throw new Error("invalid Wasm input");
-const compiled = await esbuild.build({
-  absWorkingDir: root,
-  entryPoints: ["web/src/resource-program.js"],
-  bundle: true,
-  format: "esm",
-  platform: "browser",
-  target: "es2022",
-  write: false,
-  metafile: true,
-  legalComments: "inline",
-  outfile: "runtime.js",
-});
-if (Object.values(compiled.metafile.outputs).some((o) => o.imports.length))
-  throw new Error(
-    "runtime has external JavaScript dependencies outside its inventory",
-  );
+const compiled = await buildRuntimeModule(root);
 const members = [
   ["runtime.js", compiled.outputFiles[0].contents, "text/javascript"],
   ["runtime.wasm", wasm, "application/wasm"],
