@@ -59,10 +59,14 @@ cpSync(join(root, "fixtures/resources/client"), client, { recursive: true });
 cpSync(join(root, "fixtures/resources/user"), leaf, { recursive: true });
 for (const dir of [client, leaf])
   cpSync(join(root, "lean-toolchain"), join(dir, "lean-toolchain"));
-const config = replaceFixture(readFileSync(join(client, "lakefile.lean"), "utf8"),
+let config = replaceFixture(readFileSync(join(client, "lakefile.lean"), "utf8"),
   '"../../../.."',
   JSON.stringify(root),
 );
+// Exercise the producer's configured directory, not a conventional lib/lean
+// path reconstructed by the consumer or elaborator.
+config = replaceFixture(config, 'buildDir := "build with spaces"',
+  'buildDir := "build with spaces"\n  leanLibDir := "library output"');
 writeFileSync(join(client, "lakefile.lean"), config);
 function run(cwd, label, cmd, args, error = null) {
   const result = spawnSync(cmd, args, {
@@ -107,6 +111,27 @@ const snapshot = (path) => {
   const s = statSync(path, { bigint: true });
   return [s.ino, s.mtimeNs, s.size];
 };
+const producerLib = join(client, "build with spaces/library output");
+const programStage = join(producerLib, "vir-assets/Client/Program.virres");
+const producerCarrier = join(producerLib, "Client/Resources.olean");
+// A foreign asset library prepares and embeds the dependency-owned program
+// directly, before the dependency's own carrier has been compiled.
+assert.ok(!existsSync(programStage));
+assert.ok(!existsSync(producerCarrier));
+run(leaf, "dependency-owned-cold", "lake", ["build", "UserAssets"]);
+assert.ok(existsSync(programStage));
+assert.ok(!existsSync(producerCarrier));
+assert.ok(!existsSync(join(leaf, ".lake/build/lib/lean/vir-assets/Client/Program.virres")));
+writeFileSync(join(leaf, "InspectAssets.lean"), `import UserAssets
+#eval IO.println UserAssets.resources.runtime.contentId
+#eval IO.println (reprStr (UserAssets.resources.programs.map (·.descriptor.logicalId)))
+`);
+const included = run(leaf, "dependency-owned-value", "lake", ["env", "lean", "InspectAssets.lean"]);
+assert.match(included, new RegExp(lock.contentId));
+assert.match(included, /#\["Client.Program"\]/);
+const directProgram = readFileSync(programStage);
+run(leaf, "dependency-owned-warm", "lake", ["build", "UserAssets"]);
+assert.deepEqual(readFileSync(programStage), directProgram);
 build("cold");
 if (published) {
   const before = [snapshot(runtimeCache), snapshot(runtimeStage)];
@@ -139,8 +164,8 @@ if (published) {
   assert.ok(!existsSync(join(evidence, "absent-cache.virres")));
   assert.ok(!existsSync(join(evidence, "absent-stage.virres")));
 }
-const programStage = join(client, "build with spaces/lib/lean/vir-assets/Client/Program.virres");
 const programFirst = readFileSync(programStage);
+assert.deepEqual(programFirst, directProgram, "both asset owners embed the same program");
 const clientConfig = join(client, "lakefile.lean");
 const originalConfig = readFileSync(clientConfig, "utf8");
 for (const [label, change, diagnostic] of [
@@ -177,10 +202,16 @@ assert.deepEqual(readFileSync(programStage), programFirst);
 // map or a second pass over configuration. A missing prepared root is explicit.
 const carrierSource = join(client, "resources/Client/Resources.lean");
 const originalCarrier = readFileSync(carrierSource, "utf8");
-writeFileSync(carrierSource, replaceFixture(originalCarrier, "#[Client.Program]",
-  "#[Client.Alternative]"));
-run(leaf, "unprepared-include", "lake", ["build", "generate-site"],
+const missingCarrier = replaceFixture(originalCarrier, "#[Client.Program]",
+  "#[Client.Alternative]");
+writeFileSync(carrierSource, missingCarrier);
+const missingLog = run(leaf, "unprepared-include", "lake", ["build", "generate-site"],
   /VIR_RESOURCE_NOT_PREPARED.*Client.Alternative/s);
+const missingLines = missingCarrier.split("\n");
+const missingLine = missingLines.findIndex(line => line.includes("#[Client.Alternative]"));
+const missingColumn = missingLines[missingLine].indexOf("Client.Alternative") + 1;
+assert.ok(missingLog.includes(`resources/Client/Resources.lean:${missingLine + 1}:${missingColumn}: VIR_RESOURCE_NOT_PREPARED`),
+  "missing preparation diagnostic points to the requested module identifier");
 assert.deepEqual(readFileSync(programStage), programFirst);
 writeFileSync(carrierSource, originalCarrier);
 build("include-restored");
