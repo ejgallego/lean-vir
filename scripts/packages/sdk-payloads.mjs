@@ -49,6 +49,7 @@ export const SDK_PAYLOADS = [
   ],
   ["js/host/vir-dom-host-bindings.js", "web/src/host/vir-dom-host-bindings.js"],
   ["js/host/vir-common-host-bindings.js", "web/src/host/vir-common-host-bindings.js"],
+  ["js/host/vir-json-value-bindings.js", "web/src/host/vir-json-value-bindings.js"],
   [
     "js/host/vir-infoview-host-bindings.js",
     "web/src/host/vir-infoview-host-bindings.js",
