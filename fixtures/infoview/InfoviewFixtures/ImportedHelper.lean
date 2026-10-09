@@ -10,10 +10,12 @@ import InfoviewFixtures.ImportedHelper.Internal
 
 namespace InfoviewFixtures.ImportedHelper
 
-@[noinline] public def labelBefore (_ : Unit) : String :=
-  Internal.labelBefore ()
+-- Use a runtime argument so arity reduction cannot replace these named helpers
+-- with compiler-generated wrappers. The smoke checks their imported ownership.
+@[noinline] public def labelBefore (suffix : String) : String :=
+  Internal.labelBefore () ++ suffix
 
-@[noinline] public def labelAfter (_ : Unit) : String :=
-  Internal.labelAfter ()
+@[noinline] public def labelAfter (suffix : String) : String :=
+  Internal.labelAfter () ++ suffix
 
 end InfoviewFixtures.ImportedHelper

@@ -1,18 +1,19 @@
 # Embedded resources: review and acceptance
 
-The Lean-name successor under review in PR217 uses descriptor schema2 and resource compatibility3.
-It now selects the [matching public e415 runtime](https://github.com/ejgallego/lean-vir/releases/tag/resource-e415e41a43eccf298b710056efccf6c3d436d5fceb4e130fb06cb09d12d027dd).
-Its exact pack is 1,120,065 bytes, SHA256
+The Lean-name 4.34 checkpoint introduced by PR217 uses descriptor schema2 and
+resource compatibility3. Its [public e415 runtime](https://github.com/ejgallego/lean-vir/releases/tag/resource-e415e41a43eccf298b710056efccf6c3d436d5fceb4e130fb06cb09d12d027dd)
+is 1,120,065 bytes, SHA256
 `3910c29e40ee68c3b110355fa1d30dae3029f2b34967269642521fc8409848d7`.
 Anonymous public download and independent native cold/warm/offline acquisition
-passed; owning-library and downstream adoption qualification are separate.
-The version1 public832 asset and all results below remain historical;
-they do not qualify changed loader bytes or the new schema.
+passed for that 4.34 pair; owning-library and downstream adoption are separate.
+The version1 public832 asset and all results below remain historical.
 
-The prior integration used Lean 4.34.0 and a publicly downloadable exact prebuilt
-pack. Upstream
-anonymous acquisition and downstream ordinary cold-deck qualification are
-separate gates; neither implies a complete product acceptance.
+For the current compiler and runtime selection, read `lean-toolchain` and
+`vir-resources/runtime.json`. The [Lean 4.35 runtime qualification](../evidence/runtime-435/README.md)
+records this upgrade separately. The published 4.34 pack does not qualify the
+4.35 compiler. Upstream anonymous acquisition and downstream ordinary cold-deck
+qualification are separate gates; neither implies complete product acceptance.
+
 
 The historical downstream baseline is Slides `51c6d782` / VIR `47e82e9a`, runtime
 `401b115e` and pure Except-v2 program `97b280b7`. Slides reports 101 native,
@@ -20,7 +21,7 @@ The historical downstream baseline is Slides `51c6d782` / VIR `47e82e9a`, runtim
 identities and actual exported signature without duplicating those runs.
 VIR's exact-head CI `36720794347` and candidate `36720794235` both passed.
 These are baseline evidence, not qualification of later changes or the newly
-selected runtime pack. The current reviewed supplied-pack successor is Slides
+selected runtime pack. The reviewed 4.34 supplied-pack successor was Slides
 `ea079cd7` (evidence head `3f7dbc93`) / VIR `af3052ca`, runtime `832ab095` and the
 same program `97b280b7`. Slides reports 46 focused Chromium/Firefox checks and
 owning-library root/downstream builds, including the public Embed carrier,
@@ -38,10 +39,10 @@ ordinary transport failure are distinguished in that report. This is
 consumer-reported build/acquisition evidence, not a new VIR-executed campaign or
 final reduced-renderer browser/geometry/retention qualification.
 
-## Published runtime
+## Historical 4.34 published runtime
 
 The [runtime release](https://github.com/ejgallego/lean-vir/releases/tag/resource-832ab095ad79df0f10f538bcf71272731bb74b90df44f965dac2f086c222897d)
-provides the exact bytes selected by the lock:
+provides the exact bytes selected by that checkpoint's lock:
 
 - Content ID: `832ab095ad79df0f10f538bcf71272731bb74b90df44f965dac2f086c222897d`.
 - Pack SHA-256: `d06bda0aba96547679093da441cd3d9b2b7a9291d1757f16c5c6fcf6ed081ba1`; 1,120,731 bytes.

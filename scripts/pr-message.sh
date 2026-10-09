@@ -22,6 +22,8 @@ Options:
   --base REF       Override the base branch shown in the scaffold. Defaults to main.
   --repo OWNER/REPO
                    Override the repository shown in the scaffold. Defaults to ejgallego/lean-vir.
+  --backport-of PR  Link a source PR by number and provide a default backport summary.
+                   Requires --base to name a non-main target.
   -h, --help       Show this help.
 USAGE
 }
@@ -42,6 +44,8 @@ repo="ejgallego/lean-vir"
 base="main"
 title="$(current_commit_subject)"
 summary="This PR <short summary of the problem solved and useful outcome>."
+summary_set=false
+backport_of=""
 changes=()
 
 while [ "$#" -gt 0 ]; do
@@ -60,6 +64,7 @@ while [ "$#" -gt 0 ]; do
         exit 2
       fi
       summary="$2"
+      summary_set=true
       shift 2
       ;;
     --change)
@@ -86,6 +91,14 @@ while [ "$#" -gt 0 ]; do
       repo="$2"
       shift 2
       ;;
+    --backport-of)
+      if [ "$#" -lt 2 ] || [[ ! "$2" =~ ^[1-9][0-9]*$ ]]; then
+        echo "--backport-of requires a positive source PR number" >&2
+        exit 2
+      fi
+      backport_of="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -97,6 +110,17 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+if [ -n "$backport_of" ]; then
+  if [ -z "$base" ] || [ "$base" = main ]; then
+    echo "--backport-of requires --base to name a non-main target" >&2
+    exit 2
+  fi
+  if [ "$summary_set" = false ]; then
+    summary="This PR backports #${backport_of} to ${base}."
+  fi
+  changes=("Source PR: https://github.com/${repo}/pull/${backport_of}." "${changes[@]}")
+fi
 
 branch="$(current_branch)"
 

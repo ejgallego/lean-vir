@@ -45,7 +45,8 @@ runtime JavaScript repackaging need not change program bytes.
 
 ### Compatibility versus content identity
 
-The public resource compatibility record has exactly two fields:
+The public resource compatibility record has exactly two fields. For example,
+the historical 4.34 pack uses:
 
 ```json
 {"leanRevision":"293d5d0c0c3f3dded4688b3ccd6a33939ac5102b","virVersion":3}
@@ -544,7 +545,7 @@ and a downstream library prerequisite with a custom build directory. Transport
 fault injection uses a test-only curl stub; it is not anonymous HTTPS acceptance.
 The compiled leaf still runs from another directory after raw inputs disappear.
 
-The selected baseline is main's Lean `v4.34.0`, exact
+The initial qualification baseline used Lean `v4.34.0`, exact
 `293d5d0c0c3f3dded4688b3ccd6a33939ac5102b`. The resource API does not require the
 separate Lean 4.35 support change. Runtime packs are nevertheless compiler-specific:
 select a matching pack rather than copying Wasm or a lock from another toolchain.
@@ -564,9 +565,10 @@ corrupt staging repair, carrier-cycle rejection, and native execution with the
 raw program pack removed. The producer tests cover deterministic complete packs,
 generated exports, strict locks, profile mismatches, and atomic replacement
 of larger hardlinked outputs without altering their other names.
-The historical version1 distribution is a public GitHub release asset; the
-version3 successor's new loader pack still needs publication. a
+The qualified 4.34 prebuilt distribution is a public GitHub release asset; a
 supplied local archive alone is still not anonymous acquisition evidence. The
+current toolchain's separate [runtime qualification](../evidence/runtime-435/README.md)
+records its exact selected bytes and publication status. The
 complete product campaign and resource size/compile-memory/browser measurements
 remain outstanding. The historical 4.35
 column canary remains separate from the supplied-pack 4.34 strict creation and

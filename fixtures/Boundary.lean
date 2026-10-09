@@ -383,6 +383,40 @@ unsafe def ioRefModifyBoundaryScore : Nat :=
   | .ok score => score
   | .error _ => 1000
 
+@[noinline] private def refPayload (seed : Nat) : String :=
+  "value:" ++ toString seed
+
+/-- Read the seed through a reference so payloads are allocated during the IO
+action rather than hoisted into persistent closed constants. Cover shared swap
+results and unique replacement, plus the take/put path used by modifyGet. -/
+unsafe def ioRefSwapBoundaryScore : Nat :=
+  match unsafeIO do
+    let counter ← IO.mkRef 7
+    let mut score := 0
+    for _ in [:32] do
+      let seed ← counter.get
+      counter.set (seed + 1)
+      let ref ← IO.mkRef (refPayload seed)
+      let retained ← ref.get
+      let old ← ref.swap (refPayload (seed + 1))
+      let current ← ref.get
+      ref.set (old ++ current)
+      let final ← ref.get
+      let unique ← IO.mkRef (refPayload (seed + 2))
+      discard <| unique.swap (refPayload (seed + 3))
+      unique.set (refPayload (seed + 4))
+      let taken ← unique.modifyGet fun value => (value, value ++ "!")
+      let modified ← unique.get
+      if retained == refPayload seed && old == retained &&
+          current == refPayload (seed + 1) && final == retained ++ current &&
+          taken == refPayload (seed + 4) && modified == taken ++ "!" then
+        score := score + 1
+      else
+        return 1000
+    pure score with
+  | .ok score => score
+  | .error _ => 1000
+
 def floatScaleScore : Nat :=
   let x := Float.scaleB 1.5 (2 : Int)
   x.toUInt32.toNat
