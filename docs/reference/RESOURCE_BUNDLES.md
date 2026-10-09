@@ -347,7 +347,8 @@ pack without overwriting it; maintainers select a verified public asset in
 durable consumer source, and a new producer commit does not silently change
 the runtime selected by applications.
 
-It bundles the JS import closure, Wasm and notices, verifies the compiler/profile
+It minimizes the JS import closure while preserving legal comments and public
+properties, bundles Wasm and notices, verifies the compiler/profile
 metadata and emits a native-validated pack plus provenance. Qualification of the
 supplied Wasm remains the maintainer's responsibility. This command is never
 called by an application's build or renderer.
@@ -392,7 +393,7 @@ All three URLs come from the returned `SiteFiles` loader paths, not build paths.
 For declared `text/javascript` files, responses may use `text/javascript` or
 `application/javascript` (with optional parameters). Other declared media types,
 including `application/wasm`, still require their matching response type.
-Payloads are checked against their declared lengths and hashes.
+Fetched payloads are checked against their declared lengths and hashes.
 The two manifest arguments must be explicit same-origin HTTP(S) `URL` objects,
 without credentials, query strings or fragments. The page must provide WebCrypto
 SHA-256 in a secure context: use HTTPS for deployment, or trusted localhost/loopback
@@ -400,13 +401,19 @@ HTTP for development. Remote plain HTTP is not supported. The loader checks this
 capability before making any requests; a secure context also depends on the
 embedding page, not only the manifest URL's scheme. The envelope is
 `{contentId, descriptor}`. The loader bounds requests/JSON, rejects duplicate
-keys and redirects, validates canonical identity and every declared payload,
+keys and redirects, validates canonical identity, the runtime's declared module
+and Wasm bytes, and every program payload,
 checks exact compatibility, then delegates complete package-set validation and
 loading to the existing interpreter. The set can only read members present in
 the verified outer inventory. Full Lean names are resolved against actual package
 root exports and bound to exact installed Lean entries.
 Dependency-only exports do not become call entrypoints. No PrettyM protocol or
 Slides policy is built into this API.
+
+Runtime notices remain in the complete pack and published inventory, but creating
+a program does not download them. Publishers must retain the notice files;
+this retrieval policy does not remove distribution content or exclude notices
+from content identity.
 
 Two optional creation fields are supported, with no compatibility aliases:
 

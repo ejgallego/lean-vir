@@ -49,6 +49,34 @@ const entry = {
 const expected = () => ({
   "Root.run": { args: [], result: { ...nat }, effect: "pure" },
 });
+const runtimeNotices = ["LICENSE", "NOTICE", "legal/lean.txt", "legal/dependencies.txt"];
+
+test("runtime distribution notices do not require startup retrieval", async () =>
+  fixture(async (s) => {
+    s.fetchOverride = async (url) => {
+      const path = new URL(url).pathname;
+      if (runtimeNotices.some((name) => path === `/runtime/${name}`))
+        throw new Error("notice download is not needed for execution");
+      return s.respond(url);
+    };
+    s.creation.resolve(s.runtime);
+    const program = await createProgram(s.options);
+    try {
+      assert.equal(program.call("Root.run"), 42n);
+      for (const path of ["/runtime/runtime.js", "/runtime/runtime.wasm", "/program/set.json"])
+        assert.ok(s.requests.some((request) => request.path === path));
+      assert.equal(s.requests.some((request) =>
+        runtimeNotices.some((name) => request.path === `/runtime/${name}`)), false);
+      // The descriptor and distribution still contain every notice.
+      const envelope = await s.respond("http://vir.test/runtime/bundle.json").json();
+      for (const name of runtimeNotices)
+        assert.ok(envelope.descriptor.files.some((file) => file.path === name));
+    } finally {
+      program.dispose();
+    }
+    assert.equal(s.disposed, 1);
+  }));
+
 function withResponseType(s, pathname, type, body = undefined) {
   s.fetchOverride = async (url) => {
     const response = s.respond(url);
@@ -130,6 +158,7 @@ async function fixture(body) {
         ? [
             ["runtime.js", "export {}", "text/javascript"],
             ["runtime.wasm", "wasm", "application/wasm"],
+            ...runtimeNotices.map((path) => [path, `notice for ${path}`, "text/plain"]),
           ]
         : [["set.json", "{}", "application/json"]];
     const descriptor = {
