@@ -126,7 +126,7 @@ function list(result, options) {
   if (options.brief) {
     if (!options.all && threads.length > 20) {
       const count = threads.length;
-      threads = [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.threadId.localeCompare(b.threadId)).slice(0, 20);
+      threads = [...threads].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt) || a.threadId.localeCompare(b.threadId)).slice(0, 20);
       console.log(`showing 20 of ${count} threads (latest activity); use --details, --all or --json for the full index`);
     }
     const warningCount = result.warnings.length;

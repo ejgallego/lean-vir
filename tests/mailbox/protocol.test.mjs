@@ -99,6 +99,21 @@ test("completed handoffs require explicit archival and retain their original sta
   });
 });
 
+test("recent index compares actual timestamps across timezone offsets", async () => {
+  await withMailbox(async mailbox => {
+    for (let i = 0; i < 20; i++) {
+      const id = `middle-${i}`;
+      await put(mailbox, id, message({ id, kind: null }));
+    }
+    await put(mailbox, "zone-old", message({ id: "zone-old", kind: null, time: "2026-08-13T23:00:00+14:00" }));
+    await put(mailbox, "zone-new", message({ id: "zone-new", kind: null, time: "2026-08-13T22:00:00-12:00" }));
+    const result = spawnSync(process.execPath, [script, "list", "--mailbox", mailbox], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout.split("\n")[1], /zone-new/);
+    assert.doesNotMatch(result.stdout, /zone-old/);
+  });
+});
+
 test("completed archival cannot hide an unresolved sibling branch", async () => {
   await withMailbox(async mailbox => {
     const id = "forked-handoff";
