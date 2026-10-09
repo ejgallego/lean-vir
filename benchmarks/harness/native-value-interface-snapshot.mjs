@@ -14,13 +14,13 @@ import { compileNativeValueInterface } from "./native-value-interface-prototype.
 // runs once at binding, outside value conversion. It is not a manifest reader
 // or a second supported producer. The actual producer migration remains open.
 export function snapshotNativeValueInterface(type, owners = [], nativeOwners = []) {
-  const leaf = (tag, value, extra = {}) => ({ native: { tag, ...extra }, value: { tag: value } });
+  const leaf = (tag, value, extra = {}) => ({ native: { type: { tag, ...extra } }, value: { tag: value } });
   switch (type.interfaceTag) {
     case T.NAT: return leaf("nat", "bigint");
     case T.INT: return leaf("int", "bigint");
     case T.STRING: return leaf("string", "string");
     case T.BYTE_ARRAY: return leaf("byteArray", "bytes");
-    case T.RESOURCE: return leaf("jsResource", "jsReference", { name: type.name });
+    case T.RESOURCE: return { native: { type: { tag: "resource" }, metadata: { declaration: type.name } }, value: { tag: "jsReference" } };
     case T.UINT8: return leaf("unsigned", "number", { width: 8 });
     case T.UINT16: return leaf("unsigned", "number", { width: 16 });
     case T.UINT32: return leaf("unsigned", "number", { width: 32 });
@@ -31,11 +31,11 @@ export function snapshotNativeValueInterface(type, owners = [], nativeOwners = [
     case T.RECURSIVE_REF: {
       const owner = owners[type.depth], depth = nativeOwners.indexOf(owner);
       if (owner === undefined || depth < 0) throw new Error("snapshot has unbound recursion");
-      return leaf("recursive", "recursive", { depth });
+      return { native: { ref: depth }, value: { tag: "recursive" } };
     }
     case T.ARRAY: {
       const child = snapshotNativeValueInterface(type.element, owners, nativeOwners);
-      return { native: { tag: "array", element: child.native },
+      return { native: { type: { tag: "leanObject" }, metadata: { arrayElement: child.native } },
         value: { tag: "sequence", element: child.value } };
     }
     case T.UNIT:
@@ -62,7 +62,7 @@ export function snapshotNativeValueInterface(type, owners = [], nativeOwners = [
             fields: [{ name: trivial.name, type: convert(trivial.type).native }] },
           views: [{ key: trivial.name, path: [0], value: convert(trivial.type).value }],
         };
-        return { native: { tag: "constructors", name: type.name, constructors: [item.native] },
+        return { native: { type: { tag: "leanObject" }, metadata: { declaration: type.name, constructors: [item.native] } },
           value: { tag: "record", fields: item.views } };
       }
       const items = type.constructors.map(ctor => {
@@ -70,7 +70,7 @@ export function snapshotNativeValueInterface(type, owners = [], nativeOwners = [
           return { native: { name: ctor.name, representation: "immediate", fields: [] }, views: [] };
         return stored(ctor, convert);
       });
-      const native = { tag: "constructors", name: type.name, constructors: items.map(item => item.native) };
+      const native = { type: { tag: "leanObject" }, metadata: { declaration: type.name, constructors: items.map(item => item.native) } };
       // Default recipe selection is deliberately outside the conversion kernel.
       // The kernel uses these logical positions, never a Lean declaration name.
       if (type.interfaceTag === T.CUSTOM_INDUCTIVE && type.name === "List") {
@@ -89,8 +89,8 @@ export function snapshotNativeValueInterface(type, owners = [], nativeOwners = [
 }
 
 function immediate(name, constructors) {
-  return { tag: "constructors", name,
-    constructors: constructors.map(name => ({ name, representation: "immediate", fields: [] })) };
+  return { type: { tag: "leanObject" }, metadata: { declaration: name,
+    constructors: constructors.map(name => ({ name, representation: "immediate", fields: [] })) } };
 }
 function stored(owner, convert) {
   const plan = objectLayoutPlan(owner, "benchmark snapshot");
