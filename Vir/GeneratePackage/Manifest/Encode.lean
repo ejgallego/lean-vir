@@ -21,8 +21,6 @@ open Vir.Interface
 
 def InterfaceExport.toJson (entry : InterfaceExport) : String :=
   jsonObject #[
-    ("id", jsonString entry.id),
-    ("jsName", jsonString entry.jsName),
     ("entry", jsonName entry.entry),
     ("nameKey", jsonString (Vir.nameKey entry.entry)),
     ("source", jsonString entry.source),

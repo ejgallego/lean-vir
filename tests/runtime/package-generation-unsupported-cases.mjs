@@ -270,12 +270,6 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   assert.match(badJslStringOutput, /Lean\.Vir\.JSL String/);
   assert.match(badJslStringOutput, /Lean\.Vir\.Js String/);
 
-  await assertUnsupportedInterfaceFixture(freshDir, "DuplicateExportNames.lean", [
-    /Duplicate\.entry/,
-    /Duplicate_entry/,
-    /interface export id `Duplicate_entry` duplicates/,
-  ]);
-
   const leftSource = join(freshDir, "CollisionLeft.lean");
   const rightSource = join(freshDir, "CollisionRight.lean");
   const packageFallbackMarkerSource = join(freshDir, "PackageFallbackMarkers.lean");

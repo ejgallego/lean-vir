@@ -14,7 +14,7 @@ import { validatePackageTargets } from "./package-targets.js";
 import { requireModuleIdentity } from "./module-name.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 10;
+export const INTERFACE_MANIFEST_VERSION = 11;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",
   EXPLICIT_CONVERSION: "explicitConversion",
@@ -41,7 +41,7 @@ function requireOptionalString(value, label) {
   }
 }
 
-// Machine identity is independent of the user-facing display/call aliases.
+// Machine identity is independent of the public entry text and host display names.
 function requireNameKey(value, label) {
   if (typeof value !== "string" || !/^(?:s(?:[0-9a-f]{2})*\/|n(?:0|[1-9][0-9]*)\/)*$/.test(value)) {
     throw new Error(`${label} must be a canonical structural Lean name key`);
@@ -154,7 +154,7 @@ function validateManifestMetadata(
 }
 
 function validateManifestExports(exports) {
-  const aliases = new Map();
+  const entries = new Set();
   const identities = new Set();
   exports.forEach((entry, index) => {
     const label = `embedded interface manifest exports[${index}]`;
@@ -162,25 +162,16 @@ function validateManifestExports(exports) {
       throw new Error(`${label} must be an object`);
     }
     requireString(entry.entry, `${label}.entry`);
-    requireOptionalString(entry.id, `${label}.id`);
-    requireOptionalString(entry.jsName, `${label}.jsName`);
+    requireUnique(entries, entry.entry, `${label}.entry`);
+    for (const field of ["id", "jsName"]) {
+      if (Object.hasOwn(entry, field)) {
+        throw new Error(`${label}.${field} is retired; use the full Lean entry name`);
+      }
+    }
     requireOptionalString(entry.source, `${label}.source`);
     requireInterfaceEffect(entry.effect, `${label}.effect`);
     if (typeof entry.startup !== "boolean") {
       throw new Error(`${label}.startup must be a boolean`);
-    }
-    // call(name) shares one namespace across all three spellings. Repeating a
-    // spelling for the same export is fine; selecting two exports is ambiguous.
-    for (const field of ["entry", "id", "jsName"]) {
-      const alias = entry[field];
-      if (alias === undefined || alias === "") continue;
-      const previous = aliases.get(alias);
-      if (previous !== undefined && previous !== index) {
-        throw new Error(
-          `${label}.${field} duplicates another interface export alias ${JSON.stringify(alias)} (exports[${previous}])`,
-        );
-      }
-      aliases.set(alias, index);
     }
     if (!Array.isArray(entry.args)) {
       throw new Error(`${label}.args must be an array`);

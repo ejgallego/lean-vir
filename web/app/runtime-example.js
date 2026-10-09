@@ -30,9 +30,9 @@ try {
     declarations: vir.packageInfo.count,
     interfaceExports: vir.packageInfo.interfaceExports,
     hostImports: vir.packageInfo.hostImports,
-    constNat: vir.exportsByName.SortDemo_demo(),
+    constNat: vir.call("SortDemo.demo"),
     natToNat: vir.call("fib", 12),
-    natArrayToNat: vir.exportsByName.SortDemo_demoFromArray([4, 1, 3, 2]),
+    natArrayToNat: vir.call("SortDemo.demoFromArray", [4, 1, 3, 2]),
     stringToNat: vir.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"),
     byteArrayToNat: vir.call(
       "Vir.Fixtures.Basic.byteArrayInputScore",

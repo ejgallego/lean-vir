@@ -53,8 +53,6 @@ export const invalidManifestCases = [
       manifest.exports.push({
         ...structuredClone(manifest.exports[0]),
         entry: "another alias",
-        id: "anotherId",
-        jsName: "anotherJsName",
       });
     },
     pattern: /nameKey duplicates another interface export/,

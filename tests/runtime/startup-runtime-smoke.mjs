@@ -11,8 +11,6 @@ import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-mani
 
 function entry(name, startup) {
   return {
-    id: name,
-    jsName: name,
     entry: name,
     nameKey: `s${Buffer.from(name).toString("hex")}/`,
     source: "StartupRuntime.lean",

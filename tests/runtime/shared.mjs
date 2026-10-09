@@ -111,8 +111,6 @@ const validManifestShape = {
   metadata: {},
   exports: [
     {
-      id: "ok",
-      jsName: "ok",
       entry: "ok",
       nameKey: "s6f6b/",
       source: "Ok.lean",

@@ -563,7 +563,8 @@ assert.ok(
   (runtime.entryCallCache.get(fibEntry)?.callSlot ?? 0) > 0,
   "expected fib call slot to be cached",
 );
-assert.equal(runtime.exportsByName.fib(12), 144n);
+assert.equal("exportsByName" in runtime, false);
+assert.equal(runtime.call("fib", 12), 144n);
 assert.equal(
   hostRuntime.call("HostInterop.titleHandshake", "runtime smoke"),
   "Lean VIR host: runtime smoke",

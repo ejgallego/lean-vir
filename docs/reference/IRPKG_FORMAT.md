@@ -175,23 +175,27 @@ The generator embeds the recursive interface type tree in section 5. Its
 | Manifest | `version`, `artifact: "lean-vir-ir-package"`, `metadata`, `exports`, `hostImports`, `diagnostics`. |
 | Metadata | `generator`, `packageFormatVersion`, `manifestVersion`, `leanVersion`, `leanToolchain`, `leanGithash`, `targets`, optional `packageSetMember: { module, role }`. |
 | Target | Exactly one origin field: compiled `module` or live-snapshot `source`; plus `mode`, `roots`, `resolvedRoots`. Source is document provenance, not a source-loading request. |
-| Export | `id`, `jsName`, display/call alias `entry`, structural `nameKey`, diagnostic `source`, `args`, descriptor `result`, `effect`, Boolean `startup`. Each argument is `{ name, type: <descriptor> }`. |
+| Export | full Lean call key `entry`, structural `nameKey`, diagnostic `source`, `args`, descriptor `result`, `effect`, Boolean `startup`. Each argument is `{ name, type: <descriptor> }`. |
 | Host import | `slot`, display `name`, structural `nameKey`, `source`, JS `target`, `boundary`, generated Wasm `symbol`, IR `arity`, `erasedPrefixArgs`, `args`, descriptor `result`, `effect`. |
 | Diagnostic | `name`, `source`, `reason`. |
 
-The current manifest version is 10 and every generated package must use it.
+The current manifest version is 11 and every generated package must use it.
 Every export carries an explicit Boolean `startup` field. Volatile generation
 time is omitted from embedded metadata; only the adjacent Markdown report
 records wall-clock generation time.
 
-Version 10 retires the dedicated List/Option/Prod tags. Option and List use
+Version 11 retires export `id`, export `jsName`, and the `exportsByName` runtime
+facade. Each full Lean `entry` is the sole public call key; constructor `jsName`
+labels and provider identifiers retain their meanings.
+
+Version 10 retired the dedicated List/Option/Prod tags. Option and List use
 compiler-derived generic constructor layouts, Prod uses a generic structure
 layout, and `recursiveRef` carries a lexical `depth` through complete aggregate
 scopes. The JS codec resolves these bindings once, including through nested
 containers. Version 9 added `nameKey` to exports and host imports. It is the machine identity
-compared with the independently decoded binary Name; `entry`, `id`, `jsName`
-and host `name` remain display/call aliases. Changing an alias does not change
-the declaration that executes. The runtime independently checks arity, effect,
+compared with the independently decoded binary Name. The full Lean `entry`
+selects the public callable; native dispatch uses its structural identity.
+Host import `name` is diagnostic display text. The runtime independently checks arity, effect,
 boxed-boundary requirements and host target/symbol metadata as before.
 
 `Vir.nameKey` defines root-to-leaf component encoding: a string component is
@@ -205,11 +209,11 @@ emitting their binary representation. Native registry lookup uses the same key.
 JavaScript validates the key grammar and UTF-8 before it sends the contract to
 Wasm. The pinned Wasm decoder derives the canonical key from its decoded Lean
 `Name`; the contract succeeds only when those structural identities agree.
-These checks deliberately do not parse display aliases.
+These checks use structural keys rather than parsing display names.
 
-Manifest 10 is the only supported schema. The current SDK contract is runtime
+Manifest 11 is the only supported schema. The current SDK contract is runtime
 ABI 4 with package format 11, so regenerate `.irpkg` members and descriptors
-with the manifest-10 generator and install the matching JavaScript and Wasm SDK
+with the manifest-11 generator and install the matching JavaScript and Wasm SDK
 artifacts together when the generator or runtime revision changes.
 
 The modes are `explicit`, `packageOnly`, `all`, `marked` and `markedModule`.
@@ -354,7 +358,8 @@ Before exposing entries, JavaScript validates export argument/result trees,
 host descriptors and metadata. It rejects unsupported tags, malformed recursive
 children, invalid enum constructors, inconsistent field layouts, invalid
 `trivialFieldIndex` and duplicate export names. Generation additionally rejects
-cross-target declaration collisions and duplicate export ids/JS names.
+cross-target declaration collisions; selecting the same export through multiple
+targets is deduplicated by its Lean declaration name.
 
 The mandatory [manifest/binary comparison](#manifest-and-binary-agreement)
 already rejects disagreements in ordered export and host-call metadata at load

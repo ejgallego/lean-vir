@@ -205,8 +205,8 @@ const prettyVir = await createForMember("pretty-printer.irpkg");
 const leanVir = await createForMember("fixtures-lean.irpkg");
 
 console.log(vir.call("fib", 12));
-console.log(vir.exportsByName.SortDemo_demo());
-console.log(vir.exportsByName.SortDemo_demoFromArray([4, 1, 3, 2]));
+console.log(vir.call("SortDemo.demo"));
+console.log(vir.call("SortDemo.demoFromArray", [4, 1, 3, 2]));
 console.log(vir.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"));
 console.log(vir.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]));
 console.log(hostVir.call("HostInterop.titleHandshake", "browser handshake"));
@@ -349,14 +349,15 @@ application ownership: VIR does not dispose supplied maps when runtimes shut dow
 - `vir.packageMetadata` is `vir.interfaceManifest.metadata`, including the
   package format version, Lean toolchain, source targets, and resolved roots.
   Wall-clock generation time is intentionally confined to diagnostic reports.
-- `vir.call(name, ...args)` accepts a manifest `entry`, `id`, or `jsName`.
-  These share one alias namespace: multiple
-  spellings may identify the same export, but a spelling cannot identify two
-  different exports. Ambiguous manifests are rejected before initialization.
-- `vir.callTimed(name, ...args)` performs the same call and returns
+- `vir.call(entry, ...args)` accepts the full Lean declaration name from the
+  manifest's `entry` field, for example `vir.call("SortDemo.demo")`.
+  `Duplicate.entry` and `Duplicate_entry` are distinct callable declarations.
+- `vir.callTimed(entry, ...args)` performs the same call and returns
   `{ value, timings }` for opt-in phase attribution.
-- `vir.exportsByName.<jsName>(...args)` exposes valid generated JS names as
-  methods.
+- Export `id`, export `jsName`, and `exportsByName` were removed in manifest11 /
+  resource compatibility5. Replace generated methods and alias calls with
+  `call` using the full `entry`; regenerate programs with the matching SDK.
+  Constructor `jsName` labels, provider IDs and structural `nameKey` are unchanged.
 - `vir.runStartupEntries()` invokes zero-argument exports whose manifest entry
   has `startup: true`, in manifest order, once per runtime. After success,
   repeated calls do nothing. Failure stops the sequence and throws the error;
@@ -411,8 +412,7 @@ other fields. Across repeated samples, each phase median is also computed
 independently, so phase medians need not sum to the median `totalMs`.
 
 The method throws the same errors as `call`; failed calls do not return a
-partial timing report. Ordinary `call` and generated `exportsByName` methods do
-not read the clock. Application projection, JSON conversion, DOM/render work,
+partial timing report. Ordinary `call` does not read the clock. Application projection, JSON conversion, DOM/render work,
 and reporting UI remain consumer-owned and should be timed outside this API.
 This is a JavaScript runtime API addition; it requires no Wasm ABI, `.irpkg`
 package-format, or Lean toolchain version change.

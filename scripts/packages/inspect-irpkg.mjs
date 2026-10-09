@@ -83,7 +83,7 @@ function printText(info) {
       .join(", ");
     const effect = formatInterfaceEffectSuffix(entry.effect);
     console.log(
-      `  - ${entry.jsName ?? entry.entry}(${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.entry}]`,
+      `  - ${entry.entry}(${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.entry}]`,
     );
     printDescriptorDetails(entry.args ?? [], entry.result);
   }

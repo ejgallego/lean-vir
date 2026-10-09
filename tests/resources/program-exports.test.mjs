@@ -7,9 +7,9 @@ import {
 import { interfaceSignatureKey } from "../../web/src/runtime/interface-manifest.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 
-test("fully qualified declarations bind entries, never convenience aliases", () => {
-  const wrong = { entry: "Test.wrong", id: "Test.right", jsName: "Test.right" };
-  const right = { entry: "Test.right", id: "right", jsName: "right" };
+test("fully qualified declarations are the only root call keys", () => {
+  const wrong = { entry: "Test.wrong" };
+  const right = { entry: "Test.right" };
   const declarations = resolveProgramExports([wrong, right]);
   assert.equal(declarations.get("Test.right"), right);
   assert.equal(declarations.has("right"), false);

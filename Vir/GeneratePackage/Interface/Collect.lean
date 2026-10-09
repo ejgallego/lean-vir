@@ -73,14 +73,6 @@ def exportCandidatesFor (index : DeclIndex) (target : Target) : Array Name :=
       let n := (boxedBaseName? root).getD root
       if acc.contains n then acc else acc.push n) #[]
 
-def sanitizeJsNameChar (c : Char) : Char :=
-  if c.isAlphanum || c == '_' then c else '_'
-
-def jsNameFor (n : Name) : String :=
-  let text := n.toString
-  let sanitized := text.map sanitizeJsNameChar
-  if sanitized.isEmpty then "entry" else sanitized
-
 private partial def interfaceTypeNeedsBoxedCallBoundary : InterfaceType → Bool
   | .float | .float32 | .uint64 => true
   | .structure _ _ descriptor =>
@@ -142,10 +134,7 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
                   (index.find? (boxedName name)).isNone then
                 return .error { name, source, reason := boxedBoundaryDiagnostic name }
               else
-                let jsName := jsNameFor name
                 return .ok {
-                  id := jsName
-                  jsName
                   entry := name
                   source
                   args := signature.args
