@@ -735,7 +735,7 @@ export function inspectArchive(mailboxPath) {
       && activeIds.has(message.header["message-id"]))
     .map((message) => issue(message.file, `message ID \`${message.header["message-id"]}\` also exists in the active mailbox`));
   const activeThreads = validated.threads
-    .filter((thread) => !thread.archivable)
+    .filter((thread) => !thread.archivable && thread.state !== "completed")
     .map((thread) => issue(`archive/${thread.threadId}/`, "archived thread has a nonterminal reply"));
   return {
     ...loaded,
@@ -847,7 +847,7 @@ export function deliverMessage(mailboxPath, draftPath) {
   });
 }
 
-export function archiveThread(mailboxPath, threadId) {
+export function archiveThread(mailboxPath, threadId, { completed = false } = {}) {
   if (!messageIdPattern.test(threadId)) {
     throw new Error(`thread ID must match ${messageIdPattern}`);
   }
@@ -867,7 +867,7 @@ export function archiveThread(mailboxPath, threadId) {
     }
     const thread = result.threads.find((candidate) => candidate.threadId === threadId);
     if (!thread) throw new Error(`unknown active thread \`${threadId}\``);
-    if (!thread.archivable) {
+    if (!thread.archivable && !(completed && thread.state === "completed")) {
       throw new Error(`thread \`${threadId}\` has nonterminal replies; only wholly closed or cancelled threads may be archived`);
     }
     const members = result.messages.filter((message) => message.header["thread-id"] === threadId);
