@@ -31,6 +31,7 @@ if (!source)
     "usage: node tests/resources/client.mjs EXACT_RUNTIME_PACK | --published",
   );
 const published = source === "--published";
+mkdirSync(join(sourceRoot, "build"), { recursive: true });
 const evidence = mkdtempSync(join(sourceRoot, "build/resource-client-"));
 console.log(`resource client evidence: ${evidence}`);
 let root = sourceRoot;
@@ -58,10 +59,14 @@ cpSync(join(root, "fixtures/resources/client"), client, { recursive: true });
 cpSync(join(root, "fixtures/resources/user"), leaf, { recursive: true });
 for (const dir of [client, leaf])
   cpSync(join(root, "lean-toolchain"), join(dir, "lean-toolchain"));
-const config = replaceFixture(readFileSync(join(client, "lakefile.lean"), "utf8"),
+let config = replaceFixture(readFileSync(join(client, "lakefile.lean"), "utf8"),
   '"../../../.."',
   JSON.stringify(root),
 );
+// Exercise the producer's configured directory, not a conventional lib/lean
+// path reconstructed by the consumer or elaborator.
+config = replaceFixture(config, 'buildDir := "build with spaces"',
+  'buildDir := "build with spaces"\n  leanLibDir := "library output"');
 writeFileSync(join(client, "lakefile.lean"), config);
 function run(cwd, label, cmd, args, error = null) {
   const result = spawnSync(cmd, args, {
@@ -106,6 +111,27 @@ const snapshot = (path) => {
   const s = statSync(path, { bigint: true });
   return [s.ino, s.mtimeNs, s.size];
 };
+const producerLib = join(client, "build with spaces/library output");
+const programStage = join(producerLib, "vir-assets/Client/Program.virres");
+const producerCarrier = join(producerLib, "Client/Resources.olean");
+// A foreign asset library prepares and embeds the dependency-owned program
+// directly, before the dependency's own carrier has been compiled.
+assert.ok(!existsSync(programStage));
+assert.ok(!existsSync(producerCarrier));
+run(leaf, "dependency-owned-cold", "lake", ["build", "UserAssets"]);
+assert.ok(existsSync(programStage));
+assert.ok(!existsSync(producerCarrier));
+assert.ok(!existsSync(join(leaf, ".lake/build/lib/lean/vir-assets/Client/Program.virres")));
+writeFileSync(join(leaf, "InspectAssets.lean"), `import UserAssets
+#eval IO.println UserAssets.resources.runtime.contentId
+#eval IO.println (reprStr (UserAssets.resources.programs.map (·.descriptor.logicalId)))
+`);
+const included = run(leaf, "dependency-owned-value", "lake", ["env", "lean", "InspectAssets.lean"]);
+assert.match(included, new RegExp(lock.contentId));
+assert.match(included, /#\["Client.Program"\]/);
+const directProgram = readFileSync(programStage);
+run(leaf, "dependency-owned-warm", "lake", ["build", "UserAssets"]);
+assert.deepEqual(readFileSync(programStage), directProgram);
 build("cold");
 if (published) {
   const before = [snapshot(runtimeCache), snapshot(runtimeStage)];
@@ -138,23 +164,15 @@ if (published) {
   assert.ok(!existsSync(join(evidence, "absent-cache.virres")));
   assert.ok(!existsSync(join(evidence, "absent-stage.virres")));
 }
-const programStage = join(client, "resources/.vir-generated/ClientResources.virres");
-const carrierInput = join(client, "resources/.vir-generated/inputs/Client/Resources.path");
 const programFirst = readFileSync(programStage);
-assert.equal(readFileSync(carrierInput, "utf8"), programStage);
+assert.deepEqual(programFirst, directProgram, "both asset owners embed the same program");
 const clientConfig = join(client, "lakefile.lean");
 const originalConfig = readFileSync(clientConfig, "utf8");
 for (const [label, change, diagnostic] of [
-  ["missing-selection", text => replaceFixture(text, "`+Client.Program, ", ""),
-    /exactly one program module key/],
-  ["duplicate-selection", text => replaceFixture(text, "`+Client.Program, ",
-    "`+Client.Program, `+Client.Alternative, "),
-    /exactly one program module key/],
-  ["foreign-module", text => replaceFixture(text, "`+Client.Program, ", "`+Vir.Attributes, "),
-    /not Lake-registered in/],
-  ["foreign-package", text => replaceFixture(text, "`+Client.Program, ", "`@lean_vir/+Vir.Attributes, "),
-    /must belong to/],
-  ["carrier-as-root", text => replaceFixture(text, "`+Client.Program, ", "`+Client.Resources, "),
+  ["unknown-module", text => replaceFixture(text, "`+Client.Program:virResourcePack",
+    "`+Client.Absent:virResourcePack"), /module 'Client.Absent' not found/],
+  ["carrier-as-root", text => replaceFixture(text, "`+Client.Program:virResourcePack",
+    "`+Client.Resources:virResourcePack"),
     /VIR resource cycle/],
 ]) {
   writeFileSync(clientConfig, change(originalConfig));
@@ -163,13 +181,13 @@ for (const [label, change, diagnostic] of [
 }
 writeFileSync(clientConfig, originalConfig);
 writeFileSync(clientConfig, replaceFixture(originalConfig,
-  "`+Client.Program, ", "`@client_fixture/+Client.Program, "));
+  "`+Client.Program:virResourcePack", "`@client_fixture/+Client.Program:virResourcePack"));
 build("qualified-selection");
 assert.deepEqual(readFileSync(programStage), programFirst);
 writeFileSync(clientConfig, originalConfig);
-const first = [snapshot(programStage), snapshot(runtimeStage), snapshot(carrierInput)];
+const first = [snapshot(programStage), snapshot(runtimeStage)];
 build("warm");
-assert.deepEqual([snapshot(programStage), snapshot(runtimeStage), snapshot(carrierInput)], first);
+assert.deepEqual([snapshot(programStage), snapshot(runtimeStage)], first);
 assert.doesNotMatch(
   readFileSync(join(evidence, "warm.log"), "utf8"),
   /Built.*(?:Client|Main|Runtime)/,
@@ -180,10 +198,40 @@ assert.deepEqual(readFileSync(programStage), programFirst);
 writeFileSync(programStage, "corrupt staged pack");
 build("repair-corrupt-stage");
 assert.deepEqual(readFileSync(programStage), programFirst);
-unlinkSync(carrierInput);
-build("repair-context-input");
-assert.equal(readFileSync(carrierInput, "utf8"), programStage);
+// The include consumes precisely its literal module list, not a carrier-name
+// map or a second pass over configuration. A missing prepared root is explicit.
+const carrierSource = join(client, "resources/Client/Resources.lean");
+const originalCarrier = readFileSync(carrierSource, "utf8");
+const missingCarrier = replaceFixture(originalCarrier, "#[Client.Program]",
+  "#[Client.Alternative]");
+writeFileSync(carrierSource, missingCarrier);
+const missingLog = run(leaf, "unprepared-include", "lake", ["build", "generate-site"],
+  /VIR_RESOURCE_NOT_PREPARED.*Client.Alternative/s);
+const missingLines = missingCarrier.split("\n");
+const missingLine = missingLines.findIndex(line => line.includes("#[Client.Alternative]"));
+const missingColumn = missingLines[missingLine].indexOf("Client.Alternative");
+assert.ok(missingLog.includes(`resources/Client/Resources.lean:${missingLine + 1}:${missingColumn}: VIR_RESOURCE_NOT_PREPARED`),
+  "missing preparation diagnostic points to the requested module identifier");
 assert.deepEqual(readFileSync(programStage), programFirst);
+writeFileSync(carrierSource, originalCarrier);
+build("include-restored");
+
+// Multiple roots are an ordered literal list, not an ambiguous carrier mapping.
+writeFileSync(clientConfig, replaceFixture(originalConfig,
+  "`+Client.Program:virResourcePack",
+  "`+Client.Alternative:virResourcePack, `+Client.Program:virResourcePack"));
+writeFileSync(carrierSource, replaceFixture(originalCarrier, "#[Client.Program]",
+  "#[Client.Alternative, Client.Program]"));
+run(leaf, "two-roots", "lake", ["exe", "generate-site", join(evidence, "two-root-site")]);
+assert.equal(readdirSync(join(evidence, "two-root-site")).length, 3);
+writeFileSync(join(client, "Order.lean"), `import Client.Resources
+#eval IO.println (reprStr (Client.Resources.resources.programs.map (·.descriptor.logicalId)))
+`);
+assert.match(run(client, "literal-order", "lake", ["env", "lean", "Order.lean"]),
+  /Client.Alternative.*Client.Program/s);
+writeFileSync(clientConfig, originalConfig);
+writeFileSync(carrierSource, originalCarrier);
+build("two-roots-restored");
 
 const programSource = join(client, "program/Client/Program.lean");
 const initialSource = readFileSync(programSource, "utf8");
@@ -217,7 +265,7 @@ writeFileSync(programSource, initialSource);
 build("restored");
 
 // Native publication now needs only compiled/link prerequisites, not raw packs.
-renameSync(programStage, join(client, "resources/.vir-generated/retained.virres"));
+renameSync(programStage, `${programStage}.retained`);
 const destination = join(evidence, "relocated-site");
 run(
   "/tmp",

@@ -18,7 +18,7 @@ export function checkFacetOutputSafety({ client, env, evidence }) {
   const failures = [];
   for (const [relative, ancestors, suffixes] of [
     [
-      "vir/resources/programs/ClientResources.virres",
+      "vir/resources/programs/Client/Program.virres",
       ["vir", "vir/resources", "vir/resources/programs", null],
       ["", ".trace", ".hash"],
     ],
@@ -55,7 +55,7 @@ export function checkFacetOutputSafety({ client, env, evidence }) {
         try {
           const result = spawnSync(
             "lake",
-            ["build", "ClientResources:virResourcePack"],
+            ["build", "+Client.Program:virResourcePack"],
             {
               cwd: client,
               env,

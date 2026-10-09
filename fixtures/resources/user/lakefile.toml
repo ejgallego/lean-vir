@@ -4,6 +4,10 @@ name = "user_fixture"
 name = "client_fixture"
 path = "../client"
 
+[[lean_lib]]
+name = "UserAssets"
+needs = ["@client_fixture/+Client.Program:virResourcePack"]
+
 [[lean_exe]]
 name = "generate-site"
 root = "Main"

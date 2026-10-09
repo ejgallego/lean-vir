@@ -63,7 +63,7 @@ writeFileSync(
       '  srcDir := "resources"',
       "  roots := #[]",
       "  globs := #[.one `Client.OtherResources]",
-      "  needs := #[`+Client.Program, `@client_fixture/OtherResources:virResourcePack]",
+      "  needs := #[`+Client.Program:virResourcePack]",
       "",
     ].join("\n"),
 );
@@ -79,8 +79,8 @@ const withImport = replaceFixture(readFileSync(umbrella, "utf8"),
   "public import Client.Resources",
   "public import Client.Resources\npublic import Client.OtherResources");
 writeFileSync(umbrella, replaceFixture(withImport,
-  "#[Client.Resources.bundle]",
-  "#[Client.Resources.bundle, Client.OtherResources.bundle]"));
+  "Client.Resources.resources",
+  "{ runtime := Client.Resources.resources.runtime, programs := Client.Resources.resources.programs ++ Client.OtherResources.resources.programs }"));
 // A second intermediary uses the same producer and runtime, but owns separate
 // program/carrier modules and resource identities.
 cpSync(client, peer, { recursive: true });
@@ -215,13 +215,12 @@ assert.equal(
 );
 const stages = [
   join(producer, ".vir-generated/VirResourceRuntime.virres"),
-  ...["ClientResources", "OtherResources"].map((n) =>
-    join(client, "resources/.vir-generated", `${n}.virres`),
-  ),
-  ...["PeerResources", "OtherResources"].map((n) =>
-    join(peer, "resources/.vir-generated", `${n}.virres`),
-  ),
+  join(client, "build with spaces/lib/lean/vir-assets/Client/Program.virres"),
+  join(peer, "build with spaces/lib/lean/vir-assets/Peer/Program.virres"),
 ];
+// Five compiled references share three unique prepared artifacts. Observe the
+// publisher's values rather than reading the same stage twice as two consumers.
+const consumerReferences = [0, 1, 1, 2, 2];
 const signature = (path) => {
   const s = statSync(path, { bigint: true });
   return [s.ino, s.mtimeNs, s.size];
@@ -242,15 +241,28 @@ const canonicalSignature = signature(canonical);
 const mixed = runLake("mixed-adapters", client, [
   "build",
   "+Client.Program:vir",
-  "ClientResources:virResourcePack",
+  "+Client.Program:virResourcePack",
 ]);
 assert.doesNotMatch(mixed, /Built.*Client\.Program:virProgram/);
 assert.deepEqual(signature(canonical), canonicalSignature);
 const packs = stages.map((p) => readFileSync(p));
 const signatures = stages.map(signature);
+function packDescriptor(pack) {
+  const length = pack.readUInt32LE(8);
+  return JSON.parse(pack.subarray(12, 12 + length));
+}
+async function assertConsumers(log, artifacts = stages, references = consumerReferences) {
+  const identities = await Promise.all(artifacts.map(async path => {
+    const descriptor = packDescriptor(readFileSync(path));
+    return `${descriptor.logicalId} ${await descriptorContentId(descriptor)}`;
+  }));
+  const included = log.split("\n").filter(line => /^\S+ [a-f0-9]{64}$/.test(line));
+  assert.deepEqual(included, references.map(index => identities[index]),
+    "compiled consumer values must match the current prepared artifacts");
+}
 function rootInterface(pack) {
   const length = pack.readUInt32LE(8);
-  const descriptor = JSON.parse(pack.subarray(12, 12 + length));
+  const descriptor = packDescriptor(pack);
   assert.equal(descriptor.schemaVersion, 2);
   assert.equal(Object.hasOwn(descriptor, "exports"), false);
   let offset = 12 + length;
@@ -263,13 +275,13 @@ function rootInterface(pack) {
 }
 assert.deepEqual(rootInterface(packs[1]).exports.map(entry => entry.entry),
   ["Client.Program.greet"], "imported marker is not promoted into root interface");
+await assertConsumers(cold);
 const warm = build("warm-shared");
+await assertConsumers(warm);
 assert.deepEqual(stages.map(signature), signatures);
 assert.doesNotMatch(warm, /Built.*(?:Client|Peer|Main|Runtime)/);
 assert.equal(readdirSync(join(evidence, "site")).length, 3);
-assert.deepEqual(packs[1], packs[2], "two carriers of the same root share program identity");
-assert.notDeepEqual(packs[1], packs[3]);
-assert.notDeepEqual(packs[2], packs[4]);
+assert.notDeepEqual(packs[1], packs[2], "distinct producer modules have distinct packs");
 checkNativeProfileRejection({ client, producer, env, evidence });
 build("native-profile-unset");
 assert.deepEqual(stages.map(signature), signatures);
@@ -298,7 +310,8 @@ const publicPaths = ["Helper", "Program"].map((name) =>
 const publicBytes = publicPaths.map((path) => readFileSync(path));
 const canonicalBefore = readFileSync(canonical);
 writeFileSync(helper, replaceFixture(helperSource, '"Hello, "', '"Welcome, "'));
-build("private-transitive-edit", conventionalEnv);
+const privateEdit = build("private-transitive-edit", conventionalEnv);
+await assertConsumers(privateEdit);
 assert.notDeepEqual(readFileSync(canonical), canonicalBefore);
 runLake(
   "private-edit-loose-adapter",
@@ -316,37 +329,41 @@ assert.deepEqual(
   publicBytes,
 );
 assert.notDeepEqual(readFileSync(stages[1]), packs[1]);
-assert.notDeepEqual(readFileSync(stages[2]), packs[2]);
 assert.deepEqual(signature(stages[0]), signatures[0]);
-assert.deepEqual(
-  stages.slice(3).map((path) => readFileSync(path)),
-  packs.slice(3),
-);
+assert.deepEqual(readFileSync(stages[2]), packs[2], "peer program is unchanged");
 writeFileSync(helper, helperSource);
-build("private-transitive-restored", conventionalEnv);
+await assertConsumers(build("private-transitive-restored", conventionalEnv));
 assert.deepEqual(
   stages.map((path) => readFileSync(path)),
   packs,
 );
 
-// A bare Module input has no file result to hash. Changing the selected root
-// must invalidate packaging, without recompiling the unchanged selected program.
+// Selection lives in the ordinary dependency AND literal inclusion. Changing
+// both names prepares the new root without changing other libraries' resources.
 const configBefore = readFileSync(config, "utf8");
-const originalRegistration = "`+Client.Program, `@client_fixture/ClientResources:virResourcePack";
-const alternativeRegistration = "`+Client.Alternative, `@client_fixture/ClientResources:virResourcePack";
+const originalRegistration = "globs := #[.one `Client.Resources]\n  needs := #[`+Client.Program:virResourcePack]";
+const alternativeRegistration = "globs := #[.one `Client.Resources]\n  needs := #[`+Client.Alternative:virResourcePack]";
 writeFileSync(config, replaceFixture(configBefore, originalRegistration, alternativeRegistration));
-build("registration-change");
-assert.notDeepEqual(readFileSync(stages[1]), packs[1]);
-const selectedInterface = rootInterface(readFileSync(stages[1]));
+const selectedCarrierPath = join(client, "resources/Client/Resources.lean");
+const selectedCarrierSource = readFileSync(selectedCarrierPath, "utf8");
+writeFileSync(selectedCarrierPath, replaceFixture(selectedCarrierSource,
+  "#[Client.Program]", "#[Client.Alternative]"));
+const registrationChange = build("registration-change");
+const alternativeStage = join(client, "build with spaces/lib/lean/vir-assets/Client/Alternative.virres");
+await assertConsumers(registrationChange,
+  [stages[0], alternativeStage, stages[1], stages[2]], [0, 1, 2, 3, 3]);
+assert.notDeepEqual(readFileSync(alternativeStage), packs[1]);
+const selectedInterface = rootInterface(readFileSync(alternativeStage));
 assert.equal(selectedInterface.metadata.packageSetMember.module, "Client.Alternative");
 assert.deepEqual(selectedInterface.exports.map(entry => entry.entry).sort(),
   ["OtherNamespace.greet", "OtherNamespace.startup"],
   "real module ownership, not namespace prefix; callable startup union is retained");
+assert.deepEqual(readFileSync(stages[1]), packs[1]);
 assert.deepEqual(readFileSync(stages[2]), packs[2]);
-assert.deepEqual(stages.slice(3).map((path) => readFileSync(path)), packs.slice(3));
 assert.deepEqual(signature(stages[0]), signatures[0]);
 writeFileSync(config, configBefore);
-build("registration-restored");
+writeFileSync(selectedCarrierPath, selectedCarrierSource);
+await assertConsumers(build("registration-restored"));
 assert.deepEqual(stages.map((path) => readFileSync(path)), packs);
 
 // Selecting compatible JS-only runtime bytes must not rebuild either program.
@@ -388,6 +405,7 @@ writeFileSync(
 );
 const programSignatures = stages.slice(1).map(signature);
 const runtimeEdit = build("runtime-js-only");
+await assertConsumers(runtimeEdit);
 assert.deepEqual(readFileSync(stages[0]), changedRuntime);
 assert.deepEqual(stages.slice(1).map(signature), programSignatures);
 assert.doesNotMatch(runtimeEdit, /Built.*:virResourcePack/);
@@ -395,7 +413,7 @@ writeFileSync(
   join(producer, "vir-resources/runtime.json"),
   JSON.stringify(lock),
 );
-build("runtime-restored");
+await assertConsumers(build("runtime-restored"));
 assert.deepEqual(
   stages.map((path) => readFileSync(path)),
   packs,
@@ -412,12 +430,20 @@ for (const [name, path] of [
 ])
   renameSync(path, join(evidence, `retained-${name}-build`));
 // Runtime staging is sufficient offline to recover its private acquisition cache.
-for (const [i, path] of stages.entries())
-  if (i > 0) renameSync(path, `${path}.retained`);
-build("cache-only");
+// Program inputs live in leanLibDir and moved with their owned build outputs;
+// the runtime source-relative stage deliberately survives for offline repair.
+await assertConsumers(build("cache-only"));
 for (const [i, path] of stages.entries())
   assert.deepEqual(readFileSync(path), packs[i]);
 assert.deepEqual(signature(stages[0]), signatures[0]);
+const returnedLog = runLake("cache-returned-path", client,
+  ["query", "--json", "+Client.Program:virResourcePack"]);
+const returned = JSON.parse(returnedLog.split("\n").find(line => line.startsWith('"')));
+assert.ok(returned.startsWith(join(cache, "artifacts") + "/"), returned);
+assert.deepEqual(readFileSync(returned), packs[1]);
+assert.equal(existsSync(join(client,
+  "build with spaces/vir/resources/programs/Client/Program.virres")), false,
+  "materialization must consume the returned cache artifact without restoring its conventional path");
 function compiledFiles(path) {
   if (!existsSync(path)) return [];
   return readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
@@ -448,10 +474,15 @@ assert.deepEqual(
 const facetDir = join(client, "build with spaces/vir/resources/programs");
 if (existsSync(facetDir))
   renameSync(facetDir, join(evidence, "retained-facet-traces"));
-// Change only typed registration: cached compilation remains authoritative.
+// Change the named dependency and its inclusion; cached compilation remains authoritative.
 writeFileSync(config, replaceFixture(configBefore, originalRegistration, alternativeRegistration));
-build("repack-cached-inputs");
-assert.notDeepEqual(readFileSync(stages[1]), packs[1]);
+writeFileSync(selectedCarrierPath, replaceFixture(selectedCarrierSource,
+  "#[Client.Program]", "#[Client.Alternative]"));
+const repackCached = build("repack-cached-inputs");
+await assertConsumers(repackCached,
+  [stages[0], alternativeStage, stages[1], stages[2]], [0, 1, 2, 3, 3]);
+assert.notDeepEqual(readFileSync(alternativeStage), packs[1]);
+assert.deepEqual(readFileSync(stages[1]), packs[1]);
 assert.deepEqual(readFileSync(stages[2]), packs[2]);
 assert.deepEqual(signature(stages[0]), signatures[0]);
 assert.deepEqual(
@@ -461,7 +492,7 @@ assert.deepEqual(
   [],
   "only the changed carrier may recompile",
 );
-// Recipe-only repacking consumes the shared program artifact, not another
+// Resource wrapping consumes the shared program artifact, not another
 // generator invocation or a conventional-path compiled-input reconstruction.
 assert.ok(existsSync(join(cache, "artifacts")));
 
@@ -504,9 +535,10 @@ for (const [name, path] of [
 ])
   if (existsSync(path))
     renameSync(path, join(evidence, `retained-lean-only-${name}-build`));
-for (const path of stages.slice(1))
-  renameSync(path, `${path}.lean-only-retained`);
+// Program sidecars moved with the build directory, not with source files.
 const leanOnly = build("lean-only-cache");
+await assertConsumers(leanOnly,
+  [stages[0], alternativeStage, stages[1], stages[2]], [0, 1, 2, 3, 3]);
 assert.deepEqual(
   stages.map((path) => readFileSync(path)),
   leanOnlyPacks,

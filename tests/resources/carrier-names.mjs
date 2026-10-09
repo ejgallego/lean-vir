@@ -1,53 +1,28 @@
-// Exercise real Lake library names, not an independent filename predicate.
+// Actual named inclusion through ordinary library builds, not a second locator.
 import assert from "node:assert/strict";
-import { replaceFixture } from "./fixture-edit.mjs";
 import { spawnSync } from "node:child_process";
-import {
-  cpSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  renameSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { repositoryRoot } from "../../scripts/repository-paths.mjs";
+import { replaceFixture } from "./fixture-edit.mjs";
 
-const evidence = mkdtempSync(
-  join(repositoryRoot, "build/resource-carrier-names-"),
-);
-console.log(`carrier-name evidence: ${evidence}`);
-// Optional module/path pairs exercise semantic components through the real
-// include macro, including quoted dots/spaces, not a second source-root locator.
-for (const [index, [name, stem,
-  initialModule = "Client.Resources", initialFile = "Client/Resources.lean"]] of [
-  ["«Client-Resources»", "«Client-Resources»"],
-  ["Client.Resources", "Client.Resources",
-    "Quoted.«component.with.dots».Leaf", "Quoted/component.with.dots/Leaf.lean"],
-  ["ClientRessourcesÉ", "ClientRessourcesÉ"],
-  ["«Library space»", "«Library space»",
-    "Quoted.«component space».Leaf", "Quoted/component space/Leaf.lean"],
-  ["VersoSlidesVirPrettyMResources", "VersoSlidesVirPrettyMResources",
-    "VersoSlides.VirPrettyMResources", "VersoSlides/VirPrettyMResources.lean"],
-  ["«Client\\Resources»", null],
+mkdirSync(join(repositoryRoot, "build"), { recursive: true });
+const evidence = mkdtempSync(join(repositoryRoot, "build/resource-module-names-"));
+console.log(`module-name evidence: ${evidence}`);
+for (const [index, [name, file]] of [
+  ["Client.Program", "Client/Program.lean"],
+  ["Client.«Program.with.dots»", "Client/Program.with.dots.lean"],
+  ["Quoted.«component space».Leaf", "Quoted/component space/Leaf.lean"],
 ].entries()) {
-  let carrierModule = initialModule;
-  let carrierFile = initialFile;
   const client = join(evidence, String(index));
-  cpSync(join(repositoryRoot, "fixtures/resources/client"), client, {
-    recursive: true,
-  });
+  cpSync(join(repositoryRoot, "fixtures/resources/client"), client, { recursive: true });
   cpSync(join(repositoryRoot, "lean-toolchain"), join(client, "lean-toolchain"));
-  const toolchain = readFileSync(join(client, "lean-toolchain"), "utf8").trim();
-  const configPath = join(client, "lakefile.lean");
-  const providerConfig = replaceFixture(readFileSync(configPath, "utf8"),
+  let config = replaceFixture(readFileSync(join(client, "lakefile.lean"), "utf8"),
     '"../../../.."', JSON.stringify(repositoryRoot));
-  let config = replaceFixture(providerConfig,
-    "ClientResources", name, "all");
+  // Arbitrary library spelling no longer becomes a prepared filename or source key.
+  config = replaceFixture(config, "ClientResources", "«Asset library space»", "all");
   let sourceRoot = client;
   if (index === 1) {
-    // Compose package and library source roots; registration remains package-local.
     config = replaceFixture(config, "package client_fixture where",
       'package client_fixture where\n  srcDir := "base source"');
     sourceRoot = join(client, "base source");
@@ -55,62 +30,26 @@ for (const [index, [name, stem,
     for (const source of ["program", "resources", "Client.lean"])
       renameSync(join(client, source), join(sourceRoot, source));
   }
-  let carrierPath = join(sourceRoot, "resources/Client/Resources.lean");
-  if (index === 1) {
-    // A quoted dot is one module component in the stock Name registration,
-    // native root adapter and generated package ownership, not dot splitting.
-    config = replaceFixture(config, "`Client.Program", "`Client.«Program.with.dots»", "all");
-    config = replaceFixture(config, "`+Client.Program", "`+Client.«Program.with.dots»");
-    renameSync(join(sourceRoot, "program/Client/Program.lean"),
-      join(sourceRoot, "program/Client/Program.with.dots.lean"));
-  }
-  if (carrierModule !== "Client.Resources") {
-    config = replaceFixture(config, ".one `Client.Resources",
-      `.one \`${carrierModule}`);
-    const destination = join(sourceRoot, "resources", carrierFile);
+  const carrier = join(sourceRoot, "resources/Client/Resources.lean");
+  if (name !== "Client.Program") {
+    config = replaceFixture(config, "`Client.Program", `\`${name}`, "all");
+    config = replaceFixture(config, "`+Client.Program:virResourcePack", `\`+${name}:virResourcePack`);
+    const destination = join(sourceRoot, "program", file);
     mkdirSync(dirname(destination), { recursive: true });
-    writeFileSync(destination, replaceFixture(readFileSync(carrierPath, "utf8"),
-      "Client.Resources", carrierModule));
-    carrierPath = destination;
+    renameSync(join(sourceRoot, "program/Client/Program.lean"), destination);
+    writeFileSync(carrier, replaceFixture(readFileSync(carrier, "utf8"),
+      "#[Client.Program]", `#[${name}]`));
   }
-  if (index === 4) {
-    // This include is in a local imported module, not the directly globbed root.
-    // Use Lake's existing root ownership and module collection, not a second walk.
-    const nested = `${carrierModule}.Nested`;
-    config = replaceFixture(config,
-      '  srcDir := "resources"\n  roots := #[]',
-      `  srcDir := "resources"\n  roots := #[\`${carrierModule}]`);
-    writeFileSync(carrierPath, replaceFixture(replaceFixture(readFileSync(carrierPath, "utf8"),
-      "public import Vir.Resources.Embed",
-      `public import Vir.Resources.Embed\npublic import ${nested}`),
-      "include_vir_program", "Nested.bundle"));
-    carrierModule = nested;
-    carrierFile = `${carrierFile.slice(0, -5)}/Nested.lean`;
-    carrierPath = join(sourceRoot, "resources", carrierFile);
-    mkdirSync(dirname(carrierPath), { recursive: true });
-    writeFileSync(carrierPath, `module\npublic import Vir.Resources.Embed\npublic def Nested.bundle : Vir.Resources.Bundle := include_vir_program\n`);
-  }
-  writeFileSync(configPath, config);
+  writeFileSync(join(client, "lakefile.lean"), config);
+  const stage = join(client, "build with spaces/lib/lean/vir-assets", file.replace(/\.lean$/, ".virres"));
   let previous;
   for (const phase of ["cold", "warm"]) {
-    const result = spawnSync("elan", ["run",
-      readFileSync(join(repositoryRoot, "lean-toolchain"), "utf8").trim(),
-      "lake", "--dir", client, "build", name], {
-      cwd: evidence,
-      encoding: "utf8",
-      timeout: 180000,
-      maxBuffer: 8 * 1024 * 1024,
+    const result = spawnSync("lake", ["--dir", client, "build", "«Asset library space»"], {
+      cwd: evidence, encoding: "utf8", timeout: 180000, maxBuffer: 8 * 1024 * 1024,
     });
-    const log = `${result.stdout ?? ""}${result.stderr ?? ""}`;
-    writeFileSync(join(client, `${phase}.log`), log);
+    writeFileSync(join(client, `${phase}.log`), `${result.stdout ?? ""}${result.stderr ?? ""}`);
     assert.ifError(result.error);
-    if (!stem) {
-      assert.notEqual(result.status, 0, log);
-      assert.match(log, /library name usable as one filename/);
-      break;
-    }
-    assert.equal(result.status, 0, `${name} ${phase}: ${log}`);
-    const stage = join(sourceRoot, `resources/.vir-generated/${stem}.virres`);
+    assert.equal(result.status, 0, `${name}: ${result.stdout}${result.stderr}`);
     const bytes = readFileSync(stage);
     const stat = statSync(stage, { bigint: true });
     if (previous) {
@@ -120,21 +59,14 @@ for (const [index, [name, stem,
     }
     previous = { bytes, stat };
   }
-  if (stem && (index === 1 || index === 4)) {
-    const input = join(sourceRoot, "resources/.vir-generated/inputs",
-      `${carrierFile.slice(0, -5)}.path`);
-    assert.equal(readFileSync(input, "utf8"),
-      join(sourceRoot, "resources/.vir-generated", `${stem}.virres`));
-    const setup = join(client, "build with spaces/ir",
-      `${carrierFile.slice(0, -5)}.setup.json`);
-    const result = spawnSync("elan", ["run", toolchain, "lake", "--dir", client,
-      "env", "lean", "--setup", setup, carrierPath], {
-      cwd: "/tmp", encoding: "utf8", timeout: 180000,
-    });
-    writeFileSync(join(client, "actual-context-other-cwd.log"),
-      `${result.stdout ?? ""}${result.stderr ?? ""}`);
-    assert.ifError(result.error);
-    assert.equal(result.status, 0, result.stdout + result.stderr);
-  }
+  const setup = join(client, "build with spaces/ir/Client/Resources.setup.json");
+  const toolchain = readFileSync(join(client, "lean-toolchain"), "utf8").trim();
+  const result = spawnSync("elan", ["run", toolchain, "lake", "--dir", client,
+    "env", "lean", "--setup", setup, carrier], {
+    cwd: "/tmp", encoding: "utf8", timeout: 180000,
+  });
+  writeFileSync(join(client, "actual-context-other-cwd.log"), `${result.stdout ?? ""}${result.stderr ?? ""}`);
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
 }
-console.log("carrier names: real includes with quoted module components and library names; warm staging unchanged");
+console.log("module names: real includes, custom roots, quoted components, other cwd and unchanged warm inputs PASS");

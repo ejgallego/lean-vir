@@ -1,6 +1,6 @@
 module
 
-public import Vir.Resources.Embed
+public import Vir.Resources.Assets
 
-public def Client.Resources.bundle : Vir.Resources.Bundle :=
-  include_vir_program
+public def Client.Resources.resources : Vir.Resources.ResourceSet :=
+  include_vir_assets (modules := #[Client.Program])

@@ -29,8 +29,7 @@ export function checkNativeProfileRejection({
   ])
     cpSync(join(client, name), join(cold, name), {
       recursive: true,
-      // Staging now lives under the carrier source root; copy source only for
-      // this cold rejection fixture, not its warm prepared resource bytes.
+      // Copy source only, never the warm private elaboration input.
       filter: (source) => basename(source) !== ".vir-generated",
     });
   const config = readFileSync(join(client, "lakefile.lean"), "utf8");
@@ -57,10 +56,10 @@ export function checkNativeProfileRejection({
       providerSources: ["provider.c"],
     }),
   );
-  const stage = join(client, "resources/.vir-generated/ClientResources.virres");
+  const stage = join(client, "build with spaces/lib/lean/vir-assets/Client/Program.virres");
   const output = join(
     client,
-    "build with spaces/vir/resources/programs/ClientResources.virres",
+    "build with spaces/vir/resources/programs/Client/Program.virres",
   );
   const retained = [
     stage,
@@ -82,8 +81,8 @@ export function checkNativeProfileRejection({
     ["valid", manifest],
   ]) {
     const cases = [
-      ["warm", client, "lake", ["build", "ClientResources:virResourcePack"]],
-      ["cold", cold, "lake", ["build", "ClientResources:virResourcePack"]],
+      ["warm", client, "lake", ["build", "+Client.Program:virResourcePack"]],
+      ["cold", cold, "lake", ["build", "+Client.Program:virResourcePack"]],
       [
         "build",
         client,
