@@ -156,6 +156,26 @@ Choose the affected boundary first. `npm test` is the broad pre-merge code
 check; [package.json](../package.json) owns its exact command order. Browser
 semantics require the separate Chromium checks below.
 
+### Quiet command capture
+
+For noisy non-interactive commands, retain stdout/stderr under ignored
+`build/logs/` while printing one success line or a short failure tail:
+
+```bash
+npm run quiet -- -- lake build Vir
+npm run quiet -- -- npm test
+```
+
+Use `--log PATH` and `--tail N` before `--` to select a log or change the
+default 40-line failure excerpt. Command exit codes are preserved. Log-open
+failure prevents startup; log-write failure stops the command.
+
+On POSIX, Ctrl-C/SIGTERM stops the command's process group, escalating after
+one second; cancellation exits 130/143. Deliberately detached sessions are
+outside this scope. Windows only signals the direct child and is not qualified
+by the Linux process tests. Do not use the wrapper for interactive servers or
+when live progress is needed. Focused checks: `npm run test:quiet`.
+
 ### Package and fixture work
 
 - Runtime production/release tooling: `npm run test:resources:production` checks
