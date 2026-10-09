@@ -136,9 +136,8 @@ structure Closure where
   missingExterns : Array ClosureDependency := #[]
   unsupportedInitGlobals : Array ClosureDependency := #[]
 
+/-- A public callable identified by its full Lean declaration name. -/
 structure InterfaceExport where
-  id : String
-  jsName : String
   entry : Name
   source : String
   args : Array InterfaceArg

@@ -308,6 +308,15 @@ export const browserRunnerCaseSpecs = [
 
 export const browserRunnerFailureSpecs = [
   {
+    url: "dev.html?package=demo-host.irpkg&entry=HostInterop_titleHandshake&run=1",
+    expected: {
+      packageName: "...",
+      entryCount: 0,
+      exports: "...",
+      result: /interface entry not found: HostInterop_titleHandshake; use the full Lean entry name/,
+    },
+  },
+  {
     url: "dev.html?package=bad-magic.irpkg",
     expected: {
       packageName: "...",

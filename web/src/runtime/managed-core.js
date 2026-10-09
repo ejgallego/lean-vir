@@ -40,7 +40,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     this.packageInfo = packageInfo;
     this.interfaceManifest = null;
     this.packageMetadata = null;
-    this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
     this.startupState = "pending";
@@ -203,7 +202,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     this.interfaceManifest = null;
     this.hostState?.setManifest(null);
     this.packageMetadata = null;
-    this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
   }
@@ -253,20 +251,13 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
   }
 
   rebuildManifestExports() {
-    this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
     const entries = this.interfaceManifest?.exports ?? [];
     for (let exportIndex = 0; exportIndex < entries.length; exportIndex += 1) {
       const entry = entries[exportIndex];
-      registerManifestEntryKey(this.entriesByName, entry.entry, entry);
-      registerManifestEntryKey(this.entriesByName, entry.id, entry);
-      registerManifestEntryKey(this.entriesByName, entry.jsName, entry);
+      this.entriesByName[entry.entry] = entry;
       this.entryCallCache.set(entry, { exportIndex });
-      if (entry.jsName && isIdentifier(entry.jsName)) {
-        this.exportsByName[entry.jsName] = (...args) =>
-          this.callEntry(entry, args);
-      }
     }
   }
 
@@ -500,7 +491,6 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     this.disposed = true;
     this.disposing = false;
     this.hostState = null;
-    this.exportsByName = Object.create(null);
   }
 }
 
@@ -596,15 +586,4 @@ function freezeManifestTree(manifest) {
     for (const child of Object.values(value)) pending.push(child);
   }
   return manifest;
-}
-
-function registerManifestEntryKey(map, key, entry) {
-  // Manifest validation guarantees that every nonempty alias has one owner.
-  if (typeof key === "string" && key !== "") {
-    map[key] = entry;
-  }
-}
-
-function isIdentifier(text) {
-  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text);
 }

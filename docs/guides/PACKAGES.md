@@ -352,8 +352,8 @@ Deep links select a package and entry:
 dev.html?package=local-quickstart.irpkg&entry=QuickstartApp.Program.total
 ```
 
-`entry` accepts a manifest `entry`, `id`, or `jsName` alias from the
-[shared call namespace](JS_API.md#calls-and-manifest). The Pages
+`entry` uses the full Lean declaration name from the manifest
+[call interface](JS_API.md#calls-and-manifest). The Pages
 build's `prepare:pages` step generates URL-loadable samples in one generator
 session; [HARNESS.md](../HARNESS.md) owns site build/check commands. Generated
 packages, reports and `web/dist/` remain ignored local outputs.
