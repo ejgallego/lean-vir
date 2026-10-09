@@ -52,6 +52,12 @@ The `+Client.Program:virResourcePack` prerequisite checks the graph and prepares
 the program before the asset library compiles. There is no registration table,
 JSON recipe or carrier-library key.
 
+For a program owned by a dependency package, qualify the Lake prerequisite,
+for example `@producer/+Client.Program:virResourcePack`. The include still uses
+the semantic module name `Client.Program`, without the package qualifier. Lake
+prepares it in the producer's configured library directory; the consuming asset
+library does not need to import the producer's own resource carrier.
+
 ## 2. Embed it in the library
 
 In `Client/Resources.lean` (or the existing asset module):

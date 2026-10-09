@@ -209,7 +209,7 @@ const missingLog = run(leaf, "unprepared-include", "lake", ["build", "generate-s
   /VIR_RESOURCE_NOT_PREPARED.*Client.Alternative/s);
 const missingLines = missingCarrier.split("\n");
 const missingLine = missingLines.findIndex(line => line.includes("#[Client.Alternative]"));
-const missingColumn = missingLines[missingLine].indexOf("Client.Alternative") + 1;
+const missingColumn = missingLines[missingLine].indexOf("Client.Alternative");
 assert.ok(missingLog.includes(`resources/Client/Resources.lean:${missingLine + 1}:${missingColumn}: VIR_RESOURCE_NOT_PREPARED`),
   "missing preparation diagnostic points to the requested module identifier");
 assert.deepEqual(readFileSync(programStage), programFirst);

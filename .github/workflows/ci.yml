@@ -141,6 +141,7 @@ jobs:
       - run: npm run test:resources:acquisition
       - run: npm run test:resources:packing
       - run: npm run test:resources:program
+      - run: npm run test:resources:published
       - run: npm run test:resources:cache
       - name: Preserve failed resource cache campaign
         if: failure()
@@ -169,6 +170,7 @@ jobs:
             build/resource-acquisition-*/interrupted.json
             build/resource-acquisition-*/transport/args.json
             build/resource-packing-*/
+            build/resource-client-*/*.log
           if-no-files-found: ignore
       - run: npm run test:interface
       - run: npm run test:generator:memory

@@ -26,7 +26,7 @@ elab "include_vir_assets" "(" "modules" ":=" "#[" modules:ident,* "]" ")" : term
       let path := modToFilePath (root / "vir-assets") name "virres"
       return if ← path.pathExists then some path else none
     let some path := path?
-      | throwError "VIR_RESOURCE_NOT_PREPARED: {name}; declare +{name}:virResourcePack in the asset library's needs and build it"
+      | throwErrorAt id "VIR_RESOURCE_NOT_PREPARED: {name}; declare +{name}:virResourcePack in the asset library's needs and build it"
     embedPrepared path
   return mkApp2 (mkConst ``ResourceSet.mk) (mkConst ``Runtime.bundle)
     (← Meta.mkArrayLit (mkConst ``Bundle) programs.toList)
