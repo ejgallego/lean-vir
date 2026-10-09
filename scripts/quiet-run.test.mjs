@@ -43,6 +43,13 @@ test('spawn error is diagnosed', async t => {
   assert.equal(result.code, 1);
   assert.match(result.stderr, /ENOENT/);
 });
+test('command help arguments are passed through, not interpreted by the wrapper', async t => {
+  const log = join(await fixture(t), 'out.log');
+  const result = await run(['--log', log, '--', process.execPath, '-e', 'console.log(process.argv[1])', '--', '--help']).done;
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /^ok:/);
+  assert.equal(await readFile(log, 'utf8'), '--help\n');
+});
 test('log open failure does not start the command', async t => {
   const dir = await fixture(t);
   const marker = join(dir, 'started');

@@ -14,11 +14,11 @@ one summary line; failure prints the log location and its final lines.`);
 }
 
 function parseArgs(argv) {
-  if (argv.includes("-h") || argv.includes("--help")) return { help: true };
   const options = { log: null, tail: 40, command: [] };
   let index = 0;
   while (index < argv.length) {
     const argument = argv[index];
+    if (argument === "-h" || argument === "--help") return { help: true };
     if (argument === "--") {
       options.command = argv.slice(index + 1);
       break;
