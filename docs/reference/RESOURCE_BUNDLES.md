@@ -8,8 +8,8 @@ resource preparation command manually.
 
 ## Portable values
 
-The [review assumptions](../development/REVIEW_ASSUMPTIONS.md) define the supported cooperative
-input model. Validation diagnoses ordinary build/compatibility and byte-integrity
+The [review assumptions](../development/REVIEW_ASSUMPTIONS.md) define the supported
+cooperative input model. Validation diagnoses ordinary build/compatibility and byte-integrity
 failures; it is not hostile-program admission or a Lean soundness certificate.
 
 `Vir.Resources` imports types and pure validation, not a runtime carrier. A
@@ -50,7 +50,7 @@ installed libraries. It does not identify the runtime payload bytes.
 `virVersion` is one combined contract for the client-facing JavaScript API,
 runtime ABI and accepted program formats. It is independent of the runtime ABI
 number. It covers the accepted descriptor/program formats and the
-`createProgram` / `call` / `status` / `dispose` resource API. Current format
+`createProgram` / `call` / `status` / `dispose` resource API. Program format
 versions are defined in [`Vir.Package.Format`](../../Vir/Package/Format.lean)
 and remain in their headers and validators; applications do not
 select them independently. Advance `virVersion` when any constituent contract
@@ -67,10 +67,10 @@ There are no compatibility-field aliases. Descriptor schema is 2; pack framing
 is v1, with one descriptor reader.
 
 Native package and resource hashing share `Vir.Hash`, without Node, subprocesses
-or FFI. The SHA-256
-implementation follows [FIPS 180-4](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf)
-and supplies the format's digest. This is integrity
-checking, not publisher authentication or a claim of cryptographic certification.
+or FFI. Its SHA-256 implementation follows
+[FIPS 180-4](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf) and supplies
+the format's digest. This is integrity checking, not publisher authentication
+or a claim of cryptographic certification.
 
 ## Identity and internal pack
 
@@ -277,9 +277,9 @@ lean_lib ClientResources where
 
 The ordinary module facet in `needs` is the preparation prerequisite. It checks
 the source import graph before fetching the canonical compiled program.
-No registration target, helper import,
-handwritten recipe, alias, logical ID,
-interface ID or export list. Logical identity is the selected module's name.
+The selected module name supplies the logical identity; the build generates
+the callable inventory rather than asking the client to maintain a recipe or
+export table.
 The canonical root `vir_export ∪ vir_startup` inventory supplies callable names;
 imported markers do not become root entrypoints. Startup hooks are callable but
 not automatically executed.
@@ -307,9 +307,10 @@ actual returned artifact, including cache hits, while retaining semantic traces.
 The internal `virProgram` facet is shared with `:vir`: one cached result owns full
 artifact acquisition, implementation/location traces, analysis and emission.
 `Vir.Resources.Program` verifies its canonical package-set inventory and reads
-the actual root interface manifest. The resource adapter retains that generated interface, strips the private report
-and packages member bytes unchanged. Explicit registration-value traces preserve
-invalidation even for pure Lake targets; both adapters reuse generation.
+the actual root interface manifest. The resource adapter retains that generated
+interface, strips the private report and packages member bytes unchanged. The
+facet retains the input and prepared-file traces on cache hits and misses;
+both adapters reuse generation.
 Carrier-cycle checks still run before requesting the shared program job.
 Resource facets and direct program-tool calls reject `VIR_NATIVE_EXTERN_MANIFEST`
 (including an empty value) before using cached outputs: custom providers are not
@@ -387,11 +388,11 @@ try {
 }
 ```
 
-All three URLs come from the host's published bundle plan, not from build paths.
+All three URLs come from the returned `SiteFiles` loader paths, not build paths.
 For declared `text/javascript` files, responses may use `text/javascript` or
 `application/javascript` (with optional parameters). Other declared media types,
-including `application/wasm`, still require their matching response type. Payload
-length and hash checks are unchanged.
+including `application/wasm`, still require their matching response type.
+Payloads are checked against their declared lengths and hashes.
 The two manifest arguments must be explicit same-origin HTTP(S) `URL` objects,
 without credentials, query strings or fragments. The page must provide WebCrypto
 SHA-256 in a secure context: use HTTPS for deployment, or trusted localhost/loopback
@@ -428,9 +429,10 @@ and representation/layout facts matter; JSON key order, argument display names
 and diagnostic extensions do not. Exact declaration binding never uses aliases.
 
 Exact-name and ABI comparison requires verified package bytes. Every mismatch rejects in `program-validation`
-with zero runtime creations. The consumer owns a separately reviewed reference,
-not one inferred from the just-loaded program. This establishes interface/artifact
-agreement, not proof of executable behavior. Omission preserves two-URL callers.
+with zero runtime creations. If expectations are supplied, the consumer owns a
+separately reviewed reference, not one inferred from the just-loaded program.
+This establishes interface/artifact agreement, not proof of executable behavior.
+Ordinary two-URL creation does not require an independent reference.
 
 Each `createProgram` creates an independent runtime instance. No startup markers
 are invoked. Calls return the runtime's
@@ -483,4 +485,3 @@ The host still owns mount ordering: both a new mount and unmount invalidate
 older pending results. Stale successful instances must be disposed; stale failures
 must not replace the current view. See the
 [single-component example](../guides/RESOURCE_LIFETIME.md#overlapping-loads).
-

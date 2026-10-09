@@ -63,7 +63,7 @@ its widget shows the current source URI and first goal.
 This ports the goal panel and interactive code, not the surrounding infoview
 shell. Native expression selection and modifier-click definition navigation
 are not implemented yet; native popups now float, but documentation is plain
-text. The upstream checkpoint retains upstream behavior. See the
+text. The upstream component retains upstream behavior. See the
 [example reference](../development/NATIVE_INFOVIEW_PORT.md) for implementation details and
 the known upstream development-StrictMode popup limitation.
 

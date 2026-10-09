@@ -34,7 +34,7 @@ The key is the full Lean declaration name from the
 For compound types, retain the existing complete interface representation from
 separately reviewed compiler output alongside the client's typed adapter. Do not
 construct expectations from the program being loaded. ABI agreement does not
-prove semantics; native/browser oracle tests remain necessary.
+prove semantics; applications check behavior separately.
 
 ## Pending-creation cancellation
 
