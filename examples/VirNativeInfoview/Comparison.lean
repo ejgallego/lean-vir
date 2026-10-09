@@ -14,7 +14,7 @@ public section
 namespace VirNativeInfoview.Comparison
 
 open Lean.Vir Lean.Vir.React Lean.Vir.Infoview Lean.Vir.ProofWidgets
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 /-- Identical Lean goal panels; only the code-rendering implementation differs.
 The host supplies both panels with the same native data and upstream contexts. -/
@@ -22,13 +22,13 @@ def View : RuntimeM (FunctionComponent PanelWidgetProps) := do
   let Native ← VirNativeInfoview.GoalPanel.View
   let Composed ← VirNativeInfoview.Composition.View
   FunctionComponent.ofLean fun panel => do
-    <div className="vir-infoview-comparison" style={(← js%{
+    jsx%{<div className="vir-infoview-comparison" style={(← js%{
         "display" := (← js#"grid"), "gap" := (← js#"1rem"),
         "gridTemplateColumns" := (← js#"repeat(auto-fit, minmax(min(100%, 22rem), 1fr))") })}>
       <section data-renderer="lean"><h3>Lean port</h3><Native @props={panel}/></section>
       <section data-renderer="upstream"><h3>Upstream component checkpoint</h3>
         <p>Lean goal panel; TypeScript interactive code.</p><Composed @props={panel}/></section>
-    </div>
+    </div>}
 
 vir_proof_widget View
 

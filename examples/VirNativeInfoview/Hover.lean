@@ -11,7 +11,7 @@ public import Vir.ProofWidgets.Jsx
 public section
 namespace VirNativeInfoview.Hover
 open Lean.Vir Lean.Vir.React Lean.Vir.Infoview
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 structure State where
   visible : Bool := false

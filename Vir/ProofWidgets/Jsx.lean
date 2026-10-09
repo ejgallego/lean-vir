@@ -14,6 +14,11 @@ public section
 /-!
 JSX syntax for VIR's native, client-executed ProofWidgets HTML facade.
 
+A `jsx%{...}` literal contains a single root element. The explicit delimiter
+keeps element syntax separate from Lean terms and do-block statements. This
+adopts the notation proposed in PR197 while retaining VIR's parser until the
+upstream HTML parser is available in Lean 4.36.
+
 The parser follows the familiar ProofWidgets JSX surface, but its lowering is
 deliberately native: lowercase tags lower directly to React-node construction
 actions and uppercase tags lower to Lean-authored component actions. It does
@@ -72,19 +77,19 @@ meta def jsxTag.formatter : Formatter :=
 meta def jsxTag.parenthesizer : Parenthesizer :=
   Parenthesizer.visitToken
 
-scoped syntax jsxTag : virProofWidgetsJsxTag
+syntax jsxTag : virProofWidgetsJsxTag
 
 /-- Reads one declared field from a typed native props object. -/
-scoped syntax:max "js_field% " term:arg str : term
+syntax:max "js_field% " term:arg str : term
 
-scoped syntax str : virProofWidgetsJsxAttrVal
+syntax str : virProofWidgetsJsxAttrVal
 /-- Interpolates an expression into a JSX attribute value. -/
-scoped syntax group("{" term "}") : virProofWidgetsJsxAttrVal
-scoped syntax jsxTag "=" virProofWidgetsJsxAttrVal : virProofWidgetsJsxAttr
+syntax group("{" term "}") : virProofWidgetsJsxAttrVal
+syntax jsxTag "=" virProofWidgetsJsxAttrVal : virProofWidgetsJsxAttr
 /-- Supplies a complete native props object; cannot be combined with other attributes. -/
-scoped syntax group(" @props={" term "}") : virProofWidgetsJsxAttr
+syntax group(" @props={" term "}") : virProofWidgetsJsxAttr
 /-- Recognized only to diagnose the removed, misleading exact-props spelling. -/
-scoped syntax group(" {..." term "}") : virProofWidgetsJsxAttr
+syntax group(" {..." term "}") : virProofWidgetsJsxAttr
 
 /-- Characters not allowed inside JSX plain text. -/
 meta def jsxTextForbidden : String := "{<>}$"
@@ -109,19 +114,20 @@ meta def jsxText.formatter : Formatter :=
 meta def jsxText.parenthesizer : Parenthesizer :=
   Parenthesizer.visitToken
 
-scoped syntax "<" virProofWidgetsJsxTag virProofWidgetsJsxAttr* "/>" : virProofWidgetsJsxElement
-scoped syntax "<" virProofWidgetsJsxTag virProofWidgetsJsxAttr* ">" virProofWidgetsJsxChild* "</"
+syntax "<" virProofWidgetsJsxTag virProofWidgetsJsxAttr* "/>" : virProofWidgetsJsxElement
+syntax "<" virProofWidgetsJsxTag virProofWidgetsJsxAttr* ">" virProofWidgetsJsxChild* "</"
   virProofWidgetsJsxTag ">" :
   virProofWidgetsJsxElement
 
-scoped syntax jsxText : virProofWidgetsJsxChild
+syntax jsxText : virProofWidgetsJsxChild
 /-- Retained only to diagnose the removed Lean-array child spread. -/
-scoped syntax "{..." term "}" : virProofWidgetsJsxChild
+syntax "{..." term "}" : virProofWidgetsJsxChild
 /-- Inserts a supported native React child value, or executes its construction action. -/
-scoped syntax "{" term "}" : virProofWidgetsJsxChild
-scoped syntax virProofWidgetsJsxElement : virProofWidgetsJsxChild
+syntax "{" term "}" : virProofWidgetsJsxChild
+syntax virProofWidgetsJsxElement : virProofWidgetsJsxChild
 
-scoped syntax:max virProofWidgetsJsxElement : term
+/-- Constructs a native React node from one JSX root element. -/
+syntax:max "jsx%" "{" virProofWidgetsJsxElement "}" : term
 
 -- Internal elaboration node: only JSX interpolation inserts this syntax.
 syntax (name := nativeChild) "vir_native_child% " term : term
@@ -246,7 +252,7 @@ private meta def transformTag
         `(vir_native_child% $term)
       | `(virProofWidgetsJsxChild| $element:virProofWidgetsJsxElement) =>
         whitespaceBefore := trailingWhitespace element
-        `($element:virProofWidgetsJsxElement)
+        `(jsx%{$element:virProofWidgetsJsxElement})
       | `(virProofWidgetsJsxChild| {... $_term }%$childToken) =>
         Macro.throwErrorAt childToken "JSX child spread has been removed; insert a native array of supported React child values with {children}"
       | stx => Macro.throwErrorAt stx "unknown JSX child syntax"
@@ -406,10 +412,10 @@ private meta def elabTag
     (transformTag tk opening closing attrs children sealProps)) none
 
 elab_rules : term
-  | `(<$name:virProofWidgetsJsxTag $[$attrs:virProofWidgetsJsxAttr]* />%$tk) =>
+  | `(jsx%{ <$name:virProofWidgetsJsxTag $[$attrs:virProofWidgetsJsxAttr]* />%$tk }) =>
     elabTag tk name name attrs #[]
-  | `(<$opening:virProofWidgetsJsxTag $[$attrs:virProofWidgetsJsxAttr]* >%$tk
-      $children*</$closing>) =>
+  | `(jsx%{ <$opening:virProofWidgetsJsxTag $[$attrs:virProofWidgetsJsxAttr]* >%$tk
+      $children*</$closing> }) =>
     elabTag tk opening closing attrs children
 
 end Lean.Vir.ProofWidgets.Jsx
