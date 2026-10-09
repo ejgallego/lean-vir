@@ -53,10 +53,6 @@ public inductive InterfaceClassifierContext where
   | constructorField (field : String) (constructor : Lean.Name) (type : Lean.Expr)
   | structureField (field structureName : Lean.Name) (type : Lean.Expr)
   | arrayElement
-  | listElement
-  | optionElement
-  | prodFst
-  | prodSnd
   | signatureArgument (type : Lean.Expr)
   | signatureResult (type : Lean.Expr)
   deriving BEq, Repr
@@ -113,10 +109,6 @@ private def InterfaceClassifierContext.wrap
   | .structureField field structureName type =>
       m!"field `{field}` of structure `{structureName}` has unsupported type {quotedExpr type}: {reason}"
   | .arrayElement => m!"unsupported Array element type: {reason}"
-  | .listElement => m!"unsupported List element type: {reason}"
-  | .optionElement => m!"unsupported Option element type: {reason}"
-  | .prodFst => m!"unsupported Prod fst type: {reason}"
-  | .prodSnd => m!"unsupported Prod snd type: {reason}"
   | .signatureArgument type => m!"unsupported argument type {quotedExpr type}: {reason}"
   | .signatureResult type => m!"unsupported result type {quotedExpr type}: {reason}"
 

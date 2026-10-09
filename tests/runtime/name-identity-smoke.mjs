@@ -26,7 +26,7 @@ try {
   assert.equal(generated.status, 0, `${generated.stderr}\n${generated.stdout}`);
   const bytes = await readFile(path);
   const info = readIrPackageInfo(bytes);
-  assert.equal(info.manifest.version, 9);
+  assert.equal(info.manifest.version, 10);
   const factory = createVirRuntimeFactory({ wasmBytes: await readFile(new URL("../../web/public/vir-upstream.wasm", import.meta.url)) });
   const key = parts => parts.map(part => typeof part === "string"
     ? `s${Buffer.from(part, "utf8").toString("hex")}/` : `n${part.num}/`).join("");
@@ -113,11 +113,11 @@ try {
   });
   await test("old manifests reject before initialization and permit a current-package retry", async () => {
     const canonical = replaceIrPackageManifest(bytes, info.manifest);
-    for (const version of [6, 7, 8]) {
+    for (const version of [6, 7, 8, 9]) {
       const legacy = structuredClone(info.manifest);
       legacy.version = legacy.metadata.manifestVersion = version;
       // Bypass the writer's current-schema validation. Changing only the two
-      // version digits preserves section offsets and isolates version admission.
+      // versions plus JSON whitespace preserves offsets and isolates admission.
       const oldPackage = rewriteSameLengthManifest(canonical, legacy);
       const runtime = await factory.createRuntime();
       let finishes = 0;
@@ -129,7 +129,7 @@ try {
       try {
         assert.throws(
           () => runtime.loadIrPackageSetBytes([oldPackage]),
-          /version: 9.*regenerate packages with the matching SDK/,
+          /version: 10.*regenerate packages with the matching SDK/,
         );
         assert.equal(finishes, 0);
         assert.equal(runtime.packageDeclCount(), 0);
@@ -153,7 +153,10 @@ function rewriteSameLengthManifest(bytes, manifest) {
     value => value.kind === IR_PACKAGE_SECTION.INTERFACE_MANIFEST,
   );
   assert.ok(section, "fixture must contain an interface manifest");
-  const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest));
+  const text = JSON.stringify(manifest);
+  const missingBytes = section.byteLength - 12 - Buffer.byteLength(text);
+  assert.ok(missingBytes >= 0, "version fixture must fit the existing section");
+  const manifestBytes = new TextEncoder().encode(text + " ".repeat(missingBytes));
   assert.equal(manifestBytes.byteLength, section.byteLength - 12);
   const output = Uint8Array.from(bytes);
   output.set(manifestBytes, section.offset + 12);

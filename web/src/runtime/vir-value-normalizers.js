@@ -15,19 +15,6 @@ export function normalizeArray(value, label) {
   return value;
 }
 
-export function normalizeOption(value, _label) {
-  if (value == null) return { some: false, value: null };
-  return { some: true, value };
-}
-
-export function normalizePair(value, label) {
-  if (value !== null && typeof value === "object" && !Array.isArray(value) &&
-      hasOwn(value, "fst") && hasOwn(value, "snd")) {
-    return { fst: value.fst, snd: value.snd };
-  }
-  throw new Error(`${label} must be a pair { fst, snd }`);
-}
-
 export function normalizeStructure(value, fields, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${label} must be an object`);
@@ -45,8 +32,6 @@ export function normalizeStructure(value, fields, label) {
         field.type.fields,
         `${label}.${field.name}`,
       );
-    } else if (field.type?.interfaceTag === INTERFACE_TAG.OPTION) {
-      normalized[field.name] = null;
     } else {
       throw new Error(`${label} is missing field ${field.name}`);
     }
@@ -92,18 +77,15 @@ export function normalizeTaggedUnion(value, type, label) {
   return { ...match, payload: value.value };
 }
 
-// Build the canonical shape from a tagged payload or custom-inductive field record.
+// Build the canonical shape from a payload: raw for one field, a record for many.
 // Constructor names and fields come from admitted descriptors.
 export function constructorValue(type, ctor, payload) {
   const kind = ctor.jsName;
-  if (type.interfaceTag === INTERFACE_TAG.TAGGED_UNION) {
+  if (type.interfaceTag === INTERFACE_TAG.TAGGED_UNION || ctor.fields.length === 1) {
     return { kind, value: payload };
   }
   if (ctor.fields.length === 0) {
     return { kind };
-  }
-  if (ctor.fields.length === 1) {
-    return { kind, value: payload[ctor.fields[0].name] };
   }
   return { kind, fields: payload };
 }
@@ -126,7 +108,7 @@ export function normalizeCustomInductive(value, type, label) {
   const ctorLabel = `${label}.${ctor.jsName}`;
   if (ctor.fields.length === 0) {
     requireOnlyKeys(value, constructorPlan.allowedKeys, label, expectedShape);
-    return { index, ctor, fields: {} };
+    return { index, ctor, payload: null };
   }
   if (ctor.fields.length === 1) {
     requireOnlyKeys(value, constructorPlan.allowedKeys, label, expectedShape);
@@ -136,7 +118,7 @@ export function normalizeCustomInductive(value, type, label) {
     return {
       index,
       ctor,
-      fields: { [ctor.fields[0].name]: value.value },
+      payload: value.value,
     };
   }
   requireOnlyKeys(value, constructorPlan.allowedKeys, label, expectedShape);
@@ -146,7 +128,7 @@ export function normalizeCustomInductive(value, type, label) {
   return {
     index,
     ctor,
-    fields: normalizeCustomInductiveFields(value.fields, constructorPlan, ctorLabel),
+    payload: normalizeCustomInductiveFields(value.fields, constructorPlan, ctorLabel),
   };
 }
 

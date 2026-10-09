@@ -43,7 +43,7 @@ export class PrimitiveObjectRuntime extends ObjectRuntime {
   objectResultSupported(type) {
     return primitiveTags.has(type?.interfaceTag);
   }
-  makeObjectValue(type, value, label, selfType = null) {
+  makeObjectValue(type, value, label) {
     const tag = type?.interfaceTag;
     switch (tag) {
       case INTERFACE_TAG.UNIT:
@@ -96,7 +96,7 @@ export class PrimitiveObjectRuntime extends ObjectRuntime {
         throw new Error(`${label} has unsupported object ABI argument type`);
     }
   }
-  liftObjectValue(type, obj, label, selfType = null) {
+  liftObjectValue(type, obj, label) {
     const tag = type?.interfaceTag;
     switch (tag) {
       case INTERFACE_TAG.UNIT:

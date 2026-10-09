@@ -86,7 +86,8 @@ const recursive = {
           type: {
             type: "Tree",
             interfaceTag: 26,
-            kind: "recursiveSelf",
+            kind: "recursiveRef",
+            depth: 0,
             name: "Tree",
           },
           layout: { kind: "object", index: 0 },
@@ -175,7 +176,7 @@ test("constructor order, recursive identity and callback effects are ABI facts",
         ...signature,
         result: recursive.constructors[1].fields[0].type,
       }),
-    /outside/,
+    /no enclosing recursive descriptor/,
   );
   const callback = {
     type: "Nat -> Nat",
@@ -202,6 +203,19 @@ test("constructor order, recursive identity and callback effects are ABI facts",
       },
     }),
   );
+});
+
+test("lexical recursion depth is checked at manifest admission", () => {
+  for (const depth of [-1, 0.5, 1, undefined]) {
+    const result = structuredClone(recursive);
+    result.constructors[1].fields[0].type.depth = depth;
+    assert.throws(() => interfaceSignatureKey({ args: [], result, effect: "pure" }),
+      /depth.*(?:non-negative 32-bit integer|no enclosing recursive descriptor)/);
+  }
+  for (const interfaceTag of [17, 18, 19]) {
+    assert.throws(() => interfaceSignatureKey({ args: [], result: { type: "retired container", interfaceTag }, effect: "pure" }),
+      /interfaceTag is not supported/);
+  }
 });
 
 test("structural key ignores key order/diagnostics but retains field names", () => {
@@ -242,8 +256,7 @@ test("every current interface tag has an explicit comparison rule", () => {
   const enumCtor = { name: "Flag.off", jsName: "off", tag: 0 };
   descriptors.push(
     { type: "Flag", interfaceTag: 14, kind: "simpleEnum", constructors: [enumCtor] },
-    ...[16, 17, 18].map(interfaceTag => ({ type: "container Nat", interfaceTag, element: nat })),
-    { type: "Nat × Nat", interfaceTag: 19, fst: nat, snd: nat },
+    ...[16].map(interfaceTag => ({ type: "container Nat", interfaceTag, element: nat })),
     record,
     { type: "Choice", interfaceTag: 21, kind: "taggedUnion", name: "Choice", constructors: [{ ...enumCtor, objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0, layout: { kind: "object", index: 0 }, type: nat }] },
     { type: "Js Unit", interfaceTag: 23, kind: "resource", name: "Js" },
@@ -256,6 +269,6 @@ test("every current interface tag has an explicit comparison rule", () => {
     assert.equal(typeof interfaceSignatureKey({ args: [], result: type, effect: "pure" }), "string");
     seen.add(type.interfaceTag);
   }
-  seen.add(26); // recursiveSelf is exercised inside its owning custom descriptor above.
+  seen.add(26); // recursiveRef is exercised inside its owning custom descriptor above.
   assert.deepEqual([...seen].sort((a, b) => a - b), Object.values(INTERFACE_TAG).sort((a, b) => a - b));
 });

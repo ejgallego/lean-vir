@@ -14,14 +14,14 @@ def packageMagic : String := "lean-vir-ir-package"
 
 def currentPackageFormatVersion : Nat := 11
 
-def currentInterfaceManifestVersion : Nat := 9
+def currentInterfaceManifestVersion : Nat := 10
 
 /-- Native SDK and resource producers share these runtime contract versions. -/
 def currentRuntimeAbiVersion : Nat := 4
 
 /-- Resource contract covering the client API, runtime ABI and accepted program formats.
 Advance on a breaking change to any constituent contract; not an alias for runtime ABI. -/
-def currentVirCompatibilityVersion : Nat := 3
+def currentVirCompatibilityVersion : Nat := 4
 
 def packageSetFormat : String := "lean-vir-ir-package-set"
 

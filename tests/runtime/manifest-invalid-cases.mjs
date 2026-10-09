@@ -4,9 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import {
-  INTERFACE_MANIFEST_VERSION,
-} from "../../web/src/runtime/interface-manifest.js";
+import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
 
 function packageTarget(overrides = {}) {
   return {
@@ -42,21 +40,33 @@ function hostImport(overrides = {}) {
 }
 
 export const invalidManifestCases = [
-  ...[undefined, "s0/", "n01/", "n-1/", "S41/", "sff/"].map(key => ({
+  ...[undefined, "s0/", "n01/", "n-1/", "S41/", "sff/"].map((key) => ({
     name: `invalid structural export name key ${String(key)}`,
-    mutate: manifest => { manifest.exports[0].nameKey = key; },
+    mutate: (manifest) => {
+      manifest.exports[0].nameKey = key;
+    },
     pattern: /exports\[0\]\.nameKey.*structural Lean name key/,
   })),
   {
     name: "duplicate structural export identity with distinct aliases",
-    mutate: manifest => { manifest.exports.push({ ...structuredClone(manifest.exports[0]),
-      entry: "another alias", id: "anotherId", jsName: "anotherJsName" }); },
+    mutate: (manifest) => {
+      manifest.exports.push({
+        ...structuredClone(manifest.exports[0]),
+        entry: "another alias",
+        id: "anotherId",
+        jsName: "anotherJsName",
+      });
+    },
     pattern: /nameKey duplicates another interface export/,
   },
   {
     name: "duplicate structural host identity with distinct aliases",
-    mutate: manifest => { manifest.hostImports = [hostImport(),
-      hostImport({ slot: 1, name: "another alias", symbol: "anotherSymbol" })]; },
+    mutate: (manifest) => {
+      manifest.hostImports = [
+        hostImport(),
+        hostImport({ slot: 1, name: "another alias", symbol: "anotherSymbol" }),
+      ];
+    },
     pattern: /nameKey duplicates another host import/,
   },
   {
@@ -417,7 +427,9 @@ export const invalidManifestCases = [
     name: `invalid enum constructor jsName ${String(jsName)}`,
     mutate: (manifest) => {
       manifest.exports[0].result = {
-        type: "Mode", interfaceTag: 14, kind: "simpleEnum",
+        type: "Mode",
+        interfaceTag: 14,
+        kind: "simpleEnum",
         constructors: [{ name: "Mode.cold", jsName, tag: 0 }],
       };
     },
@@ -427,7 +439,10 @@ export const invalidManifestCases = [
     name: "empty enum constructor table",
     mutate: (manifest) => {
       manifest.exports[0].result = {
-        type: "Mode", interfaceTag: 14, kind: "simpleEnum", constructors: [],
+        type: "Mode",
+        interfaceTag: 14,
+        kind: "simpleEnum",
+        constructors: [],
       };
     },
     pattern: /constructors must be a non-empty array/,
@@ -436,11 +451,21 @@ export const invalidManifestCases = [
     name: "tagged constructor missing jsName at admission",
     mutate: (manifest) => {
       manifest.exports[0].result = {
-        type: "Sum Nat Nat", interfaceTag: 21, kind: "taggedUnion", name: "Sum",
-        constructors: [{
-          name: "Sum.inl", tag: 0, objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0,
-          type: { type: "Nat", interfaceTag: 0 }, layout: { kind: "object", index: 0 },
-        }],
+        type: "Sum Nat Nat",
+        interfaceTag: 21,
+        kind: "taggedUnion",
+        name: "Sum",
+        constructors: [
+          {
+            name: "Sum.inl",
+            tag: 0,
+            objectFieldCount: 1,
+            usizeFieldCount: 0,
+            scalarByteSize: 0,
+            type: { type: "Nat", interfaceTag: 0 },
+            layout: { kind: "object", index: 0 },
+          },
+        ],
       };
     },
     pattern: /constructors\[0\]\.jsName must be a non-empty string/,
@@ -449,11 +474,20 @@ export const invalidManifestCases = [
     name: "custom constructor missing jsName at admission",
     mutate: (manifest) => {
       manifest.exports[0].result = {
-        type: "Empty", interfaceTag: 25, kind: "customInductive", name: "Empty",
-        constructors: [{
-          name: "Empty.empty", tag: 0,
-          objectFieldCount: 0, usizeFieldCount: 0, scalarByteSize: 0, fields: [],
-        }],
+        type: "Empty",
+        interfaceTag: 25,
+        kind: "customInductive",
+        name: "Empty",
+        constructors: [
+          {
+            name: "Empty.empty",
+            tag: 0,
+            objectFieldCount: 0,
+            usizeFieldCount: 0,
+            scalarByteSize: 0,
+            fields: [],
+          },
+        ],
       };
     },
     pattern: /constructors\[0\]\.jsName must be a non-empty string/,
@@ -496,7 +530,7 @@ export const invalidManifestCases = [
       /constructors\[0\] with no fields must have zero runtime field counts/,
   },
   {
-    name: "custom inductive recursiveSelf owner mismatch",
+    name: "custom inductive recursiveRef owner mismatch",
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Tree Nat",
@@ -515,12 +549,13 @@ export const invalidManifestCases = [
               {
                 name: "children",
                 type: {
-                  type: "List Tree",
-                  interfaceTag: 17,
+                  type: "Array Tree",
+                  interfaceTag: 16,
                   element: {
                     type: "Other",
                     interfaceTag: 26,
-                    kind: "recursiveSelf",
+                    kind: "recursiveRef",
+                    depth: 0,
                     name: "Other",
                   },
                 },
@@ -531,40 +566,40 @@ export const invalidManifestCases = [
         ],
       };
     },
-    pattern:
-      /constructors\[0\]\.fields\[0\]\.type\.element\.name must match Tree/,
+    pattern: /result\.branch\.children\.element\.name must match Tree/,
   },
   {
-    name: "root recursiveSelf",
+    name: "root recursiveRef",
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Tree Nat",
         interfaceTag: 26,
-        kind: "recursiveSelf",
+        kind: "recursiveRef",
+        depth: 0,
         name: "Tree",
       };
     },
-    pattern: /result cannot be recursiveSelf outside a recursive descriptor/,
+    pattern: /result.depth has no enclosing recursive descriptor/,
   },
   {
-    name: "dangling nested recursiveSelf",
+    name: "dangling nested recursiveRef",
     mutate: (manifest) => {
       manifest.exports[0].result = {
-        type: "Option Tree",
-        interfaceTag: 18,
+        type: "Array Tree",
+        interfaceTag: 16,
         element: {
           type: "Tree Nat",
           interfaceTag: 26,
-          kind: "recursiveSelf",
+          kind: "recursiveRef",
+          depth: 0,
           name: "Tree",
         },
       };
     },
-    pattern:
-      /result\.element cannot be recursiveSelf outside a recursive descriptor/,
+    pattern: /result\.element.depth has no enclosing recursive descriptor/,
   },
   {
-    name: "structure recursiveSelf owner mismatch",
+    name: "structure recursiveRef owner mismatch",
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Chain",
@@ -578,12 +613,13 @@ export const invalidManifestCases = [
           {
             name: "next",
             type: {
-              type: "Option Chain",
-              interfaceTag: 18,
+              type: "Array Chain",
+              interfaceTag: 16,
               element: {
                 type: "Other",
                 interfaceTag: 26,
-                kind: "recursiveSelf",
+                kind: "recursiveRef",
+                depth: 0,
                 name: "Other",
               },
             },
@@ -592,7 +628,7 @@ export const invalidManifestCases = [
         ],
       };
     },
-    pattern: /fields\[0\]\.type\.element\.name must match Chain/,
+    pattern: /result\.next\.element\.name must match Chain/,
   },
   {
     name: "duplicate custom inductive field",
@@ -850,6 +886,7 @@ export const invalidManifestCases = [
         hostImport({ slot: 1, name: "Example.otherHost" }),
       ];
     },
-    pattern: /hostImports\[1\]\.symbol alias "vir_host_import_0" belongs to more than one host import/,
+    pattern:
+      /hostImports\[1\]\.symbol alias "vir_host_import_0" belongs to more than one host import/,
   },
 ];

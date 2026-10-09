@@ -17,22 +17,26 @@ import { trivialStructureField } from "./object-boundary.js";
 const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
 const objectLayoutPlanCache = new WeakMap();
+// Zero-sized scalar/usize buffers contain no mutable slots. Object references
+// always get fresh owned slots, even for constructors with no scalar storage.
+const emptyUSizeFields = Object.freeze([]);
+const emptyScalarBytes = new Uint8Array(0);
 
-export function objectArgumentSupported(type, selfType = null) {
-  return objectTypeSupported(type, false, selfType);
+export function objectArgumentSupported(type, bindings = []) {
+  return objectTypeSupported(type, false, bindings);
 }
 
-export function objectResultSupported(type, selfType = null) {
-  return objectTypeSupported(type, true, selfType);
+export function objectResultSupported(type, bindings = []) {
+  return objectTypeSupported(type, true, bindings);
 }
 
 // One descriptor traversal; automatic functions are results only. These helpers
 // consume admitted descriptors, not another independently validated type grammar.
-function objectTypeSupported(type, isResult, selfType) {
+function objectTypeSupported(type, isResult, bindings) {
   const fieldSupported = isResult ? objectResultSupported : objectArgumentSupported;
   switch (type?.interfaceTag) {
-    case INTERFACE_TAG.RECURSIVE_SELF:
-      return selfType !== null;
+    case INTERFACE_TAG.RECURSIVE_REF:
+      return type.depth < bindings.length;
     case INTERFACE_TAG.FUNCTION:
       return isResult;
     case INTERFACE_TAG.UNIT:
@@ -53,62 +57,58 @@ function objectTypeSupported(type, isResult, selfType) {
     case INTERFACE_TAG.SIMPLE_ENUM:
       return true;
     case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
-      return fieldSupported(type.element, selfType);
-    case INTERFACE_TAG.PROD:
-      return fieldSupported(type.fst, selfType) && fieldSupported(type.snd, selfType);
+      return fieldSupported(type.element, bindings);
     case INTERFACE_TAG.STRUCTURE:
-      return objectStructureSupported(type, fieldSupported);
+      return objectStructureSupported(type, fieldSupported, bindings);
     case INTERFACE_TAG.TAGGED_UNION:
-      return objectTaggedUnionSupported(type, fieldSupported, selfType);
+      return objectTaggedUnionSupported(type, fieldSupported, bindings);
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      return objectCustomInductiveSupported(type, fieldSupported);
+      return objectCustomInductiveSupported(type, fieldSupported, bindings);
     default:
       return false;
   }
 }
 
-function objectStructureSupported(type, fieldSupported) {
+function objectStructureSupported(type, fieldSupported, bindings) {
   const fields = type.fields;
   const trivial = trivialStructureField(type, fields);
   if (trivial !== null) {
-    return fieldSupported(trivial.type, type);
+    return fieldSupported(trivial.type, [type, ...bindings]);
   }
-  return objectLayoutSupported(type, fieldSupported, type);
+  return objectLayoutSupported(type, fieldSupported, [type, ...bindings]);
 }
 
-function objectTaggedUnionSupported(type, fieldSupported, selfType) {
+function objectTaggedUnionSupported(type, fieldSupported, bindings) {
   // The constructor owns storage, but its payload retains the enclosing recursive type.
   return type.constructors.every((ctor) =>
-    objectLayoutSupported(ctor, fieldSupported, selfType));
+    objectLayoutSupported(ctor, fieldSupported, bindings));
 }
 
-function objectCustomInductiveSupported(type, fieldSupported) {
+function objectCustomInductiveSupported(type, fieldSupported, bindings) {
   return type.constructors.every((ctor) => {
     if (ctor.fields.length === 0) {
       const counts = objectRuntimeCounts(ctor, "object custom inductive");
       return counts.objectFieldCount === 0 && counts.usizeFieldCount === 0 && counts.scalarByteSize === 0;
     }
-    return objectLayoutSupported(ctor, fieldSupported, type);
+    return objectLayoutSupported(ctor, fieldSupported, [type, ...bindings]);
   });
 }
 
-function objectLayoutSupported(owner, fieldSupported, selfType) {
+function objectLayoutSupported(owner, fieldSupported, bindings) {
   let plan;
   try {
     plan = objectLayoutPlan(owner, "object layout");
   } catch {
     return false;
   }
-  return plan.fields.every((fieldPlan) => objectFieldPlanSupported(fieldPlan, fieldSupported, selfType));
+  return plan.fields.every((fieldPlan) => objectFieldPlanSupported(fieldPlan, fieldSupported, bindings));
 }
 
-function objectFieldPlanSupported(fieldPlan, fieldSupported, selfType) {
+function objectFieldPlanSupported(fieldPlan, fieldSupported, bindings) {
   const field = fieldPlan.field;
   switch (fieldPlan.kind) {
     case "object":
-      return fieldSupported(field.type, selfType);
+      return fieldSupported(field.type, bindings);
     case "usize":
       return field.type?.interfaceTag === INTERFACE_TAG.USIZE;
     case "scalar":
@@ -122,8 +122,8 @@ export function objectLayoutSlotsFromPlan(plan) {
   // Slots own per-call Lean references. Cache metadata, never these mutable buffers.
   return {
     objectFields: Array(plan.objectFieldCount).fill(0),
-    usizeFields: Array(plan.usizeFieldCount).fill(0n),
-    scalarBytes: new Uint8Array(plan.scalarByteSize),
+    usizeFields: plan.usizeFieldCount === 0 ? emptyUSizeFields : Array(plan.usizeFieldCount).fill(0n),
+    scalarBytes: plan.scalarByteSize === 0 ? emptyScalarBytes : new Uint8Array(plan.scalarByteSize),
   };
 }
 

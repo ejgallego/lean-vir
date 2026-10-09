@@ -55,23 +55,23 @@ const expectedShapes =
 assert.deepEqual(normalizeCustomInductive({ kind: "nil" }, type, "value"), {
   index: 0,
   ctor: nilCtor,
-  fields: {},
+  payload: null,
 });
 assert.deepEqual(normalizeCustomInductive({ kind: "unary", value: 1 }, type, "value"), {
   index: 1,
   ctor: unaryCtor,
-  fields: { arg1: 1 },
+  payload: 1,
 });
 assert.deepEqual(
   normalizeCustomInductive({ kind: "pair", fields: { left: 1, right: 2 } }, type, "value"),
-  { index: 2, ctor: pairCtor, fields: { left: 1, right: 2 } },
+  { index: 2, ctor: pairCtor, payload: { left: 1, right: 2 } },
 );
 
 // Exercise repeated normalization against the same admitted descriptor.
 assert.deepEqual(normalizeCustomInductive({ kind: "unary", value: 3 }, type, "repeat"), {
   index: 1,
   ctor: unaryCtor,
-  fields: { arg1: 3 },
+  payload: 3,
 });
 assert.throws(
   () => normalizeCustomInductive({ kind: "Example.unary", value: 1 }, type, "value"),

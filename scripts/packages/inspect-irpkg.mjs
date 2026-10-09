@@ -131,12 +131,12 @@ function descriptorSummary(type) {
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return `customInductive ${type.name ?? type.type ?? "?"} { ${customInductiveConstructors(type).join(", ")} }`;
     case INTERFACE_TAG.STRUCTURE:
-      if (!containsRecursiveSelf(type)) return null;
+      if (!containsRecursiveReference(type)) return null;
       return `structure ${type.name ?? type.type ?? "?"} { ${(type.fields ?? [])
         .map((field) => `${field.name}: ${descriptorLabel(field.type)}`)
         .join(", ")} }`;
     default:
-      return containsRecursiveSelf(type) ? descriptorLabel(type) : null;
+      return containsRecursiveReference(type) ? descriptorLabel(type) : null;
   }
 }
 
@@ -152,16 +152,10 @@ function customInductiveConstructors(type) {
 
 function descriptorLabel(type) {
   switch (type?.interfaceTag) {
-    case INTERFACE_TAG.RECURSIVE_SELF:
-      return `recursiveSelf ${type.name ?? type.type ?? "?"}`;
+    case INTERFACE_TAG.RECURSIVE_REF:
+      return `recursiveRef ${type.name} depth ${type.depth}`;
     case INTERFACE_TAG.ARRAY:
       return `Array<${descriptorLabel(type.element)}>`;
-    case INTERFACE_TAG.LIST:
-      return `List<${descriptorLabel(type.element)}>`;
-    case INTERFACE_TAG.OPTION:
-      return `Option<${descriptorLabel(type.element)}>`;
-    case INTERFACE_TAG.PROD:
-      return `Prod<${descriptorLabel(type.fst)}, ${descriptorLabel(type.snd)}>`;
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return `customInductive ${type.name ?? type.type ?? "?"}`;
     case INTERFACE_TAG.STRUCTURE:
@@ -173,32 +167,28 @@ function descriptorLabel(type) {
   }
 }
 
-function containsRecursiveSelf(type) {
+function containsRecursiveReference(type) {
   switch (type?.interfaceTag) {
-    case INTERFACE_TAG.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_REF:
       return true;
     case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
-      return containsRecursiveSelf(type.element);
-    case INTERFACE_TAG.PROD:
-      return containsRecursiveSelf(type.fst) || containsRecursiveSelf(type.snd);
+      return containsRecursiveReference(type.element);
     case INTERFACE_TAG.STRUCTURE:
       return (type.fields ?? []).some((field) =>
-        containsRecursiveSelf(field.type),
+        containsRecursiveReference(field.type),
       );
     case INTERFACE_TAG.TAGGED_UNION:
       return (type.constructors ?? []).some((ctor) =>
-        containsRecursiveSelf(ctor.type),
+        containsRecursiveReference(ctor.type),
       );
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return (type.constructors ?? []).some((ctor) =>
-        (ctor.fields ?? []).some((field) => containsRecursiveSelf(field.type)),
+        (ctor.fields ?? []).some((field) => containsRecursiveReference(field.type)),
       );
     case INTERFACE_TAG.FUNCTION:
       return (
-        (type.args ?? []).some((arg) => containsRecursiveSelf(arg.type)) ||
-        containsRecursiveSelf(type.result)
+        (type.args ?? []).some((arg) => containsRecursiveReference(arg.type)) ||
+        containsRecursiveReference(type.result)
       );
     default:
       return false;

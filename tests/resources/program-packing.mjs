@@ -343,8 +343,8 @@ for (const role of ["root", "dependency"]) {
 }
 for (const role of ["root", "dependency"]) {
   for (const [label, transform] of [
-    ["obsolete-interface", (text) => replaceFixture(text, '"version":9', '"version":8')],
-    ["wrong-manifest-metadata", (text) => replaceFixture(text, '"manifestVersion":9', '"manifestVersion":8')],
+    ["obsolete-interface", (text) => replaceFixture(text, '"version":10', '"version":9 ')],
+    ["wrong-manifest-metadata", (text) => replaceFixture(text, '"manifestVersion":10', '"manifestVersion":9 ')],
     ["wrong-package-metadata", (text) => replaceFixture(text, '"packageFormatVersion":11', '"packageFormatVersion":10')],
     ["wrong-lean-revision", (text, manifest) => replaceFixture(text,
       `"leanGithash":${JSON.stringify(manifest.metadata.leanGithash)}`,

@@ -132,7 +132,7 @@ runtime also calls `vir_validate_package_contract` between prepare and finish:
 one transient binary projection of the validated manifest is compared with the
 decoded call tables. It checks ordered export names, argument counts, IO and
 boxed-boundary flags, and ordered host-import names, targets, symbols, arities,
-erased-prefix counts and IO flags. Manifest 9 compares canonical structural
+erased-prefix counts and IO flags. Manifest 10 compares canonical structural
 name keys. The current loader does not accept older manifest schemas or
 display-name fallback contracts.
 The contract compares structural keys rather than reparsing display names.
@@ -179,12 +179,16 @@ The generator embeds the recursive interface type tree in section 5. Its
 | Host import | `slot`, display `name`, structural `nameKey`, `source`, JS `target`, `boundary`, generated Wasm `symbol`, IR `arity`, `erasedPrefixArgs`, `args`, descriptor `result`, `effect`. |
 | Diagnostic | `name`, `source`, `reason`. |
 
-The current manifest version is 9 and every generated package must use it.
+The current manifest version is 10 and every generated package must use it.
 Every export carries an explicit Boolean `startup` field. Volatile generation
 time is omitted from embedded metadata; only the adjacent Markdown report
 records wall-clock generation time.
 
-Version 9 adds `nameKey` to exports and host imports. It is the machine identity
+Version 10 retires the dedicated List/Option/Prod tags. Option and List use
+compiler-derived generic constructor layouts, Prod uses a generic structure
+layout, and `recursiveRef` carries a lexical `depth` through complete aggregate
+scopes. The JS codec resolves these bindings once, including through nested
+containers. Version 9 added `nameKey` to exports and host imports. It is the machine identity
 compared with the independently decoded binary Name; `entry`, `id`, `jsName`
 and host `name` remain display/call aliases. Changing an alias does not change
 the declaration that executes. The runtime independently checks arity, effect,
@@ -203,9 +207,9 @@ Wasm. The pinned Wasm decoder derives the canonical key from its decoded Lean
 `Name`; the contract succeeds only when those structural identities agree.
 These checks deliberately do not parse display aliases.
 
-Manifest 9 is the only supported schema. The current SDK contract is runtime
+Manifest 10 is the only supported schema. The current SDK contract is runtime
 ABI 4 with package format 11, so regenerate `.irpkg` members and descriptors
-with the manifest-9 generator and install the matching JavaScript and Wasm SDK
+with the manifest-10 generator and install the matching JavaScript and Wasm SDK
 artifacts together when the generator or runtime revision changes.
 
 The modes are `explicit`, `packageOnly`, `all`, `marked` and `markedModule`.
@@ -273,16 +277,13 @@ against [`interface-tags.js`](../../web/src/runtime/interface-tags.js) by
 | 14 | `SIMPLE_ENUM` | Nullary enum / `simpleEnum` | `constructors: [{ name, jsName, tag }]`. |
 | 15 | `EXPR` | `Lean.Expr` | None; caller value is a structural expression object. |
 | 16 | `ARRAY` | `Array α` / `array` | `element` descriptor. |
-| 17 | `LIST` | `List α` / `list` | `element` descriptor. |
-| 18 | `OPTION` | `Option α` / `option` | `element` descriptor. |
-| 19 | `PROD` | `α × β` / `prod` | `fst` and `snd` descriptors. |
 | 20 | `STRUCTURE` | Structure / `structure` | `name`, layout counts, `fields`, optional `trivialFieldIndex`. |
 | 21 | `TAGGED_UNION` | `Sum` / `Except` / `taggedUnion` | `name`, `constructors` with payload descriptor and layout. |
 | 22 | `UNIT` | `Unit` | None. |
 | 23 | `RESOURCE` | Opaque JS resource / `resource` | Resource `name`. |
 | 24 | `FUNCTION` | Callback / `function` | `args: [{ name, type }]`, descriptor `result`, `effect`. |
 | 25 | `CUSTOM_INDUCTIVE` | Non-indexed inductive / `customInductive` | `name`, `constructors` with field descriptors/layouts. |
-| 26 | `RECURSIVE_SELF` | Recursive reference / `recursiveSelf` | Referenced owner `name`. |
+| 26 | `RECURSIVE_REF` | Lexical recursive reference / `recursiveRef` | Referenced owner `name` and nonnegative `depth` (0 is the innermost aggregate). |
 | 27 | `LEAN_OBJECT` | Retained Lean object / `leanObject` | No additional payload. |
 
 ### Constructor and field layouts
