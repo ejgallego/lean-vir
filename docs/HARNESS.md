@@ -412,7 +412,7 @@ The [workflow files](../.github/workflows) own job definitions. Pages runs
 `npm run build:site`; [surface analysis](development/SURFACE_ANALYSIS.md) explains its
 deployed surface/size explorers.
 
-### Repository Protection
+## Repository Protection
 
 To enforce the [PR landing workflow](../CONTRIBUTING.md#landing-and-completion)
 on GitHub, protect `main` and any active maintenance branch: require pull requests

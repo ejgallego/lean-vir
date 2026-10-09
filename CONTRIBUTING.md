@@ -83,15 +83,14 @@ target, provenance, PR links and validation workflow.
 ### Landing and completion
 
 Land repository changes through a PR, including documentation-only changes and
-maintenance fixes. A maintainer's request to "wrap up", "land" or "merge" uses
-this workflow. Direct pushes to `main` or a maintenance branch require an
-explicit maintainer request to bypass the PR workflow for that change.
+maintenance fixes. For an authorized landing, requests to "wrap up", "land" or
+"merge" use this workflow. Direct pushes to `main` or a maintenance branch require
+an explicit maintainer request to bypass the PR workflow for that change.
 
-Within an authorized landing, publish the task branch and open its PR if needed
-without another permission loop. A request to prepare a PR authorizes branch
-publication and PR creation for review; it does not authorize merging it.
-Before an authorized merge, complete the selected review and verify that the
-applicable PR checks pass on the actual head being merged.
+A request to prepare a PR authorizes branch publication and PR creation for
+review; merging requires landing authorization. Within an authorized landing,
+publish the task branch and open its PR if needed, complete the selected review,
+and verify that the applicable PR checks pass on the actual head being merged.
 
 Before reporting source changes as landed, verify GitHub's merged PR state and
 record the PR URL, validated head and merge commit in the task's completion
