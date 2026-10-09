@@ -1,20 +1,75 @@
 # Embedded resources: review and acceptance
 
-## Current workflow
+## Currently selected runtime
+
+At source [47e5bc4e](https://github.com/ejgallego/lean-vir/commit/47e5bc4e9f436f25440d431086e4451cbc1efa68)
+(2026-10-09), the committed [runtime lock](../../vir-resources/runtime.json) and
+[compatibility record](../../vir-resources/compatibility.json) select:
+
+| Field | Selected value |
+| --- | --- |
+| Lean toolchain | `leanprover/lean4:v4.35.0-rc4` |
+| Lean compiler revision | `c29b6dda4f7c20e3eeaa717c4e565663c5cfa364` |
+| Resource compatibility version | 3 |
+| Runtime content ID | `6cddc4b897410d7524a69bdaff0327d9f07916735078a0b12d548e2f88c23d20` |
+| Pack SHA-256 | `8fbf3dd2cc065c714ba17b7093edbcd1e285e7fc6353b7b7594c5031781dccf3` |
+| Pack size | 1,114,116 bytes |
+
+[`Build.currentCompatibility`](../../Vir/Resources/Build.lean) derives the
+compiler revision from Lean and the combined resource version from
+[`currentVirCompatibilityVersion`](../../Vir/Package/Format.lean).
+The [public runtime release](https://github.com/ejgallego/lean-vir/releases/tag/resource-6cddc4b897410d7524a69bdaff0327d9f07916735078a0b12d548e2f88c23d20)
+supplies the locked bytes. This is the application's precompiled runtime, not
+a general SDK release; its complete format and payload identities are recorded
+in [the 4.35 qualification](../evidence/runtime-435/README.md).
+
+## Qualification of the current workflow
 
 [PR229](https://github.com/ejgallego/lean-vir/pull/229) landed module-owned
 `+Module:virResourcePack` and literal `include_vir_assets`, replacing carrier keys
 and recipe-based application setup. Reviewed head `957854b9` passed all four
-jobs in CI run `37925315137`, including native resources, published-client and
-cache checks. The landed source is `aa465b87` on Lean 4.35.0-rc4. Follow the
+jobs in [CI run 37925315137](https://github.com/ejgallego/lean-vir/actions/runs/37925315137),
+including native resources, published-client and cache checks. The landed source
+is `aa465b87`. Follow the
 [runnable application](../../examples/tutorials/quickstart/README.md), not old
 recipe commands in dated acceptance records.
+
+The [runtime publication record](../evidence/runtime-435/README.md#public-acquisition-acceptance)
+qualifies the exact `6cdd` pack on source `e0d1e291`: anonymous download with
+SHA/length verification, ordinary leaf acquisition and native publication,
+warm explicit offline acquisition, cold offline miss, stage repair and relocated
+native execution. Its browser resource checks used byte-identical runtime
+payloads. Relocated native execution is not browser execution; offline pack
+reuse is not a globally offline application build.
+
+[PR248](https://github.com/ejgallego/lean-vir/pull/248) added the complete Quickstart
+and landed as `47e5bc4e`, with the reviewed `05a13c7d` tree unchanged. All four
+jobs in [CI run 37949303300](https://github.com/ejgallego/lean-vir/actions/runs/37949303300)
+passed, including the native tutorial smoke and the actual Chromium greeting at
+a nested URL, initialization failure reporting, frontend and program edits,
+warm reuse and restoration. Its browser program is
+`1627a3bfbde0c167feb6f98701dc68916c96b55e1bfe08cb12e62167cbe401eb`;
+the runtime remains `6cdd`. The authored copy-out configuration pins landed
+`aa465b87`; CI explicitly substitutes the candidate checkout into the same
+project. Local public-pin publication passed without a supplied runtime, npm
+or WASI setup. This is not an all-cache-isolated Git installation campaign.
+The separate [candidate workflow](https://github.com/ejgallego/lean-vir/actions/runs/37949303310)
+also passed; its catalog checks are not additional Slides product qualification.
 
 Slides separately qualified its main-4.35 successor at `daa96fee` (executed
 `99ec093`) with VIR `3e7dbcf0`, runtime `6cdd` and regenerated program `00c4`.
 Its own root/leaf builds, native checks and 30 focused Chromium/Firefox results are
 [retained downstream evidence](https://github.com/ejgallego/verso-slides/tree/6f3653037663f529fb8ffb64ebe2cb227d0fe886/docs/evidence/main435-adoption),
 not tests rerun by this document update or complete product qualification.
+That consumer selected VIR `3e7dbcf0`, not the later `957854b9` or Quickstart
+head; these are its executed consumer tests, not an automatic downstream repin.
+
+This reconciliation reuses the identified source, CI and owner evidence; no
+new Lean/Wasm/browser campaign or runtime publication was performed for it.
+[Support scope](../SUPPORT.md) remains authoritative, including the separately
+planned 0.1.1 explicit generated JSON converters. Deploy
+[matching JavaScript/Wasm assets](../guides/JS_API.md#matching-runtime-assets)
+together; validation and green CI do not extend the supported-input guarantees.
 
 The historical matrix below includes superseded recipe/v2/bounds contracts.
 Its partial rows are evidence limits, not requirements to restore retired APIs,
@@ -28,14 +83,21 @@ is 1,120,065 bytes, SHA256
 `3910c29e40ee68c3b110355fa1d30dae3029f2b34967269642521fc8409848d7`.
 Anonymous public download and independent native cold/warm/offline acquisition
 passed for that 4.34 pair; owning-library and downstream adoption are separate.
-The version1 public832 asset and all results below remain historical.
+The version1 public832 asset and all results below remain historical. The
+[inspected main e4c5d665 lock](https://github.com/ejgallego/lean-vir/blob/e4c5d665293c7ab705658882948c19d84ab2ce59/vir-resources/runtime.json)
+instead selected `3d7f7e87920b4a076b299e1cd2b2fc54fa007ac7af321a84fe74daa1389109e0`
+with compatibility version 2. Neither historical lock selects today's bytes.
+A 4.34 pack does not qualify the 4.35 compiler.
 
-For the current compiler and runtime selection, read `lean-toolchain` and
-`vir-resources/runtime.json`. The [Lean 4.35 runtime qualification](../evidence/runtime-435/README.md)
-records this upgrade separately. The published 4.34 pack does not qualify the
-4.35 compiler. Upstream anonymous acquisition and downstream ordinary cold-deck
-qualification are separate gates; neither implies complete product acceptance.
-
+The 4.34 native-library checkpoint [PR223](https://github.com/ejgallego/lean-vir/pull/223)
+landed as `fb5af647`, with the reviewed `2fcdfeac` tree unchanged;
+[its CI](https://github.com/ejgallego/lean-vir/actions/runs/37851028686) and
+[candidate workflow](https://github.com/ejgallego/lean-vir/actions/runs/37851028693)
+passed. The separate Slides `35b5d14` / VIR `49445aa0` / e415 / `ba68416b`
+[checkpoint](https://github.com/ejgallego/verso-slides/tree/73a78d76bf8f6e0fbe36919868d44e9b5130676a/docs/evidence/dedicated-config-adoption)
+records fresh owning-library builds and regenerated-byte comparisons, explicitly
+reusing earlier cfa browser/Node/TypeScript results for identical bytes. Neither
+record is a fresh 4.35 campaign or blanket downstream acceptance.
 
 The historical downstream baseline is Slides `51c6d782` / VIR `47e82e9a`, runtime
 `401b115e` and pure Except-v2 program `97b280b7`. Slides reports 101 native,
@@ -78,18 +140,18 @@ the miss names the exact required content ID. No different revision, supplied
 pack or source Wasm build was used. The identity is content-addressed and verified;
 GitHub-enforced immutable releases are not enabled in this repository.
 
-The network-dependent three-package campaign is an explicit qualification command,
-not a second broad CI campaign:
+At that historical checkpoint, the network-dependent three-package campaign
+was an explicit qualification command rather than routine CI:
 
 ```sh
 npm run test:resources:published
 ```
 
-It archives the current committed producer source into a fresh owned directory,
-without copying `.lake` or runtime staging. The leaf application's ordinary
-`lake exe generate-site` must acquire the public pack through the intermediary
-library's prerequisites. Logs and source inputs are retained under `build/`,
-including on failure. This does not test a public Git clone or a fresh Slides deck.
+It archived that committed producer source into a fresh owned directory without
+copying `.lake` or runtime staging. The leaf application's ordinary
+`lake exe generate-site` acquired the public pack through the intermediary
+library's prerequisites. Logs and source inputs were retained under `build/`,
+including on failure. This was not a public Git clone or a fresh Slides deck.
 The campaign passed at `3a7c836c430cb13668f3e8c240b65f10f739e876`, including exact
 cached/staged pack checksum, warm offline acquisition without inode/mtime changes,
 cold offline miss, ordinary warm build, stage repair, program edit, carrier-cycle
@@ -114,14 +176,15 @@ rejection and relocated native rendering. See the
 6. `fixtures/resources/` and `tests/resources/`: ordinary leaf builds and negative
    cases. The resource API contains no PrettyM or Slides-specific policy.
 
-See [the contract and compiling recipe](RESOURCE_BUNDLES.md). This is based on
-main, independently of the Lean 4.35 support PR. Runtime packs must match the
+See [the resource contract](RESOURCE_BUNDLES.md). Runtime packs must match the
 selected compiler exactly; a 4.35 pack cannot be reused under 4.34.
 
 ## Historical acceptance scope
 
-“Covered” means the focused behavior has passing local evidence, not that the
-complete product or every supported platform is qualified. CI runs core,
+These statuses describe the retained campaigns and source/runtime pairs above,
+not a new acceptance matrix for the currently selected pair. “Covered” means
+focused behavior has passing local evidence, not that the complete product or
+every supported platform is qualified. Current CI runs core,
 embedding, acquisition, packing, native program, descriptor, cache and browser
 checks. The downstream Slides tests belong to Slides and are not run by VIR CI.
 
@@ -200,10 +263,14 @@ reject. This changes neither the underlying runtime's ownership policy nor its
 ABI. Collection is observed after explicit GC, not promised to occur immediately
 on disposal, and linear memory capacity need not shrink while an instance lives.
 
-## Historical promotion checklist
+## Remaining qualification boundaries
 
-Finish the partial/pending build-graph and Wasm-bound cases above; measure resource
-size, compile memory and retained browser memory; qualify the published runtime
-through a fresh ordinary Slides build. Keep the native generation pipeline independent of
-that release operation. The host publisher currently assumes a trusted single
-writer and does not provide atomic old-or-new website replacement.
+Use the current-pair evidence above, not the historical matrix, when selecting
+new qualification. Acquisition, native publication, browser execution and
+downstream product acceptance are distinct results. Dynamic PrettyM/callback
+retention and broader product/platform claims need their own concrete consumer
+evidence; the scalar retention observations do not establish them. Changed behavior
+or payloads need matching qualification; reuse for unchanged bytes must identify
+the source differences and tested scope, not silently relabel an old result.
+Keep native generation independent of runtime
+production. The host's simple asset writer is not a transactional website publisher.
