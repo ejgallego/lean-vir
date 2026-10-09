@@ -13,21 +13,23 @@ import {
 // ownership operations are reused; no intermediate tree of normalized values
 // is built. This is benchmark code, not a public raw-object API.
 export function compileNativeValueInterface(runtime, native, view, bindings = []) {
+  if ("ref" in native) {
+    if (view.tag !== "recursive" || bindings[native.ref] === undefined)
+      throw new Error("unbound recursive interface");
+    return bindings[native.ref];
+  }
+  const type = native.type;
   const codec = {};
   const compile = (type, value, scope = bindings) =>
     compileNativeValueInterface(runtime, type, value, scope);
   const expect = tag => {
-    if (view.tag !== tag) throw new Error(`${native.tag} requires ${tag} view`);
+    if (view.tag !== tag) throw new Error(`${type.tag} requires ${tag} view`);
   };
-  switch (native.tag) {
-    case "recursive":
-      expect("recursive");
-      if (bindings[native.depth] === undefined) throw new Error("unbound recursive interface");
-      return bindings[native.depth];
+  switch (type.tag) {
     case "nat":
     case "int": {
       if (!["bigint", "safeInteger"].includes(view.tag)) throw new Error("integer view required");
-      const safe = view.tag === "safeInteger", signed = native.tag === "int";
+      const safe = view.tag === "safeInteger", signed = type.tag === "int";
       codec.lower = (value, label) => {
         if (safe && !Number.isSafeInteger(value)) throw new Error(`${label} must be a safe integer`);
         return runtime.makeObjectDecimal(signed ? "vir_obj_int" : "vir_obj_nat",
@@ -53,13 +55,13 @@ export function compileNativeValueInterface(runtime, native, view, bindings = []
       codec.lower = (value, label) => runtime.makeObjectByteArray(value, label);
       codec.lift = obj => runtime.readObjectByteArray(obj);
       break;
-    case "jsResource":
+    case "resource":
       expect("jsReference");
       codec.lower = (value, label) => runtime.makeObjectResource(value, label);
       codec.lift = (obj, label) => runtime.liftObjectResource(obj, label);
       break;
     case "unsigned": {
-      const width = native.width;
+      const width = type.width;
       expect(width === 64 ? "bigint" : "number");
       if (width === "usize") runtime.requireWasm32USize();
       if (width === 8 || width === 16) {
@@ -78,7 +80,7 @@ export function compileNativeValueInterface(runtime, native, view, bindings = []
     }
     case "float": {
       expect("number");
-      const single = native.width === 32;
+      const single = type.width === 32;
       codec.lower = (value, label) => single ? runtime.makeObjectFloat32(value, label)
         : runtime.makeObjectFloat(value, label);
       codec.lift = obj => single ? Math.fround(runtime.exports.vir_obj_float32_value(obj))
@@ -92,41 +94,45 @@ export function compileNativeValueInterface(runtime, native, view, bindings = []
       };
       break;
     }
-    case "array": {
-      expect("sequence");
-      if (view.chain !== undefined) throw new Error("native Array does not use chain traversal");
-      const element = compile(native.element, view.element);
-      codec.lower = (value, label, scratch) => {
-        requireArray(value, label);
-        const objects = [];
-        try {
-          for (let i = 0; i < value.length; i++) objects.push(element.lower(value[i], `${label}[${i}]`, scratch));
-          return runtime.makeObjectArrayFromOwnedElements(objects, label);
-        } finally { runtime.releaseOwnedObjects(objects); }
-      };
-      codec.lift = (obj, label) => {
-        const values = [], size = runtime.exports.vir_obj_array_size(obj);
-        for (let i = 0; i < size; i++) {
-          const child = runtime.exports.vir_obj_array_get(obj, i);
-          if (child === 0) throw new Error(`${label}[${i}] is unavailable`);
-          try { own(values, i, element.lift(child, `${label}[${i}]`)); }
-          finally { runtime.exports.vir_obj_dec(child); }
-        }
-        return values;
-      };
-      break;
-    }
-    case "constructors": {
+    case "leanObject": {
+      if (view.tag === "sequence" && view.chain === undefined) {
+        const elementType = native.metadata?.arrayElement;
+        if (elementType === undefined) throw new Error("array codec requires native array metadata");
+        const element = compile(elementType, view.element);
+        codec.lower = (value, label, scratch) => {
+          requireArray(value, label);
+          const objects = [];
+          try {
+            for (let i = 0; i < value.length; i++) objects.push(element.lower(value[i], `${label}[${i}]`, scratch));
+            return runtime.makeObjectArrayFromOwnedElements(objects, label);
+          } finally { runtime.releaseOwnedObjects(objects); }
+        };
+        codec.lift = (obj, label) => {
+          const values = [], size = runtime.exports.vir_obj_array_size(obj);
+          for (let i = 0; i < size; i++) {
+            const child = runtime.exports.vir_obj_array_get(obj, i);
+            if (child === 0) throw new Error(`${label}[${i}] is unavailable`);
+            try { own(values, i, element.lift(child, `${label}[${i}]`)); }
+            finally { runtime.exports.vir_obj_dec(child); }
+          }
+          return values;
+        };
+        break;
+      }
+      const constructors = native.metadata?.constructors;
+      if (!["unit", "boolean", "enum", "sequence", "variant", "record"].includes(view.tag))
+        throw new Error(`prototype does not bind object view ${view.tag}`);
+      if (constructors === undefined) throw new Error("structural codec requires constructor metadata");
       const scope = [codec, ...bindings];
       if (["unit", "boolean", "enum"].includes(view.tag)) {
-        if (!native.constructors.every(ctor => ctor.representation === "immediate"))
+        if (!constructors.every(ctor => ctor.representation === "immediate"))
           throw new Error("scalar views require immediate constructors");
-        const scalar = immediateView(native, view);
+        const scalar = immediateView(constructors, view);
         // Ask the native allocator for these constants once. Immediate values
         // own no heap references and survive memory growth; no pointer encoding
         // is reproduced in JS. Membership checks reject heap objects as well as
         // unknown ordinals, without two Wasm unboxing calls per value.
-        const objects = native.constructors.map((_ctor, index) =>
+        const objects = constructors.map((_ctor, index) =>
           runtime.makeObjectScalar(index, "immediate constructor binding"));
         const ordinals = new Map(objects.map((obj, index) => [obj, index]));
         codec.lower = (value, label) => objects[scalar.encode(value, label)];
@@ -140,10 +146,10 @@ export function compileNativeValueInterface(runtime, native, view, bindings = []
           read: (bytes, offset, size, label) => scalar.decode(readOrdinal(bytes, offset, size), label),
         };
       } else if (view.tag === "sequence") {
-        Object.assign(codec, compileChain(runtime, native, view, scope, compile));
+        Object.assign(codec, compileChain(runtime, constructors, view, scope, compile));
       } else if (view.tag === "variant") {
         const shape = compileConstructorValueInterface(native, view);
-        const constructors = native.constructors.map((ctor, index) => {
+        const plans = constructors.map((ctor, index) => {
           const entry = view.cases[index];
           const mappings = entry.payload === "none" ? [] : entry.payload === "value"
             ? [{ path: [0], value: entry.value }] : entry.fields;
@@ -154,20 +160,20 @@ export function compileNativeValueInterface(runtime, native, view, bindings = []
         codec.lower = (value, label, scratch) => {
           const index = shape.select(value, label);
           const payload = shape.cases[index].read(value, label);
-          return constructors[index].lower(index, payload, label, scratch);
+          return plans[index].lower(index, payload, label, scratch);
         };
         codec.lift = (obj, label) => {
           const index = runtime.exports.vir_obj_tag(obj);
-          if (!Number.isInteger(index) || index < 0 || index >= constructors.length)
+          if (!Number.isInteger(index) || index < 0 || index >= plans.length)
             throw new Error(`${label} constructor is out of range`);
-          return constructors[index].lift(obj, label);
+          return plans[index].lift(obj, label);
         };
       } else if (view.tag === "record") {
-        if (native.constructors.length !== 1) throw new Error("record view requires one constructor");
+        if (constructors.length !== 1) throw new Error("record view requires one constructor");
         const fieldKeys = view.fields.map(field => field.key);
         if (fieldKeys.some(key => typeof key !== "string")) throw new Error("record keys must be strings");
         const keys = new Set(fieldKeys);
-        const ctor = constructorKernel(runtime, native.constructors[0], view.fields, scope, compile,
+        const ctor = constructorKernel(runtime, constructors[0], view.fields, scope, compile,
           key => value => value[key], false, value => value);
         codec.lower = (value, label, scratch) => {
           requireRecord(value, keys, label);
@@ -177,7 +183,7 @@ export function compileNativeValueInterface(runtime, native, view, bindings = []
       } else throw new Error(`unsupported constructor view ${view.tag}`);
       break;
     }
-    default: throw new Error(`prototype does not bind ${native.tag}`);
+    default: throw new Error(`prototype does not bind ${type.tag}`);
   }
   return Object.freeze(codec);
 }
@@ -312,12 +318,12 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
   };
 }
 
-function compileChain(runtime, native, view, scope, compile) {
+function compileChain(runtime, constructors, view, scope, compile) {
   const { nil, cons, head, tail } = view.chain ?? {};
-  const empty = native.constructors[nil], cell = native.constructors[cons];
-  if (native.constructors.length !== 2 || empty?.representation !== "immediate" || cell?.representation !== "object" ||
+  const empty = constructors[nil], cell = constructors[cons];
+  if (constructors.length !== 2 || empty?.representation !== "immediate" || cell?.representation !== "object" ||
       cell.fields.length !== 2 || head === tail || !cell.fields[head] || !cell.fields[tail] ||
-      cell.fields[tail].type.tag !== "recursive" || cell.fields[tail].type.depth !== 0 ||
+      !Object.hasOwn(cell.fields[tail].type, "ref") || cell.fields[tail].type.ref !== 0 ||
       cell.storage.objectFieldCount !== 2 ||
       cell.storage.usizeFieldCount !== 0 || cell.storage.scalarByteSize !== 0 ||
       !cell.fields.every(field => field.location.tag === "object")) throw new Error("unsupported chain traversal");
@@ -345,8 +351,8 @@ function compileChain(runtime, native, view, scope, compile) {
   };
 }
 
-function immediateView(native, view) {
-  const count = native.constructors.length;
+function immediateView(constructors, view) {
+  const count = constructors.length;
   let encode, decode;
   if (view.tag === "unit") {
     if (count !== 1) throw new Error("unit requires one constructor");

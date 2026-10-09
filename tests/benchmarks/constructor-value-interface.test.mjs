@@ -8,15 +8,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { compileConstructorValueInterface } from "../../benchmarks/harness/constructor-value-interface-prototype.mjs";
 
-const unit = { tag: "constructors", name: "Unit", constructors: [
+const objectType = (declaration, constructors) => ({
+  type: { tag: "leanObject" }, metadata: { declaration, constructors },
+});
+const unit = objectType("Unit", [
   { name: "Unit.unit", representation: "immediate", fields: [] },
-] };
-const native = { tag: "constructors", name: "Option", constructors: [
+]);
+const native = objectType("Option", [
   { name: "Option.none", representation: "immediate", fields: [] },
   { name: "Option.some", representation: "object",
     storage: { objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0 },
     fields: [{ name: "val", type: unit, location: { tag: "object", index: 0 } }] },
-] };
+]);
 const view = (absent, present) => ({ tag: "variant", cases: [
   { kind: absent, payload: "none" }, { kind: present, payload: "value", value: { tag: "unit" } },
 ] });
@@ -57,14 +60,14 @@ test("binding rejects incomplete constructor or field mappings", () => {
 });
 
 test("field mappings choose keys independently of native names", () => {
-  const descriptor = { tag: "constructors", name: "Pair", constructors: [{
+  const descriptor = objectType("Pair", [{
     name: "Pair.mk", representation: "object",
     storage: { objectFieldCount: 2, usizeFieldCount: 0, scalarByteSize: 0 },
     fields: [
-      { name: "a", type: { tag: "nat" }, location: { tag: "object", index: 0 } },
-      { name: "b", type: { tag: "nat" }, location: { tag: "object", index: 1 } },
+      { name: "a", type: { type: { tag: "nat" } }, location: { tag: "object", index: 0 } },
+      { name: "b", type: { type: { tag: "nat" } }, location: { tag: "object", index: 1 } },
     ],
-  }] };
+  }]);
   const plan = compileConstructorValueInterface(descriptor, { tag: "variant", cases: [{
     kind: "pair", payload: "fields", fields: [
       { key: "__proto__", path: [1], value: { tag: "bigint" } },

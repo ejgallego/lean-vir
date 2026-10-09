@@ -5,7 +5,8 @@ Author: Emilio J. Gallego Arias
 */
 
 // Draft contract, not a runtime module or a supported construction API.
-// NativeDescriptor owns ABI facts; ValueInterface owns a chosen JS encoding.
+// NativeType is the core boundary. Compiler metadata feeds optional codecs;
+// ValueInterface chooses a JS encoding without changing that boundary.
 
 export type Effect = "pure" | "runtime" | "io" | "dom" | "react";
 export type UnsignedWidth = 8 | 16 | 32 | 64 | "usize";
@@ -28,7 +29,7 @@ export type FieldLocation =
 
 export interface NativeField {
   readonly name: string;
-  readonly type: NativeDescriptor;
+  readonly type: DescriptorRef;
 }
 
 export interface StoredField extends NativeField {
@@ -56,32 +57,51 @@ export type ConstructorDescriptor = ConstructorIdentity & (
     }
 );
 
-export interface NativeSignature {
-  readonly args: readonly NativeDescriptor[];
-  readonly result: NativeDescriptor;
-  readonly effect: Effect;
-}
-
-export type NativeDescriptor =
+// These primitive kinds select scalar, text and byte operations. Array storage
+// is Lean-object storage; its element fact belongs to optional codec metadata.
+export type PrimitiveType =
   | { readonly tag: "nat" }
   | { readonly tag: "int" }
   | { readonly tag: "string" }
   | { readonly tag: "byteArray" }
   | { readonly tag: "unsigned"; readonly width: UnsignedWidth }
-  | { readonly tag: "float"; readonly width: FloatWidth }
-  | { readonly tag: "array"; readonly element: NativeDescriptor }
-  | {
-      readonly tag: "constructors";
-      readonly name: DeclarationName;
-      readonly constructors: readonly ConstructorDescriptor[];
-    }
-  | { readonly tag: "recursive"; readonly depth: number }
-  | { readonly tag: "jsResource"; readonly name: DeclarationName }
-  | { readonly tag: "leanObject" }
-  | { readonly tag: "function"; readonly signature: NativeSignature }
-  | { readonly tag: "expr" };
+  | { readonly tag: "float"; readonly width: FloatWidth };
 
-export type NativeTag = NativeDescriptor["tag"];
+export type NativeType = PrimitiveType
+  | { readonly tag: "leanObject" }
+  | { readonly tag: "resource" };
+
+export type NativeTag = NativeType["tag"];
+
+// A reference in compiler metadata, not a native type or a runtime capability.
+// Its depth is relative to enclosing constructor descriptions.
+export interface RecursiveDescriptorRef {
+  readonly ref: number;
+}
+export type DescriptorRef = NativeDescriptor | RecursiveDescriptorRef;
+
+export interface NativeSignature {
+  readonly args: readonly DescriptorRef[];
+  readonly result: DescriptorRef;
+  readonly effect: Effect;
+}
+
+// Facts for optional codec binding. This is not another native-kind union:
+// opaque object passage needs none of these fields. A structural codec requires
+// constructors, an array codec requires arrayElement, a callable requires signature.
+// Admission checks facts against the producer's type and the selected operation.
+export interface CompilerMetadata {
+  readonly declaration?: DeclarationName;
+  readonly constructors?: readonly ConstructorDescriptor[];
+  // Present only for compiler-confirmed native Lean Array storage.
+  readonly arrayElement?: DescriptorRef;
+  readonly signature?: NativeSignature;
+}
+
+export interface NativeDescriptor {
+  readonly type: NativeType;
+  readonly metadata?: CompilerMetadata;
+}
 
 // Field positions are declaration/projection order, never physical slot indices.
 // A path crosses native fields, e.g. [0, 1] for an inherited parent's field.
@@ -143,7 +163,7 @@ export type ValueInterface =
 export type ValueTag = ValueInterface["tag"];
 
 export interface BoundaryInterface {
-  readonly native: NativeDescriptor;
+  readonly native: DescriptorRef;
   readonly value: ValueInterface;
 }
 
@@ -156,23 +176,21 @@ export interface ExportInterface {
 // Concrete examples use the same native descriptor with different value views.
 // These layout facts illustrate the draft, not a replacement metadata producer.
 export const optionNatDescriptor: NativeDescriptor = {
-  tag: "constructors",
-  name: "Option",
-  constructors: [
-    { name: "Option.none", representation: "immediate", fields: [] },
-    {
-      name: "Option.some",
-      representation: "object",
-      storage: { objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0 },
-      fields: [
-        {
-          name: "val",
-          type: { tag: "nat" },
+  type: { tag: "leanObject" },
+  metadata: {
+    declaration: "Option",
+    constructors: [
+      { name: "Option.none", representation: "immediate", fields: [] },
+      {
+        name: "Option.some", representation: "object",
+        storage: { objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0 },
+        fields: [{
+          name: "val", type: { type: { tag: "nat" } },
           location: { tag: "object", index: 0 },
-        },
-      ],
-    },
-  ],
+        }],
+      },
+    ],
+  },
 };
 
 export const taggedOptionNat: BoundaryInterface = {
@@ -199,28 +217,21 @@ export const alternateOptionNat: BoundaryInterface = {
 };
 
 export const listNatDescriptor: NativeDescriptor = {
-  tag: "constructors",
-  name: "List",
-  constructors: [
-    { name: "List.nil", representation: "immediate", fields: [] },
-    {
-      name: "List.cons",
-      representation: "object",
-      storage: { objectFieldCount: 2, usizeFieldCount: 0, scalarByteSize: 0 },
-      fields: [
-        {
-          name: "head",
-          type: { tag: "nat" },
-          location: { tag: "object", index: 0 },
-        },
-        {
-          name: "tail",
-          type: { tag: "recursive", depth: 0 },
-          location: { tag: "object", index: 1 },
-        },
-      ],
-    },
-  ],
+  type: { tag: "leanObject" },
+  metadata: {
+    declaration: "List",
+    constructors: [
+      { name: "List.nil", representation: "immediate", fields: [] },
+      {
+        name: "List.cons", representation: "object",
+        storage: { objectFieldCount: 2, usizeFieldCount: 0, scalarByteSize: 0 },
+        fields: [
+          { name: "head", type: { type: { tag: "nat" } }, location: { tag: "object", index: 0 } },
+          { name: "tail", type: { ref: 0 }, location: { tag: "object", index: 1 } },
+        ],
+      },
+    ],
+  },
 };
 
 export const arrayListNat: BoundaryInterface = {
@@ -248,4 +259,40 @@ export const constructorListNat: BoundaryInterface = {
       },
     ],
   },
+};
+
+// Retaining a Lean object does not require its constructor layout. Metadata can
+// later serve a selected structural codec without adding another core tag.
+export const opaqueObject: BoundaryInterface = {
+  native: { type: { tag: "leanObject" } },
+  value: { tag: "leanReference" },
+};
+
+export const exactJsResource: BoundaryInterface = {
+  native: { type: { tag: "resource" } },
+  value: { tag: "jsReference" },
+};
+
+export const arrayNat: BoundaryInterface = {
+  native: { type: { tag: "leanObject" }, metadata: { arrayElement: { type: { tag: "nat" } } } },
+  value: { tag: "sequence", element: { tag: "bigint" } },
+};
+
+// Callability is an operation plus compiler-owned signature, not an object kind.
+export const callableObject: BoundaryInterface = {
+  native: {
+    type: { tag: "leanObject" },
+    metadata: { signature: {
+      args: [{ type: { tag: "nat" } }],
+      result: { type: { tag: "nat" } }, effect: "pure",
+    } },
+  },
+  value: { tag: "function", args: [{ tag: "bigint" }], result: { tag: "bigint" } },
+};
+
+// Specialized Expr conversion is an optional operation. Its nominal type must
+// be admitted as compatible before binding; the core only retains an object.
+export const expressionObject: BoundaryInterface = {
+  native: { type: { tag: "leanObject" }, metadata: { declaration: "Lean.Expr" } },
+  value: { tag: "expr" },
 };

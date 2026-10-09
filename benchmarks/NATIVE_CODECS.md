@@ -158,6 +158,11 @@ unchanged text/byte paths have small deltas, so these figures should guide sourc
 inspection, not serve as precise forecasts. They describe the prototype, not a
 speedup already present in the production generic-container codec.
 
+These timings precede the draft's core-tag reduction. The current prototype
+uses primitives, Lean objects, and resources; constructor, native-array and
+callable facts are optional codec metadata. The grammar revision retains the
+same conversion algorithms and makes no new speed claim.
+
 The representative next comparison is an actual caller's complete encode/call/
 decode workflow, including the materialization it chooses. A JSL boundary can
 keep data opaque when the application does not need a JS graph. The view grammar
