@@ -1,0 +1,124 @@
+{
+  "$schema": "../bindings.schema.json",
+  "version": 2,
+  "id": "infoview",
+  "title": "Infoview RPC and notifications",
+  "description": "Native infoview client sessions, options and notification hook.",
+  "lean": { "modules": ["Vir.Infoview.Client", "Vir.Infoview.Client.Generated"] },
+  "generation": {
+    "output": "Vir/Infoview/Client/Generated.lean",
+    "imports": ["Vir.Browser.Types", "Vir.React.Types", "Vir.Infoview.Client.Types"],
+    "namespace": "Lean.Vir",
+    "abiProfile": {
+      "id": "vir-infoview-protocol-v1",
+      "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+      "types": { "void": { "lean": "Unit", "representation": "immediate" } },
+      "resource": {
+        "constructor": "Lean.Vir.Js", "nullableConstructor": "Lean.Vir.Js.Nullable",
+        "argument": { "passing": "borrowed", "retention": "call" },
+        "result": { "ownership": "owned" }
+      },
+      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
+    },
+    "resources": {},
+    "protocolOperations": [
+      {
+        "id": "infoview.client-notification-effect", "group": "client-notifications", "target": "infoview.useClientNotificationEffect",
+        "lean": "Lean.Vir.Infoview.useClientNotificationEffect", "marker": "vir_js",
+        "reason": "Calls the upstream infoview hook with the exact method, callback and dependency array or undefined. Upstream treats undefined as omitted and owns subscription and cleanup; VIR neither queues nor filters notifications.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "useClientNotificationEffect", "semantics": "preserving" },
+        "typeParameters": ["params"],
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [
+          { "name": "method", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "callback", "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js params) Unit", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js params) Unit" } },
+          { "name": "deps", "type": { "lean": "Lean.Vir.Js.UndefinedOr React.DependencyList", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value React.DependencyList" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "infoview.request-options.empty", "group": "request-options", "target": "infoview.clientRequestOptions.empty",
+        "lean": "Lean.Vir.Infoview.ClientRequestOptions.empty", "marker": "vir_js",
+        "reason": "Constructs an ordinary empty ClientRequestOptions object, omitting abortSignal rather than substituting null.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "ClientRequestOptions", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [],
+        "result": { "type": { "lean": "Lean.Vir.Js Infoview.ClientRequestOptions", "representation": "js-resource", "resourceInner": "Infoview.ClientRequestOptions" } }
+      },
+      {
+        "id": "infoview.request-options.abort-signal", "group": "request-options", "target": "infoview.clientRequestOptions.setAbortSignal",
+        "lean": "Lean.Vir.Infoview.ClientRequestOptions.setAbortSignal", "marker": "vir_js",
+        "reason": "Assigns the exact native AbortSignal to options.abortSignal without wrapping the signal or changing cancellation behavior.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "ClientRequestOptions.abortSignal", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "options", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.ClientRequestOptions", "representation": "js-resource", "resourceInner": "Infoview.ClientRequestOptions" } },
+          { "name": "signal", "type": { "lean": "Lean.Vir.Js Browser.AbortSignal", "representation": "js-resource", "resourceInner": "Browser.AbortSignal" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "infoview.rpc-session.call", "group": "rpc-session", "target": "infoview.rpcSession.call",
+        "lean": "Lean.Vir.Infoview.RpcSession.call", "marker": "vir_js",
+        "reason": "Calls the exact position-specific infoview RPC session with the exact method string and request object, omits its optional ClientRequestOptions argument, and returns its native Promise.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "RpcSessionAtPos.call", "semantics": "preserving" },
+        "typeParameters": ["params", "result"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "session", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.RpcSession", "representation": "js-resource", "resourceInner": "Infoview.RpcSession" } },
+          { "name": "method", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "params", "type": { "lean": "Lean.Vir.Js params", "representation": "js-resource", "resourceInner": "params" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Promise result", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value result" } }
+      },
+      {
+        "id": "infoview.rpc-session.call-options", "group": "rpc-session", "target": "infoview.rpcSession.callWithOptions",
+        "lean": "Lean.Vir.Infoview.RpcSession.callWithOptions", "marker": "vir_js",
+        "reason": "Passes the exact ClientRequestOptions and AbortSignal to the position-specific session; params use Js.Any to fit the interpreter arity limit without changing their value. Cancellation and Promise settlement follow the official RPC client and server.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "RpcSessionAtPos.call", "semantics": "preserving" },
+        "typeParameters": ["result"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "session", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.RpcSession", "representation": "js-resource", "resourceInner": "Infoview.RpcSession" } },
+          { "name": "method", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "params", "type": { "lean": "Lean.Vir.Js.Any", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Any.Value" } },
+          { "name": "options", "type": { "lean": "Lean.Vir.Js Infoview.ClientRequestOptions", "representation": "js-resource", "resourceInner": "Infoview.ClientRequestOptions" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Promise result", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value result" } }
+      }
+    ]
+  },
+  "roots": [
+    {
+      "id": "client-notifications", "title": "Infoview client notifications",
+      "targets": ["infoview.useClientNotificationEffect*"],
+      "lean": { "public": ["Lean.Vir.Infoview.useClientNotificationEffect"] },
+      "upstream": {
+        "kind": "typescript", "package": "@leanprover/infoview",
+        "declarations": ["node_modules/@leanprover/infoview/dist/infoview/util.d.ts"],
+        "roots": ["useClientNotificationEffect"]
+      }
+    },
+    {
+      "id": "request-options",
+      "title": "RPC request options",
+      "targets": ["infoview.clientRequestOptions.*"],
+      "lean": { "public": ["Lean.Vir.Infoview.ClientRequestOptions"] },
+      "upstream": {
+        "kind": "typescript", "package": "@leanprover/infoview-api",
+        "declarations": ["Vir/Infoview/RpcSession.contract.d.ts"],
+        "roots": ["ClientRequestOptions"]
+      }
+    },
+    {
+      "id": "rpc-session",
+      "title": "Infoview RPC session",
+      "targets": ["infoview.rpcSession.*"],
+      "lean": { "public": ["Lean.Vir.Infoview.RpcSession"] },
+      "upstream": {
+        "kind": "typescript",
+        "package": "@leanprover/infoview-api",
+        "declarations": ["Vir/Infoview/RpcSession.contract.d.ts"],
+        "roots": ["RpcSessionAtPos"]
+      }
+    }
+  ]
+}

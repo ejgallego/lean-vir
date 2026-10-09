@@ -47,6 +47,7 @@ export const runtimeTests = Object.freeze(
       group: "pure",
     },
     { id: "startup-hooks", file: "startup-runtime-smoke.mjs", group: "pure" },
+    { id: "startup-reentry", file: "startup-reentry-smoke.mjs", group: "lean" },
     {
       id: "callback-lifecycle",
       file: "callback-lifecycle-smoke.mjs",
@@ -62,7 +63,12 @@ export const runtimeTests = Object.freeze(
       file: "custom-inductive-normalization-smoke.mjs",
       group: "pure",
     },
+    { id: "resource-roots", file: "resource-roots-smoke.mjs", group: "pure", nodeArgs: ["--expose-gc"] },
     { id: "object-abi", file: "object-abi-smoke.mjs", group: "pure" },
+    { id: "fixed-width", file: "fixed-width-smoke.mjs", group: "pure" },
+    { id: "numeric-results", file: "numeric-results-smoke.mjs", group: "pure" },
+    { id: "usize-fields", file: "usize-fields-smoke.mjs", group: "pure" },
+    { id: "fixed-width-interop", file: "fixed-width-interop-smoke.mjs", group: "lean" },
     {
       id: "object-abi-structural",
       file: "object-abi-structural-smoke.mjs",
@@ -77,6 +83,36 @@ export const runtimeTests = Object.freeze(
     {
       id: "package-generator",
       file: "package-generator-smoke.mjs",
+      group: "lean",
+    },
+    {
+      id: "package-call-preparation",
+      file: "package-call-preparation-smoke.mjs",
+      group: "lean",
+    },
+    {
+      id: "object-name-raw",
+      file: "object-name-raw-smoke.mjs",
+      group: "pure",
+    },
+    {
+      id: "name-identity",
+      file: "name-identity-smoke.mjs",
+      group: "lean",
+    },
+    {
+      id: "host-import-limits",
+      file: "host-import-limits-smoke.mjs",
+      group: "lean",
+    },
+    {
+      id: "package-lifecycle",
+      file: "package-lifecycle-smoke.mjs",
+      group: "lean",
+    },
+    {
+      id: "initializer-retirement",
+      file: "initializer-retirement-smoke.mjs",
       group: "lean",
     },
     {
@@ -115,13 +151,20 @@ export const runtimeTests = Object.freeze(
       file: "infoview-rpc-promise-smoke.mjs",
       group: "lean",
     },
+    { id: "host-error-propagation", file: "host-error-propagation-smoke.mjs", group: "lean" },
+    { id: "fatal-generation", file: "fatal-generation-smoke.mjs", group: "lean" },
     { id: "js-nat-number", file: "js-nat-number-smoke.mjs", group: "lean" },
     {
       id: "package-generation",
       file: "package-generation-smoke.mjs",
       group: "lean",
     },
+    { id: "recursive-owner", file: "recursive-owner-smoke.mjs", group: "lean" },
+    { id: "json-codecs", file: "json-codecs-smoke.mjs", group: "lean" },
+    { id: "tamagotchi-codecs", file: "tamagotchi-codecs-smoke.mjs", group: "lean" },
     { id: "sdk-import", file: "sdk-import-smoke.mjs", group: "lean" },
+    { id: "managed-core", file: "managed-core-smoke.mjs", group: "lean", nodeArgs: ["--expose-gc"] },
+    { id: "shared-lean-ownership", file: "shared-lean-ownership-smoke.mjs", group: "lean" },
   ].map(freezeRuntimeTest),
 );
 

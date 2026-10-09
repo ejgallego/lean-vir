@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import * as React from "react";
 import { createRoot } from "react-dom/client";
@@ -162,6 +163,11 @@ async function run() {
           bindings["js.object.get"] = (object, key) => {
             if (key === "message" && object?.ref) renderedReply = object;
             return get(object, key);
+          };
+          const decodeString = bindings["js.string.value"];
+          bindings["js.string.value"] = value => {
+            check(value !== config.uri, "notification URI stays a native string");
+            return decodeString(value);
           };
           return bindings;
         },
@@ -502,7 +508,7 @@ async function run() {
       "unmounted generation's Lean stale guard prevents a late success",
     );
     old.dispose();
-    check(old.liveCallbacks.size === 0, "explicit disposal releases old Lean roots");
+    check(countLiveCallbacks(old.hostState) === 0, "explicit disposal releases old Lean roots");
 
     await gate("arm", "after unmount");
     render(a, query("after unmount"));
@@ -517,7 +523,7 @@ async function run() {
       "late success after unmount is inert",
     );
     runtime.dispose();
-    check(runtime.liveCallbacks.size === 0, "explicit disposal releases Lean closure roots");
+    check(countLiveCallbacks(runtime.hostState) === 0, "explicit disposal releases Lean closure roots");
 
     const failures = requests.filter(
       (record) =>

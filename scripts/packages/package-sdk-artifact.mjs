@@ -99,13 +99,26 @@ await writeFile(
 This SDK contains the JavaScript runtime modules and wasm32-wasip1 interpreter
 for the matching lean_vir package revision.
 
+It exposes the direct runtime API for custom hosts and existing integrations.
+The application resource workflow uses a separately prepared runtime.js loader
+with createProgram; that facade exposes status, call and dispose. Start ordinary
+applications with the complete resource example:
+https://github.com/ejgallego/lean-vir/blob/main/docs/guides/EMBEDDED_RESOURCES.md
+
+Official support covers the runtime, packages, object API and minimal JS/Lean
+interop. DOM, React/JSX, widgets, broad generated bindings and automatic conversion
+of records and custom inductives are experimental, including when shipped in this
+archive. Arrays inherit the support status of their element representations.
+See the support scope for details and the planned 0.1.1 JSON converter API:
+https://github.com/ejgallego/lean-vir/blob/main/docs/SUPPORT.md
+
 The JavaScript files are ES modules. The generic runtime and host-binding
 modules do not import React; js/vir-react-host-bindings.js imports react and
 react-dom/client and should only be used by browser React integrations. Their
 exact build-time versions are recorded under externalDependencies in
 lean-vir-artifact.json.
 
-Application code should import the entry modules directly under js/:
+SDK host code should import the entry modules directly under js/:
 
   js/vir-runtime.js
   js/vir-runtime-node.js
@@ -116,23 +129,30 @@ Nested js/runtime/, js/host/, and js/react/ modules are shipped so those entry
 modules can resolve relative imports. They remain internal implementation
 modules and may change with the matching lean_vir revision.
 
-In a Lake client package, mark JavaScript-callable declarations with
+For a host using this SDK, mark JavaScript-callable declarations with
 @[vir_export] and startup hooks with @[vir_startup], then build the module
 package and matching SDK:
 
   lake build +MyApp.Runtime:vir
   lake build :virSdk
 
+The SDK installer needs a matching published SDK release. For an unreleased
+revision, VIR_SDK_COMMIT selects an existing, unexpired Actions artifact for
+that exact commit; downloading it requires GitHub authentication. A runtime
+resource release is not an SDK release. VIR_SDK_ARCHIVE selects a matching
+archive supplied locally, without downloading it.
+
 The module facet creates a descriptor plus ordinary .irpkg members. Serve:
 
   wasm/vir-upstream.wasm
-  wasm/vir-upstream.dev.wasm
-  js/vir-runtime.js
+  the complete js/ directory, preserving relative imports
   your generated .irpkg-set.json and all of its .irpkg members
+  the SDK license notices
 
 wasm/vir-upstream.wasm is the stripped release artifact and is selected by
 default. wasm/vir-upstream.dev.wasm is an optimized, unstripped debugging
 companion.
+Serve the companion alongside the release Wasm when enabling debugWasm.
 
 Minimal browser usage:
 
@@ -155,7 +175,7 @@ Set debugWasm: true to load ./wasm/vir-upstream.dev.wasm instead:
     irPackageSet: "./MyApp/Runtime.irpkg-set.json",
   });
 
-Browser React root usage:
+Experimental browser React root usage:
 
   import { createVirRuntimeFactory } from "./js/vir-runtime.js";
   import {

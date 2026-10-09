@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 export const browserRunnerCaseSpecs = [
   {
     packageFile: "local-quickstart.irpkg",
-    entryName: "Quickstart.total",
+    entryName: "QuickstartApp.Program.total",
     expected: {
       entryCount: 6,
       input: "[]",
@@ -177,7 +177,7 @@ export const browserRunnerCaseSpecs = [
   "level": 3,
   "score16": 32,
   "visits": 403,
-  "quota": "9",
+  "quota": 9,
   "checksum": "6005",
   "tier": "elite",
   "note": "ok!"

@@ -27,6 +27,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run test:native-client
       - run: npm run test:packages:unit
       - run: npm run test:tutorials
       - run: npm run check:bindings
@@ -50,16 +51,39 @@ jobs:
             .tools/wasi-sdk-33.0-x86_64-linux
           key: ${{ runner.os }}-${{ runner.arch }}-wasi-sdk-${{ hashFiles('scripts/install-wasi-sdk.sh') }}
       - run: npm run fetch:lean
+      - run: npm run test:resources:production
       - run: npm run test:package-ir-builders
       - run: npm run check:client-native-externs
       - run: npm run install:wasi
       - run: npm run check:boundary-registry
       - run: npm run build:site
+      - run: npm run test:constructor-providers
+      - run: npm run test:resource-roots
       - run: npm run test:env-lookup:wasm-pair
       - run: npm run test:pages
       - run: npm run test:pages:browser
+      - run: npm run test:quickstart:browser
       - run: npm run test:infoview:browser
+      - run: npm run test:resources:browser
+      - name: Retain resource browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resource-browser-diagnostics
+          path: |
+            build/resources-browser/
+            build/quickstart-*/*.log
+          if-no-files-found: ignore
       - run: npm run test:upstream:no-build
+      - run: npm run package:runtime
+      - name: Upload runtime pack and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: lean-vir-runtime
+          path: |
+            build/artifacts/runtime/*.virres
+            build/artifacts/runtime/provenance.json
+          if-no-files-found: error
       - name: Upload SDK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -113,8 +137,46 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run test:lake
+      - run: npm run test:lake:facets
       - run: npm run test:generator:imports
+      - run: npm run test:resources:core
+      - run: npm run test:resources:embedding
+      - run: npm run test:resources:acquisition
+      - run: npm run test:resources:packing
+      - run: npm run test:resources:program
+      - run: npm run test:resources:published
+      - run: npm run test:quickstart
+      - run: npm run test:resources:cache
+      - name: Preserve failed resource cache campaign
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resource-cache-failure
+          path: |
+            /tmp/vir-resource-cache-*/*.log
+            /tmp/vir-resource-cache-*/producer/vir-resources/*.json
+            /tmp/vir-resource-cache-*/client/lakefile.lean
+            /tmp/vir-resource-cache-*/client/build with spaces/vir/resources/programs/*
+            /tmp/vir-resource-cache-*/client/build with spaces/lib/lean/vir-assets/**/*.virres
+            /tmp/vir-resource-cache-*/peer/lakefile.lean
+            /tmp/vir-resource-cache-*/peer/build with spaces/vir/resources/programs/*
+            /tmp/vir-resource-cache-*/peer/build with spaces/lib/lean/vir-assets/**/*.virres
+          if-no-files-found: ignore
+      - run: npm run test:resources:descriptor
+      - name: Retain resource diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resource-diagnostics
+          path: |
+            build/resource-embedding-*/*.log
+            build/resource-acquisition-*/*.log
+            build/resource-acquisition-*/interrupted.json
+            build/resource-acquisition-*/transport/args.json
+            build/resource-packing-*/
+            build/resource-client-*/*.log
+            build/quickstart-*/*.log
+          if-no-files-found: ignore
       - run: npm run test:interface
       - run: npm run test:generator:memory
       - name: Download demo artifacts
@@ -123,6 +185,19 @@ jobs:
           name: vir-demo-artifacts
           path: web/public
       - run: npm run test:infoview
+      - run: npm run test:lake:cache:wasm
+        id: lake_cache
+        env:
+          TMPDIR: ${{ runner.temp }}
+      - name: Preserve failed Lake cache campaign
+        if: failure() && steps.lake_cache.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lake-cache-failure
+          path: ${{ runner.temp }}/vir-lake-cache-artifacts-*
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
       - run: npm run test:runtime:lean
 
   fixtures:

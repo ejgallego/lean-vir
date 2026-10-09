@@ -14,8 +14,9 @@ namespace Lean.Vir
 Runtime/JavaScript-resource effect.
 
 `RuntimeM` is for host-runtime operations that may allocate or inspect
-JavaScript-owned values and mutate VIR runtime bookkeeping, but do not by
-themselves mutate the browser DOM or enter React's render/root APIs.
+JavaScript-owned values and mutate VIR runtime bookkeeping. React construction
+and hooks use the source-level alias `ReactM`; that name does not enforce render
+purity. DOM/root bindings are conventionally labelled `DomM`.
 -/
 @[expose, irreducible] def RuntimeM (α : Type) : Type :=
   IO α

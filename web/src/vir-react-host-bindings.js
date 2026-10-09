@@ -5,25 +5,32 @@ Author: Emilio J. Gallego Arias
 */
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import * as ReactDOMClient from "./vir-react-dom-client.js";
 import { createReactRootHostBindings } from "./react/vir-react-root.js";
 
 export function createBrowserReactHostBindings(lifecycle) {
   return {
     ...createReactRootHostBindings(lifecycle, ReactDOMClient.createRoot),
-    "react.node.text": (value) => value,
-    "react.elementType.tag": (tag) => tag,
     "react.node.createElement": (elementType, props, children) =>
       React.createElement(elementType, props, ...children),
-    "react.node.component": (component, leanProps) =>
-      React.createElement(component, { leanProps }),
-    "react.node.keyedComponent": (component, leanProps, key) =>
-      React.createElement(component, { leanProps, key }),
+    "infoview.hover.portal": node => createPortal(node, document.body),
+    "react.props.withData.make": (data) => ({ data }),
+    "react.props.withData.get": (props) => props.data,
+    "react.props.withData.children": (props) => props.children,
     "react.node.fragment": (props, children) =>
       React.createElement(React.Fragment, props, ...children),
+    "react.syntheticEvent.nativeEvent": (event) => event.nativeEvent,
+    "react.syntheticEvent.target": (event) => event.target,
+    "react.syntheticEvent.currentTarget": (event) => event.currentTarget,
+    "react.syntheticEvent.defaultPrevented": (event) => event.defaultPrevented,
+    "react.syntheticEvent.preventDefault": (event) => event.preventDefault(),
+    "react.syntheticEvent.stopPropagation": (event) => event.stopPropagation(),
     "react.useState": (initial) => React.useState(initial),
     "react.useReducer": (reducer, initial) =>
       React.useReducer(reducer, initial),
+    "react.useReducerWithInit": (reducer, initial, initialize) =>
+      React.useReducer(reducer, initial, initialize),
     "react.useRef": (initial) => React.useRef(initial),
     "react.useId": () => React.useId(),
     "react.useMemo": (calculate, deps) => React.useMemo(calculate, deps),
@@ -35,17 +42,5 @@ export function createBrowserReactHostBindings(lifecycle) {
       ref.current = value;
       return undefined;
     },
-    "react.state.modify": (setter, update) => setter(update),
-    "js.value.react.reducer": (reducer) => reducer,
-    "js.value.react.memoCalculation": (calculate) => calculate,
-    "js.value.react.callback": (callback) => callback,
-    "js.value.react.effectCallback": (effect) => () => {
-      const value = effect.setup();
-      return () => effect.cleanup(value);
-    },
-    "js.value.react.component": (render) =>
-      function LeanComponent(props) {
-        return render(props.leanProps);
-      },
   };
 }

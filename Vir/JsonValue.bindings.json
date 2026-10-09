@@ -26,7 +26,7 @@
         "id": "json-value.check", "group": "conversion", "target": "jsonValue.check",
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "lean": "Lean.Vir.JsonValue.Internal.check", "marker": "vir_js_explicit_conversion", "visibility": "private",
-        "reason": "Explicitly validates the complete ordinary-value graph before copying it into Lean; rejects unsupported shapes, non-safe-integer numbers and reserved reference objects.",
+        "reason": "Explicitly validates the complete ordinary-value graph and expanded-tree budget before copying it into Lean; rejects unsupported shapes, non-safe-integer numbers and SDK-owned Lean handles.",
         "upstreamRelation": { "kind": "vir-owned" },
         "arguments": [{ "name": "value", "type": { "lean": "Js.Any", "representation": "js-resource", "resourceInner": "Js.Any.Value" } }],
         "result": { "type": { "lean": "Except String Unit", "representation": "lean-owned" } }

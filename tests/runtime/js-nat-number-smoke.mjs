@@ -66,7 +66,7 @@ try {
     const result = runtime.call(entries[1], value.toString());
     assert.equal(typeof result, "bigint");
     assert.equal(result, value);
-    assert.equal(runtime.call(entries[2], value.toString()), value.toString());
+    assert.equal(runtime.call(entries[2], value.toString()), value);
     assert.throws(() => JSON.stringify({ value: result }), TypeError);
   }
   assert.equal(numberInputs.length, 3);

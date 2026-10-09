@@ -3,8 +3,10 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { runNativeValuesSmoke } from "./native-values-cases.mjs";
 import {
   readIrPackageInfo,
   replaceIrPackageManifest,
@@ -18,6 +20,7 @@ import {
 } from "./shared.mjs";
 
 export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
+  await runNativeValuesSmoke({ freshDir, wasmBytes });
   const hostSource = join(freshDir, "FreshHost.lean");
   const hostPackage = join(freshDir, "host.irpkg");
   await writeRuntimeFixture(hostSource, "FreshHost.lean");
@@ -55,6 +58,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       },
       "test.react.value": () => 7n,
       "test.runtime.value": () => 9n,
+      "test.runtime.echoString": (value) => value,
     },
   });
   const hostPackageBytes = await readFile(hostPackage);
@@ -79,7 +83,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     [
       "name",
       (m) => {
-        m.hostImports[0].name += ".mismatch";
+        m.hostImports[0].nameKey += "s6d69736d61746368/";
       },
     ],
     [
@@ -123,13 +127,15 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       readIrPackageInfo(hostPackageBytes).manifest,
     );
     mutate(manifest);
+    const candidate = await hostFactory.createRuntime();
     assert.throws(
       () =>
-        hostRuntime.loadIrPackageSetBytes([
+        candidate.loadIrPackageSetBytes([
           replaceIrPackageManifest(hostPackageBytes, manifest),
         ]),
       new RegExp(`manifest/binary contract mismatch:.*host.*${field}`),
     );
+    candidate.dispose();
   }
   assert.equal(hostRuntime.interfaceManifest.hostImports.length, 18);
   assert.equal(
@@ -210,13 +216,13 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     )?.boundary,
     "hostResource",
   );
-  const commonEchoImport = hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "common.echoString",
+  const fixtureEchoImport = hostRuntime.interfaceManifest.hostImports.find(
+    (entry) => entry.target === "test.runtime.echoString",
   );
-  assert.equal(commonEchoImport?.effect, "runtime");
-  assert.equal(commonEchoImport?.boundary, "hostResource");
-  assert.equal(commonEchoImport?.args[0]?.type?.type, "Js");
-  assert.equal(commonEchoImport?.result?.type, "Js");
+  assert.equal(fixtureEchoImport?.effect, "runtime");
+  assert.equal(fixtureEchoImport?.boundary, "hostResource");
+  assert.equal(fixtureEchoImport?.args[0]?.type?.type, "Js");
+  assert.equal(fixtureEchoImport?.result?.type, "Js");
   const nullableOfImport = hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "js.nullable.of",
   );
@@ -224,10 +230,10 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(nullableOfImport?.boundary, "hostResource");
   assert.equal(hostRuntime.call("freshEchoBang", "ok"), "ok!");
   assert.equal(hostRuntime.call("freshTitleRoundtrip", "Lean.Vir"), "Lean.Vir");
-  assert.equal(hostRuntime.call("freshReactValue"), "7");
-  assert.equal(hostRuntime.call("freshRuntimeValue"), "9");
-  assert.equal(hostRuntime.call("freshRuntimeInDom"), "10");
-  assert.equal(hostRuntime.call("freshRuntimeInReact"), "11");
+  assert.equal(hostRuntime.call("freshReactValue"), 7n);
+  assert.equal(hostRuntime.call("freshRuntimeValue"), 9n);
+  assert.equal(hostRuntime.call("freshRuntimeInDom"), 10n);
+  assert.equal(hostRuntime.call("freshRuntimeInReact"), 11n);
   assert.deepEqual(hostRuntime.call("freshElementRoundtrip", "element"), {
     fst: "element",
     snd: "element!",
@@ -237,11 +243,24 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const jsObjectPackage = join(freshDir, "js-object.irpkg");
   await writeRuntimeFixture(jsObjectSource, "FreshJsObject.lean");
   await generateIrPackage("FreshJsObject", jsObjectSource, jsObjectPackage);
+  const proofFailure = new Error("proof-prefix host failure");
+  let proofCalls = 0;
+  let failProofCall = false;
   const jsObjectRuntime = await createVirRuntimeFactory({
     wasmBytes,
     hostBindings: {
       "test.js.id": (value) => value,
       "test.js.length": (value) => BigInt(value.length),
+      "test.js.proofId": (...args) => {
+        assert.equal(args.length, 1, "type and proof slots must not reach JS");
+        proofCalls++;
+        if (failProofCall) throw proofFailure;
+        return args[0];
+      },
+      "test.js.pureProofId": (...args) => {
+        assert.equal(args.length, 1, "pure imports also skip the proof prefix");
+        return args[0];
+      },
     },
   }).createRuntime({ irPackageSet: [await readFile(jsObjectPackage)] });
   const jsIdImport = jsObjectRuntime.interfaceManifest.hostImports.find(
@@ -267,7 +286,28 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const jsArrayAlias = jsObjectRuntime.call("freshJsIdNat", jsArray);
   assert.equal(jsArrayAlias, jsArray);
   assert.deepEqual(jsArray, [10, 20, 30]);
-  assert.equal(jsObjectRuntime.call("freshJsLengthNatArray", jsArray), "3");
+  assert.equal(jsObjectRuntime.call("freshJsLengthNatArray", jsArray), 3n);
+  for (const [target, prefix, arity, effect] of [
+    ["test.js.proofId", 3, 5, "runtime"],
+    ["test.js.pureProofId", 2, 3, "pure"],
+  ]) {
+    const entry = jsObjectRuntime.interfaceManifest.hostImports.find(entry => entry.target === target);
+    assert.equal(entry?.erasedPrefixArgs, prefix);
+    assert.equal(entry?.arity, arity, "opaque IR retains the erased prefix slots");
+    assert.equal(entry?.args.length, 1);
+    assert.equal(entry?.effect, effect);
+  }
+  // Identity and error transport are independent of the phantom payload shape.
+  const proofValue = Object.freeze({ exact: true });
+  assert.equal(jsObjectRuntime.call("freshProofId", proofValue), proofValue);
+  assert.equal(jsObjectRuntime.call("freshPureProofId", proofValue), proofValue);
+  assert.equal(jsObjectRuntime.call("freshProofContinuation", proofValue), proofValue);
+  assert.equal(proofCalls, 3);
+  failProofCall = true;
+  assert.throws(() => jsObjectRuntime.call("freshProofContinuation", proofValue), error => error === proofFailure);
+  assert.equal(proofCalls, 4, "IO failure must skip the second host call");
+  failProofCall = false;
+  assert.equal(jsObjectRuntime.call("freshProofId", proofValue), proofValue);
 
   const leanRefSource = join(freshDir, "FreshLeanRef.lean");
   const leanRefPackage = join(freshDir, "lean-ref.irpkg");
@@ -338,7 +378,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     customJsValueRuntime.call("Vir.Fixtures.CustomJsValue.makePayload"),
     {
       name: "custom!",
-      count: "3",
+      count: 3n,
     },
   );
 
@@ -370,9 +410,16 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   );
   assert.equal(
     reactExternalRuntime.interfaceManifest.hostImports.find(
-      (entry) => entry.target === "js.object.set",
+      (entry) => entry.target === "js.construction.field",
     )?.effect,
     "runtime",
+  );
+  assert.equal(
+    reactExternalRuntime.interfaceManifest.hostImports.some(
+      (entry) => entry.target === "js.object.set",
+    ),
+    false,
+    "literal props must define own data properties, not use ordinary assignment",
   );
   assert.throws(
     () =>
@@ -380,9 +427,9 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
         "Vir.Fixtures.ReactExternalComponent.mount",
         "#react-external-component",
       ),
-    /host import binding not found: js\.value\.react\.component/,
+    /host import binding not found: browser\.document\.current/,
   );
-  assert.equal(reactExternalRuntime.liveCallbacks.size, 0);
+  assert.equal(countLiveCallbacks(reactExternalRuntime.hostState), 0);
   reactExternalRuntime.dispose();
 }
 

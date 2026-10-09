@@ -5,11 +5,15 @@ application. It owns the request effect, native Promise continuations,
 cancellation, stale-result guard, loading/error state and rendered child state.
 There is no application JavaScript companion.
 
-`WidgetView` consumes the shell's position-specific `Surface.rpcSession`, builds
-the request object and renders the application. `vir_proof_widget WidgetView`
-generates the standard `createComponent`, `mount`, `irPackage` and `widgetProps`
-entries. In this repository, a file importing both `tutorials.RpcReferenceWidget`
-and the native server fixture `fixtures.infoview.RpcBrowserServer` can activate it with:
+`WidgetView` is a `RuntimeM (React.FunctionComponent
+Infoview.PanelWidgetProps)` factory. React supplies the native panel props
+directly; the component calls the actual `Infoview.useRpcSession` hook for its
+position-specific session, whose context position can differ from `props.pos`.
+It uses `props.pos` only for its edit-notification URI filter. `vir_proof_widget
+WidgetView` generates `createComponent`, `irPackage` and `widgetProps`; the
+factory is the only package root. In this repository, a file importing both
+`tutorials.RpcReferenceWidget` and the native server fixture
+`fixtures.infoview.RpcBrowserServer` can activate it with:
 
 ```lean
 show_panel_widgets [local Lean.Vir.Infoview.widget with
@@ -54,15 +58,15 @@ the effectful `JsValue.ofString "message"` construction for literal keys.
 `Infoview.useClientNotificationEffect` forwards the method, callback and optional
 dependency list to the upstream infoview hook. Native `undefined` and an empty
 JavaScript array remain distinct, expressed by `Js.UndefinedOr`, not `Option`.
-The tutorial subscribes to
-`textDocument/didChange`, filters notifications to the current surface URI and
-increments a revision included in the request effect's dependencies. Filtering
-by URI and choosing to refresh are application policy; VIR does not queue,
-filter or schedule notifications. This example passes `undefined` so the
-subscription follows the current editor connection on every render as well as
-changes to the URI. This subscribes/unsubscribes every render; the upstream hook
-does not await those operations, and VIR adds no ordering. An explicit dependency
-list must account for context changes.
+The tutorial subscribes to `textDocument/didChange`, filters notifications to
+the URI projected from native `PanelWidgetProps.pos`, and increments a revision
+included in the request effect's dependencies. Filtering by URI and choosing to
+refresh are application policy; VIR does not queue, filter or schedule
+notifications. This example passes `undefined` so the subscription follows the
+current editor connection on every render as well as changes to the URI. This
+subscribes/unsubscribes every render; the upstream hook does not await those
+operations, and VIR adds no ordering. An explicit dependency list must account
+for context changes.
 
 The component function and request object remain stable across unrelated shell
 renders. A matching edit starts another request at the same position without

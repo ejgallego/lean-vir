@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 import * as React from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -31,6 +32,7 @@ globalThis.runVirGenerationGc = async (wasm, pkg) => {
   const lifecycle = await runGenerationLifecycleCases(
     createRuntime,
     irPackageSet[0],
+    () => createVirRuntime({ wasmModule }),
   );
   const sharedBindings = {};
   const shared = await runSharedBindingGcCases(
@@ -39,8 +41,61 @@ globalThis.runVirGenerationGc = async (wasm, pkg) => {
     irPackageSet[0],
   );
   const react = await runReactChurn(createRuntime);
-  return { gc, lifecycle, shared, react };
+  const fatal = await runFatalRecovery(wasmModule, irPackageSet);
+  return { gc, lifecycle, shared, react, fatal };
 };
+
+async function runFatalRecovery(wasmModule, irPackageSet) {
+  let captured;
+  const factory = createVirRuntimeFactory({ wasmModule, hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      captured = callback;
+      return callback(input);
+    },
+    "test.recordNat": () => undefined,
+  } });
+  const bad = await factory.createRuntime({ irPackageSet });
+  const good = await factory.createRuntime({ irPackageSet });
+  let recovered;
+  try {
+    bad.call("HostInterop.callbackRoundTrip", 3);
+    const oldCallback = captured;
+    const state = bad.hostState;
+    const held = makeJsl(bad, "retained across trap");
+    const exports = bad.exports;
+    check(exports.vir_obj_resource({ label: "retained browser payload" }) !== 0,
+      "browser payload acquires a Wasm root");
+    check(exports.vir_resource_roots_active() > 0,
+      "browser table has live roots before trap");
+    let failure;
+    try { bad.exports.vir_obj_nat(0xfffffff0, 32); }
+    catch (error) { failure = error; }
+    check(failure instanceof WebAssembly.RuntimeError, "real browser Wasm trap");
+    check(bad.failure === failure, "browser runtime remembers original trap");
+    for (const action of [
+      () => oldCallback(4n),
+      () => readJsl(bad, held),
+      () => bad.loadIrPackageSetBytes(irPackageSet),
+    ]) {
+      let rejected = false;
+      try { action(); } catch (error) { rejected = /fresh runtime/.test(error.message); }
+      check(rejected, "trapped generation rejects callback, handle and installation");
+    }
+    bad.dispose(); bad.dispose();
+    check(exports.vir_resource_roots_active() === 0 &&
+      exports.vir_resource_roots_reusable() === 0,
+      "browser disposal clears the Wasm table after trap");
+    check(state.leanObjectHandleCells.size === 0 && countLiveCallbacks(bad.hostState) === 0,
+      "browser disposal releases JavaScript roots after trap");
+    for (const runtime of [good, recovered = await factory.createRuntime({ irPackageSet })]) {
+      runtime.call("HostInterop.callbackRoundTrip", 3);
+      check(captured(4n) === 11n, "other and fresh generations execute after trap");
+    }
+    return { retired: true, recovered: true };
+  } finally {
+    bad.dispose(); good.dispose(); recovered?.dispose(); captured = null;
+  }
+}
 
 async function runReactChurn(createRuntime) {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -112,12 +167,12 @@ async function runReactChurn(createRuntime) {
     );
     await collectUntil(
       () =>
-        runtime.liveCallbacks.size === 0 &&
+        countLiveCallbacks(runtime.hostState) === 0 &&
         runtime.hostState.leanObjectHandleCells.size === 0,
       "React render foreign-root recovery",
     );
     check(
-      runtime.hostState.resourceRoots.debugCounts().active === 0,
+      runtime.hostState.resourceRootCounts().active === 0,
       "React externrefs return to zero",
     );
     return counts;

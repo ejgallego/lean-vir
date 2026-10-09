@@ -52,6 +52,7 @@ const cases = [
 const caseById = new Map(cases.map((entry) => [entry.id, entry]));
 const query = new URLSearchParams(window.location.search);
 const statusEl = document.querySelector("#format-status");
+const reloadRuntimeButton = document.querySelector("#format-reload-runtime");
 const exportCountEl = document.querySelector("#format-export-count");
 const durationEl = document.querySelector("#format-duration");
 const widthRange = document.querySelector("#format-width-range");
@@ -67,6 +68,8 @@ const runtimeFactory = createVirRuntimeFactory({
 
 let runtime = null;
 let activeCase = normalizeCase(query.get("case") ?? "list");
+let loadGeneration = 0;
+let loadingRuntime = false;
 
 function normalizeCase(value) {
   return caseById.has(value) ? value : "list";
@@ -103,15 +106,36 @@ function updateUrl(width) {
 }
 
 function renderError(error) {
+  if (runtime?.failure != null) {
+    try {
+      runtime.dispose();
+    } catch (cleanupError) {
+      console.error("failed to dispose trapped format runtime", cleanupError);
+    }
+  }
   const message = errorMessage(error);
   outputEl.textContent = message;
   durationEl.textContent = "Trap";
-  setReadyState(statusEl, "Failed", false);
+  setReadyState(statusEl, runtime?.failure != null ? "Trap" : "Failed", false);
+  updateRuntimeControls();
   console.error(error);
 }
 
+function updateRuntimeControls() {
+  const failed = runtime?.failure != null;
+  const usable = runtime !== null && !failed && !loadingRuntime;
+  for (const button of caseButtons) button.disabled = !usable;
+  widthRange.disabled = !usable;
+  widthInput.disabled = !usable;
+  reloadRuntimeButton.hidden = !failed;
+  reloadRuntimeButton.disabled = loadingRuntime;
+}
+
 function render() {
-  if (runtime === null) return;
+  if (runtime === null || runtime.failure !== null || loadingRuntime) {
+    updateRuntimeControls();
+    return;
+  }
   try {
     const width = setWidth(widthInput.value);
     setActiveCase(activeCase);
@@ -122,23 +146,40 @@ function render() {
     durationEl.textContent = `${elapsed.toFixed(2)} ms`;
     setReadyState(statusEl, "Ready", true);
     updateUrl(width);
+    updateRuntimeControls();
   } catch (error) {
     renderError(error);
   }
 }
 
-async function boot() {
+async function loadRuntime() {
+  const generation = ++loadGeneration;
+  loadingRuntime = true;
   setReadyState(statusEl, "Loading", false);
-  const width = setWidth(query.get("width") ?? "18");
-  setActiveCase(activeCase);
-  runtime = await runtimeFactory.createRuntime({
-    irPackageSet: [
-      await fetchBytes(`${import.meta.env.BASE_URL}${prettyPackageFile}`),
-    ],
-  });
-  exportCountEl.textContent = String(runtime.packageInfo.interfaceExports);
-  setWidth(width);
-  render();
+  updateRuntimeControls();
+  try {
+    const packageBytes = await fetchBytes(
+      `${import.meta.env.BASE_URL}${prettyPackageFile}`,
+    );
+    const candidate = await runtimeFactory.createRuntime({
+      irPackageSet: [packageBytes],
+    });
+    if (generation !== loadGeneration) {
+      candidate.dispose();
+      return;
+    }
+    const previousRuntime = runtime;
+    runtime = candidate;
+    previousRuntime?.dispose();
+    exportCountEl.textContent = String(runtime.packageInfo.interfaceExports);
+    loadingRuntime = false;
+    updateRuntimeControls();
+    render();
+  } catch (error) {
+    if (generation !== loadGeneration) return;
+    loadingRuntime = false;
+    renderError(error);
+  }
 }
 
 for (const button of caseButtons) {
@@ -147,6 +188,11 @@ for (const button of caseButtons) {
     render();
   });
 }
+
+reloadRuntimeButton.addEventListener("click", () => {
+  if (runtime?.failure == null || loadingRuntime) return;
+  void loadRuntime();
+});
 
 widthRange.addEventListener("input", () => {
   widthInput.value = widthRange.value;
@@ -158,4 +204,8 @@ widthInput.addEventListener("input", () => {
   render();
 });
 
-boot().catch(renderError);
+setReadyState(statusEl, "Loading", false);
+setWidth(query.get("width") ?? "18");
+setActiveCase(activeCase);
+updateRuntimeControls();
+void loadRuntime();

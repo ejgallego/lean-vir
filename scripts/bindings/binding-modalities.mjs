@@ -48,6 +48,45 @@ function validateVisibility(value, context) {
   }
 }
 
+function validateTypeParameters(value, context) {
+  const parameters = value ?? [];
+  if (!Array.isArray(parameters) || new Set(parameters).size !== parameters.length) {
+    throw new Error(`${context} must be an array of distinct Lean identifiers`);
+  }
+  for (const parameter of parameters) validateLeanIdentifier(parameter, context);
+  return parameters;
+}
+
+// Configured proof binders are deliberately bounded to a class constant applied
+// to declared type parameters. This supports erased membership constraints
+// without turning configuration into a general Lean-code injection channel.
+function validateProofParameters(value, typeParameters, context) {
+  const proofs = value ?? [];
+  if (!Array.isArray(proofs) || new Set(proofs).size !== proofs.length) {
+    throw new Error(`${context} must be an array of distinct proof types`);
+  }
+  const parameters = new Set(typeParameters);
+  for (const proof of proofs) {
+    if (!nonemptyString(proof) || proof !== proof.trim() || proof.includes("\t") || proof.includes("\n")) {
+      throw new Error(`${context} proof type must be a space-separated Lean class application`);
+    }
+    const [head, ...arguments_] = proof.split(" ");
+    if (head === "" || head.split(".").some((part) => part === "")) {
+      throw new Error(`${context} proof type must begin with a qualified Lean identifier`);
+    }
+    for (const part of head.split(".")) validateLeanIdentifier(part, `${context} proof type`);
+    if (parameters.has(head)) {
+      throw new Error(`${context} proof type must begin with a Lean class identifier`);
+    }
+    for (const argument of arguments_) {
+      if (!parameters.has(argument)) {
+        throw new Error(`${context} proof type argument ${JSON.stringify(argument)} is not a declared type parameter`);
+      }
+    }
+  }
+  return proofs;
+}
+
 function validateSemanticPolicy(value, context, additionalFields = []) {
   if (!object(value) || !nonemptyString(value.reason)) {
     throw new Error(`${context} must define semantics and reason`);
@@ -230,6 +269,8 @@ export function validateGenerationProfile(generation, context = "generation") {
         "fixedRestParameters",
         "fixedArguments",
         "parameterRenames",
+        "typeParameters",
+        "proofParameters",
         "visibility",
         "semantics",
         "reason",
@@ -237,6 +278,15 @@ export function validateGenerationProfile(generation, context = "generation") {
       `${context} method policy ${member}`,
     );
     validateVisibility(policy.visibility, `${context} method policy ${member}`);
+    const typeParameters = validateTypeParameters(
+      policy.typeParameters,
+      `${context} method policy ${member} type parameters`,
+    );
+    validateProofParameters(
+      policy.proofParameters,
+      typeParameters,
+      `${context} method policy ${member} proof parameters`,
+    );
     if (policy.signature !== undefined &&
         (!Number.isInteger(policy.signature) || policy.signature < 0)) {
       throw new Error(`${context} method policy ${member} requires an overload index`);
@@ -416,7 +466,9 @@ function methodPolicyChangesCall(policy) {
     (policy.omittedRequiredParameters?.length ?? 0) !== 0 ||
     (policy.omittedRestParameters?.length ?? 0) !== 0 ||
     Object.keys(policy.fixedRestParameters ?? {}).length !== 0 ||
-    Object.keys(policy.fixedArguments ?? {}).length !== 0;
+    Object.keys(policy.fixedArguments ?? {}).length !== 0 ||
+    (policy.typeParameters?.length ?? 0) !== 0 ||
+    (policy.proofParameters?.length ?? 0) !== 0;
 }
 
 function combineSemantics(primary, policyFacts) {
@@ -846,6 +898,15 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
   const fixedRest = policy.fixedRestParameters ?? {};
   const fixedArguments = policy.fixedArguments ?? {};
   const parameterRenames = policy.parameterRenames ?? {};
+  const typeParameters = validateTypeParameters(
+    policy.typeParameters,
+    `${member} policy type parameters`,
+  );
+  const proofParameters = validateProofParameters(
+    policy.proofParameters,
+    typeParameters,
+    `${member} policy proof parameters`,
+  );
   const exception = exceptionFor(generation, operationId);
   if (policy.semantics !== undefined && exception !== null) {
     throw new Error(
@@ -1028,10 +1089,14 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
         fixedRestParameters: structuredClone(fixedRest),
         fixedArguments: structuredClone(fixedArguments),
         parameterRenames: structuredClone(parameterRenames),
+        typeParameters: [...typeParameters],
+        proofParameters: [...proofParameters],
         provenance: signatureProvenance,
       },
     },
     host: { target },
+    typeParameters,
+    proofParameters,
     lean: {
       declaration: mapping.lean[0],
       namespace: leanName.namespace,
@@ -1208,13 +1273,15 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot) 
         throw new Error(`generated protocol ${protocol.id} classifies missing ${relation.accessor} accessor ${relation.member}`);
       }
     }
-    const typeParameters = protocol.typeParameters ?? [];
-    if (new Set(typeParameters).size !== typeParameters.length) {
-      throw new Error(`generated protocol ${protocol.id} repeats a type parameter`);
-    }
-    for (const parameter of typeParameters) {
-      validateLeanIdentifier(parameter, `${protocol.id} type parameter`);
-    }
+    const typeParameters = validateTypeParameters(
+      protocol.typeParameters,
+      `generated protocol ${protocol.id} type parameters`,
+    );
+    const proofParameters = validateProofParameters(
+      protocol.proofParameters,
+      typeParameters,
+      `generated protocol ${protocol.id} proof parameters`,
+    );
     validateJsValueTypeRelationships(protocol, symbolsByRoot.get(protocol.group));
     const args = protocol.arguments.map((argument) => {
       const type = overriddenType(
@@ -1278,6 +1345,7 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot) 
         provenance: typeProvenance("generation.protocolOperations.effect", "explicit protocol effect"),
       },
       typeParameters,
+      proofParameters,
       receiver: {
         kind: "none",
         provenance: {

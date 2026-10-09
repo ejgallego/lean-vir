@@ -22,10 +22,7 @@ extern "C" uint32_t vir_begin_ir_package_set(void) {
 }
 
 extern "C" uint32_t vir_append_ir_package(uint8_t const * data, uint32_t size) {
-    if (!lean::vir::append_package(data, size)) {
-        return 0;
-    }
-    return lean::vir::package_decl_count();
+    return lean::vir::append_package(data, size) ? 1 : 0;
 }
 
 extern "C" uint32_t vir_prepare_ir_package_set(void) {
@@ -36,11 +33,7 @@ extern "C" uint32_t vir_prepare_ir_package_set(void) {
 }
 
 extern "C" uint32_t vir_finish_ir_package_set(void) {
-    if (!lean::vir::finish_package_set()) {
-        lean::vir::clear_loaded_package();
-        return 0;
-    }
-    return lean::vir::package_decl_count();
+    return lean::vir::finish_package_set() ? 1 : 0;
 }
 
 extern "C" uint32_t vir_validate_package_contract(uint8_t const * data, uint32_t size) {

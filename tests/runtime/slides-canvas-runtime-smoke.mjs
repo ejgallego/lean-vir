@@ -156,7 +156,7 @@ try {
   const runtime = await createVirRuntime({
     wasmBytes,
     irPackageSet: [await readFile(packagePath)],
-    defaultHostBindings: createBrowserHostBindings({ lifecycle }),
+    defaultHostBindings: () => createBrowserHostBindings({ lifecycle }),
   });
   try {
     const hostImport = (target) =>

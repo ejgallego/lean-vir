@@ -4,8 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Lean
-import Vir.Hash
+import Lake
+import Vir.NativePayload
+import Vir.Package.Format
 
 open Lean
 open System
@@ -13,8 +14,6 @@ open System
 namespace Vir.FetchSdk
 
 def sdkVersion : String := "0.1.0"
-
-def sdkRuntimeAbiVersion : Nat := 2
 
 structure Options where
   out : FilePath := "web/public/vendor/lean-vir"
@@ -152,21 +151,14 @@ def needsGitHubAuthentication (url : String) : Bool :=
   url.startsWith "https://api.github.com/"
 
 def fetchUrl (url : String) (dest : FilePath) : IO Unit := do
-  if let some parent := dest.parent then
-    IO.FS.createDirAll parent
-  let mut args := #[
-    "--fail",
-    "--location",
-    "--show-error",
-    "--silent",
-    "-H", "Accept: application/vnd.github+json",
-    "-H", "X-GitHub-Api-Version: 2022-11-28"
-  ]
+  let mut headers := #["Accept: application/vnd.github+json",
+    "X-GitHub-Api-Version: 2022-11-28"]
   if needsGitHubAuthentication url then
     if let some token ← githubToken? then
-      args := (args.push "-H").push s!"Authorization: Bearer {token}"
-  args := ((args.push "--output").push dest.toString).push url
-  discard <| run "curl" args
+      headers := headers.push s!"Authorization: Bearer {token}"
+  let downloaded ← (Lake.download url dest headers).toBaseIO
+  if downloaded.isNone then
+    throw <| IO.userError s!"failed to download SDK from {url}"
 
 def findCommitArtifactUrl (json : Json) (artifactName : String) (commit : String) : IO String := do
   let artifacts ← jsonField json "artifacts" Json.getArr?
@@ -226,8 +218,8 @@ def verifySdkFiles (sdkDir : FilePath) (manifest : Json) : IO Unit := do
     let relPath ← jsonField file "path" Json.getStr?
     let expected ← jsonField file "sha256" Json.getStr?
     return (relPath, expected)
-  let hashes ← Vir.sha256Files (entries.map fun (relPath, _) => sdkDir / FilePath.mk relPath)
-  for ((relPath, expected), actual) in entries.zip hashes do
+  for (relPath, expected) in entries do
+    let actual ← Vir.NativePayload.sha256File (sdkDir / FilePath.mk relPath)
     if actual != expected then
       throw <| IO.userError s!"checksum mismatch for {relPath}: expected {expected}, got {actual}"
 
@@ -244,7 +236,7 @@ def verifyInstalledSdk
   if version != expectVersion then
     throw <| IO.userError s!"SDK version mismatch: expected {expectVersion}, got {version}"
   let abi ← jsonField manifest "runtimeAbiVersion" Json.getNat?
-  if abi != sdkRuntimeAbiVersion then
+  if abi != Vir.GeneratePackage.currentRuntimeAbiVersion then
     throw <| IO.userError s!"unsupported SDK runtime ABI version: {abi}"
   let actualCommit ← jsonField manifest "gitCommit" Json.getStr?
   if actualCommit.isEmpty then
@@ -259,24 +251,14 @@ def installArchive
     (outDir : FilePath)
     (expectVersion : String)
     (expectCommit? : Option String) : IO Unit := do
-  let stamp ← IO.monoMsNow
-  let tmpRoot := FilePath.mk s!"/tmp/lean-vir-sdk-fetch-{stamp}"
-  let unpackDir := tmpRoot / "unpack"
-  let sdkDir := unpackDir / "lean-vir-sdk"
-  try
+  Vir.NativePayload.withSiblingDirectory outDir fun tmpRoot => do
+    let unpackDir := tmpRoot / "unpack"
+    let sdkDir := unpackDir / "lean-vir-sdk"
     IO.FS.createDirAll unpackDir
     discard <| run "tar" #["-xzf", archive.toString, "-C", unpackDir.toString]
-    verifyInstalledSdk sdkDir expectVersion expectCommit?
-    if ← outDir.pathExists then
-      IO.FS.removeDirAll outDir
-    if let some parent := outDir.parent then
-      IO.FS.createDirAll parent
-    discard <| run "mv" #[sdkDir.toString, outDir.toString]
-  finally
-    try
-      IO.FS.removeDirAll tmpRoot
-    catch _ =>
-      pure ()
+    let verified ← Vir.NativePayload.verifyDirectory sdkDir fun sdkDir =>
+      verifyInstalledSdk sdkDir expectVersion expectCommit?
+    Vir.NativePayload.promote outDir verified
 
 def fetchArchive (url : String) (dest : FilePath) : IO Unit :=
   fetchUrl url dest

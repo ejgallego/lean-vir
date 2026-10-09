@@ -34,12 +34,12 @@ assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.constNatExpr"), {
 });
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.twoLitExpr"), {
   kind: "lit",
-  literal: { kind: "nat", value: "2" },
+  literal: { kind: "nat", value: 2n },
 });
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.appExpr"), {
   kind: "app",
   fn: { kind: "const", name: "Nat.succ", levels: [] },
-  arg: { kind: "lit", literal: { kind: "nat", value: "2" } },
+  arg: { kind: "lit", literal: { kind: "nat", value: 2n } },
 });
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.sortParamExpr"), {
   kind: "sort",
@@ -49,6 +49,30 @@ assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.fvarExpr"), {
   kind: "fvar",
   name: "x",
 });
+assert.deepEqual(
+  leanRuntime.call("Vir.Fixtures.ExprPrinter.anonymousNameExpr"),
+  {
+    kind: "fvar",
+    name: "[anonymous]",
+  },
+);
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.unicodeNameExpr"), {
+  kind: "fvar",
+  name: "αβ₁",
+});
+for (const entry of [
+  "numeralNameExpr",
+  "largeNumeralNameExpr",
+  "dottedStringNameExpr",
+  "emptyComponentNameExpr",
+  "escapedNameExpr",
+]) {
+  assert.throws(
+    () => leanRuntime.call(`Vir.Fixtures.ExprPrinter.${entry}`),
+    /unsupported numeric, escaped, empty, or non-identifier components/,
+    `expected ${entry} to be rejected by the raw Name getter`,
+  );
+}
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.mvarExpr"), {
   kind: "mvar",
   name: "m",
@@ -57,22 +81,22 @@ assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.lambdaExpr"), {
   kind: "lam",
   name: "x",
   type: { kind: "const", name: "Nat", levels: [] },
-  body: { kind: "bvar", index: "0" },
+  body: { kind: "bvar", index: 0n },
   binderInfo: "default",
 });
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.forallExpr"), {
   kind: "forall",
   name: "x",
   type: { kind: "const", name: "Nat", levels: [] },
-  body: { kind: "bvar", index: "0" },
+  body: { kind: "bvar", index: 0n },
   binderInfo: "implicit",
 });
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.letExpr"), {
   kind: "let",
   name: "x",
   type: { kind: "const", name: "Nat", levels: [] },
-  value: { kind: "lit", literal: { kind: "nat", value: "2" } },
-  body: { kind: "bvar", index: "0" },
+  value: { kind: "lit", literal: { kind: "nat", value: 2n } },
+  body: { kind: "bvar", index: 0n },
   nondep: false,
 });
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.stringLitExpr"), {
@@ -81,31 +105,48 @@ assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.stringLitExpr"), {
 });
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.mdataExpr"), {
   kind: "mdata",
-  expr: { kind: "bvar", index: "0" },
+  expr: { kind: "bvar", index: 0n },
 });
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.projExpr"), {
   kind: "proj",
   typeName: "Prod",
-  index: "1",
+  index: 1n,
   struct: { kind: "const", name: "p", levels: [] },
 });
 assert.equal(
   leanRuntime.call("Vir.Fixtures.ExprPrinter.exprCoverageScore"),
-  "1232",
+  1232n,
 );
+assert.equal(leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", {
+  kind: "bvar", index: 1048574,
+}), 1048575n);
+for (const index of [1048575, "18446744073709551615", "18446744073709551616", "9".repeat(200)]) {
+  assert.throws(() => leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", {
+    kind: "bvar", index,
+  }), /maximum index 1048574/);
+  assert.equal(leanRuntime.failure, null, "invalid JS input must not trap the interpreter");
+  const bytes = new TextEncoder().encode(String(index));
+  const ptr = leanRuntime.allocBytes(bytes);
+  try {
+    assert.equal(leanRuntime.exports.vir_obj_expr_bvar(ptr, bytes.length), 0,
+      "raw ABI also rejects indices outside the kernel's cached range");
+  } finally {
+    leanRuntime.freeBytes(ptr);
+  }
+}
 assert.equal(
   leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", {
     kind: "bvar",
     index: 4,
   }),
-  "5",
+  5n,
 );
 assert.equal(
   leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", {
     kind: "lit",
     literal: { kind: "nat", value: 2 },
   }),
-  "102",
+  102n,
 );
 assert.deepEqual(
   leanRuntime.call("Vir.Fixtures.ExprPrinter.bumpBVar", {
@@ -114,37 +155,37 @@ assert.deepEqual(
   }),
   {
     kind: "bvar",
-    index: "5",
+    index: 5n,
   },
 );
 assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifySum", 0), {
   kind: "inl",
-  value: "10",
+  value: 10n,
 });
 assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifySum", 4), {
   kind: "inr",
-  value: "4",
+  value: 4n,
 });
 assert.equal(
   runtime.call("Vir.Fixtures.ListOption.sumScore", { kind: "inr", value: 7 }),
-  "70",
+  70n,
 );
 assert.equal(
   runtime.call("Vir.Fixtures.ListOption.sumScore", {
     kind: "inl",
     value: 12,
   }),
-  "12",
+  12n,
 );
 assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 0), {
   kind: "error",
-  value: "90",
+  value: 90n,
 });
 assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 5), {
   kind: "ok",
   value: {
     kind: "inr",
-    value: "5",
+    value: 5n,
   },
 });
 assert.equal(
@@ -157,11 +198,11 @@ assert.equal(
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", 41),
-  "42",
+  42n,
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.baseIntNegate", -41),
-  "41",
+  41n,
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", "ok"),
@@ -180,19 +221,19 @@ assert.equal(
     "a",
     "bc",
   ]),
-  "3",
+  3n,
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.baseArrayNatSum", [4, 5, 6]),
-  "15",
+  15n,
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.listUInt32Sum", [1, 2, 3]),
-  "6",
+  6n,
 );
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.arrayNatBumpAll", [4, 5]),
-  ["5", "6"],
+  [5n, 6n],
 );
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.listStringBangAll", ["a", "bc"]),
@@ -204,16 +245,16 @@ assert.equal(
     "Vir.Fixtures.InterfaceShapes.uint64Bump",
     "18446744073709551615",
   ),
-  "0",
+  0n,
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.baseUSizeBump", "41"),
-  "42",
+  42,
 );
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.floatScale", 1.5), 6);
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.floatScore", 3.25),
-  "4",
+  4n,
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.float32Roundtrip", 1.25),
@@ -240,11 +281,11 @@ assert.equal(float32Entry.args[0].type.interfaceTag, INTERFACE_TAG.FLOAT32);
 assert.equal(float32Entry.result.interfaceTag, INTERFACE_TAG.FLOAT32);
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", null),
-  "0",
+  0n,
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", 41),
-  "42",
+  42n,
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", null),
@@ -256,7 +297,7 @@ assert.equal(
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.optionNatScore", 6),
-  "17",
+  17n,
 );
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSwap", {
@@ -264,8 +305,8 @@ assert.deepEqual(
     snd: 9,
   }),
   {
-    fst: "9",
-    snd: "2",
+    fst: 9n,
+    snd: 2n,
   },
 );
 assert.equal(
@@ -273,22 +314,22 @@ assert.equal(
     fst: 4,
     snd: 5,
   }),
-  "9",
+  9n,
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.optionArrayNatSum", [4, 5, 6]),
-  "15",
+  15n,
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.optionArrayNatSum", null),
-  "0",
+  0n,
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.listProdNatStringScore", [
     { fst: 4, snd: "ab" },
     { fst: 5, snd: "c" },
   ]),
-  "12",
+  12n,
 );
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.prodStringNatSwap", {
@@ -296,7 +337,7 @@ assert.deepEqual(
     snd: 6,
   }),
   {
-    fst: "7",
+    fst: 7n,
     snd: "ok!",
   },
 );
@@ -305,7 +346,7 @@ assert.equal(
     { kind: "const", name: "Nat", levels: [] },
     { kind: "bvar", index: 2 },
   ]),
-  "13",
+  13n,
 );
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.optionExprBump", {
@@ -314,7 +355,7 @@ assert.deepEqual(
   }),
   {
     kind: "bvar",
-    index: "7",
+    index: 7n,
   },
 );
 assert.deepEqual(
@@ -325,7 +366,7 @@ assert.deepEqual(
   }),
   {
     nickname: "lean!",
-    points: "6",
+    points: 6n,
     tags: ["ir", "wasm"],
   },
 );
@@ -335,8 +376,24 @@ assert.equal(
     points: 4,
     tags: ["ir", "wasm"],
   }),
-  "14",
+  14n,
 );
+// A getter can reenter conversion for the same descriptor while the outer
+// constructor owns partially lowered fields. Only the metadata may be shared.
+{
+  const tags = ["outer"];
+  let nestedScore;
+  Object.defineProperty(tags, 0, { get() {
+    nestedScore = runtime.call("Vir.Fixtures.InterfaceShapes.profileScore", {
+      nickname: "inner", points: 10, tags: ["xy"],
+    });
+    return "tag";
+  } });
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileScore", {
+    nickname: "outer", points: 1, tags,
+  }), 9n);
+  assert.equal(nestedScore, 17n);
+}
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.profileSummary", {
     nickname: "lean",
@@ -345,8 +402,8 @@ assert.deepEqual(
   }),
   {
     label: "lean:2",
-    total: "14",
-    bonus: "14",
+    total: 14n,
+    bonus: 14n,
   },
 );
 assert.equal(
@@ -362,7 +419,7 @@ assert.equal(
       bonus: 14,
     },
   }),
-  "48",
+  48n,
 );
 const profileStatsInput = {
   enabled: true,
@@ -407,8 +464,8 @@ assert.deepEqual(
     level: 3,
     score16: 32,
     visits: 403,
-    quota: "9",
-    checksum: "6005",
+    quota: 9,
+    checksum: 6005n,
     tier: "elite",
     note: "ok!",
   },
@@ -418,12 +475,12 @@ assert.equal(
     "Vir.Fixtures.InterfaceShapes.profileStatsScore",
     profileStatsInput,
   ),
-  "6549",
+  6549n,
 );
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.boxNatBump", { value: 41 }),
   {
-    value: "42",
+    value: 42n,
   },
 );
 const boxNatEntry = manifestEntry(
@@ -476,7 +533,7 @@ assert.deepEqual(
     value: "18446744073709551615",
   }),
   {
-    value: "0",
+    value: 0n,
   },
 );
 const uint32BoxEntry = manifestEntry(
@@ -520,7 +577,7 @@ assert.deepEqual(
     value: "18446744073709551615",
   }),
   {
-    value: "0",
+    value: 0n,
   },
 );
 assert.deepEqual(
@@ -528,7 +585,7 @@ assert.deepEqual(
     value: { value: 4 },
   }),
   {
-    value: { value: "5" },
+    value: { value: 5n },
   },
 );
 assert.equal(
@@ -536,7 +593,7 @@ assert.equal(
     label: "ab",
     payload: ["x", "yz"],
   }),
-  "5",
+  5n,
 );
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.taggedProfileBump", {
@@ -551,7 +608,7 @@ assert.deepEqual(
     label: "profile!",
     payload: {
       nickname: "lean!",
-      points: "6",
+      points: 6n,
       tags: ["ir", "wasm"],
     },
   },
@@ -565,14 +622,14 @@ assert.deepEqual(
   {
     active: true,
     count: 4,
-    payload: { value: "7" },
+    payload: { value: 7n },
   },
 );
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.boxExprKindScore", {
     value: { kind: "const", name: "Nat", levels: [] },
   }),
-  "10",
+  10n,
 );
 const extendedProfileInput = {
   nickname: "lean",
@@ -605,7 +662,7 @@ assert.deepEqual(
     nickname: "lean!",
     active: false,
     visits: 6,
-    score: "8",
+    score: 8n,
     tags: ["ir", "extended"],
   },
 );
@@ -614,7 +671,7 @@ assert.equal(
     "Vir.Fixtures.InterfaceShapes.extendedProfileScore",
     extendedProfileInput,
   ),
-  "118",
+  118n,
 );
 assert.throws(
   () =>

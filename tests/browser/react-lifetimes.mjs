@@ -14,40 +14,77 @@ import * as esbuild from "esbuild";
 import { evaluate, launchChromium, openChromiumPage } from "./harness.mjs";
 import {
   hostPackageFile,
+  packageSpecs,
   wasmPublicFile,
 } from "../../scripts/packages/browser-package-config.mjs";
 
 const resultKey = "__leanVirReactRefLifetimeSmoke";
 const strictModeResultKey = "__leanVirReactStrictModeSmoke";
+const hoverLifecycleResultKey = "__leanVirInfoviewHoverLifecycleSmoke";
 const browserProbeBundles = new Map();
 
 export async function smokeBrowserReactLifetimes(cdp, artifactDirectory) {
   await smokeBrowserReactRefLifetime(cdp);
   await smokeBrowserReactStrictModeLifetime(cdp);
+  await smokeBrowserInfoviewHoverLifecycle(cdp);
   await smokeBrowserReactUseId(cdp, artifactDirectory);
   await smokeBrowserNativeInfoviewUpdates(cdp, artifactDirectory);
+}
+
+async function smokeBrowserInfoviewHoverLifecycle(cdp) {
+  const source = await bundledBrowserProbe(
+    "./hover-lifecycle-entry.js",
+    "production",
+  );
+  await evaluateBrowserProbe(
+    cdp,
+    source,
+    "lean-vir-infoview-hover-lifecycle-smoke.js",
+  );
+  const result = await evaluate(
+    cdp,
+    `globalThis[${JSON.stringify(hoverLifecycleResultKey)}]`,
+  );
+  if (result?.ok !== true) {
+    throw new Error(
+      `Infoview hover lifecycle browser probe failed: ${result?.error?.message ?? JSON.stringify(result)}`,
+    );
+  }
+  assert.deepEqual(result.value, {
+    activeBeforeDispose: 1,
+    activeAfterDispose: 0,
+    constructed: 1,
+    disconnected: 1,
+    added: 2,
+    removed: 2,
+    reentrantError: "host lifecycle cannot register active resources while disposing or disposed",
+  });
 }
 
 export async function smokeBrowserNativeInfoviewUpdates(
   cdp,
   artifactDirectory = fileURLToPath(new URL("../../web/public/", import.meta.url)),
 ) {
-  const [wasm, pkg, source] = await Promise.all([
+  const nativeInfoviewFile = packageSpecs.find(spec => spec.id === "native-infoview").file;
+  const [wasm, pkg, nativePkg, source] = await Promise.all([
     ...[wasmPublicFile, hostPackageFile].map((file) =>
       readFile(resolve(artifactDirectory, file))),
+    readFile(resolve(artifactDirectory, nativeInfoviewFile)),
     bundledBrowserProbe("./react-native-infoview-entry.js", "development"),
   ]);
   await evaluateBrowserProbe(cdp, source, "lean-vir-native-infoview-updates-smoke.js");
   const result = await evaluate(cdp,
-    `runVirNativeInfoviewUpdates(${JSON.stringify([...wasm])},${JSON.stringify([...pkg])}).then(
+    `runVirNativeInfoviewUpdates(${JSON.stringify([...wasm])},${JSON.stringify([...nativePkg])}).then(
       value => ({ ok: true, value }),
       error => ({ ok: false, error: error.stack ?? String(error),
         causes: error.errors?.map(cause => cause.stack ?? String(cause)) })
     )`);
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.deepEqual(result.value, {
-    submissions: 4, initialGoals: 3, collapsedAfterUpdate: true, finalGoals: 0,
-  });
+  assert.ok(result.value.checks >= 50, "native goals and interactive-code acceptance ran");
+  assert.deepEqual(result.value.warnings, [], "native infoview React warnings");
+  const authoring = await evaluate(cdp,
+    `runProofWidgetsNativeChildren(${JSON.stringify([...wasm])},${JSON.stringify([...pkg])})`);
+  assert.equal(authoring, true);
   return result.value;
 }
 

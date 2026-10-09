@@ -8,11 +8,12 @@ module
 
 public import Vir.Infoview
 public import Vir.React
+public import Vir.ProofWidgets.Jsx
 
 /-!
 A minimal live widget: the shell reuses the component factory's result and
-passes a fresh `Surface` when the cursor moves. For a complete goal and local
-context viewer, see `examples/VirNativeInfoview.lean`.
+passes native infoview panel props when the cursor moves. For a complete goal
+and local-context viewer, see `examples/VirNativeInfoview.lean`.
 -/
 
 public section
@@ -20,21 +21,27 @@ public section
 namespace ReactProofWidgetHello
 
 open Lean.Vir Lean.Vir.React Lean.Vir.Infoview
+open scoped Lean.Vir.Js
 
-def View : RuntimeM (Js (Component Surface)) := Component.ofLean fun surface => do
-  let surface ← LeanRef.fromJSL surface
-  let heading ← Node.text (← JsValue.ofString ("Hello from " ++ surface.cursor.label))
-  let goal := match surface.goals[0]? with
-    | none => "Move the cursor into a proof to see its first goal."
-    | some goal => "⊢ " ++ goal.target
-  let target ← Node.text (← JsValue.ofString goal)
-  Node.sectionWith #[Props.id "react-proof-hello"] #[
-    ← Node.h3 #[heading],
-    ← Node.pre #[target]
-  ]
+def View : RuntimeM (FunctionComponent PanelWidgetProps) :=
+  FunctionComponent.ofLean fun props => do
+  let position ← PanelWidgetProps.pos props
+  let uri ← PanelPosition.uri position
+  let goals ← PanelWidgetProps.goals props
+  let zero ← JsValue.ofFloat 0
+  let isEmpty ← Js.Number.equal (← Js.Array.length goals) zero
+  let target : ReactM (Js Node) := if ← JsValue.toBool isEmpty then
+      jsx%{<pre>Move the cursor into a proof to see its first goal.</pre>}
+    else do
+      let goal ← Js.Array.get goals zero
+      jsx%{<pre>⊢ {← CodeWithInfos.stripTags (← InteractiveGoal.type goal)}</pre>}
+  jsx%{<section id="react-proof-hello">
+    <h3>{← js#!"Hello from {uri}"}</h3>
+    {target}
+  </section>}
 
--- Derive the standard factory, mount entry, and widget configuration.
-vir_proof_widget View with mountId := "vir-react-proof-widget-hello"
+-- Derive the standard native-props factory and widget configuration.
+vir_proof_widget View
 
 end ReactProofWidgetHello
 

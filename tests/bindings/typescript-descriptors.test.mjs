@@ -333,6 +333,7 @@ test("the comparator fails closed on TypeScript absence semantics", async () => 
         id: "maybeString",
         jsName: "maybeString",
         entry: "Demo.maybeString",
+        nameKey: "s44656d6f/s6d61796265537472696e67/",
         source: "Demo.lean",
         startup: false,
         args: [],

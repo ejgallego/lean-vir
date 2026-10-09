@@ -25,13 +25,6 @@ export function interfaceEffectRuntimeTag(effect) {
   return isEffectfulInterfaceEffect(effect) ? 1 : 0;
 }
 
-export function sameRuntimeInterfaceEffect(expected, actual) {
-  if (!isInterfaceEffectLabel(expected) || !isInterfaceEffectLabel(actual)) {
-    return false;
-  }
-  return interfaceEffectRuntimeTag(expected) === interfaceEffectRuntimeTag(actual);
-}
-
 export function formatInterfaceEffect(effect) {
   switch (requireInterfaceEffect(effect, "effect")) {
     case "pure":

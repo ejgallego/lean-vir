@@ -29,8 +29,14 @@ const optionResourceType = {
   element: resourceType,
 };
 
+const rootCounts = () => runtime.hostState.resourceRootCounts();
+const initialRoots = rootCounts().active;
+
 assert.equal(typeof runtime.exports.vir_call_resolved, "undefined");
 assert.equal(typeof runtime.exports.vir_call_result_size, "undefined");
+
+const objectValue = { name: "object" };
+const arrayValue = ["array"];
 
 for (const value of [
   null,
@@ -38,14 +44,18 @@ for (const value of [
   false,
   0,
   -0,
+  NaN,
   42n,
   "raw",
-  { name: "object" },
-  ["array"],
+  Symbol("resource"),
+  objectValue,
+  arrayValue,
   () => "callback",
+  Promise.resolve("resource"),
 ]) {
   let object = runtime.makeObjectValue(resourceType, value, "raw resource");
   try {
+    assert.equal(rootCounts().active, initialRoots + 1);
     assert.equal(
       Object.is(
         runtime.liftObjectValue(resourceType, object, "raw resource"),
@@ -58,12 +68,47 @@ for (const value of [
     runtime.exports.vir_obj_dec(object);
     object = 0;
   }
-  // Releasing the Lean-side root cannot mutate or invalidate the JavaScript
-  // value. JavaScript reachability is the lifetime oracle.
-  if (value !== null && typeof value === "object") {
-    assert.equal(value.name ?? value[0], value.name ?? "array");
-  }
+  assert.equal(rootCounts().active, initialRoots);
 }
+
+{
+  const value = { shared: true };
+  const object = runtime.exports.vir_obj_resource(value);
+  const independentlyBoxed = runtime.exports.vir_obj_resource(value);
+  assert.notEqual(object, independentlyBoxed);
+  assert.equal(rootCounts().active, initialRoots + 2);
+  runtime.exports.vir_obj_inc(object);
+  runtime.exports.vir_obj_dec(object);
+  assert.equal(runtime.exports.vir_obj_resource_externref(object), value);
+  runtime.exports.vir_obj_dec(object);
+  assert.equal(rootCounts().active, initialRoots + 1);
+  assert.equal(
+    runtime.exports.vir_obj_resource_externref(independentlyBoxed),
+    value,
+  );
+  runtime.exports.vir_obj_dec(independentlyBoxed);
+  assert.equal(rootCounts().active, initialRoots);
+}
+
+{
+  // Use valid Lean values of other kinds, never forged object pointers.
+  const string = makeObjectString(runtime, "not a resource");
+  const scalar = runtime.exports.vir_obj_scalar(0);
+  try {
+    for (const value of [string, scalar]) {
+      assert.equal(runtime.exports.vir_obj_resource_is_valid(value), 0);
+      assert.equal(runtime.exports.vir_obj_resource_externref(value), null);
+    }
+  } finally {
+    runtime.exports.vir_obj_dec(string);
+    runtime.exports.vir_obj_dec(scalar);
+  }
+  assert.equal(rootCounts().active, initialRoots);
+}
+
+// Releasing a Lean root leaves the independently reachable JS values intact.
+assert.deepEqual(objectValue, { name: "object" });
+assert.deepEqual(arrayValue, ["array"]);
 
 assert.throws(
   () => runtime.makeJsObjectValue(stringType, "raw", "raw string host result"),
@@ -108,6 +153,9 @@ const rootsBeforeDispose = runtime.hostState.leanObjectHandleCells.size;
 assert.equal(rootsBeforeDispose, 1);
 const hostState = runtime.hostState;
 runtime.dispose();
+assert.equal(runtime.exports.vir_resource_roots_active(), 0);
+assert.equal(runtime.exports.vir_resource_roots_reusable(), 0);
+assert.equal(runtime.exports.vir_obj_resource({ closed: true }), 0);
 assert.equal(hostState.leanObjectHandleCells.size, 0);
 assert.throws(
   () => runtime.retainLeanObjectHandleValue(jsl, "disposed lean object handle"),

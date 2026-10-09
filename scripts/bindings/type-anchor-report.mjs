@@ -418,7 +418,7 @@ function leanShape(type) {
     case WIRE.SIMPLE_ENUM:
       return {
         kind: "enum",
-        cases: (type.constructors ?? []).map((ctor) => ctor.jsName ?? ctor.name),
+        cases: (type.constructors ?? []).map((ctor) => ctor.jsName),
       };
     case WIRE.STRUCTURE:
       return {
@@ -431,7 +431,7 @@ function leanShape(type) {
         kind: "variant",
         name: type.name ?? type.type,
         constructors: Object.fromEntries((type.constructors ?? []).map((ctor) => [
-          ctor.jsName ?? ctor.name,
+          ctor.jsName,
           { fields: { value: leanShape(ctor.type) } },
         ])),
       };
@@ -440,7 +440,7 @@ function leanShape(type) {
         kind: "variant",
         name: type.name ?? type.type,
         constructors: Object.fromEntries((type.constructors ?? []).map((ctor) => [
-          ctor.jsName ?? ctor.name,
+          ctor.jsName,
           { fields: Object.fromEntries((ctor.fields ?? []).map((field) => [field.name, leanShape(field.type)])) },
         ])),
       };

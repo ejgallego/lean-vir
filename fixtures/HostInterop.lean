@@ -49,6 +49,10 @@ def titleHandshakeLoop (count : Nat) : DomM Nat :=
 def callbackRoundTrip (n : Nat) : Lean.Vir.RuntimeM Nat :=
   callNatCallback n fun value => value + 7
 
+-- Returned closures exercise the structural result codec, not host arguments.
+def callbackResults (n : Nat) : Array (Nat → Nat) :=
+  #[fun value => n + value, fun value => n + value + 1]
+
 def floatRoundTrip (value : Float) : Lean.Vir.RuntimeM Float := do
   let jsValue ← Lean.Vir.JsValue.ofFloat value
   Lean.Vir.JsValue.toFloat jsValue

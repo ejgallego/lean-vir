@@ -6,6 +6,11 @@ Non-module developments and source-file package loading are unsupported.
 Use [Packages](../guides/PACKAGES.md) for commands, facets and caches, and the
 [format reference](IRPKG_FORMAT.md) for binary and manifest schemas.
 
+Application package generation belongs to the [support scope](../SUPPORT.md).
+This reference also covers experimental editor snapshot integration. The
+generator's accepted signatures describe implementation capabilities rather than
+an official support commitment for every automatic conversion.
+
 ## Entry points and selection
 
 [`tools/GeneratePackage.lean`](../../tools/GeneratePackage.lean) parses CLI targets
@@ -34,10 +39,19 @@ marked targets use `marked`.
 
 ### Compiled modules
 
-Lake owns compilation. The generator calls Lean's direct `importModules` API
-through `importModuleEnv`, without a source frontend or generated import driver.
+Lake owns compilation. Through `loadDeclIndex`, the generator uses a cached
+adapter of Lean's importer and ordinary `finalizeImport`, without a source
+frontend or generated import driver.
 Source commands such as `#eval` execute during compilation, not again during
 packaging. Build the named module and artifacts before invoking the executable.
+
+The optional `--setup <setup.json>` immediately after the package/report paths
+reads Lean's `ModuleSetup.importArts` map. Lake supplies resolved root and
+transitive artifacts, including private data and full IR, so cache-only inputs
+need not exist at conventional search-path locations. `DeclIndex` retains this
+map for subsequent owning-module loads. Only artifact paths are consumed; setup
+options, plugins and target selection do not override the generator's import
+context. Without a setup file, ordinary Lean search paths remain in use.
 
 Acquisition preserves `module; import all M` semantics: ordinary/meta `Init`
 imports, private target IR, persistent extensions and module-system visibility.
@@ -52,13 +66,18 @@ gets a fresh Lean import state and environment: sharing a union environment
 would expose unrelated targets' declarations and private metadata. Neither
 visibility flags nor extension state are shared between these contexts.
 
-`CachedImports` is a narrow adapter of the pinned Lean import algorithm at
-exported level with interpretation IR. Lean 4.33 has no overlapping-import
-artifact cache hook; the adapter uses `import all Lean.Environment` for its
-internal acquisition types/readers and ordinary `finalizeImport`. On toolchain
-changes, compare it with upstream `importModulesCore` and run the import-cache
-equivalence tests. Cache scope is one index with fixed search paths/artifacts,
-not a process-global cache. Compacted regions must not be explicitly freed:
+`CachedImports` originated with Lean 4.33 and adapts the pinned
+`importModulesCore` at exported level with
+interpretation IR. It uses `import all Lean.Environment` for its internal
+acquisition types/readers and ordinary `finalizeImport`; see [the upstream
+implementation at the source revision used for this adapter](https://github.com/leanprover/lean4/blob/c29b6dda4f7c20e3eeaa717c4e565663c5cfa364/src/Lean/Environment.lean#L2108).
+On toolchain changes, compare it with the new upstream implementation, update
+the source link, and run the import-cache equivalence tests.
+`CompiledImportCache.empty` fixes the resolved artifact map for one index;
+changing the map requires a fresh cache. Resolved data/IR reads are memoized
+just like conventional search-path reads. Search paths and file contents must
+remain fixed, and the cache is not process-global.
+Compacted regions must not be explicitly freed:
 imported extension closures can retain references outside the index.
 
 Input identity is a typed module/snapshot identity, not a display label or
@@ -68,17 +87,25 @@ locations are provenance for diagnostics and navigation, never loader keys.
 
 ### Live snapshots
 
+Infoview widget requests require a `vir_proof_widget` description with a
+fingerprint selecting the inputs
+retained at widget elaboration; see [widget package identity](../guides/INFOVIEW.md#package-identity-and-live-editing).
+That path analyzes the definition snapshot once and emits the retained package
+on demand. Its manifest preserves the defining file's provenance, including when
+an imported widget is displayed in a different document.
+
 `prepareSnapshotInput` uses the editor's current environment, including unsaved
 and private local IR. The document requires `module`, even when every requested
 root is imported, but does not need to be saved. Preparation rejects non-module
-environments before closure, revision or emission; both package RPC methods map
-that rejection to `invalidParams`.
+environments before analysis or emission. Widget elaboration reports this failure
+at the defining command; its RPC only retrieves already analyzed inputs.
 
 The prepared input pairs a snapshot target (module identity and document
-provenance) with its `DeclIndex`. Stat, revision and emission use that same
-environment. RPC tasks neither reacquire the source through the filesystem nor
-run another frontend or enable global initializer execution. Declaration lookup
-prefers already-loaded server IR over opaque imported entries, including
+provenance) with its `DeclIndex`. Analysis uses that environment, and emission
+uses the resulting closure and manifest. Widget RPC tasks neither reacquire the
+source through the filesystem nor run another frontend or enable global
+initializer execution. Declaration lookup prefers already-loaded server IR over
+opaque imported entries, including
 private dependency bodies.
 
 The adapter assigns snapshot-local IR, including private/generated helpers, to
@@ -100,9 +127,12 @@ Local label removal does not retract compiled marker additions; see
 persistent removal metadata. Runtime ABI, manifest compatibility and raw-byte
 or package-set transport remain independent of input acquisition.
 
-Analysis tools may still elaborate sources, and historical benchmark catalogs
-use their pinned producers. Neither is a package-generator fallback. External
-adapters require matching module-capable dependencies/toolchains.
+Analysis tools may still elaborate sources. Every active package/browser
+catalog entry and exporter must work with the current `lean-toolchain`; archived
+benchmark identities remain provenance and do not qualify current catalog
+compatibility. Neither analysis tools nor historical evidence is a
+package-generator fallback. External adapters require matching module-capable
+dependencies/toolchains.
 
 ## Implementation ownership
 
@@ -113,18 +143,18 @@ module. The map below groups shared policy separately from orchestration;
 
 | Boundary | Source owners |
 | --- | --- |
-| Targets and acquisition | [`Basic`](../../Vir/GeneratePackage/Basic.lean) defines targets, collected declarations and limits. [`Inputs`](../../Vir/GeneratePackage/Inputs.lean) owns compiled/live acquisition, `DeclIndex`, markers, fallback adapters, declaration ownership, on-demand import-all environments and collision diagnostics. [`CachedImports`](../../Vir/GeneratePackage/CachedImports.lean) shares raw artifacts while preserving independent import contexts. |
-| Names and dependency closure | [`LeanName`](../../Vir/LeanName.lean) parses strict dotted names for tools and clients. [`IRDependencies`](../../Vir/IRDependencies.lean) walks IR references and formats dependency paths; [`Closure`](../../Vir/GeneratePackage/Closure.lean) resolves roots and collects typed IR. [`ExternFallback`](../../Vir/ExternFallback.lean) owns transparent extern-body clones and recursion rejection. |
-| Native and host metadata | [`NativeExterns`](../../Vir/GeneratePackage/NativeExterns.lean) owns VIR's registration policy; resolved compiler metadata and wrappers remain with [native tooling](../../scripts/native/README.md). [`HostMetadata`](../../Vir/HostMetadata.lean) is the single encoder/decoder of VIR targets in Lean extern symbols. [`Host`](../../Vir/Host.lean) retains attribute-validated signatures in compiled metadata, including private imports. |
-| Interface policy | [`Interface.Model`](../../Vir/Interface/Model.lean) defines descriptors, effects, layouts and boundaries. [`InterfaceValidation`](../../Vir/InterfaceValidation.lean) owns typed binder/startup preflight, effects and abbreviation reduction. [`ExportValidation`](../../Vir/ExportValidation.lean) checks visible compiled closures and defers opaque imports; [`Attributes`](../../Vir/Attributes.lean) owns declaration-kind/postponed-compilation handling. |
-| Classification and collection | [`Interface.Classify`](../../Vir/Interface/Classify) separates typed errors, helpers, type/layout classification and signature analysis. [`HostValidation`](../../Vir/HostValidation.lean) shares host signature/boundary policy between attributes and packaging. [`Interface.Collect`](../../Vir/GeneratePackage/Interface/Collect.lean) adds boxed-boundary, call-summary, duplicate and host-import collection checks. |
-| Encoding | [`PackageFormat`](../../Vir/GeneratePackage/PackageFormat.lean) owns format identities, versions and section kinds. [`PackageIRTags`](../../Vir/GeneratePackage/PackageIRTags.lean) owns Name/IR tags. [`Interface.Encode`](../../Vir/GeneratePackage/Interface/Encode.lean), [`Manifest.Encode`](../../Vir/GeneratePackage/Manifest/Encode.lean), [`Json`](../../Vir/GeneratePackage/Json.lean) and [`Emit`](../../Vir/GeneratePackage/Emit.lean) encode descriptors, metadata and package bytes. |
+| Targets and acquisition | [`Basic`](../../Vir/GeneratePackage/Basic.lean) defines targets, collected declarations and limits. [`Inputs`](../../Vir/GeneratePackage/Inputs.lean) owns compiled/live acquisition, `DeclIndex`, markers, fallback adapters, declaration ownership, on-demand import-all environments and collision diagnostics. [`CachedImports`](../../Vir/Compiler/CachedImports.lean) shares raw artifacts while preserving independent import contexts. |
+| Names and dependency closure | [`LeanName`](../../Vir/Package/Name.lean) parses strict dotted names for tools and clients. [`IRDependencies`](../../Vir/Compiler/IRDependencies.lean) walks IR references and formats dependency paths; [`Closure`](../../Vir/GeneratePackage/Closure.lean) resolves roots and collects typed IR. [`ExternFallback`](../../Vir/ExternFallback.lean) owns transparent extern-body clones and recursion rejection. |
+| Native and host metadata | [`NativeExterns`](../../Vir/Compiler/NativeExterns.lean) owns VIR's registration policy; resolved compiler metadata and wrappers remain with [native tooling](../../scripts/native/README.md). [`HostMetadata`](../../Vir/Compiler/HostMetadata.lean) is the single encoder/decoder of VIR targets in Lean extern symbols. [`Host`](../../Vir/Host.lean) retains attribute-validated signatures in compiled metadata, including private imports. |
+| Interface policy | [`Interface.Model`](../../Vir/Compiler/Interface/Model.lean) defines descriptors, effects, layouts and boundaries. [`InterfaceValidation`](../../Vir/Compiler/InterfaceValidation.lean) owns typed binder/startup preflight, effects and abbreviation reduction. [`ExportValidation`](../../Vir/Compiler/ExportValidation.lean) checks visible compiled closures and defers opaque imports; [`Attributes`](../../Vir/Attributes.lean) owns declaration-kind/postponed-compilation handling. |
+| Classification and collection | [`Interface.Classify`](../../Vir/Compiler/Interface/Classify) separates typed errors, helpers, type/layout classification and signature analysis. [`HostValidation`](../../Vir/Compiler/HostValidation.lean) shares host signature/boundary policy between attributes and packaging. [`Interface.Collect`](../../Vir/GeneratePackage/Interface/Collect.lean) adds boxed-boundary, call-summary, duplicate and host-import collection checks. |
+| Encoding | [`PackageFormat`](../../Vir/Package/Format.lean) owns format identities, versions and section kinds. [`PackageIRTags`](../../Vir/Package/IRTags.lean) owns Name/IR tags. [`Interface.Encode`](../../Vir/Compiler/Interface/Encode.lean), [`Manifest.Encode`](../../Vir/GeneratePackage/Manifest/Encode.lean), [`Json`](../../Vir/Package/Json.lean) and [`Emit`](../../Vir/GeneratePackage/Emit.lean) encode descriptors, metadata and package bytes. |
 | Output | [`Manifest`](../../Vir/GeneratePackage/Manifest.lean) assembles metadata/interface diagnostics, [`Report`](../../Vir/GeneratePackage/Report.lean) renders them, and [`Run`](../../Vir/GeneratePackage/Run.lean) orchestrates generation and filesystem writes. |
 
 ## Data flow and initialization
 
 1. The CLI constructs targets with independent origin and selection. Compiled
-   inputs use `importModuleEnv`; server inputs use `prepareSnapshotInput`.
+   inputs use `loadDeclIndex`; server inputs use `prepareSnapshotInput`.
 2. `Inputs.loadDeclIndex` records input environments, owned IR names and marker
    sets. All-public and marked selection filter to the requested module.
    Different module targets defining the same Lean declaration name produce a
@@ -134,7 +164,7 @@ module. The map below groups shared policy separately from orchestration;
    ownership, acquiring newly reached owners until the closure is complete or
    no more IR is available. Explicit extern fallbacks supply an original-name
    adapter whose closure reaches the compiled reference body.
-4. `Interface.collectHostImports` repeats typed `Vir.HostValidation` when the
+4. `Interface.collectHostImports` repeats typed `Vir.Compiler.HostValidation` when the
    declaration is visible. Private imports with hidden types use the signature
    captured by the existing attribute, including in live snapshots without
    filesystem acquisition. Raw externs without attribute data require visible
@@ -197,7 +227,7 @@ Supported layouts and descriptor fields are specified in
 
 ## Version changes
 
-[`PackageFormat`](../../Vir/GeneratePackage/PackageFormat.lean) owns Lean's binary,
+[`PackageFormat`](../../Vir/Package/Format.lean) owns Lean's binary,
 manifest and package-set versions and descriptor identity.
 [`package-versions.mjs`](../../scripts/packages/package-versions.mjs) owns the
 JavaScript expectations for binary, manifest and runtime ABI compatibility.
@@ -213,9 +243,13 @@ Lean/Lake/C++/JS, plus interface tags and host-boundary tables.
 
 Runtime ABI is SDK metadata, not embedded package metadata. The same artifact
 metadata records exact build-time React/ReactDOM versions from
-`package-lock.json` for the optional React host. ABI 2 requires the
-manifest/binary validation entrypoint and deeply freezes installed manifest
-metadata; installers reject older ABIs before replacing an SDK.
+`package-lock.json` for the optional React host. ABI 4 is the current SDK
+contract: loader success status and declaration counts remain separate,
+including for successful empty packages. It requires manifest 9, package
+format 11, and matching JavaScript/Wasm artifacts. Installed manifest metadata
+remains deeply frozen; installers reject older ABIs before replacing an SDK.
+When the generator or runtime revision changes, regenerate the package set and
+install the SDK produced from that same revision.
 
 Name and declaration-IR tags are a separate wire contract owned by
 `PackageIRTags.lean`; `scripts/native/ir-codec-tags.mjs` maps C++ enums and

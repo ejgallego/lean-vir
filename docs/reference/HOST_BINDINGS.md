@@ -1,5 +1,9 @@
 # Host Bindings
 
+Explicit host imports and Js/JSL/callback ownership belong to the official
+[support scope](../SUPPORT.md). DOM, React and widget providers described here
+are experimental, including those installed by the default browser entry.
+
 This page documents the JavaScript side of Lean-to-JavaScript host imports.
 The Lean declarations are listed in [LEAN_VIR_LIBRARY.md](../guides/LEAN_VIR_LIBRARY.md),
 and the runtime facade is documented in [JS_API.md](../guides/JS_API.md).
@@ -15,6 +19,26 @@ The host binding receives the same JavaScript value that a TypeScript caller
 would receive, and it returns the same value the corresponding JavaScript API
 returns. VIR does not place resource, ownership-lease, or alias wrappers
 around JavaScript values.
+
+The `js.construction.*` imports are compiler primitives for literals, not alternate
+assignment APIs. For ordinary fresh objects and arrays, `Object.defineProperty`
+produces the same own writable/enumerable/configurable data properties as
+[CreateDataPropertyOrThrow](https://tc39.es/ecma262/multipage/abstract-operations.html#sec-createdatapropertyorthrow).
+It is **not** that internal operation: the global `Object.defineProperty` function
+is replaceable, so application instrumentation can observe or interrupt VIR
+construction while a JavaScript literal would not call that function. Dense
+structural arrays also use it to avoid inherited numeric setters. General
+`Object.set` and `Array.push` retain their native assignment/push behavior.
+
+JSX batches prop and child construction to reduce host calls. Attribute actions
+run left-to-right before any props are defined; after successful props construction,
+child actions run left-to-right before any child-array indices are defined. A
+definition failure can therefore occur after later actions have already run,
+unlike the former per-field/per-child lowering. Attribute-action failure prevents
+props construction; props-definition failure prevents child actions; child-action
+failure prevents array publication. An exact `@props={props}` bypasses props
+construction. This failure ordering and replaceable-intrinsic dependency are the
+limits of the batching optimization, not guarantees of React or native JS literals.
 
 For example:
 
@@ -41,13 +65,19 @@ separately named and documented as adapters.
 
 Ordinary host imports use a deliberately narrow type surface:
 
+Leading type parameters and `Prop` proof parameters (including proposition-valued
+typeclass instances) are allowed. The compiler retains erased slots in an opaque
+import's IR arity; package validation checks that arity, and the host trampoline
+skips the prefix. No proof or type dictionary reaches JavaScript. Proofs after
+runtime arguments and data-carrying instances are not supported.
+
 | Lean type                | JavaScript value                                                | Purpose                                   |
 | ------------------------ | --------------------------------------------------------------- | ----------------------------------------- |
 | `Lean.Vir.Js α`          | The exact JavaScript value                                      | Phantom-typed JavaScript value.           |
 | `Lean.Vir.Js.Nullable α` | The exact value or `null`                                       | Native nullable result or argument.       |
 | `Lean.Vir.JSL α`         | An ordinary JavaScript object backed by one Lean root           | Store an opaque Lean value in JavaScript. |
 | `Lean.Vir.Js.Function1 α β` | An exact ordinary JavaScript function                         | Native unary function with a phantom call shape. |
-| Lean function argument   | An ordinary JavaScript function backed by one Lean closure root | Explicit callback conversion into Lean.   |
+| Lean function argument   | An ordinary JavaScript function backed by one retained Lean value | Explicit callback conversion into Lean.   |
 | `Unit`                   | `undefined`                                                     | No result.                                |
 
 Raw Lean scalars and structures are rejected on an ordinary host-import
@@ -56,12 +86,25 @@ are the explicit exception used by conversions such as `js.string.value`.
 Exported Lean functions called from JavaScript use the separate structural
 interface codec.
 
+A failed effectful host import propagates an IO error inside Lean, stopping
+ordinary bind continuation. The owning JavaScript call reports the original
+host exception; catching the internal IO error does not clear that exception.
+Previously completed host effects are not rolled back as a group. This is not
+a general exception model for pure imports: their failures are reported at the
+JavaScript boundary, but early termination of pure Lean evaluation is not guaranteed.
+
 `Js.Function1 argument result` does not wrap a function and VIR does not
 dynamically inspect its TypeScript signature. `Js.Function.ofLean` and
-`Js.Function.ofLeanVoid` are explicit conversions from Lean closures; native
+`Js.Function.ofLeanVoid` are explicit conversions from Lean closures;
+`Js.Function3`/`ofLean3` describe and create three-argument functions. Native
 functions such as React state setters already cross as `Js.Function1` values
 and need no conversion. `Js.erase` similarly forgets only a phantom type and
 returns the exact same JavaScript value as `Js.Any`.
+
+Converted callbacks use ordinary JavaScript formal-argument rules: extra
+arguments are ignored and omitted arguments arrive as `undefined`. Declared
+Lean boundary views still apply their normal conversion checks. This permits
+React to invoke a unary component with its additional internal argument.
 
 Unknown values narrow through the polymorphic `Js.cast` operation. Its
 `Js.Cast` instance selects a type-specific predicate and returns
@@ -79,9 +122,8 @@ fail with `TypeError`. It does not coerce or decode/re-encode. In a native Promi
 fulfillment callback, this check's failure rejects the resulting chain.
 
 The package manifest currently calls the raw JavaScript-value lane
-`hostResource`. That is a legacy ABI classification name, not a JavaScript
-wrapper or public lifetime model. At runtime the lane transports the value
-itself.
+`hostResource`. This is the current ABI classification for transporting the
+JavaScript value itself; it does not introduce a wrapper or lifetime model.
 
 ## Interpreter Transport
 
@@ -96,9 +138,13 @@ externref table slot  ◀── numeric root id ──▶  Lean external object
 ```
 
 The root id is private transport. It is never presented to a host binding and
-does not replace the JavaScript value with a handle object. A separate live-id
-set makes every JavaScript value valid, including `null` and `undefined`.
-Dropping the Lean external object releases its table slot.
+does not replace the JavaScript value with a handle object. The Wasm module owns
+the unexported table and its slot allocator. Separate per-slot liveness metadata
+makes every JavaScript value valid, including `null` and `undefined`.
+Dropping the Lean external object releases its table slot without entering JS.
+Disposal terminally clears the table; that instance cannot acquire new roots.
+See the [resource allocator design](../development/WASM_RESOURCE_ROOTS.md) for
+growth failure, slot reuse and retirement after a trap.
 
 ## JavaScript Reachability
 
@@ -120,26 +166,40 @@ ordinary values.
 
 JSL objects and converted Lean callbacks need bridge state because their payload
 lives in the Lean heap. A JSL value is an ordinary empty JavaScript object with
-one retained Lean pointer; a callback is an ordinary function with one closure
-root. Private WeakMaps associate those values with their roots. There is no
-public retain/release protocol, and native functions acquire no Lean lifetime.
+one retained Lean pointer; a callback is an ordinary function using the same
+ownership cell, plus its call description. One private WeakMap associates both
+target kinds with their cells. There is no public retain/release protocol, and
+native JavaScript functions acquire no Lean lifetime.
 
 A live value strongly retains its original runtime generation: the Wasm instance
 and host state containing its Lean payload. Collection releases the foreign root
-through a best-effort finalizer; explicit disposal releases it deterministically.
+through a best-effort finalizer; explicit disposal of a healthy generation releases
+it deterministically. After a fatal failure, native cleanup is quarantined:
+disposal invalidates the carriers and clears the permitted JavaScript resource
+roots, while abandoned Lean heap objects are reclaimed with the Wasm instance.
+See the [object ABI ownership contract](OBJECT_ABI.md#ownership) for that boundary.
+Retirement also detaches the cell from its runtime, pointer and calling descriptor.
+Keeping a dead callback or JSL carrier alone therefore does not retain the old
+generation. Collection timing remains the JavaScript engine's responsibility.
 Calling a Lean callback after disposal fails before entering its Lean body.
 If invoked as a Promise reaction, that failure rejects the resulting Promise.
 Hard disposal prevents Lean entry; it does not guarantee cancellation or quiet
 settlement of pending JavaScript work. Terminal handling that must survive
 disposal must run outside the disposed Lean runtime.
 
-Global finalization registries hold only weak references to cleanup records;
-generation-owned sets keep those records available while the generation is live.
+The shared global finalization registry holds only weak references to cleanup records;
+the generation-owned tracking set keeps those records available while it is live.
 This includes the entire JSL cell and its `onRelease` closure. Otherwise global
 metadata could anchor a runtime whose externref table points back to the targets.
 A wholly unreachable generation can be collected without running every foreign
 finalizer; this is not a collector for mixed Lean/JS cycles inside a runtime
 still owned elsewhere.
+
+During healthy disposal, runtime-owned providers run before retained Lean values
+are released. Their synchronous Lean cleanup may convert temporary callbacks;
+those cells join the same terminal cleanup. JSL acquisition remains closed during
+disposal. Before the final cell snapshot, acquisition closes for callbacks too,
+so release hooks cannot leave newly acquired cells outside the retirement sweep.
 
 Finalizer diagnostics store only bounded text, not error objects or failed
 payload graphs that could keep Lean-backed values alive.
@@ -149,11 +209,10 @@ callbacks and therefore a generation. Their owners remain responsible for
 cancellation, removal and reference release. GC timing, released foreign roots
 and Wasm memory/table capacity are different observations.
 
-The shared binding-map lease counter is decremented by explicit teardown, not
-by collection of an undisposed runtime. A retained factory/shared map can keep
-an outstanding lease count and defer its last-owner disposer. Use explicit
-disposal when deterministic shared-resource cleanup is needed; collection alone
-does not establish that those resources were released.
+Supplied binding maps and their services remain application-owned, even after
+every runtime is disposed or collected. The application terminates those services
+and drops retained callbacks when it no longer needs them. Runtime collection is
+not a substitute for explicit cleanup of runtime-owned fresh providers either.
 
 ## UI Cleanup Versus Runtime Disposal
 
@@ -162,24 +221,29 @@ After that, distinguish releasing UI ownership from shutting down the interprete
 
 | Operation | Effect on the generation |
 | --- | --- |
-| Normal infoview unmount or mounted-generation refresh | Unmounts the owned root and detaches shell references; surviving callbacks/JSL remain usable in their original generation. |
+| Normal infoview unmount or mounted-generation refresh | React removes the descendant UI and the shell releases its references; surviving callbacks/JSL remain usable in their original generation. |
 | Explicit runtime disposal | Invalidates Lean callbacks/JSL and attempts all runtime-owned cleanup. |
-| Core in-place package replacement | Invalidates old Lean roots; never moves them into the new exports. Public factory-managed replacement is described in [JS_API.md](../guides/JS_API.md#replacing-a-package-set). |
+| Runtime generation selection | A factory creates a fresh instance and may reuse the compiled module. Reachable callbacks/JSL retain their original generation; explicit `dispose` invalidates them. They never move into a new generation. |
 
-Normal shell cleanup detaches its loaded reference before unmount and surfaces
-cleanup errors. Unmount stops shell polling; auto-refresh keeps its polling
-effect. Obsolete load results cannot install UI. Refreshed services use fresh
-factories and browser/React lifecycles, reusing compiled Wasm and the mutable
-editor host context; the latter is not a frozen per-generation snapshot.
-The separate React root receives that upstream `EditorContext` through a stable
-per-service provider component; the inner component identity and nested prop
-values are preserved. The shell does not implement notification subscriptions.
+Normal shell cleanup detaches its loaded reference; React owns descendant
+unmount and cleanup errors. Package fingerprints and configuration props drive
+code acquisition without polling. Healthy proof/context updates preserve the
+loaded component, and obsolete load results cannot install UI. Each new generation
+uses a fresh runtime and browser/React bindings, reusing compiled Wasm.
+Components read the current native editor connection through React context;
+there is no mutable command-dispatch proxy between the component and editor.
+The widget participates in the infoview's existing React tree, inheriting its
+contexts. The shell does not implement notification subscriptions.
 
 UI cleanup does not restrict new activity or cancel application-owned timers,
 listeners, subscriptions or independent roots. Those still need application
-cleanup. Failed setup, synchronous mount-entry failures and obsolete candidates
-that were never installed retain hard teardown. The mount-entry catch does not
-handle errors thrown later by React rendering.
+cleanup. Failed loading, component-factory/manifest validation and obsolete
+candidates that were never published retain hard teardown. Once published,
+element-entry and component-render errors follow React's error boundaries; they
+do not implicitly dispose the runtime. This also leaves Lean effect cleanup
+usable when React removes the failed subtree.
+React may retain failed subtrees and their callbacks after a cleanup error;
+VIR does not guarantee collection while those JavaScript owners remain.
 
 ## Active Resources
 
@@ -188,22 +252,44 @@ termination operation:
 
 - timeouts and intervals;
 - animation frames;
-- React roots.
+- React roots;
+- Infoview hover observers and their viewport listeners.
 
 The shared `HostLifecycle` registers each active value together with its exact
-cleanup function. Runtime disposal invokes those functions without inspecting
+cleanup function. Lifecycle disposal invokes those functions without inspecting
 or guessing methods on the value. Timer and frame completion remove their
 registration before invoking user code. Cancellation of a registered timer or
 frame deactivates and detaches it before calling the platform cancellation
 function. Explicit React-root unmount removes
 its registration only after the platform unmount succeeds, so a failed unmount
-remains visible to runtime teardown.
+remains visible to lifecycle teardown.
 
 Each browser binding-factory invocation owns a fresh lifecycle unless the
-caller explicitly supplies one. Package replacement can therefore dispose a
-failed or superseded generation without invalidating the live generation.
-Preconstructed binding maps are reference-counted only so intentional sharing
-across an atomic replacement remains safe.
+caller explicitly supplies one. A function-valued `defaultHostBindings` must
+return a fresh map for each runtime and transfers ownership of that result to
+VIR. Disposal and failed runtime creation invoke its `[VIR_HOST_DISPOSE]()` hook.
+The built-in defaults and Infoview/React integrations use this per-runtime form.
+
+Preconstructed `hostBindings` and `defaultHostBindings` maps remain
+application-owned. Runtime disposal releases its bridge references and owned
+registrations without invoking a supplied map's disposer. Sharing a map across
+runtimes or factories does not transfer ownership. The application calls
+`bindings[VIR_HOST_DISPOSE]()` when the service is no longer needed. This ownership
+rule replaces the previous reference counting and automatic last-runtime disposal.
+Use a preconstructed map for shared services; returning the same map from multiple
+per-runtime builders violates the fresh-result ownership contract.
+Freshness includes the cleanup scope: returning new maps that wrap one shared
+`HostLifecycle` still shares teardown. A per-runtime builder must provide an
+independent cleanup scope for the resources it transfers to VIR.
+
+The Infoview hover provider registers its `ResizeObserver` and viewport
+listeners in this same lifecycle. Its returned cleanup removes that
+registration before disconnecting the observer and listeners, so normal Lean
+effect cleanup and hard lifecycle disposal are both idempotent. The lifecycle
+gate applies to this provider-owned activity only; generic DOM event listeners
+remain application-owned. When a preconstructed binding map is intentionally
+shared, its lifecycle remains active until the application disposes it. Runtime
+shutdown does not close admission for another runtime using that supplied map.
 
 New lifecycle-managed resources are published transactionally. Before invoking a
 binding, the runtime opens a private transaction. An active resource created by
@@ -214,13 +300,24 @@ terminates the newly created activity. A Promise declared as an exact `Js`
 result is simply rooted and commits like any other JavaScript object. This
 transaction is out of band and does not alter the returned value.
 
-If argument lifting or the host call fails, callbacks created for that failed
-call are released. A synchronous host exception is rethrown by the owning export
-or callback call before any placeholder interpreter result is treated as success.
+Converted callbacks follow JavaScript reachability, including callbacks in
+structural export or callback results. Failed argument/result conversion or a
+throwing host does not revoke a callback retained by JavaScript. VIR does not
+keep a per-call callback census or a result-conversion cleanup list.
+Unretained callbacks become eligible for collection; reclamation timing belongs
+to the garbage collector, with explicit runtime disposal as the deterministic
+fallback. This does not waive responsibility for accidental retention by VIR.
+Temporary Lean references are still released on success and failure; active
+host effects still use the transaction rollback described above.
+
+A synchronous host exception is rethrown by the owning export or callback call
+before any placeholder interpreter result is treated as success.
 
 Custom binding maps may expose `[VIR_HOST_DISPOSE]()` for their own active
-resources. Runtime disposal attempts every binding hook, active resource, Lean
-handle, JSL cell and callback even if cleanup throws. One failure is rethrown
+resources. VIR calls it only for runtime-owned fresh provider results; the
+application calls it for supplied maps. Runtime disposal attempts its owned
+provider hook, active resources, Lean handles, JSL cells and callbacks even if
+cleanup throws. One failure is rethrown
 directly; multiple failures become an `AggregateError` in cleanup order.
 Disposal is terminal and subsequent `dispose()` calls are no-ops.
 

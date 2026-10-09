@@ -9,12 +9,10 @@ import { tmpdir } from "node:os";
 
 import { createBrowserHostBindings } from "../../web/src/vir-host-bindings.js";
 import { createVirRuntime } from "../../web/src/vir-runtime.js";
-import { createProofSurfaceFixture } from "../support/proof-surface-fixtures.mjs";
 import {
   assert,
   join,
   readFile,
-  readRuntimeArtifacts,
   runVirIrpkg,
   spawnSync,
 } from "./shared.mjs";
@@ -35,7 +33,7 @@ try {
     "--target-module",
     "InfoviewRpcPromise",
     "Vir.Fixtures.InfoviewRpcPromise.callExact",
-    "Vir.Fixtures.InfoviewRpcPromise.callSurfaceExact",
+    "Vir.Fixtures.InfoviewRpcPromise.callHookExact",
     "Vir.Fixtures.InfoviewRpcPromise.callMessage",
     "Vir.Fixtures.InfoviewRpcPromise.recover",
     "Vir.Fixtures.InfoviewRpcPromise.eraseExact",
@@ -50,11 +48,12 @@ try {
   ]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 
-  const { wasmBytes } = await readRuntimeArtifacts();
+  const wasmBytes = await readFile(new URL("../../web/public/vir-upstream.wasm", import.meta.url));
+  let hookSession;
   const runtime = await createVirRuntime({
     wasmBytes,
     irPackageSet: [await readFile(packagePath)],
-    defaultHostBindings: createBrowserHostBindings(),
+    defaultHostBindings: () => createBrowserHostBindings({ infoviewUseRpcSession: () => hookSession }),
   });
   try {
     const controller = runtime.call(
@@ -155,13 +154,13 @@ try {
     );
     assert.equal(exactResult, exactPromise);
 
-    requests.push({ message: "surface session request identity" });
-    const surfaceResult = runtime.call(
-      "Vir.Fixtures.InfoviewRpcPromise.callSurfaceExact",
-      createProofSurfaceFixture({ rpcSession: session }),
+    hookSession = session;
+    requests.push({ message: "hook session request identity" });
+    const hookResult = runtime.call(
+      "Vir.Fixtures.InfoviewRpcPromise.callHookExact",
       requests[1],
     );
-    assert.equal(surfaceResult, exactPromise);
+    assert.equal(hookResult, exactPromise);
 
     requests.push({ message: "continuation request identity" });
     const result = runtime.call(
@@ -231,12 +230,17 @@ try {
     const latePromise = new Promise((resolve) => {
       resolveAfterDispose = resolve;
     });
+    const nativeSetter = (value) => {
+      stateUpdates.push(value);
+    };
+    latePromise.then = function (...args) {
+      assert.equal(args[0], nativeSetter, "setter narrowing must preserve function identity");
+      return Reflect.apply(Promise.prototype.then, this, args);
+    };
     const lateChain = runtime.call(
       "Vir.Fixtures.InfoviewRpcPromise.settleIntoState",
       latePromise,
-      (value) => {
-        stateUpdates.push(value);
-      },
+      nativeSetter,
     );
     // Contrast native continuations with explicitly converted Lean closures.
     // Disposal invalidates the Lean closure before it could inspect a stale flag.

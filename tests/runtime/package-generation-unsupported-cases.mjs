@@ -98,9 +98,19 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     "@[vir_js \"test.implicitValue\"]",
     "opaque jsImplicitValue {value : Lean.Vir.Js Nat} : Lean.Vir.RuntimeM Unit",
     "",
+    "@[vir_js \"test.dataInstance\"]",
+    "opaque jsDataInstance {α : Type} [evidence : Inhabited α] (value : Lean.Vir.Js α) : Lean.Vir.RuntimeM Unit",
+    "",
+    "@[vir_js \"test.lateProof\"]",
+    "opaque jsLateProof (value : Lean.Vir.Js Nat) (proof : True) : Lean.Vir.RuntimeM Unit",
+    "",
   ], [
     /invalid `@\[vir_js\]` declaration `jsImplicitValue`/,
     implicitHostImportReason,
+    /invalid `@\[vir_js\]` declaration `jsDataInstance`/,
+    /implicit or instance argument `evidence` is not supported/,
+    /invalid `@\[vir_js\]` declaration `jsLateProof`/,
+    /runtime-erased type or proof parameter `proof` after runtime arguments/,
   ]);
 
   await assertInvalidAttributeSource(freshDir, "InvalidHostBoundaryAttribute", [
@@ -159,7 +169,7 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /nakedReactRootIdentity/,
     /JavaScript object marker `Lean\.Vir\.React\.Root` must appear under `Lean\.Vir\.Js`/,
     /nakedStateSetterIdentity/,
-    /unsupported type `Lean\.Vir\.Js\.Function\.Unary Nat Unit`/,
+    /unsupported type `Lean\.Vir\.Js\.Function\.Unary \(Lean\.Vir\.Js \(Lean\.Vir\.React\.SetStateAction\.Value Nat\)\) Unit`/,
     /nakedPropsIdentity/,
     /unsupported type `Lean\.Vir\.Js\.Object\.Value`/,
   ], [

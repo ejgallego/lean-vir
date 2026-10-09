@@ -8,7 +8,7 @@ module
 
 public import Vir.GeneratePackage.Emit
 public import Vir.GeneratePackage.Report
-import Vir.ClientNativeExternManifest
+import Vir.GeneratePackage.ClientNativeExternManifest
 import Vir.Hash
 
 public section
@@ -70,8 +70,9 @@ structure AnalyzedPackage where
 structure GeneratedPackage extends AnalyzedPackage where
   bytes : ByteArray
 
-private unsafe def loadRunDeclIndex (targets : Array Target) : IO DeclIndex := do
-  let index ← loadDeclIndex targets
+private unsafe def loadRunDeclIndex (targets : Array Target)
+    (importArts : NameMap ImportArtifacts) : IO DeclIndex := do
+  let index ← loadDeclIndex targets importArts
   let index ← match ← Vir.readClientNativeExternManifestFromEnv with
     | none => pure index
     | some manifest =>
@@ -138,8 +139,9 @@ def buildPackageFromIndex
   | .error err =>
       return .error err
 
-unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePath) : IO UInt32 := do
-  let index ← loadRunDeclIndex targets
+unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePath)
+    (importArts : NameMap ImportArtifacts := {}) : IO UInt32 := do
+  let index ← loadRunDeclIndex targets importArts
   let analysis ← analyzePackage (← generatedAtUtc) targets index
   let closure := analysis.closure
   let manifest := analysis.manifest
@@ -166,74 +168,58 @@ unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePat
       IO.eprintln err
       return 1
 
-private def packageSetMemberJson
-    (moduleName path : String) (role : PackageSetMemberRole)
-    (byteLength : Nat) (sha256 : String) : String :=
-  jsonObject #[
-    ("module", jsonString moduleName),
-    ("role", jsonString role.label),
-    ("path", jsonString path),
-    ("byteLength", jsonNat byteLength),
-    ("sha256", jsonString sha256)
-  ]
-
-private def packageSetDescriptorJson (members : Array String) : String :=
-  jsonObject #[
-    ("format", jsonString packageSetFormat),
-    ("version", jsonNat currentPackageSetVersion),
-    ("packages", jsonArray members)
-  ] ++ "\n"
-
-private structure PendingPackageSetMember where
-  moduleName : Name
-  role : PackageSetMemberRole
-  relativePath : String
-  outputPath : System.FilePath
-  byteLength : Nat
-
 unsafe def runModuleSet
     (targets : Array Target)
     (rootModule : Name)
     (packagePath descriptorPath shardDir : System.FilePath)
     (rootRelativePath shardRelativeDir : String)
-    (reportPath : System.FilePath) : IO UInt32 := do
+    (reportPath : System.FilePath)
+    (importArts : NameMap ImportArtifacts := {})
+    (requiredExports : Array Name := #[]) : IO (Except UInt32 (Array PackageSet.Member)) := do
   if targets.size != 1 then
     IO.eprintln s!"module package-set generation requires exactly one target, got {targets.size}"
-    return 1
+    return .error 1
   let some target := targets[0]?
     | IO.eprintln "module package-set generation requires one target"
-      return 1
+      return .error 1
   match target.mode with
   | .marked => pure ()
   | _ =>
       IO.eprintln "module package-set generation requires a marked module target"
-      return 1
+      return .error 1
   let targetModule := target.origin.moduleName
   if targetModule != rootModule then
     IO.eprintln s!"module package-set root `{rootModule}` does not match target `{targetModule}`"
-    return 1
+    return .error 1
 
-  let index ← loadRunDeclIndex targets
+  let index ← loadRunDeclIndex targets importArts
   let analysis ← analyzePackage (← generatedAtUtc) targets index
   let closure := analysis.closure
   let manifest := analysis.manifest
   let report := analysis.report
-  writeTextFile reportPath report
   if hasBlockingDiagnostics closure manifest then
+    writeTextFile reportPath report
     printBlockingDiagnostics closure manifest
       "missing IR declarations after loading imported module IR:"
     IO.eprintln s!"see {reportPath}"
-    return 1
+    return .error 1
+
+  for required in requiredExports do
+    unless manifest.exports.any (·.entry == required) do
+      IO.eprintln s!"required VIR interface export `{required}` is absent from marked module `{rootModule}`"
+      return .error 1
+
+  writeTextFile reportPath report
 
   let moduleOrder? ← match closure.moduleInitializationOrder index target rootModule with
     | .ok moduleOrder => pure (some moduleOrder)
     | .error err =>
         IO.eprintln err
         pure none
-  let some moduleOrder := moduleOrder? | return 1
+  let some moduleOrder := moduleOrder? | return .error 1
 
   let dependencyModules := moduleOrder.filter (· != rootModule)
-  let mut pendingMembers : Array PendingPackageSetMember := #[]
+  let mut pendingMembers : Array PackageSet.Member := #[]
   for moduleName in dependencyModules do
     let moduleClosure := closure.forModule moduleName rootModule
     if moduleClosure.decls.isEmpty && moduleClosure.initGlobals.isEmpty then
@@ -250,15 +236,15 @@ unsafe def runModuleSet
     match emitPackage moduleClosure dependencyManifest with
     | .error err =>
         IO.eprintln s!"while emitting module shard `{moduleName}`: {err}"
-        return 1
+        return .error 1
     | .ok bytes =>
         writeBinFile outputPath bytes
         pendingMembers := pendingMembers.push {
-          moduleName
+          moduleName := moduleName.toString
           role := .dependency
-          relativePath := (System.FilePath.mk shardRelativeDir / fileName).toString
-          outputPath
+          path := (System.FilePath.mk shardRelativeDir / fileName).toString
           byteLength := bytes.size
+          sha256 := Vir.sha256 bytes
         }
 
   let rootClosure := closure.forModule rootModule rootModule
@@ -272,28 +258,24 @@ unsafe def runModuleSet
   match emitPackage rootClosure rootManifest with
   | .error err =>
       IO.eprintln s!"while emitting root module `{rootModule}`: {err}"
-      return 1
+      return .error 1
   | .ok bytes =>
       writeBinFile packagePath bytes
       pendingMembers := pendingMembers.push {
-        moduleName := rootModule
+        moduleName := rootModule.toString
         role := .root
-        relativePath := rootRelativePath
-        outputPath := packagePath
+        path := rootRelativePath
         byteLength := bytes.size
+        sha256 := Vir.sha256 bytes
       }
-      let hashes ← Vir.sha256Files (pendingMembers.map (fun member => member.outputPath))
-      let members := pendingMembers.zip hashes |>.map fun (member, sha256) =>
-        packageSetMemberJson member.moduleName.toString member.relativePath member.role
-          member.byteLength sha256
-      writeTextFile descriptorPath (packageSetDescriptorJson members)
+      writeTextFile descriptorPath (PackageSet.encode pendingMembers)
       IO.println s!"wrote {descriptorPath}"
       IO.println s!"wrote {packagePath}"
       IO.println s!"wrote {reportPath}"
-      IO.println s!"package set members: {members.size}"
+      IO.println s!"package set members: {pendingMembers.size}"
       IO.println s!"package format: {rootManifest.metadata.packageFormatVersion}"
       IO.println s!"declarations: {closure.decls.size + closure.externs.size} ({closure.decls.size} Lean IR, {closure.externs.size} native externs)"
       IO.println s!"interface exports: {manifest.exports.size}"
-      return 0
+      return .ok pendingMembers
 
 end Vir.GeneratePackage

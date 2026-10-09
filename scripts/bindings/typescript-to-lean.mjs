@@ -78,10 +78,11 @@ function validateGenerationConfig(config, configPath) {
   return generation;
 }
 
-function renderSignature(name, typeParameters, args, effect, result, prefix) {
+function renderSignature(name, typeParameters, proofParameters, args, effect, result, prefix) {
   const effectResult = result === "Unit" ? result : `(${result})`;
   const binders = [
     ...typeParameters.map((parameter) => `    {${parameter} : Type}`),
+    ...proofParameters.map((parameter) => `    [${parameter}]`),
     ...args.map((arg) =>
       `    (${arg.name} : ${arg.modalities.passing === "borrowed" ? "@& " : ""}${arg.type})`),
   ];
@@ -183,10 +184,11 @@ function renderOperation(operation, profile) {
   ].filter(Boolean).join("\n\n"));
   const marker = operation.host.marker ?? "vir_js";
   const typeParameters = operation.typeParameters ?? [];
+  const proofParameters = operation.proofParameters ?? [];
   const declarationPrefix = operation.lean.visibility === "private" ? "private opaque " : "opaque ";
   return {
     namespace: operation.lean.namespace,
-    text: `/--\n${publicDocumentation}\n\n${operationModalities(operation, profile)}\n\nThis declaration is generated; edit ${operation.typescript.kind === "protocol" ? "the binding configuration" : "the TypeScript source or binding configuration"}.\n-/\n@[${marker} "${operation.host.target}"]\n${renderSignature(operation.lean.name, typeParameters, args, operation.effect.lean, operation.result.lean, declarationPrefix)}`,
+    text: `/--\n${publicDocumentation}\n\n${operationModalities(operation, profile)}\n\nThis declaration is generated; edit ${operation.typescript.kind === "protocol" ? "the binding configuration" : "the TypeScript source or binding configuration"}.\n-/\n@[${marker} "${operation.host.target}"]\n${renderSignature(operation.lean.name, typeParameters, proofParameters, args, operation.effect.lean, operation.result.lean, declarationPrefix)}`,
   };
 }
 

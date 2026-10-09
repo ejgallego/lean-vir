@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -14,7 +14,7 @@ import { readIrPackageInfo } from "../../web/src/runtime/ir-package.js";
 import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import { createTestModuleProject } from "../support/module-project.mjs";
-import { virIrpkgPath } from "../../scripts/packages/irpkg-generator.mjs";
+import { resolveVirIrpkgPathSync } from "../../scripts/packages/irpkg-generator.mjs";
 
 const moduleName = "ModuleSetFixture.InputSelection";
 const selected = `${moduleName}.selected`;
@@ -38,13 +38,14 @@ function success(result) {
 
 try {
   success(lake(["build", "vir_irpkg", moduleName]));
+  const virIrpkgPath = resolveVirIrpkgPathSync();
   const wasmBytes = await readFile(join(repositoryRoot, "web/public/vir-upstream.wasm"));
   const factory = createVirRuntimeFactory({ wasmBytes });
   async function generate(name, args) {
     const output = join(scratch, `${name}.irpkg`);
     const result = lake([
       "env",
-      ".lake/build/bin/vir_irpkg",
+      virIrpkgPath,
       output,
       join(scratch, `${name}.report.md`),
       ...args,
@@ -70,6 +71,18 @@ try {
     "--target-marked-module",
     moduleName,
   ]);
+  const setupPath = join(scratch, "empty.setup.json");
+  await writeFile(setupPath, JSON.stringify({
+    name: moduleName, isModule: true, importArts: {},
+    dynlibs: [], plugins: [], options: {},
+  }));
+  assert.deepEqual(
+    (await generate("setup-marked", [
+      "--setup", setupPath, "--target-marked-module", moduleName,
+    ])).bytes,
+    marked.bytes,
+    "an empty artifact map must preserve conventional module imports",
+  );
   assert.deepEqual(
     marked.manifest.exports.map((entry) => entry.entry),
     [selected],
@@ -113,10 +126,10 @@ try {
   );
 
   for (const [pkg, entry, expected] of [
-    [marked, selected, "69"],
-    [all, unmarked, "99"],
-    [combined, selected, "69"],
-    [explicitImported, imported, "62"],
+    [marked, selected, 69n],
+    [all, unmarked, 99n],
+    [combined, selected, 69n],
+    [explicitImported, imported, 62n],
   ]) {
     const runtime = await factory.createRuntime({ irPackageSet: [pkg.bytes] });
     try {
@@ -128,6 +141,8 @@ try {
 
   for (const args of [
     [],
+    ["--setup"],
+    ["--setup", setupPath],
     ["--target-module", moduleName],
     ["--package-module", moduleName],
     ["--target-marked-module"],

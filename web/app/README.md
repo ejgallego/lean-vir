@@ -13,7 +13,10 @@ runtime through `web/src` entry points.
 - `browser-react-runtime.js`: browser application composition of the generic,
   DOM, and official React hosts.
 - `vir-infoview-widget.js`: live infoview application that loads WASM, requests
-  fresh `.irpkg` packages, and owns the official nested React root.
+  fresh `.irpkg` packages, and renders Lean-produced components in the existing
+  Infoview React tree.
+- `vir-widget-errors.js`: presentation and serialization of Infoview widget
+  failures.
 - `pages/`: import-safe page configuration, parsing, rendering, and fixture
   metadata helpers.
 

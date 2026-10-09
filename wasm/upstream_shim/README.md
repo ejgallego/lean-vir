@@ -2,46 +2,71 @@
 
 This directory contains the local WASI boundary used to run Lean's real IR
 interpreter in `wasm32-wasip1`. The upstream interpreter source stays in
-`third_party/lean4-src/src/library/ir_interpreter.cpp`; demo-only host support,
-package lookup, and temporary runtime glue live here instead.
+`third_party/lean4-src/src/library/ir_interpreter.cpp`. Package execution,
+Lean object ownership, host calls and constrained platform providers live here.
+These support the general package runtime as well as the demos.
 
 ## Directory Map
 
 - `package/`: `.irpkg` decoding, loaded package state, declaration lookup,
   call-slot summary metadata, host-import metadata, and package-backed
-  initializer-name lookup. Future module-backed loading should replace this
-  layer first.
+  initializer-name lookup. Declaration-provider changes belong behind
+  `package/decl_provider.h`.
 - `abi/`: exported JS/WASM ABI entry points for package calls, closures, owned
-  Lean objects, temporary `Lean.Level`/`Lean.Expr` support, and `Lean.Vir.Js α`
+  Lean objects, specialized `Lean.Level`/`Lean.Expr` support, and `Lean.Vir.Js α`
   resources.
 - `interpreter/`: upstream interpreter lifecycle, `lean_ir_find_env_decl` hooks,
   and boxed interpreter execution.
 - `runtime/`: shim-specific native extern wrappers, restricted native symbol
-  lookup for both shim and compiler-generated wrappers, temporary Lean object
-  constructors/name helpers, and WASI/runtime stubs.
+  lookup for both shim and compiler-generated wrappers, pinned Lean object
+  constructors/name helpers, and WASI/runtime providers.
 - `bench/`: local benchmark harness entry point. It is not linked into the
   browser WASM.
 
 ## Code Attribution
 
-This table attributes the local shim code by ownership and package-format
-coupling. Line counts are approximate and are meant for sizing, not policy.
+This table attributes the local shim code by responsibility and package-format
+coupling. Generated adapters and selected upstream providers are outside this
+directory; the build script records the actual linked inputs.
 
-| Area | Files | Approx. LOC | Package coupling | Notes |
-| --- | --- | ---: | --- | --- |
-| Package envelope decoding | `package/package_section_directory.cpp`, `package/package_section_directory.h`, `package/package_binary_reader.h`, `package/package_decl_provider_types.h` | 325 | Direct | Reads the `.irpkg` header and section directory, checks required sections, and validates section bounds. |
-| Package payload decoding | `package/package_ir_decoder.cpp` | 562 | Direct | Decodes section payloads into package declarations, init globals, host imports, export summaries, and the embedded manifest, with scoped cleanup for partial graphs. |
-| Package IR object materialization | `package/package_ir_builders.cpp`, `package/package_ir_builders.h` | 304 | Direct IR object layout | Reconstructs Lean IR objects from decoded package fields under a consuming-child ownership convention. |
-| Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | ~525 | Direct | Owns loaded package indices, declaration lookup, structural export-index call slots, direct export call summaries, interface manifest, and init globals. |
-| Package load ABI | `package/package_loader_abi.cpp` | 49 | Direct | Exposes package byte allocation, package loading, package errors, and interface manifest access to JavaScript. |
-| Host import dispatch | `package/host_import_trampolines.cpp` | 382 | Direct metadata | Uses package host-import slots, arity, erased-prefix count, and effect metadata. |
-| Native extern support | `runtime/native_symbols.cpp`, `runtime/native_symbol_lookup.cpp`, `native-support-sources.txt`, `tools/GenerateNativeWrappers.lean`, `scripts/native/native-symbol-registry.mjs`, `scripts/build-upstream-probe.sh` | ~1400 | Declaration/native symbol coupling | Standard boxed adapters and the lookup registry are emitted into `build/`. The tracked stage0 source list supplies selected Lean-defined raw exports; three ownership adapters and raw environment-policy providers remain in the shim. |
-| JavaScript package-call ABI | `abi/call_abi.cpp` | 134 | Consumes package metadata | Thin JS-facing entry point over call slots and direct call summaries. |
-| Upstream interpreter bridge | `interpreter/interpreter_bridge.cpp/.h`, `interpreter/persistent_ir_interpreter.cpp` | ~160 | Low | Initializes the upstream interpreter, provides `lean_ir_find_env_decl` hooks, and owns the package-scoped interpreter session. |
-| Object/resource/closure ABI | `abi/object_abi.cpp`, `abi/object_expr_abi.cpp`, `abi/resource_abi.cpp/.h`, `abi/closure_abi.cpp` | 776 | Low | Runtime object boundary used after explicit lowering; `object_expr_abi.cpp` is fixture/parser support. |
-| Lean object construction helpers | `runtime/lean_object_constructors.cpp`, `runtime/name_utils.cpp/.h` | ~445 | Support | Temporary constructors and name helpers needed while package decoding constructs Lean objects directly. |
-| Platform/runtime stubs | `runtime/runtime_environment_stubs.cpp`, `package/package_init_bridge.cpp`, `runtime/runtime_value_stubs.cpp`, `runtime/io_stubs.cpp` | 167 | Mostly low | Runtime glue; `package/package_init_bridge.cpp` is package-backed but not package-format parsing. |
-| Benchmark harness | `bench/engine_bench.cpp` | 211 | None | Local benchmark entry point; not linked into the browser WASM. |
+| Area | Files | Package coupling | Notes |
+| --- | --- | --- | --- |
+| Package envelope decoding | `package/package_section_directory.cpp`, `package/package_section_directory.h`, `package/package_binary_reader.h`, `package/package_decl_provider_types.h` | Direct | Reads the `.irpkg` header and section directory, checks required sections, and validates section bounds. |
+| Package payload decoding | `package/package_ir_decoder.cpp` | Direct | Decodes section payloads into package declarations, init globals, host imports, export summaries, and the embedded manifest, with scoped cleanup for partial graphs. |
+| Package IR object materialization | `package/package_ir_builders.cpp`, `package/package_ir_builders.h` | Direct IR object layout | Reconstructs Lean IR objects from decoded package fields under a consuming-child ownership convention. |
+| Standalone package IR builder test | `package/package_ir_builders_test.cpp` | Native test only | Checks package IR object construction and ownership; excluded from the browser Wasm link. |
+| Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | Direct | Owns loaded package indices, declaration lookup, structural export-index call slots, direct export call summaries, interface manifest, and init globals. |
+| Package load ABI | `package/package_loader_abi.cpp` | Direct | Exposes package byte allocation, package loading, package errors, and interface manifest access to JavaScript. |
+| Host import dispatch | `package/host_import_trampolines.cpp` | Direct metadata | Generates fixed typed slot/arity tables at compile time from producer-derived limits; uses package erased-prefix and effect metadata. Preparation validates the aggregate limits. |
+| Native extern support | `runtime/native_symbols.cpp`, `runtime/native_symbol_lookup.{cpp,h}`, `native-support-sources.txt`, `tools/GenerateNativeWrappers.lean`, `scripts/native/native-symbol-registry.mjs`, `scripts/build-upstream-probe.sh` | Declaration/native symbol coupling | Standard boxed adapters and the lookup registry are emitted into `build/`. The tracked stage0 source list supplies selected Lean-defined raw exports; three ownership adapters and raw environment-policy providers remain in the shim. |
+| JavaScript package-call ABI | `abi/call_abi.cpp` | Consumes package metadata | JS-facing entry point over call slots and summaries; null results signal failure. |
+| IO error diagnostics | `runtime/io_error.cpp`, `runtime/io_error.h` | Low | Formats Lean IO errors for named calls, closures and initializers with explicit ownership; no host/UI presentation policy. |
+| Upstream interpreter bridge | `interpreter/interpreter_bridge.cpp/.h`, `interpreter/persistent_ir_interpreter.cpp` | Low | Initializes the upstream interpreter, provides `lean_ir_find_env_decl` hooks, and owns the package-scoped interpreter session. |
+| Object/resource/closure ABI | `abi/object_abi.cpp`, `abi/object_expr_abi.cpp`, `abi/resource_abi.cpp/.h`, `abi/closure_abi.cpp` | Low | Runtime object boundary used after explicit lowering; `object_expr_abi.cpp` provides the specialized Expr/Level interface used by parsers and other clients. |
+| Lean object construction | `scripts/build-upstream-probe.sh`, `native-support-sources.txt`, `runtime/name_utils.cpp/.h` | Support | Pinned generated `Init/Prelude.c`, `Lean/Level.c` and `Lean/Expr.c` supply Name/Level/Expr constructors and cached metadata. Local dotted-name conversion is a restricted Expr interface. |
+| Structural Lean Name identity | `runtime/name_identity.h` | Manifest 9 | Encodes Lean names by constructor structure for package identity; it does not use display-name formatting. |
+| Lazy constant initialization | `runtime/once.cpp` | Pinned runtime ABI | Eight single-threaded `*_once_cold` providers preserve initialization and persistent roots without atomic waits or clocks; same-cell recursion traps by VIR policy and retires the instance ([pinned ABI](https://github.com/leanprover/lean4/blob/293d5d0c0c3f3dded4688b3ccd6a33939ac5102b/src/include/lean/lean.h#L3374), [upstream implementation](https://github.com/leanprover/lean4/blob/293d5d0c0c3f3dded4688b3ccd6a33939ac5102b/src/runtime/object.cpp#L2896)). |
+| Platform/runtime providers | `runtime/runtime_environment_stubs.cpp`, `package/package_init_bridge.cpp`, `runtime/runtime_value_stubs.cpp`, `runtime/io_stubs.cpp` | Mostly low | Includes real ST references, initializing state and numeric conversion alongside constrained environment and diagnostic providers. |
+| Benchmark harness | `bench/engine_bench.cpp` | Fixture-specific | Local benchmark entry point; not linked into the browser WASM. |
+
+## Runtime limits
+
+The provider names do not all describe stubs. ST references, `IO.initializing`,
+numeric conversion, closure roots and foreign-resource ownership are implemented
+runtime mechanisms. The following constraints remain explicit:
+
+| Surface | Current behavior |
+| --- | --- |
+| System, heartbeat, stack and trace hooks | Inert; they do not supply cancellation or execution budgets. |
+| Options | Boolean defaults without general option discovery/configuration. |
+| Compiler environment metadata | No sorry-dependency/export metadata; the meta-check provider always accepts. This is limited parser/environment compatibility. |
+| Diagnostics | The stderr provider discards output. Named calls, callbacks and initializers preserve Lean IO error text through their diagnostics. |
+| Expr/Name conversion | Dotted string-component names are restricted, and JS lowering drops expression metadata. See [the SDK contract](../../docs/guides/JS_API.md). |
+| Exceptions | Effectful host errors stop IO continuation and allow reuse. Pure host failures trap; the SDK retires the instance. C++ exceptions and other escaping Wasm traps also retire it, without claiming frame unwinding. |
+
+Application code chooses artifact acquisition, rendering, scheduling and error
+presentation. Object layout/refcounts, interpreter state, initialization and
+cross-runtime roots remain VIR responsibilities.
 
 ## Editing Rules
 
@@ -73,7 +98,7 @@ npm run check:native-wrappers
 ```
 
 `NativeExternSpec` stores VIR policy only. Lean supplies each declaration's
-parameter/borrow/result ABI and native symbol except for the eleven intentional
+parameter/borrow/result ABI and native symbol except for intentional
 provider aliases. Keep those aliases in `symbolOverride?`; the metadata check
 rejects an override once it becomes redundant. The JavaScript registry and
 inventory checks consume `vir_native_wrappers --catalog`, not the Lean source

@@ -12,7 +12,6 @@ import {
 } from "../../scripts/packages/package-versions.mjs";
 import {
   assert,
-  assertManifestTypeDescriptorsRoundTrip,
   generateIrPackage,
   join,
   manifestEntry,
@@ -51,8 +50,6 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.ok(
     freshManifest.metadata.targets[0].resolvedRoots.includes("freshBump"),
   );
-  assertManifestTypeDescriptorsRoundTrip(freshManifest);
-
   const freshEntries = freshManifest.exports.map((entry) => entry.entry).sort();
   assert.deepEqual(freshEntries, [
     "freshAliasBump",
@@ -154,17 +151,17 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   );
   assert.equal(dottedEntry.id, "_foo_bar_");
   assert.equal(dottedEntry.jsName, "_foo_bar_");
-  assert.equal(escapedRuntime.call(dottedEntry.entry, 3), "4");
-  assert.equal(escapedRuntime.call(dottedEntry.id, 4), "5");
-  assert.equal(escapedRuntime.call(dottedEntry.jsName, 5), "6");
-  assert.equal(escapedRuntime.exportsByName[dottedEntry.jsName](6), "7");
+  assert.equal(escapedRuntime.call(dottedEntry.entry, 3), 4n);
+  assert.equal(escapedRuntime.call(dottedEntry.id, 4), 5n);
+  assert.equal(escapedRuntime.call(dottedEntry.jsName, 5), 6n);
+  assert.equal(escapedRuntime.exportsByName[dottedEntry.jsName](6), 7n);
   const numericTextEntry = manifestEntry(
     escapedRuntime.interfaceManifest,
     "Numeric.«1»",
   );
-  assert.equal(escapedRuntime.call(numericTextEntry.entry, 7), "9");
-  assert.equal(escapedRuntime.call(numericTextEntry.id, 8), "10");
-  assert.equal(escapedRuntime.call(numericTextEntry.jsName, 9), "11");
+  assert.equal(escapedRuntime.call(numericTextEntry.entry, 7), 9n);
+  assert.equal(escapedRuntime.call(numericTextEntry.id, 8), 10n);
+  assert.equal(escapedRuntime.call(numericTextEntry.jsName, 9), 11n);
   for (const [entry, increment] of [
     ["café", 3],
     ["αβ₁", 4],
@@ -179,27 +176,27 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     ["Hygienic.numeric.part._hyg.2", 2],
     ["Inaccessible.numeric.part✝.3", 2],
   ]) {
-    assert.equal(escapedRuntime.call(entry, 10), String(10 + increment), entry);
+    assert.equal(escapedRuntime.call(entry, 10), BigInt(10 + increment), entry);
   }
   escapedRuntime.dispose();
 
   const freshAliasEntry = manifestEntry(freshManifest, "freshAliasBump");
   assert.equal(freshAliasEntry.args[0].type.type, "Nat");
   assert.equal(freshAliasEntry.result.type, "Nat");
-  assert.equal(freshRuntime.call("freshAliasBump", 3), "12");
-  assert.equal(freshRuntime.call("freshBump", 35), "42");
-  assert.equal(freshRuntime.exportsByName.freshBump(1), "8");
-  assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), "15");
-  assert.equal(freshRuntime.call("freshPairSum", { fst: 7, snd: 8 }), "15");
+  assert.equal(freshRuntime.call("freshAliasBump", 3), 12n);
+  assert.equal(freshRuntime.call("freshBump", 35), 42n);
+  assert.equal(freshRuntime.exportsByName.freshBump(1), 8n);
+  assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), 15n);
+  assert.equal(freshRuntime.call("freshPairSum", { fst: 7, snd: 8 }), 15n);
   assert.equal(
     freshRuntime.call("freshUInt64Bump", "18446744073709551615"),
-    "0",
+    0n,
   );
   assert.equal(freshRuntime.call("freshFloatScale", 2.5), 5);
   assert.equal(freshRuntime.call("freshFloat32Roundtrip", 1.25), 1.25);
   assert.deepEqual(freshRuntime.call("freshClassifySum", 2), {
     kind: "inl",
-    value: "12",
+    value: 12n,
   });
   assert.deepEqual(freshRuntime.call("freshClassifySum", 5), {
     kind: "inr",
@@ -207,7 +204,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   });
   assert.equal(
     freshRuntime.call("freshSumScore", { kind: "inr", value: "lean" }),
-    "24",
+    24n,
   );
   assert.deepEqual(freshRuntime.call("freshClassifyExcept", 0), {
     kind: "error",
@@ -215,7 +212,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   });
   assert.deepEqual(freshRuntime.call("freshClassifyExcept", 6), {
     kind: "ok",
-    value: "7",
+    value: 7n,
   });
   assert.deepEqual(
     freshRuntime.call("freshBoxBump", {
@@ -228,10 +225,10 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     }),
     {
       label: "abc",
-      value: "7",
+      value: 7n,
       enabled: true,
       hits: 8,
-      quota: "10",
+      quota: 10,
       mode: "hot",
     },
   );
@@ -296,7 +293,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
       value: "18446744073709551615",
     }),
     {
-      value: "0",
+      value: 0n,
     },
   );
 
@@ -316,10 +313,10 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
       label: "box!",
       payload: {
         label: "abc",
-        value: "7",
+        value: 7n,
         enabled: true,
         hits: 8,
-        quota: "10",
+        quota: 10,
         mode: "hot",
       },
     },
@@ -336,7 +333,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     freshRuntime.call("freshChainIdentity", freshChain),
     freshChain,
   );
-  assert.equal(freshRuntime.call("freshChainScore", freshChain), "208");
+  assert.equal(freshRuntime.call("freshChainScore", freshChain), 208n);
   assert.deepEqual(freshRuntime.call("freshChainPush", "new", freshChain), {
     label: "new",
     next: freshChain,
@@ -375,17 +372,17 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.deepEqual(freshRuntime.call("freshTreeIdentity", freshTree), {
     kind: "node",
     value: [
-      { kind: "leaf", value: "3" },
+      { kind: "leaf", value: 3n },
       {
         kind: "node",
         value: [
-          { kind: "leaf", value: "5" },
-          { kind: "leaf", value: "8" },
+          { kind: "leaf", value: 5n },
+          { kind: "leaf", value: 8n },
         ],
       },
     ],
   });
-  assert.equal(freshRuntime.call("freshTreeRootScore", freshTree), "12");
+  assert.equal(freshRuntime.call("freshTreeRootScore", freshTree), 12n);
   const freshTreeEntry = manifestEntry(freshManifest, "freshTreeIdentity");
   assert.equal(
     freshTreeEntry.args[0].type.interfaceTag,
@@ -411,7 +408,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
       arg: { kind: "var", value: "y" },
     },
   };
-  assert.equal(freshRuntime.call("freshTermSize", term), "4");
+  assert.equal(freshRuntime.call("freshTermSize", term), 4n);
   assert.deepEqual(freshRuntime.call("freshTermWrap", term), {
     kind: "lam",
     fields: {
@@ -448,7 +445,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     () => freshRuntime.call("freshJsonWeight", "null"),
     /must be a custom inductive object; expected \{ kind: "null" \}/,
   );
-  assert.equal(freshRuntime.call("freshJsonWeight", { kind: "null" }), "1");
+  assert.equal(freshRuntime.call("freshJsonWeight", { kind: "null" }), 1n);
   assert.throws(
     () => freshRuntime.call("freshJsonWeight", { tag: 0 }),
     /must specify custom inductive kind; expected \{ kind: "null" \}/,
@@ -463,14 +460,14 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   );
   assert.equal(
     freshRuntime.call("freshJsonWeight", { kind: "bool", value: true }),
-    "2",
+    2n,
   );
   assert.equal(
     freshRuntime.call("freshJsonWeight", {
       kind: "array",
       value: [{ kind: "null" }, { kind: "nat", value: 4 }],
     }),
-    "12",
+    12n,
   );
   assert.equal(
     freshRuntime.call("freshJsonWeight", {
@@ -480,13 +477,13 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
         { fst: "empty", snd: { kind: "null" } },
       ],
     }),
-    "22",
+    22n,
   );
   assert.deepEqual(
     freshRuntime.call("freshJsonWrap", { kind: "nat", value: 4 }),
     {
       kind: "array",
-      value: [{ kind: "nat", value: "4" }, { kind: "null" }],
+      value: [{ kind: "nat", value: 4n }, { kind: "null" }],
     },
   );
   const freshJsonEntry = manifestEntry(freshManifest, "freshJsonWeight");
@@ -513,4 +510,26 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.kind,
     "recursiveSelf",
   );
+
+  const spellingSource = join(freshDir, "ConstructorSpelling.lean");
+  const spellingPackage = join(freshDir, "constructor-spelling.irpkg");
+  await writeRuntimeFixture(spellingSource, "ConstructorSpelling.lean");
+  await generateIrPackage("ConstructorSpelling", spellingSource, spellingPackage);
+  const spellingRuntime = await factory.createRuntime({
+    irPackageSet: [await readFile(spellingPackage)],
+  });
+  try {
+    const spellingType = manifestEntry(spellingRuntime.interfaceManifest, "constructorSpellingIdentity").args[0].type;
+    assert.deepEqual(spellingType.constructors, [
+      { name: "ConstructorSpelling.plain", jsName: "plain", tag: 0 },
+      { name: "ConstructorSpelling.constructor", jsName: "constructor", tag: 1 },
+    ]);
+    assert.equal(spellingRuntime.call("constructorSpellingIdentity", "constructor"), "constructor");
+    assert.throws(
+      () => spellingRuntime.call("constructorSpellingIdentity", "ConstructorSpelling.constructor"),
+      /unknown enum constructor/,
+    );
+  } finally {
+    spellingRuntime.dispose();
+  }
 }

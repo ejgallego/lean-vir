@@ -8,8 +8,8 @@ module
 
 public import Vir.GeneratePackage.Closure
 public import Vir.Host
-public import Vir.HostValidation
-public import Vir.InterfaceValidation
+public import Vir.Compiler.HostValidation
+public import Vir.Compiler.InterfaceValidation
 
 public section
 
@@ -82,9 +82,9 @@ def jsNameFor (n : Name) : String :=
 
 private partial def interfaceTypeNeedsBoxedCallBoundary : InterfaceType → Bool
   | .float | .float32 | .uint64 => true
-  | .structure _ _ (some idx) _ _ _ fields =>
-      match fields[idx]? with
-      | some (_, fieldType, _, _) => interfaceTypeNeedsBoxedCallBoundary fieldType
+  | .structure _ _ descriptor =>
+      match descriptor.trivialField?.bind (descriptor.fields[·]?) with
+      | some field => interfaceTypeNeedsBoxedCallBoundary field.type
       | none => false
   | _ => false
 
@@ -182,6 +182,8 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
   if slot >= maxHostImportSlots then
     return .error { name := loaded.decl.name, source := loaded.source, reason := s!"too many JavaScript imports; current package format supports at most {maxHostImportSlots}" }
   let arity := declParamCount loaded.decl
+  if arity == 0 then
+    return .error { name := loaded.decl.name, source := loaded.source, reason := "nullary JavaScript host imports are unsupported: native constants require storage; use an explicit Unit argument or RuntimeM result" }
   if arity > maxHostImportArity then
     return .error { name := loaded.decl.name, source := loaded.source, reason := s!"JavaScript import arity {arity} exceeds current limit {maxHostImportArity}" }
   let env ← getEnv

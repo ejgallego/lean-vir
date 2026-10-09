@@ -18,14 +18,9 @@ compiler-classified declarations in the shipped public inventory. These are
 review fixtures, not application APIs.
 -/
 
-def reactPropertyIdentity
-    (value : Lean.Vir.React.Property) :
-    Lean.Vir.React.Property :=
-  value
-
-def reactEventHandlerIdentity
-    (value : Lean.Vir.React.EventHandler) :
-    Lean.Vir.React.EventHandler :=
+def browserEventIdentity
+    (value : Lean.Vir.Js Lean.Vir.Browser.Event) :
+    Lean.Vir.Js Lean.Vir.Browser.Event :=
   value
 
 def reactRootIdentity

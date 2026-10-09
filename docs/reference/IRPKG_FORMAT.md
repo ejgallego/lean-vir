@@ -132,8 +132,11 @@ runtime also calls `vir_validate_package_contract` between prepare and finish:
 one transient binary projection of the validated manifest is compared with the
 decoded call tables. It checks ordered export names, argument counts, IO and
 boxed-boundary flags, and ordered host-import names, targets, symbols, arities,
-erased-prefix counts and IO flags. Names are rendered structurally with the
-pinned Lean printing rules, not parsed from text. Recomputing a manifest checksum
+erased-prefix counts and IO flags. Manifest 9 compares canonical structural
+name keys. The current loader does not accept older manifest schemas or
+display-name fallback contracts.
+The contract compares structural keys rather than reparsing display names.
+Recomputing a manifest checksum
 cannot bypass this comparison. Detailed interface types and effect labels are
 not independently stored in those tables and remain producer-owned metadata;
 this check does not authenticate a package or prove its IR implements its types.
@@ -146,7 +149,7 @@ package owner releases the complete graph both when a later section fails and
 when the package state is cleared.
 
 Package `Name` tags and IR declaration payload tag values live in
-`Vir/GeneratePackage/PackageIRTags.lean`. The mapping in
+`Vir/Package/IRTags.lean`. The mapping in
 `scripts/native/ir-codec-tags.mjs` generates
 `build/generated/wasm/package/package_ir_tags.h`. Name encoding is shared by the
 declaration, initializer-global, host-import, and export-summary sections; the
@@ -171,33 +174,60 @@ The generator embeds the recursive interface type tree in section 5. Its
 | Manifest | `version`, `artifact: "lean-vir-ir-package"`, `metadata`, `exports`, `hostImports`, `diagnostics`. |
 | Metadata | `generator`, `packageFormatVersion`, `manifestVersion`, `leanVersion`, `leanToolchain`, `leanGithash`, `targets`, optional `packageSetMember: { module, role }`. |
 | Target | Exactly one origin field: compiled `module` or live-snapshot `source`; plus `mode`, `roots`, `resolvedRoots`. Source is document provenance, not a source-loading request. |
-| Export | `id`, `jsName`, Lean declaration `entry`, diagnostic `source`, `args`, descriptor `result`, `effect`, Boolean `startup`. Each argument is `{ name, type: <descriptor> }`. |
-| Host import | `slot`, Lean `name`, `source`, JS `target`, `boundary`, generated Wasm `symbol`, IR `arity`, `erasedPrefixArgs`, `args`, descriptor `result`, `effect`. |
+| Export | `id`, `jsName`, display/call alias `entry`, structural `nameKey`, diagnostic `source`, `args`, descriptor `result`, `effect`, Boolean `startup`. Each argument is `{ name, type: <descriptor> }`. |
+| Host import | `slot`, display `name`, structural `nameKey`, `source`, JS `target`, `boundary`, generated Wasm `symbol`, IR `arity`, `erasedPrefixArgs`, `args`, descriptor `result`, `effect`. |
 | Diagnostic | `name`, `source`, `reason`. |
 
-The current manifest version is 8. Runtime validation accepts versions 6–8:
-version 6 may omit `startup`, normalized to `false`; versions 7–8 require an
-explicit Boolean on every export. Version 6 removed `wireTag` and the `wire`
-host-boundary label without aliases. Version 8 omits volatile generation time
-from embedded metadata and validates the five target modes and root arrays.
-Only the adjacent Markdown report records wall-clock generation time.
+The current manifest version is 9 and every generated package must use it.
+Every export carries an explicit Boolean `startup` field. Volatile generation
+time is omitted from embedded metadata; only the adjacent Markdown report
+records wall-clock generation time.
+
+Version 9 adds `nameKey` to exports and host imports. It is the machine identity
+compared with the independently decoded binary Name; `entry`, `id`, `jsName`
+and host `name` remain display/call aliases. Changing an alias does not change
+the declaration that executes. The runtime independently checks arity, effect,
+boxed-boundary requirements and host target/symbol metadata as before.
+
+`Vir.nameKey` defines root-to-leaf component encoding: a string component is
+`s` followed by lowercase hexadecimal UTF-8 bytes and `/`; a numeral component
+is `n` followed by canonical decimal digits and `/`. Anonymous is the empty key;
+an empty string component is `s/`. Thus string `"1"` (`s31/`) and numeral `1`
+(`n1/`) differ, as do a dotted component and multiple components. The key itself
+does not narrow numerals; format 11 still rejects Name numerals above u32 when
+emitting their binary representation. Native registry lookup uses the same key.
+
+JavaScript validates the key grammar and UTF-8 before it sends the contract to
+Wasm. The pinned Wasm decoder derives the canonical key from its decoded Lean
+`Name`; the contract succeeds only when those structural identities agree.
+These checks deliberately do not parse display aliases.
+
+Manifest 9 is the only supported schema. The current SDK contract is runtime
+ABI 4 with package format 11, so regenerate `.irpkg` members and descriptors
+with the manifest-9 generator and install the matching JavaScript and Wasm SDK
+artifacts together when the generator or runtime revision changes.
 
 The modes are `explicit`, `packageOnly`, `all`, `marked` and `markedModule`.
 `explicit`/`packageOnly` require nonempty `roots`; other modes require `[]`.
 `roots` and `resolvedRoots` contain unique normalized names. Compiled marked
 selection uses `markedModule` and requires `module`; live marked selection
-uses `marked` with `source`. Legacy `markedModules` is accepted only in
-pre-version-8 manifests. New generation uses the current spellings.
+uses `marked` with `source`. These are the only accepted target spellings.
 
 `effect` is one of `pure`, `runtime`, `io`, `dom` or `react`, preserving
 source-level classification for tooling. Binary export/host summaries carry
 only pure versus effectful. These are synchronous effects (`RuntimeM`, `IO`,
 `DomM`, `ReactM`), not an asynchronous interpreter protocol.
 
-Host slots are zero-based array indices; the package supports at most 128
-host imports with IR arity at most 6. `erasedPrefixArgs` records leading erased
-type arguments, skipped before JavaScript-visible arguments (supported since
-package format 6). Boundary labels are:
+Host slots are zero-based array indices; an assembled package set supports at
+most 128 host imports with IR arity at most 6. The producer owns both limits in
+`Vir/GeneratePackage/Basic.lean`; the Wasm build generates the C++ constants from
+those definitions. Preparation checks the aggregate slot count and each import's
+arity and erased/world counts before initializers can run. Nullary pure host
+imports are rejected because upstream treats native constants as storage, not
+functions; use an explicit `Unit` argument or an effectful result. IR arity includes
+leading erased type/proof arguments and the final world argument for effectful
+imports. `erasedPrefixArgs` records the leading erased arguments, skipped before
+JavaScript-visible arguments (supported since package format 6). Boundary labels are:
 
 | Boundary | Accepted interface |
 | --- | --- |
@@ -212,10 +242,15 @@ and [host bindings](HOST_BINDINGS.md) for authoring and lifetime rules.
 
 ## Interface descriptors
 
+The table below specifies accepted descriptor shapes, including those used by
+experimental automatic conversion of records and custom inductives. Official
+support follows the [support scope](../SUPPORT.md); accepting a descriptor does
+not extend that promise.
+
 Every descriptor has `type` (the applied Lean type label) and `interfaceTag`.
 Compound descriptors also have the `kind` and payload below. The numeric tags
 are package ABI, owned by
-[`Interface.Encode`](../../Vir/GeneratePackage/Interface/Encode.lean) and checked
+[`Interface.Encode`](../../Vir/Compiler/Interface/Encode.lean) and checked
 against [`interface-tags.js`](../../web/src/runtime/interface-tags.js) by
 `npm run check:package-abi`. JS constant names in this table have the prefix
 `INTERFACE_TAG.`; unlisted tags are unsupported.
@@ -284,7 +319,8 @@ a supported outer type shape.
 Top-level `Float`, `Float32`, `UInt64` and trivial wrappers over them require a
 compiler-generated `_boxed` declaration for wasm32 calls. Generation includes
 that companion or fails with an explicit diagnostic; it does not emit a partial
-package. Large exact integer results use decimal strings at the JS boundary;
+package. `Nat`, `Int`, and `UInt64` results use bigint at the JS boundary, while
+wasm32 `USize` results use Number;
 the [JS value reference](../guides/JS_API.md#calls-and-manifest) owns concrete shapes.
 
 ### Resources and callbacks
@@ -307,6 +343,10 @@ in private state. Pointer calls and callback rooting are specified in
 [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md#host-imports-and-reentrant-callbacks).
 
 ## Validation and trust limits
+
+The [supported-input review assumptions](../development/REVIEW_ASSUMPTIONS.md)
+apply: cooperative users/developers and trusted generated packages. Unsupported
+artifact manipulation has undefined behavior, not a promised rejection contract.
 
 Before exposing entries, JavaScript validates export argument/result trees,
 host descriptors and metadata. It rejects unsupported tags, malformed recursive

@@ -6,27 +6,14 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.GeneratePackage.Interface.Encode
+public import Vir.Compiler.Interface.Encode
 public import Vir.GeneratePackage.Manifest
+public import Vir.Package.Json
+public import Vir.Package.Name
 
 public section
 
 open Lean
-
-namespace Vir.Interface
-
-open Vir.GeneratePackage
-
-def InterfaceArg.toJson (arg : InterfaceArg) : String :=
-  jsonObject #[
-    ("name", jsonString arg.name),
-    ("type", arg.type.toJson)
-  ]
-
-def InterfaceEffect.toJson (effect : InterfaceEffect) : String :=
-  jsonString effect.label
-
-end Vir.Interface
 
 namespace Vir.GeneratePackage
 
@@ -37,6 +24,7 @@ def InterfaceExport.toJson (entry : InterfaceExport) : String :=
     ("id", jsonString entry.id),
     ("jsName", jsonString entry.jsName),
     ("entry", jsonName entry.entry),
+    ("nameKey", jsonString (Vir.nameKey entry.entry)),
     ("source", jsonString entry.source),
     ("args", jsonArray (entry.args.map InterfaceArg.toJson)),
     ("result", entry.result.toJson),
@@ -48,6 +36,7 @@ def HostImport.toJson (entry : HostImport) : String :=
   jsonObject #[
     ("slot", jsonNat entry.slot),
     ("name", jsonName entry.name),
+    ("nameKey", jsonString (Vir.nameKey entry.name)),
     ("source", jsonString entry.source),
     ("target", jsonString entry.target),
     ("boundary", jsonString entry.boundary.label),

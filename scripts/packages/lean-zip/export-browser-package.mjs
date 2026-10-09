@@ -17,7 +17,6 @@ import {
   gitIdentity,
   parseProducerArguments,
   readMatchingWorkloadPackage,
-  requireToolchain,
   requireFreshOutput,
   sha256,
   writeChecksums,
@@ -65,12 +64,6 @@ async function main() {
       source: sourceIdentities.leanZip,
       label: "lean-zip",
     });
-  for (const [root, label] of [
-    [producer, "VIR"],
-    [client, "lean-zip"],
-  ]) {
-    await requireToolchain(root, label, "leanprover/lean4:v4.33.0");
-  }
   const workspace = await mkdtemp(join(tmpdir(), "vir-lean-zip-export-"));
   try {
     const project = await createLeanZipModuleProject({
@@ -149,6 +142,8 @@ async function main() {
       sources: sourceIdentities,
       runtime: {
         profile: "client-native",
+        leanToolchain: project.toolchain,
+        clientLeanToolchain: project.clientToolchain,
         nativeExternManifest: {
           sourceFile: "lean-vir-native-externs.json",
           sha256: sha256(

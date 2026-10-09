@@ -470,7 +470,7 @@ function callRawResolvedObjects(entry, callSlot) {
     throw new Error(runtime.lastCallError() || `resolved call failed: ${entry.entry}`);
   }
   try {
-    return runtime.liftOwnedObjectValue(entry.result, resultObj, `${entry.entry} result`);
+    return runtime.liftObjectValue(entry.result, resultObj, `${entry.entry} result`);
   } finally {
     runtime.exports.vir_obj_dec(resultObj);
   }

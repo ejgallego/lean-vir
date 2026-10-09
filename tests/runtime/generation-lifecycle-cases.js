@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
 import {
   check,
@@ -22,67 +23,87 @@ function rejects(action, pattern) {
   throw new Error("expected rejection");
 }
 
-export async function runGenerationLifecycleCases(createRuntime, packageBytes) {
-  const first = await makeGeneration(createRuntime, "before replacement");
-  const state = first.runtime.hostState;
+export async function runGenerationLifecycleCases(
+  createRuntime,
+  packageBytes,
+  createDeferredRuntime,
+) {
+  const deferred = await createDeferredRuntime();
   rejects(
-    () => first.runtime.loadIrPackageSetBytes([new Uint8Array([0])]),
+    () => deferred.loadIrPackageSetBytes([new Uint8Array([0])]),
     /package|header|truncated|byte/i,
   );
-  check(first.callback(4n) === 11n, "failed replacement preserves callback");
   check(
-    readJsl(first.runtime, first.jsl) === "before replacement",
-    "failed replacement preserves JSL",
+    deferred.packageInfo === null && deferred.packageDeclCount() === 0,
+    "failed first installation leaves the deferred runtime empty",
   );
-  first.runtime.loadIrPackageSetBytes([packageBytes]);
+  deferred.loadIrPackageSetBytes([packageBytes]);
   check(
-    first.runtime.hostState !== state,
-    "replacement adopts separate host state",
+    deferred.packageInfo !== null,
+    "deferred runtime accepts its first package generation",
   );
-  check(
-    state.leanObjectHandleCells.size === 0,
-    "replacement releases old JSL roots",
+  rejects(
+    () => deferred.loadIrPackageSetBytes([packageBytes]),
+    /already owns an IR package set/i,
   );
-  rejects(() => first.callback(4n), /disposed runtime/);
-  rejects(() => readJsl(first.runtime, first.jsl), /live Lean object handle/);
-  const replacementJsl = makeJsl(first.runtime, "after replacement");
-  check(
-    readJsl(first.runtime, replacementJsl) === "after replacement",
-    "new heap is usable",
-  );
+  deferred.dispose();
+
+  const first = await makeGeneration(createRuntime, "one generation");
+  const state = first.runtime.hostState;
+  for (const method of ["loadIrPackageSetBytes", "installIrPackageSetBytes"]) {
+    rejects(
+      () => first.runtime[method]([packageBytes]),
+      /already owns an IR package set/i,
+    );
+    check(first.callback(4n) === 11n, `${method} rejection preserves callback`);
+    check(
+      readJsl(first.runtime, first.jsl) === "one generation",
+      `${method} rejection preserves JSL`,
+    );
+    check(
+      first.runtime.hostState === state,
+      `${method} rejection preserves host state`,
+    );
+  }
   first.runtime.dispose();
   first.runtime.dispose();
   rejects(
-    () => readJsl(first.runtime, replacementJsl),
+    () => readJsl(first.runtime, first.jsl),
     /live Lean object handle/,
   );
 
   // Fault injection releases the actual Wasm roots first, then throws. Every
   // independent cleanup must still run; repeated disposal must not release twice.
   let hostDisposals = 0;
-  const failures = await makeGeneration((bindings) =>
-    createRuntime({
-      ...bindings,
-      [VIR_HOST_DISPOSE]: () => {
-        hostDisposals++;
-        throw new Error("host cleanup sentinel");
-      },
-    }),
-  );
+  const failures = await makeGeneration(createRuntime);
+  // Inject into the runtime-owned fresh default provider, preserving its cleanup.
+  const ownedBindings = failures.runtime.hostState.defaultBindings;
+  const disposeOwnedBindings = ownedBindings[VIR_HOST_DISPOSE];
+  ownedBindings[VIR_HOST_DISPOSE] = () => {
+    disposeOwnedBindings?.call(ownedBindings);
+    hostDisposals++;
+    throw new Error("host cleanup sentinel");
+  };
   const failedState = failures.runtime.hostState;
+  const exports = failures.runtime.exports;
+  check(exports.vir_obj_resource({ label: "retained during cleanup failure" }) !== 0,
+    "cleanup-failure payload acquires a Wasm root");
+  check(exports.vir_resource_roots_active() > 0,
+    "table has live roots before failed shutdown");
   const counts = injectReleaseFailures(failures.runtime);
-  rejects(() => failures.runtime.dispose(), /cleanup|teardown/i);
+  rejects(() => failures.runtime.dispose(), /cleanup|teardown|disposal/i);
   check(
     hostDisposals === 1 && counts.callback === 1 && counts.jsl === 1,
     "shutdown attempts host, callback and JSL cleanup exactly once",
   );
   check(
     failedState.leanObjectHandleCells.size === 0 &&
-      failures.runtime.liveCallbacks.size === 0,
+      countLiveCallbacks(failures.runtime.hostState) === 0,
     "failed shutdown clears tracked foreign roots",
   );
   check(
-    failedState.resourceRoots.debugCounts().active === 0,
+    exports.vir_resource_roots_active() === 0 &&
+      exports.vir_resource_roots_reusable() === 0,
     "failed shutdown clears externrefs",
   );
   failures.runtime.dispose();
@@ -109,7 +130,7 @@ export async function runGenerationLifecycleCases(createRuntime, packageBytes) {
     "both finalizer errors are recorded",
   );
   check(
-    owned.liveCallbacks.size === 0 &&
+    countLiveCallbacks(owned.hostState) === 0 &&
       owned.hostState.leanObjectHandleCells.size === 0,
     "failing finalizers untrack their roots",
   );
@@ -119,8 +140,9 @@ export async function runGenerationLifecycleCases(createRuntime, packageBytes) {
     "finalized roots are not released twice",
   );
   return {
-    replacement: true,
-    failedReplacement: true,
+    deferredFirstInstall: true,
+    failedFirstInstall: true,
+    rejectedReload: true,
     hardShutdown: true,
     cleanupErrors: true,
   };
@@ -128,19 +150,21 @@ export async function runGenerationLifecycleCases(createRuntime, packageBytes) {
 
 function injectReleaseFailures(runtime) {
   const counts = { callback: 0, jsl: 0 };
-  const release = runtime.releaseClosure.bind(runtime);
   const dec = runtime.exports.vir_obj_dec;
-  runtime.releaseClosure = (id) => {
-    release(id);
-    counts.callback++;
-    throw new Error("callback release sentinel");
-  };
+  const identities = Array.from(runtime.hostState.leanObjectHandleCells,
+    cell => ({ cell, object: cell.object, kind: cell.callType === null ? "jsl" : "callback" }));
   runtime.exports = {
     ...runtime.exports,
     vir_obj_dec: (ptr) => {
       dec(ptr);
-      counts.jsl++;
-      throw new Error("JSL release sentinel");
+      // Cell retirement marks it dead before native release and untracks in
+      // finally. Observe that ordering for both kinds, including finalizers.
+      const identity = identities.find(({ cell, object }) => object === ptr && !cell.live);
+      if (identity) {
+        const { kind } = identity;
+        counts[kind]++;
+        throw new Error(`${kind} release sentinel`);
+      }
     },
   };
   return counts;
@@ -160,12 +184,12 @@ export async function runSharedBindingGcCases(
   first.dispose();
   check(
     disposals === 0,
-    "one shared owner cannot dispose another owner's bindings",
+    "runtime disposal preserves application-owned bindings",
   );
   second.dispose();
-  check(disposals === 1, "last explicit shared owner disposes bindings once");
+  check(disposals === 0, "final runtime disposal preserves supplied bindings");
   second.dispose();
-  check(disposals === 1, "shared binding disposal is idempotent");
+  check(disposals === 0, "repeated runtime disposal preserves supplied bindings");
 
   // An externally owned factory/passive shared map has no reverse runtime edge.
   const weak = await makeSharedGraph(factory, packageBytes);
@@ -188,10 +212,11 @@ export async function runSharedBindingGcCases(
     () => retained.deref() === undefined,
     "shared-map target released",
   );
-  // Collection does not decrement existing numeric lease counts. This test
-  // establishes reachability only, not automatic shared-binding teardown.
+  check(disposals === 0, "generation collection does not dispose application services");
+  sharedBindings[VIR_HOST_DISPOSE]();
+  check(disposals === 1, "the application disposes its shared bindings");
   return {
-    explicitSharedDisposal: true,
+    applicationOwnedBindings: true,
     passiveFactory: true,
     retainedMap: true,
   };
@@ -200,7 +225,7 @@ export async function runSharedBindingGcCases(
 async function makeSharedGraph(factory, packageBytes, bindings = null) {
   const runtime = await factory.createRuntime({ irPackageSet: [packageBytes] });
   const jsl = makeJsl(runtime, "shared");
-  runtime.hostState.resourceRoots.root(jsl);
+  runtime.exports.vir_obj_resource(jsl);
   if (bindings !== null) bindings.retained = jsl;
   return new WeakRef(runtime);
 }

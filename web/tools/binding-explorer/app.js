@@ -558,7 +558,6 @@ function displayLeanName(value) {
       ["Lean.Vir.React.", ""],
       ["Lean.Vir.ProofWidgets.", ""],
       ["Lean.Vir.Infoview.", ""],
-      ["Lean.Vir.Common.", ""],
       ["Lean.Vir.Js.", "Js."],
       ["Lean.Vir.Js", "Js"],
       ["Lean.Vir.", ""],

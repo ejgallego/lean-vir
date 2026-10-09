@@ -56,6 +56,12 @@ Author: Emilio J. Gallego Arias
             <div>
               <p class="eyebrow">Local package</p>
               <h2 id="dev-package-title">Load Package</h2>
+              <p>
+                This developer runner includes experimental DOM/UI packages and
+                automatic conversion of records and custom inductives. See the
+                <a href="https://github.com/ejgallego/lean-vir/blob/main/docs/SUPPORT.md"
+                  >support scope</a>.
+              </p>
             </div>
           </div>
           <div class="dev-runner-grid">
@@ -96,7 +102,12 @@ Author: Emilio J. Gallego Arias
               <select id="dev-entry-select"></select>
             </label>
             <div id="dev-input-fields" class="dev-input-fields"></div>
-            <button id="dev-run-entry" type="button" disabled>Run</button>
+            <div class="dev-eval-actions">
+              <button id="dev-run-entry" type="button" disabled>Run</button>
+              <button id="dev-reload-runtime" type="button" hidden disabled>
+                Reload runtime
+              </button>
+            </div>
             <output id="dev-result">...</output>
           </div>
         </section>
@@ -111,7 +122,15 @@ Author: Emilio J. Gallego Arias
               <strong id="dev-command-title">Command shape</strong>
             </summary>
             <div class="dev-command-grid">
-              <pre><code>npm run generate:irpkg -- MyModule web/public/local.irpkg Namespace.entry1 Namespace.entry2</code></pre>
+              <pre><code>// Save as my-module.virpkg.json:
+{
+  "version": 2,
+  "module": "MyModule",
+  "package": "web/public/local.irpkg",
+  "roots": ["Namespace.entry1", "Namespace.entry2"]
+}
+
+npm run prepare:irpkg -- my-module.virpkg.json</code></pre>
               <pre><code>npm run dev -- --port 5173
 http://127.0.0.1:5173/dev.html?package=local.irpkg</code></pre>
             </div>

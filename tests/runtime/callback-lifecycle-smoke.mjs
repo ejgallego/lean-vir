@@ -3,13 +3,17 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import assert from "node:assert/strict";
 
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
-import { readRuntimeArtifacts } from "./shared.mjs";
+import { readFile } from "node:fs/promises";
 
-const { wasmBytes, hostPackageBytes } = await readRuntimeArtifacts();
+const [wasmBytes, hostPackageBytes] = await Promise.all(
+  ["vir-upstream.wasm", "demo-host.irpkg"].map(file =>
+    readFile(new URL(`../../web/public/${file}`, import.meta.url))),
+);
 
 let retainedCallback = null;
 const runtime = await createVirRuntime({
@@ -24,12 +28,12 @@ const runtime = await createVirRuntime({
   },
 });
 
-assert.equal(runtime.call("HostInterop.callbackRoundTrip", 3), "10");
+assert.equal(runtime.call("HostInterop.callbackRoundTrip", 3), 10n);
 assert.equal(typeof retainedCallback, "function");
 assert.deepEqual(Object.keys(retainedCallback), []);
 assert.equal(Object.hasOwn(retainedCallback, "retain"), false);
 assert.equal(Object.hasOwn(retainedCallback, "release"), false);
-assert.equal(runtime.liveCallbacks.size, 1);
+assert.equal(countLiveCallbacks(runtime.hostState), 1);
 
 const jsNat = (value) =>
   runtime.hostState.defaultBindings["js.nat"](BigInt(value));
@@ -38,7 +42,7 @@ const jsNatValue = (value) =>
 assert.equal(jsNatValue(retainedCallback(jsNat(4))), 11n);
 
 runtime.dispose();
-assert.equal(runtime.liveCallbacks.size, 0);
+assert.equal(countLiveCallbacks(runtime.hostState), 0);
 assert.throws(
   () => retainedCallback(1n),
   /disposed runtime|belongs to a disposed runtime/,
@@ -61,34 +65,28 @@ assert.throws(
   /host binding boom/,
 );
 assert.equal(typeof failedCallback, "function");
-assert.equal(failedRuntime.liveCallbacks.size, 0);
-assert.throws(
-  () => failedCallback(1n),
-  /disposed runtime|closure root id is not live/,
-);
+assert.equal(countLiveCallbacks(failedRuntime.hostState), 1);
+assert.equal(failedCallback(1n), 8n, "a throwing host may still retain its callback");
 failedRuntime.dispose();
+assert.equal(countLiveCallbacks(failedRuntime.hostState), 0);
+assert.throws(() => failedCallback(1n), /disposed runtime/);
 
-let wrongArityCallback = null;
-const wrongArityRuntime = await createVirRuntime({
+let extraArgumentCallback = null;
+const extraArgumentRuntime = await createVirRuntime({
   wasmBytes,
   irPackageSet: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
-      wrongArityCallback = callback;
-      return callback(input, input);
+      extraArgumentCallback = callback;
+      return callback(input, { unused: true });
     },
     "test.recordNat": () => undefined,
   },
 });
-assert.throws(
-  () => wrongArityRuntime.call("HostInterop.callbackRoundTrip", 1),
-  /callback expects 1 arguments, got 2/,
-);
-assert.equal(wrongArityRuntime.liveCallbacks.size, 0);
-assert.throws(
-  () => wrongArityCallback(1n),
-  /closure root id is not live|disposed runtime/,
-);
-wrongArityRuntime.dispose();
+assert.equal(extraArgumentRuntime.call("HostInterop.callbackRoundTrip", 1), 8n);
+assert.equal(countLiveCallbacks(extraArgumentRuntime.hostState), 1);
+assert.equal(extraArgumentCallback(2n, undefined), 9n);
+extraArgumentRuntime.dispose();
+assert.throws(() => extraArgumentCallback(2n, undefined), /disposed runtime/);
 
 console.log("self-owning callback lifecycle smoke ok");

@@ -9,11 +9,9 @@ import {
   beginHostCallTransaction,
   commitHostCallTransaction,
   disposeHostBindings,
-  ExternrefRoots,
 } from "../host-boundary.js";
-import { createBrowserHostBindings } from "../vir-host-bindings.js";
-import { releaseCallbackRoots } from "./callbacks.js";
 import {
+  asError,
   collectCleanupError,
   throwCollectedErrors,
   throwWithCleanup,
@@ -33,20 +31,18 @@ export const RUNTIME_INTRINSIC_HOST_TARGETS = Object.freeze({
 export class VirHostState {
   constructor({
     hostBindings = null,
-    defaultHostBindings = createBrowserHostBindings(),
-    releaseHostBindings = null,
-    releaseDefaultHostBindings = null,
+    defaultHostBindings = null,
+    ownsDefaultHostBindings = false,
   } = {}) {
     this.exports = null;
     this.manifest = null;
     this.hostImports = [];
     this.userBindings = hostBindings;
     this.defaultBindings = defaultHostBindings;
-    this.releaseHostBindings = releaseHostBindings;
-    this.releaseDefaultHostBindings = releaseDefaultHostBindings;
+    this.ownsDefaultHostBindings = ownsDefaultHostBindings;
     this.runtime = null;
-    this.resourceRoots = new ExternrefRoots();
     this.leanObjectHandleCells = new Set();
+    this.leanObjectHandleTrackingClosed = false;
     this.callError = null;
     this.callTimings = [];
     this.finalizerErrorMessages = [];
@@ -84,8 +80,9 @@ export class VirHostState {
 
   recordCallError(error) {
     if (this.callError === null) {
-      this.callError =
-        error instanceof Error ? error : new Error(String(error));
+      // Quarantine before inspecting an arbitrary thrown value.
+      this.callError = new Error("JavaScript host exception", { cause: error });
+      this.callError = asError(error, "JavaScript host exception");
     }
   }
 
@@ -95,25 +92,13 @@ export class VirHostState {
     return error;
   }
 
-  rootResource(value) {
-    return this.resourceRoots.root(value);
-  }
-
-  getRootedResource(rootId) {
-    return this.resourceRoots.get(rootId);
-  }
-
-  releaseRootedResource(rootId) {
-    return this.resourceRoots.release(rootId);
-  }
-
-  releaseRootedResourceFromFinalizer(rootId) {
-    try {
-      return this.releaseRootedResource(rootId);
-    } catch (error) {
-      this.recordFinalizerError(error);
-      return undefined;
-    }
+  resourceRootCounts() {
+    if (this.exports === null) return { active: 0, capacity: 0, reusable: 0 };
+    return {
+      active: this.exports.vir_resource_roots_active(),
+      capacity: this.exports.vir_resource_roots_capacity(),
+      reusable: this.exports.vir_resource_roots_reusable(),
+    };
   }
 
   recordFinalizerError(error) {
@@ -141,7 +126,8 @@ export class VirHostState {
   }
 
   clearResourceRoots() {
-    this.resourceRoots.clear();
+    // Small hostless modules used by the raw boundary may have no resource ABI.
+    this.exports?.vir_resource_roots_clear?.();
   }
 
   callObjects(slot, argvPtr, argc) {
@@ -156,6 +142,10 @@ export class VirHostState {
   }
 
   callObjectsImpl(slot, argvPtr, argc) {
+    if (this.runtime?.failure != null) throw this.runtime.failure;
+    // A recorded exception belongs to the active JS call. Even if Lean catches
+    // the IO error used for propagation, it must not dispatch further host work.
+    if (this.callError !== null) throw this.callError;
     if (this.disposed) {
       throw new Error("Vir host state has been disposed");
     }
@@ -183,69 +173,53 @@ export class VirHostState {
       throw new Error(`Vir host import binding not found: ${entry.target}`);
     }
 
-    const args = [];
-    const liftedCallbacks = new Set();
     const explicitConversionTarget =
       entry.boundary === HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION;
+    const argObjects = this.readObjectArgv(argvPtr, argc);
+    if (argObjects.length !== entry.args.length) {
+      throw new Error(
+        `Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`,
+      );
+    }
+    // Lifted callbacks own their closure roots through JS reachability, even if
+    // this call fails. Explicit host effects still use transactional rollback.
+    const args = entry.args.map((arg, index) =>
+      explicitConversionTarget
+        ? this.runtime.liftObjectValue(
+            arg.type,
+            argObjects[index],
+            `${entry.target} argument ${arg.name}`,
+          )
+        : this.runtime.liftJsObjectValue(
+            arg.type,
+            argObjects[index],
+            `${entry.target} argument ${arg.name}`,
+          ),
+    );
+    const transaction = beginHostCallTransaction();
     try {
-      const argObjects = this.readObjectArgv(argvPtr, argc);
-      if (argObjects.length !== entry.args.length) {
+      const value = binding(...args);
+      if (this.runtime.failure != null) throw this.runtime.failure;
+      if (
+        !isGenericJsResourceDescriptor(entry.result) &&
+        isPromiseLike(value)
+      ) {
         throw new Error(
-          `Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`,
+          `Vir host import ${entry.target} returned a Promise where ${entry.result?.type ?? "the declared result"} requires a synchronously lowered value`,
         );
       }
-      entry.args.forEach((arg, index) => {
-        const callbacksBeforeArgument = new Set(this.runtime.liveCallbacks);
-        try {
-          const value = explicitConversionTarget
-            ? this.runtime.liftObjectValue(
-                arg.type,
-                argObjects[index],
-                `${entry.target} argument ${arg.name}`,
-              )
-            : this.runtime.liftJsObjectValue(
-                arg.type,
-                argObjects[index],
-                `${entry.target} argument ${arg.name}`,
-              );
-          args.push(value);
-        } finally {
-          captureCallbacksCreatedSince(
-            this.runtime.liveCallbacks,
-            callbacksBeforeArgument,
-            liftedCallbacks,
-          );
-        }
-      });
-      const transaction = beginHostCallTransaction();
-      try {
-        const value = binding(...args);
-        if (
-          !isGenericJsResourceDescriptor(entry.result) &&
-          isPromiseLike(value)
-        ) {
-          throw new Error(
-            `Vir host import ${entry.target} returned a Promise where ${entry.result?.type ?? "the declared result"} requires a synchronously lowered value`,
-          );
-        }
-        const resultLabel = `${entry.target} result`;
-        const resultObject = explicitConversionTarget
-          ? this.runtime.makeObjectValue(entry.result, value, resultLabel)
-          : this.runtime.makeJsObjectValue(entry.result, value, resultLabel);
-        commitHostCallTransaction(transaction);
-        return resultObject;
-      } catch (error) {
-        throwWithCleanup(
-          error,
-          () => abortHostCallTransaction(transaction),
-          `Vir host import ${entry.target} failed during transactional rollback`,
-        );
-      }
+      const resultLabel = `${entry.target} result`;
+      const resultObject = explicitConversionTarget
+        ? this.runtime.makeObjectValue(entry.result, value, resultLabel)
+        : this.runtime.makeJsObjectValue(entry.result, value, resultLabel);
+      if (this.runtime.failure != null) throw this.runtime.failure;
+      commitHostCallTransaction(transaction);
+      return resultObject;
     } catch (error) {
       throwWithCleanup(
         error,
-        () => releaseCallbackRoots(liftedCallbacks),
-        `Vir host import ${entry.target} failed during callback cleanup`,
+        () => abortHostCallTransaction(transaction),
+        `Vir host import ${entry.target} failed during transactional rollback`,
       );
     }
   }
@@ -280,16 +254,7 @@ export class VirHostState {
       } catch (error) {
         throwWithCleanup(
           error,
-          () => {
-            const errors = [];
-            collectCleanupError(errors, () =>
-              this.runtime.releaseLeanObjectHandleCell(cell),
-            );
-            throwCollectedErrors(
-              errors,
-              `${entry.target} failed during object-handle rollback`,
-            );
-          },
+          () => this.runtime.releaseLeanObjectHandleCell(cell),
           `${entry.target} failed during result cleanup`,
         );
       }
@@ -316,7 +281,13 @@ export class VirHostState {
   }
 
   trackLeanObjectHandleCell(cell) {
-    if (this.disposed || this.disposing || this.runtime === null) {
+    const isCallback = cell.callType != null;
+    if (
+      this.disposed ||
+      this.runtime === null ||
+      this.leanObjectHandleTrackingClosed ||
+      (this.disposing && !isCallback)
+    ) {
       throw new Error(
         "cannot track a Lean object handle in an inactive host state",
       );
@@ -345,20 +316,7 @@ export class VirHostState {
     try {
       this.clearCallError();
 
-      const userRelease = collectCleanupError(
-        errors,
-        () => this.releaseHostBindings?.() ?? true,
-      );
-      if (userRelease.ok && userRelease.value) {
-        collectCleanupError(errors, () =>
-          disposeHostBindings(this.userBindings),
-        );
-      }
-      const defaultRelease = collectCleanupError(
-        errors,
-        () => this.releaseDefaultHostBindings?.() ?? true,
-      );
-      if (defaultRelease.ok && defaultRelease.value) {
+      if (this.ownsDefaultHostBindings) {
         collectCleanupError(errors, () =>
           disposeHostBindings(this.defaultBindings),
         );
@@ -372,11 +330,16 @@ export class VirHostState {
       this.disposing = false;
       this.runtime = null;
       this.exports = null;
+      this.userBindings = null;
+      this.defaultBindings = null;
     }
     throwCollectedErrors(errors, "Vir host state disposal failed");
   }
 
   releaseLeanObjectHandleCells() {
+    // Providers may synchronously convert callbacks while cleaning up. Close
+    // acquisition before the final snapshot so every accepted cell is retired.
+    this.leanObjectHandleTrackingClosed = true;
     const errors = [];
     for (const cell of Array.from(this.leanObjectHandleCells)) {
       collectCleanupError(errors, () =>
@@ -430,16 +393,4 @@ function isPromiseLike(value) {
     (typeof value === "object" || typeof value === "function") &&
     typeof value.then === "function"
   );
-}
-
-function captureCallbacksCreatedSince(
-  liveCallbacks,
-  callbacksBeforeArgument,
-  liftedCallbacks,
-) {
-  for (const callback of liveCallbacks) {
-    if (!callbacksBeforeArgument.has(callback)) {
-      liftedCallbacks.add(callback);
-    }
-  }
 }

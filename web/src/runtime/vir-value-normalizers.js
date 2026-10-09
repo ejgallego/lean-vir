@@ -4,60 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import {
-  customInductiveShape,
-  requireCustomInductiveConstructors,
-  requireStructureFields,
-  requireTaggedUnionConstructors,
-} from "./vir-codec.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
 
 const customInductiveNormalizationPlanCache = new WeakMap();
-
-export function normalizeDecimal(value, label, { signed }) {
-  if (typeof value === "bigint") {
-    if (!signed && value < 0n) throw new Error(`${label} must be non-negative`);
-    return value.toString();
-  }
-  if (typeof value === "number") {
-    if (!Number.isSafeInteger(value)) throw new Error(`${label} must be a safe integer or decimal string`);
-    if (!signed && value < 0) throw new Error(`${label} must be non-negative`);
-    return String(value);
-  }
-  if (typeof value === "string") {
-    const pattern = signed ? /^-?\d+$/ : /^\d+$/;
-    if (!pattern.test(value.trim())) throw new Error(`${label} must be a decimal string`);
-    return value.trim();
-  }
-  throw new Error(`${label} must be an integer, BigInt, or decimal string`);
-}
-
-export function normalizeBoundedUnsignedDecimal(value, label, max, typeName) {
-  const decimal = normalizeDecimal(value, label, { signed: false });
-  const normalized = BigInt(decimal);
-  if (normalized > max) {
-    throw new Error(`${label} is out of range for ${typeName}`);
-  }
-  return decimal;
-}
-
-export function normalizeBoundedUnsignedBigInt(value, label, max, typeName) {
-  return BigInt(normalizeBoundedUnsignedDecimal(value, label, max, typeName));
-}
-
-export function normalizeFloat(value, label) {
-  if (typeof value !== "number") {
-    throw new Error(`${label} must be a number`);
-  }
-  return value;
-}
-
-export function normalizeInteger(value, label, min, max) {
-  if (!Number.isInteger(value) || value < min || value > max) {
-    throw new Error(`${label} must be an integer in ${min}..${max}`);
-  }
-  return value;
-}
 
 export function normalizeArray(value, label) {
   if (!Array.isArray(value)) {
@@ -93,7 +42,7 @@ export function normalizeStructure(value, fields, label) {
     } else if (field.subobject === true) {
       normalized[field.name] = normalizeStructure(
         value,
-        requireStructureFields(field.type, `${label}.${field.name}`),
+        field.type.fields,
         `${label}.${field.name}`,
       );
     } else if (field.type?.interfaceTag === INTERFACE_TAG.OPTION) {
@@ -106,7 +55,7 @@ export function normalizeStructure(value, fields, label) {
 }
 
 export function flattenStructureSubobjects(type, value) {
-  const fields = requireStructureFields(type, "result");
+  const fields = type.fields;
   const flattened = {};
   for (const field of fields) {
     if (field.subobject === true) {
@@ -129,9 +78,9 @@ export function normalizeTaggedUnion(value, type, label) {
   if (typeof value.kind !== "string") {
     throw new Error(`${label} must specify tagged-union kind`);
   }
-  const constructors = requireTaggedUnionConstructors(type, label);
+  const constructors = type.constructors;
   const index = constructors.findIndex(
-    (ctor) => (ctor.jsName ?? ctor.name) === value.kind,
+    (ctor) => ctor.jsName === value.kind,
   );
   if (index < 0) {
     throw new Error(`${label} has unknown tagged-union constructor ${value.kind}`);
@@ -141,6 +90,22 @@ export function normalizeTaggedUnion(value, type, label) {
     throw new Error(`${label}.${match.ctor.jsName} is missing value`);
   }
   return { ...match, payload: value.value };
+}
+
+// Build the canonical shape from a tagged payload or custom-inductive field record.
+// Constructor names and fields come from admitted descriptors.
+export function constructorValue(type, ctor, payload) {
+  const kind = ctor.jsName;
+  if (type.interfaceTag === INTERFACE_TAG.TAGGED_UNION) {
+    return { kind, value: payload };
+  }
+  if (ctor.fields.length === 0) {
+    return { kind };
+  }
+  if (ctor.fields.length === 1) {
+    return { kind, value: payload[ctor.fields[0].name] };
+  }
+  return { kind, fields: payload };
 }
 
 export function normalizeCustomInductive(value, type, label) {
@@ -187,11 +152,11 @@ export function normalizeCustomInductive(value, type, label) {
 
 function customInductiveNormalizationPlan(type) {
   const cached = customInductiveNormalizationPlanCache.get(type);
-  if (cached?.constructors === type?.constructors) {
+  if (cached !== undefined) {
     return cached;
   }
 
-  const constructors = requireCustomInductiveConstructors(type, "custom inductive");
+  const constructors = type.constructors;
   const constructorPlans = constructors.map((ctor, index) => {
     const fieldCount = ctor.fields.length;
     return {
@@ -209,12 +174,11 @@ function customInductiveNormalizationPlan(type) {
   const constructorsByName = new Map();
   for (const constructorPlan of constructorPlans) {
     constructorsByName.set(
-      constructorPlan.ctor.jsName ?? constructorPlan.ctor.name,
+      constructorPlan.ctor.jsName,
       constructorPlan,
     );
   }
   const plan = {
-    constructors,
     constructorsByName,
     expectedShapes: constructorPlans.map(({ expectedShape }) => expectedShape).join(" | "),
   };
@@ -222,13 +186,27 @@ function customInductiveNormalizationPlan(type) {
   return plan;
 }
 
+function customInductiveShape(ctor) {
+  // Constructor metadata was validated at manifest admission.
+  const kind = JSON.stringify(ctor.jsName);
+  const fields = ctor.fields;
+  if (fields.length === 0) {
+    return `{ kind: ${kind} }`;
+  }
+  if (fields.length === 1) {
+    return `{ kind: ${kind}, value }`;
+  }
+  return `{ kind: ${kind}, fields: { ${fields.map((field) => field.name).join(", ")} } }`;
+}
+
+// Enum helpers consume admitted descriptors and check only per-call values.
 export function normalizeEnum(value, type, label) {
-  const constructors = type?.constructors ?? [];
   if (typeof value !== "string") {
     throw new Error(`${label} must be an enum constructor name`);
   }
+  const constructors = type.constructors;
   const index = constructors.findIndex(
-    (ctor) => (ctor.jsName ?? ctor.name) === value,
+    (ctor) => ctor.jsName === value,
   );
   if (index < 0) {
     throw new Error(`${label} has unknown enum constructor ${value}`);
@@ -236,23 +214,34 @@ export function normalizeEnum(value, type, label) {
   return index;
 }
 
-export function enumValue(type, index) {
-  const ctor = type?.constructors?.[index];
-  if (ctor === undefined) {
-    throw new Error(`result enum index ${index} is out of range`);
-  }
-  return ctor.jsName ?? ctor.name ?? String(index);
+// Descriptors reaching conversion have been validated and frozen at admission.
+// Constructor indices come from live Lean values and still need a bounds check.
+export function taggedUnionConstructorAt(type, index, label) {
+  return constructorAt(type, index, label, "tagged-union");
 }
 
-export function requireByteArrayBytes(values) {
-  if (!(values instanceof Uint8Array)) {
-    throw new Error("byte array values must be a Uint8Array");
+export function customInductiveConstructorAt(type, index, label) {
+  return constructorAt(type, index, label, "custom inductive");
+}
+
+function constructorAt(type, index, label, kindLabel) {
+  const constructors = type.constructors;
+  if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
+    throw new Error(`${label} ${kindLabel} constructor index is out of range`);
   }
-  return values;
+  return constructors[index];
+}
+
+export function enumValue(type, index) {
+  const constructors = type.constructors;
+  if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
+    throw new Error(`result enum index ${index} is out of range`);
+  }
+  return constructors[index].jsName;
 }
 
 function flattenedSubobjectFieldsPresent(value, type) {
-  for (const field of requireStructureFields(type, "subobject")) {
+  for (const field of type.fields) {
     if (field.subobject === true) {
       if (flattenedSubobjectFieldsPresent(value, field.type)) return true;
     } else if (hasOwn(value, field.name)) {

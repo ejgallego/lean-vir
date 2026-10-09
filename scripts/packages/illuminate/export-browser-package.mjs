@@ -19,7 +19,6 @@ import {
   gitIdentity,
   parseProducerArguments,
   readMatchingWorkloadPackage,
-  requireToolchain,
   requireFreshOutput,
   writeChecksums,
 } from "../vir-client-package-lib.mjs";
@@ -71,16 +70,6 @@ async function main() {
       source: sources.illuminate,
       label: "Illuminate",
     });
-  const toolchain = await requireToolchain(
-    producer,
-    "VIR",
-    "leanprover/lean4:v4.33.0",
-  );
-  await requireToolchain(
-    client,
-    "Illuminate",
-    "leanprover/lean4:v4.33.0",
-  );
 
   let workspace = null;
   try {
@@ -94,6 +83,7 @@ async function main() {
       producer,
       dirname(output),
     );
+    const toolchain = sourceView.toolchain;
     workspace = sourceView.workspace;
     runSync("lake", ["build", `+${rootModule}`], {
       cwd: sourceView.sourceView,
@@ -169,6 +159,7 @@ async function main() {
       runtime: {
         profile: "client-native",
         leanToolchain: toolchain,
+        clientLeanToolchain: sourceView.clientToolchain,
         wasiSdk: runtimeBuild.wasiSdk,
         module: "lean-vir/js/vir-runtime.js",
         wasm: "lean-vir/wasm/vir-upstream.wasm",

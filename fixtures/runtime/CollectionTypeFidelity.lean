@@ -26,6 +26,21 @@ def sameElement {α : Type} (value : Js α) (index : Js Float) : RuntimeM (Js α
 def sameJSL {α : Type} (value : JSL α) (index : Js Float) : RuntimeM (JSL α) :=
   sameElement value index
 
+def mapElement {α β : Type} (array : Js.Array α)
+    (callback : Js.Function3 (Js α) (Js Float) (Js.Array α) (Js β)) : RuntimeM (Js.Array β) :=
+  Js.Array.map array callback
+
+-- A unary JavaScript function is an exact native map callback too: JavaScript
+-- supplies index/source; the native function and its arguments behavior are unchanged.
+def mapUnaryElement {α β : Type} (array : Js.Array α)
+    (callback : Js.Function1 (Js α) (Js β)) : RuntimeM (Js.Array β) :=
+  Js.Array.map array callback
+
+def mapWithIndexedCallback {α β : Type} (array : Js.Array α)
+    (callback : Js α → Js Float → Js.Array α → RuntimeM (Js β)) : RuntimeM (Js.Array β) := do
+  let callback ← Js.Function.ofLean3 callback
+  Js.Array.map array callback
+
 def sameNodeListElement {α : Type} (list : Js.NodeList (Js α)) : RuntimeM (Js.Array α) :=
   Js.NodeList.toArray list
 
@@ -59,23 +74,23 @@ example {α : Type} (list : Js.NodeList α) : True := by
     have unwrapped : RuntimeM (Js.Array α) := Js.NodeList.toArray list
   trivial
 
-def stateValue {α : Type} (tuple : Js (StateTuple (Js α))) : RuntimeM (Js α) :=
-  StateTuple.value tuple
+def stateValue {α : Type} (tuple : Js (StateTuple α)) : RuntimeM (Js α) :=
+  Js.Tuple2.first tuple
 
-def stateSetter {α : Type} (tuple : Js (StateTuple (Js α))) :
-    RuntimeM (Js (StateSetter (Js α))) :=
-  StateTuple.setter tuple
+def stateSetter {α : Type} (tuple : Js (StateTuple α)) :
+    RuntimeM (Js (StateSetter α)) :=
+  Js.Tuple2.second tuple
 
 def reducerValue {state action : Type} (tuple : Js (ReducerTuple state action)) :
     RuntimeM (Js state) :=
-  ReducerTuple.value tuple
+  Js.Tuple2.first tuple
 
 def reducerDispatch {state action : Type} (tuple : Js (ReducerTuple state action)) :
     RuntimeM (Js (ReducerDispatch state action)) :=
-  ReducerTuple.dispatch tuple
+  Js.Tuple2.second tuple
 
 def sameCallbackInput {α : Type} (value : JSL α) : RuntimeM Unit := do
-  let callback ← Callback.ofUnary fun (_ : JSL α) => pure ()
+  let callback ← Js.Function.ofLeanVoid fun (_ : JSL α) => pure ()
   Js.Function.callVoid callback value
 
 -- Unary callbacks preserve their argument type independently of collection
@@ -83,7 +98,7 @@ def sameCallbackInput {α : Type} (value : JSL α) : RuntimeM Unit := do
 example (value : JSL String) : True := by
   fail_if_success
     have wrongCallbackInput : RuntimeM Unit := do
-      let callback ← Callback.ofUnary fun (_ : JSL Nat) => pure ()
+      let callback ← Js.Function.ofLeanVoid fun (_ : JSL Nat) => pure ()
       Js.Function.callVoid callback value
   trivial
 
@@ -97,6 +112,21 @@ example {α β : Type} (array : Js.Array α) (value : Js β) : True := by
     have wrong : RuntimeM (Js Float) := Js.Array.push array value
   trivial
 
+example {α β γ : Type} (array : Js.Array α)
+    (callback : Js.Function3 (Js α) (Js Float) (Js.Array α) (Js β)) : True := by
+  fail_if_success
+    have wrongResult : RuntimeM (Js.Array γ) := Js.Array.map array callback
+  fail_if_success
+    have wrongInput : RuntimeM (Js.Array β) :=
+      Js.Array.map array (show Js.Function3 (Js γ) (Js Float) (Js.Array γ) (Js β) from callback)
+  fail_if_success
+    have wrongIndex : RuntimeM (Js.Array β) :=
+      Js.Array.map array (show Js.Function3 (Js α) (Js String) (Js.Array α) (Js β) from callback)
+  fail_if_success
+    have wrongSource : RuntimeM (Js.Array β) :=
+      Js.Array.map array (show Js.Function3 (Js α) (Js Float) (Js.Array γ) (Js β) from callback)
+  trivial
+
 example (array : Js.Array (LeanRef.Handle String)) (index : Js Float) : True := by
   fail_if_success
     have forged : RuntimeM (JSL Nat) := Js.Array.get array index
@@ -107,13 +137,13 @@ example (array : Js.Array Nat) (value : Nat) : True := by
     have rawLeanValue : RuntimeM (Js Float) := Js.Array.push array value
   trivial
 
-example {α β : Type} (tuple : Js (StateTuple (Js α))) : True := by
+example {α β : Type} (tuple : Js (StateTuple α)) : True := by
   fail_if_success
-    have erased : Js (StateTuple (Js β)) := tuple
+    have erased : Js (StateTuple β) := tuple
   fail_if_success
-    have wrongValue : RuntimeM (Js β) := StateTuple.value tuple
+    have wrongValue : RuntimeM (Js β) := Js.Tuple2.first tuple
   fail_if_success
-    have wrongSetter : RuntimeM (Js (StateSetter (Js β))) := StateTuple.setter tuple
+    have wrongSetter : RuntimeM (Js (StateSetter β)) := Js.Tuple2.second tuple
   trivial
 
 example {state action other : Type} (tuple : Js (ReducerTuple state action)) : True := by
@@ -122,12 +152,12 @@ example {state action other : Type} (tuple : Js (ReducerTuple state action)) : T
   fail_if_success
     have erasedAction : Js (ReducerTuple state other) := tuple
   fail_if_success
-    have wrongValue : RuntimeM (Js other) := ReducerTuple.value tuple
+    have wrongValue : RuntimeM (Js other) := Js.Tuple2.first tuple
   fail_if_success
-    have wrongDispatch : RuntimeM (Js (ReducerDispatch state other)) := ReducerTuple.dispatch tuple
+    have wrongDispatch : RuntimeM (Js (ReducerDispatch state other)) := Js.Tuple2.second tuple
   trivial
 
-example {α β : Type} (tuple : Js.Tuple2 (Js α) (Js β)) : True := by
+example {α β : Type} (tuple : Js.Tuple2 α β) : True := by
   fail_if_success
     have wrongFirst : RuntimeM (Js β) := Js.Tuple2.first tuple
   fail_if_success

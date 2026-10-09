@@ -9,9 +9,9 @@ module
 public import Lean.LabelAttribute
 import Lean.Compiler.Options
 import Lean.OriginalConstKind
-import Vir.ExportValidation
-import Vir.Interface.Classify.Signature
-import Vir.InterfaceValidation
+import Vir.Compiler.ExportValidation
+import Vir.Compiler.Interface.Classify.Signature
+import Vir.Compiler.InterfaceValidation
 
 public section
 
@@ -130,8 +130,9 @@ Startup hooks are also JavaScript-callable exports and carry `startup: true` in
 the package manifest. The browser host invokes them with
 `vir.runStartupEntries()`. After Lean compiles the declaration, the attribute
 performs the same entrypoint and closure checks as `@[vir_export]` and requires
-the hook to take no JavaScript arguments and return `Unit`, possibly through a
-supported effect such as `DomM`. Package generation remains the final check for
+the hook to take no JavaScript arguments and return `Unit`, possibly through
+an accepted effect such as `RuntimeM`. `DomM` and `ReactM` are also accepted for
+experimental integrations. Package generation remains the final check for
 opaque imported dependencies and interface layout. Signature errors distinguish
 unexpected parameters from unsupported result or effect forms.
 -/

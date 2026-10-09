@@ -22,8 +22,8 @@ const temp = await mkdtemp(join(tmpdir(), "vir-rpc-browser-"));
 await withCleanup(async () => {
   const packagePath = join(temp, "rpc.irpkg");
   const generator = prepareVirIrpkgSync({
-    lakeTargets: ["VirInfoview", "+tutorials.RpcReferenceWidget", "+JsonValueCodec",
-      "+Vir.Infoview.JsonRpc.Server"],
+    lakeTargets: ["VirInfoview"],
+    modules: ["tutorials.RpcReferenceWidget", "JsonValueCodec", "Vir.Infoview.JsonRpc.Server"],
   });
   assert.equal(
     generator.ok,
@@ -35,6 +35,7 @@ await withCleanup(async () => {
     [
       packagePath,
       join(temp, "rpc.report.md"),
+      ...generator.setupArgs,
       "--target-module",
       "tutorials.RpcReferenceWidget",
       ...[
@@ -46,7 +47,7 @@ await withCleanup(async () => {
         "render",
       ].map((n) => `RpcReferenceWidget.${n}`),
       "--target-module", "JsonValueCodec",
-      ...["copy", "sampleWire", "roundtripFoo", "integerWire", "leanHandle", "call",
+      ...["copy", "sampleWire", "nestedWire", "roundtripFoo", "integerWire", "leanHandle", "call",
         "resultSummary"].map((n) => `JsonValueCodec.${n}`),
     ],
     { cwd: root, env: generator.env, encoding: "utf8", timeout: 120000 },

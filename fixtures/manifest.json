@@ -288,6 +288,13 @@
         "Vir.Fixtures.ExprPrinter.appExpr",
         "Vir.Fixtures.ExprPrinter.sortParamExpr",
         "Vir.Fixtures.ExprPrinter.fvarExpr",
+        "Vir.Fixtures.ExprPrinter.anonymousNameExpr",
+        "Vir.Fixtures.ExprPrinter.unicodeNameExpr",
+        "Vir.Fixtures.ExprPrinter.numeralNameExpr",
+        "Vir.Fixtures.ExprPrinter.largeNumeralNameExpr",
+        "Vir.Fixtures.ExprPrinter.dottedStringNameExpr",
+        "Vir.Fixtures.ExprPrinter.emptyComponentNameExpr",
+        "Vir.Fixtures.ExprPrinter.escapedNameExpr",
         "Vir.Fixtures.ExprPrinter.mvarExpr",
         "Vir.Fixtures.ExprPrinter.lambdaExpr",
         "Vir.Fixtures.ExprPrinter.forallExpr",
@@ -675,6 +682,13 @@
       "id": "boundary-io-ref-modify",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.ioRefModifyBoundaryScore",
+      "result": { "type": "Nat" },
+      "unsafe": true
+    },
+    {
+      "id": "boundary-io-ref-swap",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.ioRefSwapBoundaryScore",
       "result": { "type": "Nat" },
       "unsafe": true
     },

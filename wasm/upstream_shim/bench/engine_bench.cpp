@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 
 typedef struct lean_object lean_object;
@@ -30,21 +31,7 @@ extern "C" lean_object * vir_js_call_objects(uint32_t slot, lean_object ** argv,
     (void) argv;
     (void) argc;
     fprintf(stderr, "unexpected JavaScript host import call in engine benchmark: slot %u\n", slot);
-    return nullptr;
-}
-
-extern "C" uint32_t vir_resource_root(__externref_t value) {
-    (void) value;
-    return 0;
-}
-
-extern "C" __externref_t vir_resource_get(uint32_t root_id) {
-    (void) root_id;
-    return __builtin_wasm_ref_null_extern();
-}
-
-extern "C" void vir_resource_release(uint32_t root_id) {
-    (void) root_id;
+    abort();
 }
 
 #include "vir_fixtures_basic_package.inc"
@@ -52,9 +39,6 @@ extern "C" void vir_resource_release(uint32_t root_id) {
 static bool g_benchmark_failed = false;
 static uint32_t g_fib_slot = 0;
 static uint32_t g_sort_slot = 0;
-// These indices follow the export order of the embedded fixtures-basic package.
-static constexpr uint32_t fib_export_index = 0;
-static constexpr uint32_t sort_export_index = 2;
 
 static uint64_t monotonic_nanos() {
     struct timespec ts;
@@ -192,15 +176,15 @@ static void bench_sort() {
 }
 
 int main() {
-    uint32_t loaded = 0;
+    bool loaded = false;
     if (vir_begin_ir_package_set() != 0 &&
         vir_append_ir_package(
             reinterpret_cast<uint8_t const *>(vir_demo_ir_package),
             static_cast<uint32_t>(vir_demo_ir_package_len)) != 0 &&
         vir_prepare_ir_package_set() != 0) {
-        loaded = vir_finish_ir_package_set();
+        loaded = vir_finish_ir_package_set() != 0;
     }
-    if (loaded == 0) {
+    if (!loaded) {
         uint32_t len = vir_last_package_error_size();
         fprintf(stderr, "IR package load failed");
         if (len != 0) {

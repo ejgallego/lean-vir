@@ -1,5 +1,9 @@
 # Binding reference, shipped inventory, and author actions
 
+This is an implementation inventory, not a promise of official support for every
+listed binding. See [support scope](SUPPORT.md); DOM/React/widget bindings and
+broad generated JS conveniences remain experimental even when shipped and tested.
+
 The generated binding reference is the primary human report for VIR's
 pre-release library surface. One HTML document presents three projections of the
 same machine data:
@@ -43,7 +47,7 @@ This check makes six mechanically enforceable claims:
 
 1. Every row comes from elaborated declarations and compiled IR metadata, not
    source-text matching.
-2. Lean revalidates every complete signature against `Vir.HostValidation`.
+2. Lean revalidates every complete signature against `Vir.Compiler.HostValidation`.
    Ordinary `@[vir_js]` declarations may use only `Unit`, JavaScript resources,
    object handles, and resource-shaped callbacks at the boundary.
 3. Conversions between JavaScript values and ordinary Lean values must be
@@ -210,7 +214,7 @@ Unreviewed translations and unresolved canonical-policy failures remain author
 actions. Explicitly unsupported operations remain roadmap entries, while
 unselected upstream operations may remain visible without failing CI.
 
-The abrupt migration covers Browser, JavaScript core, React, Common, Infoview,
+The abrupt migration covers Browser, JavaScript core, React, Infoview,
 and ProofWidgets. Further slices should replace reviewed protocol operations
 with direct TypeScript lowering where an upstream declaration exists, without
 changing their host target or public faithful type unnecessarily.
@@ -228,20 +232,19 @@ Each Lean source group that owns shipped bindings has a companion
 `Vir/bindings.schema.json`:
 
 - `Vir/Browser.bindings.json`
-- `Vir/Common.bindings.json`
 - `Vir/Js.bindings.json`
 - `Vir/React.bindings.json`
-- `Vir/Infoview/Surface.bindings.json`
+- `Vir/Infoview/Panel.bindings.json`
+- `Vir/Infoview/Client.bindings.json`
 
 Selected upstream declarations may be pinned as small provenance-bearing
 extracts when installing the full package is unnecessary:
 
 - `Vir/Infoview/RpcSession.contract.d.ts`, from
   `@leanprover/infoview-api`
+- `Vir/Infoview/Editor.contract.d.ts`, selected editor instance/static members,
+  independently checked against the pinned infoview packages by TypeScript tests.
 
-Local host protocols use declaration syntax too:
-
-- `Vir/Infoview/Surface.contract.d.ts`
 
 Every local protocol operation names the exact declaration member it
 implements. The generator rejects missing members, while the explorer verifies

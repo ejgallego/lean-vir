@@ -7,9 +7,8 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.React.Core
-public import Vir.React.Builders
 
 /-!
-Convenience import for native React bindings and optional Lean HTML builders.
-Use `Vir.React.Core` when only native calls and hook/state compositions are needed.
+Convenience import for native React bindings and hook/state compositions.
+Import `Vir.ProofWidgets.Jsx` separately for native JSX notation.
 -/

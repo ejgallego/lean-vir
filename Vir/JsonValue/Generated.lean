@@ -19,7 +19,7 @@ namespace Internal
 /--
 Generated binding for reviewed VIR protocol `json-value.check`.
 
-Explicitly validates the complete ordinary-value graph before copying it into Lean; rejects unsupported shapes, non-safe-integer numbers and reserved reference objects.
+Explicitly validates the complete ordinary-value graph and expanded-tree budget before copying it into Lean; rejects unsupported shapes, non-safe-integer numbers and SDK-owned Lean handles.
 
 Binding contract: `generation.protocolOperations`.
 

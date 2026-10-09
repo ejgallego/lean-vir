@@ -10,9 +10,30 @@ import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collec
 import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindings.js";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { VirHostState } from "../../web/src/runtime/host-state.js";
+import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 
 const objects = createJsCollectionHostBindings();
 const requireString = createJsValueHostBindings()["js.string.fromAny"];
+
+test("callback formal parameters ignore extras and receive undefined when absent", () => {
+  const runtime = Object.create(VirRuntime.prototype);
+  const lowered = [];
+  Object.assign(runtime, {
+    exports: { vir_closure_apply_objects() { return 1; }, vir_obj_dec() {} },
+    makeObjectValue(_type, value) { lowered.push(value); return lowered.length; },
+    allocByteLength: () => 4,
+    writePointerArray(_ptr, args) { assert.equal(args.length, 1); },
+    freeBytes() {},
+    releaseOwnedObjects() {},
+  });
+  const type = { effect: "runtime", result: { interfaceTag: INTERFACE_TAG.UNIT }, args: [{ name: "value", type: { interfaceTag: INTERFACE_TAG.RESOURCE } }] };
+  const value = {};
+  const args = [value];
+  Object.defineProperty(args, 1, { get() { assert.fail("unused argument must not be lowered"); } });
+  runtime.callClosure({ runtime, object: 1, live: true, callType: type }, args);
+  runtime.callClosure({ runtime, object: 1, live: true, callType: type }, []);
+  assert.deepEqual(lowered, [value, undefined]);
+});
 
 test("dynamic properties preserve exact values, missing undefined and getter behavior", () => {
   for (const value of [{}, [], () => {}, "text", 0, 1n, false, null, undefined]) {
@@ -29,6 +50,26 @@ test("dynamic properties preserve exact values, missing undefined and getter beh
   const failure = new Error("upstream getter failed");
   assert.throws(() => objects["js.object.get"]({ get field() { throw failure; } }, "field"),
     (error) => error === failure);
+});
+
+test("explicit property assignment preserves setters and prototype semantics", () => {
+  const object = objects["js.object.empty"]();
+  const prototype = {};
+  objects["js.object.set"](object, "__proto__", prototype);
+  assert.equal(Object.getPrototypeOf(object), prototype);
+  assert.equal(Object.hasOwn(object, "__proto__"), false);
+  const value = {};
+  const calls = [];
+  Object.defineProperty(prototype, "field", {
+    set(next) { calls.push([this, next]); },
+  });
+  objects["js.object.set"](object, "field", value);
+  assert.deepEqual(calls, [[object, value]]);
+  assert.equal(Object.hasOwn(object, "field"), false);
+  const failure = new Error("setter failed");
+  Object.defineProperty(object, "reject", { set() { throw failure; } });
+  assert.throws(() => objects["js.object.set"](object, "reject", value),
+    error => error === failure);
 });
 
 test("closed String narrowing returns the exact primitive and rejects every wrong kind", () => {
@@ -70,7 +111,7 @@ test("callback bridge preserves the String check error as a Promise rejection", 
     Object.assign(runtime, {
       hostState,
       exports: {
-        vir_closure_call_objects() {
+        vir_closure_apply_objects() {
           try {
             requireString(undefined);
             assert.fail("a missing message must not pass the String check");
@@ -83,7 +124,8 @@ test("callback bridge preserves the String check error as a Promise rejection", 
         },
       },
     });
-    const project = () => runtime.callClosureObjects(1, null, []);
+    const project = () => runtime.callClosure({ runtime, object: 1, live: true,
+      callType: { args: [], effect: "pure", result: { interfaceTag: INTERFACE_TAG.UNIT } } }, []);
     await assert.rejects(objects["js.promise.thenValue"](Promise.resolve({}), project),
       (error) => error === hostError && error instanceof TypeError);
     assert.equal(hostState.takeCallError(), null);

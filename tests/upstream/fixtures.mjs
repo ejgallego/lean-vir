@@ -24,10 +24,10 @@ export async function smokeFixtureManifest(context) {
     } catch (error) {
       throw new Error(`${fixture.id}: fixture evaluation failed`, { cause: error });
     }
-    if (!/^\d+$/.test(value)) {
+    if (typeof value !== "bigint" || value < 0n) {
       throw new Error(`${fixture.id}: expected Nat result, got ${value}`);
     }
-    if (expectation.wasm !== null && value !== expectation.wasm) {
+    if (expectation.wasm !== null && value !== BigInt(expectation.wasm)) {
       throw new Error(`${fixture.id}: expected Wasm Nat ${expectation.wasm}, got ${value}`);
     }
   }

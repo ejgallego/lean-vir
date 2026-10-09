@@ -116,9 +116,9 @@ const byTarget = new Map(report.bindings.map((entry) => [entry.target, entry]));
 assert.equal(byTarget.get("browser.document.getTitle")?.declarations[0]?.boundary, "hostResource");
 assert.match(byTarget.get("browser.document.getTitle")?.declarations[0]?.type ?? "", /Lean\.Vir\.Js String/u);
 assert.equal(byTarget.get("js.string")?.declarations[0]?.boundary, "explicitConversion");
-assert.equal(byTarget.get("infoview.command.insertText")?.status, "provided");
+assert.equal(byTarget.get("infoview.editorApi.insertText")?.status, "provided");
 assert.equal(
-  byTarget.get("infoview.command.insertText")?.declarations[0]?.boundary,
+  byTarget.get("infoview.editorApi.insertText")?.declarations[0]?.boundary,
   "hostResource",
 );
 assert.equal(byTarget.get("react.root.create")?.status, "provided");

@@ -1,12 +1,18 @@
-# Packages
+# Package tooling reference
 
-VIR packages selected Lean declarations for its browser runtime. Downstream
-projects use Lake's module `:vir` facet to build a package set and its package
-`:virSdk` facet to install the matching JavaScript/Wasm SDK. The repository's
-npm commands build focused, single-member packages for local development.
-This is a browser-program workflow, not a general Lean-to-Wasm compiler.
+Applications follow [library-owned setup](EMBEDDED_RESOURCES.md). This page
+documents lower-level tools retained for VIR development and existing
+integrations, not an alternative first-release application workflow.
+Program generation and loading are part of the [support scope](../SUPPORT.md);
+the DOM examples below use experimental bindings.
 
-For application calls, follow [Call Lean from JavaScript](CALL_LEAN_FROM_JS.md).
+The module `:vir` facet writes compiler package files; `:virSdk` installs the
+JavaScript/Wasm distribution used by older hosts. Repository npm commands select
+declarations for demos and tests. Applications do not manually assemble these
+outputs or run the commands below.
+
+[Direct runtime calls](CALL_LEAN_FROM_JS.md) describes the repository development
+runner, not normal application setup.
 [Generator internals](../reference/GENERATE_PACKAGE.md) owns compiled/live input selection;
 [the format reference](../reference/IRPKG_FORMAT.md) owns binary and manifest schemas.
 
@@ -141,6 +147,11 @@ See the [descriptor schema](../reference/IRPKG_FORMAT.md#package-set-descriptor)
 ordering, integrity and duplicate-identity rules. Browsers load neither
 `.olean` nor Lean's raw `.ir` files.
 
+The supported compatibility tuple is manifest 9, package format 11 and runtime
+ABI 4. Generate the package set and install the JavaScript/Wasm SDK from the
+same `lean_vir` revision. After changing that revision or the generator,
+regenerate the `.irpkg` members and descriptor and reinstall the matching SDK.
+
 An executable or renderer consuming this output should declare the facet as a
 build dependency:
 
@@ -156,16 +167,31 @@ The facet tracks Lake's transitive import artifacts, so imported implementation
 changes regenerate the set even when the root's public interface and `.olean`
 stay unchanged. The selected `VIR_NATIVE_EXTERN_MANIFEST` path and contents are
 also inputs. A missing root, report or listed shard, or a member whose length
-or SHA-256 differs from the descriptor, invalidates the cached target. Size
-checks use filesystem metadata; one portable Node crypto invocation hashes all
-members. These checks cover the descriptor cache; they do not establish
-cache-only reuse of Lean's input artifacts.
+or SHA-256 differs from the descriptor, is repaired from the shared compiled
+program result. Verification and hashing run in the native Lean tool; this path
+does not require Node.
 
-The descriptor is one Lake target. Invalidating it regenerates every reached
-member; unchanged members are not independently cached. Before generation the
-facet removes the previous descriptor, root and root-specific shard directory.
+Compiled inputs use Lake's resolved artifact paths, including cache-only hits
+with no conventional `.olean` or `.ir` files restored under `.lake/build`.
+The facet carries root and transitive private/IR artifacts through a local Lean
+setup file; later owning-module loads use the same mapping. No cache restoration
+setting is required. The setup file is build-local input metadata, not part of
+the published package set; output locations and descriptor ownership are unchanged.
+
+The marked program is one cached Lake result, shared with `virResourcePack`.
+Its key includes full implementation/location traces, compiler/producer identity,
+root selection and native profile. A program edit regenerates every reached
+member; unchanged members are not independently cached. The loose-file adapter
+preserves the existing output names and installs the descriptor last. Repairing
+loose outputs does not rerun IR analysis. This is build-directory publication,
+not a transactional deployment mechanism for concurrent readers.
 Non-module inputs fail explicitly and invalidate stale outputs, including when
 replacing a previously successful module; there is no source fallback.
+
+The internal result reuses the validated resource-pack container and its bounded
+inventory (4096 files, 512 MiB of payload). It is not a public resource recipe:
+roles/support files and runtime acquisition do not affect its identity. Reports
+and setup maps remain build-local and are not embedded in public resources.
 
 Module identities and ordinal shard names avoid checkout-local paths in the
 package set. Manifests omit wall-clock timestamps, so identical
@@ -173,6 +199,13 @@ source/toolchain/profile inputs can produce identical bytes across build
 directories. The diagnostic report retains its generation timestamp.
 
 ## Install the browser SDK
+
+The SDK supplies the [direct runtime API](JS_API.md#entry-points-and-distribution)
+for custom hosts and existing integrations. Its archive includes the `js/`
+module tree and release/debug Wasm files. The runtime resource pack acquired by
+the [application workflow](EMBEDDED_RESOURCES.md) instead contains a bundled
+`createProgram` loader, its selected release Wasm and license notices. That
+resource release does not provide an SDK archive for this command.
 
 ```bash
 lake build :virSdk
@@ -186,6 +219,11 @@ revision, select the exact dependency commit:
 VIR_SDK_COMMIT=<lean-vir-revision> lake build :virSdk
 ```
 
+Commit selection requires an existing, unexpired `lean-vir-sdk` Actions artifact
+for that exact commit. It does not create an archive or fall back to a different
+revision. If the matching release or artifact is unavailable, use a matching
+archive supplied by the maintainer through `VIR_SDK_ARCHIVE`.
+
 The installer verifies the selected commit, SDK version, runtime ABI, non-empty
 source commit and every manifest checksum. Actions artifact downloads require
 `GITHUB_TOKEN` or authenticated `gh`. Set
@@ -194,8 +232,10 @@ network access. Lake tracks the selected source and local archive contents;
 cached SDK manifests recheck every payload checksum and reinstall missing or
 modified payloads from the configured source.
 
-Publish the SDK, descriptor and every referenced `.irpkg`, preserving the
-descriptor's relative layout. Member URLs resolve relative to its served URL:
+Publish the SDK's complete `js/` tree, the selected Wasm, descriptor and every
+referenced `.irpkg`, preserving their relative layout. Keep the SDK's license
+notices with the deployment. Member URLs resolve relative to the descriptor's
+served URL:
 
 ```js
 import { createVirRuntime } from "./vir/sdk/js/vir-runtime.js";
@@ -207,11 +247,15 @@ const vir = await createVirRuntime({
 vir.runStartupEntries();
 ```
 
-Startup hooks run in manifest order and are recorded only after success. A
-retry skips completed hooks and resumes at the failed hook. Successful package
-replacement resets that state; failed replacement preserves it. The
-[replacement API](JS_API.md#replacing-a-package-set) owns candidate failure,
-old-generation invalidation and cleanup-failure behavior.
+Startup runs once per runtime, invoking hooks in manifest order. After success,
+repeated calls do nothing. Failure stops the sequence and throws the error;
+later startup calls report failure without retrying the failed hook or running
+remaining hooks. Effects already performed are not rolled back. Enable the
+application only after startup succeeds. Synchronous host reentry does not invoke hooks
+recursively. Ordinary exported calls can still return recoverable errors;
+a fatal host failure or Wasm trap retires the runtime. When selecting another
+package generation, create a new runtime and dispose the previous runtime when
+its callbacks and resources should become invalid.
 
 The [SlidesCanvas example](../../examples/SlidesCanvas.lean) creates its DOM and
 canvas and schedules animation frames entirely from Lean:
@@ -230,35 +274,7 @@ for `examples/MyApp.lean`. Sources must begin with `module`; expose intended
 callable definitions with `public def` or `public section`. Independent
 downstream projects use the Lake workflow above.
 
-For the bundled quickstart, run `npm run quickstart`, then
-`npm run dev -- --port 5173` and open the printed URL. The general CLI is:
-
-```bash
-npm run generate:irpkg -- <Module.Name> [package.irpkg] [root ...]
-```
-
-Select explicit exports, or omit roots to export the module's public definitions:
-
-```bash
-npm run generate:irpkg -- Quickstart web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet
-npm run generate:irpkg -- Fib build/generated/local.irpkg
-```
-
-The command builds the module and generator with Lake, then loads compiled IR.
-Source commands such as `#eval` run during compilation, never again during
-packaging. Reached opaque imports are materialized through their owning modules
-and folded into the single output package; the Lake facet uses the same closure
-logic but emits members by owner.
-
-Use the actual module identity, not a source path or Lake target/facet syntax.
-Without an output path, `App.Widget` writes `build/generated/Widget.irpkg` and
-`Widget.report.md`; quoted module names require an explicit path. A successful
-command prints format/toolchain metadata, declaration/export/host-import counts,
-targets and resolved roots. Its report also lists closure declarations, native
-externs, initializers and diagnostics. Unpackageable exports or unsupported
-interfaces exit nonzero and point to the report.
-
-## Configure package generation
+Use a configuration file to select the module and its exports:
 
 ```json
 {
@@ -274,6 +290,19 @@ interfaces exit nonzero and point to the report.
 npm run prepare:irpkg -- examples/fib.virpkg.json
 npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json
 ```
+
+For the retained explicit-root developer example, run `npm run prepare:irpkg -- examples/quickstart.virpkg.json`,
+then `npm run dev -- --port 5173` and open
+`http://127.0.0.1:5173/dev.html?package=local-quickstart.irpkg`.
+It uses the same Lean source as the [application tutorial](../../examples/tutorials/quickstart/README.md);
+it is not a second application setup path.
+
+The command builds the module and generator with Lake, then loads compiled IR.
+Source commands such as `#eval` run during compilation, never again during
+packaging. Reached opaque imports are materialized through their owning modules
+and folded into the single output package; the Lake facet uses the same closure
+logic but emits members by owner. The report lists closure declarations, native
+externs, initializers and diagnostics; unsupported interfaces exit nonzero.
 
 `roots` is the only selection setting. A nonempty array selects exactly those
 exports; omission or `[]` selects all public definitions of the module. An
@@ -320,13 +349,19 @@ complete module sets. Application code uses `irPackageSet` for either form.
 Deep links select a package and entry:
 
 ```text
-dev.html?package=local-quickstart.irpkg&entry=Quickstart.total
+dev.html?package=local-quickstart.irpkg&entry=QuickstartApp.Program.total
 ```
 
-`entry` accepts a manifest `id`, `jsName` or Lean declaration name. The Pages
+`entry` accepts a manifest `entry`, `id`, or `jsName` alias from the
+[shared call namespace](JS_API.md#calls-and-manifest). The Pages
 build's `prepare:pages` step generates URL-loadable samples in one generator
 session; [HARNESS.md](../HARNESS.md) owns site build/check commands. Generated
 packages, reports and `web/dist/` remain ignored local outputs.
+
+After a fatal Wasm failure, the runner disables Run and offers **Reload
+runtime**. Reload creates a fresh instance while preserving the selected entry
+and inputs; it does not execute the entry again. Ordinary input errors and
+recoverable Lean IO errors leave Run available for a corrected attempt.
 
 The [JS API](JS_API.md#calls-and-manifest) defines caller values, while
 [host bindings](../reference/HOST_BINDINGS.md) defines the narrower Lean-to-JavaScript

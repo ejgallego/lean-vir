@@ -7,114 +7,63 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.React.Generated
-import all Vir.React.Generated
 
 /-!
 Native React operations and small compositions over exact JavaScript values.
-Lean HTML/props authoring helpers live in `Vir.React.Builders`.
+Native JSX notation lives in `Vir.ProofWidgets.Jsx`.
 -/
 
 public section
 
 namespace Lean.Vir.React
 
-namespace StateSetter
+/-- React's initializer overload, with exact input, initializer and reducer.
+The identity-only definition keeps erased types out of the fixed-arity host ABI. -/
+@[inline] def Hooks.useReducerWithInit {state action input : Type}
+    (reducer : Lean.Vir.Js (Reducer state action)) (initial : Lean.Vir.Js input)
+    (init : Lean.Vir.Js.Function1 (Lean.Vir.Js input) (Lean.Vir.Js state)) :
+    ReactM (Lean.Vir.Js (ReducerTuple state action)) := by
+  have invoke := Hooks.Internal.useReducerWithInit
+  unfold Lean.Vir.Js.Function1 Lean.Vir.Js.Any Lean.Vir.Js at *
+  exact invoke reducer initial init
 
-def set
-    (setter : @& Lean.Vir.Js (StateSetter (Lean.Vir.Js α)))
-    (value : @& Lean.Vir.Js α) : Lean.Vir.RuntimeM Unit :=
-  Lean.Vir.Js.Function.callVoid setter value
+namespace ElementType
 
-end StateSetter
+/-- Views the exact native string as an element type, without a host call. -/
+@[inline] def tag (tag : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js ElementType) := by
+  unfold Lean.Vir.Js at *
+  exact pure tag
 
-namespace ReducerDispatch
+end ElementType
 
-def dispatch {state action : Type}
-    (dispatch : Lean.Vir.Js (ReducerDispatch state action))
-    (action : Lean.Vir.Js action) : Lean.Vir.RuntimeM Unit :=
-  Lean.Vir.Js.Function.callVoid dispatch action
+/-- Creates a native function component from a Lean render callback. -/
+def FunctionComponent.ofLean
+    (render : Lean.Vir.Js props → ReactM (Lean.Vir.Js Node)) :
+    Lean.Vir.RuntimeM (FunctionComponent props) :=
+  Lean.Vir.Js.Function.ofLean render
 
-end ReducerDispatch
+namespace Node
 
-namespace StateTuple
+/-- Views the exact native string as a text node, without a host call. -/
+@[inline] def text (value : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js Node) :=
+  pure (ofJs value)
 
-def value {α : Type}
-    (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js α) :=
-  Lean.Vir.Js.Tuple2.first result
+@[inline] private def componentProps {α : Type}
+    (props : Lean.Vir.Js α) : Lean.Vir.Js Props := by
+  unfold Lean.Vir.Js at *
+  exact props
 
-def setter {α : Type}
-    (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (StateSetter (Lean.Vir.Js α))) :=
-  Lean.Vir.Js.Tuple2.second result
+/--
+Builds an element from a native function component and its native props.
+The function and its matching native props are passed directly to React.
+-/
+def functionComponent [Shape α]
+    (component : @& FunctionComponent props)
+    (props : @& Lean.Vir.Js props)
+    (children : @& Lean.Vir.Js.Array α) :
+    ReactM (Lean.Vir.Js Node) :=
+  createElement (FunctionComponent.asElementType component) (componentProps props) children
 
-/-- Explicitly projects React's native `useState` result array into a Lean structure. -/
-def toState {α : Type}
-    (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
-    Lean.Vir.RuntimeM (State (Lean.Vir.Js α)) := do
-  let value ← StateTuple.value result
-  let setter ← StateTuple.setter result
-  pure { value, setter }
-
-end StateTuple
-
-namespace ReducerTuple
-
-def value {state action : Type}
-    (result : @& Lean.Vir.Js (ReducerTuple state action)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js state) :=
-  Lean.Vir.Js.Tuple2.first result
-
-def dispatch {state action : Type}
-    (result : @& Lean.Vir.Js (ReducerTuple state action)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (ReducerDispatch state action)) :=
-  Lean.Vir.Js.Tuple2.second result
-
-/-- Explicitly projects React's native `useReducer` result array into a Lean structure. -/
-def toState {state action : Type}
-    (result : @& Lean.Vir.Js (ReducerTuple state action)) :
-    Lean.Vir.RuntimeM (ReducerState state action) := do
-  let value ← ReducerTuple.value result
-  let dispatch ← ReducerTuple.dispatch result
-  pure { value, dispatch }
-
-end ReducerTuple
-
-namespace Hooks
-
-namespace DependencyList
-
-def empty : ReactM (Lean.Vir.Js DependencyList) := do
-  Lean.Vir.Js.Array.empty
-
-def push
-    (deps : @& Lean.Vir.Js DependencyList)
-    (value : @& Lean.Vir.Js α) : ReactM Unit := do
-  let _ ← Lean.Vir.Js.Array.push deps (Lean.Vir.Js.erase value)
-  pure ()
-
-def ofArray {α : Type} (deps : @& Array (Lean.Vir.Js α)) :
-    ReactM (Lean.Vir.Js DependencyList) := do
-  let jsDeps ← empty
-  for dep in deps do
-    push jsDeps dep
-  pure jsDeps
-
-end DependencyList
-
-end Hooks
-
-namespace State
-
-def set (state : State (Lean.Vir.Js α)) (value : Lean.Vir.Js α) : Lean.Vir.RuntimeM Unit :=
-  StateSetter.set state.setter value
-
-def modify
-    (state : State (Lean.Vir.Js α))
-    (update : Lean.Vir.Js α → Lean.Vir.RuntimeM (Lean.Vir.Js α)) :
-    Lean.Vir.RuntimeM Unit :=
-  StateSetter.modify state.setter update
-
-end State
+end Node
 
 end Lean.Vir.React

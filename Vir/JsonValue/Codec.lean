@@ -34,18 +34,35 @@ def integer? (number : JsonNumber) : Except String Int := do
 private def fieldPath (path key : String) : String :=
   path ++ "[" ++ (Json.str key).compress ++ "]"
 
-/-- Validate before native JSON-RPC serialization can round a numeric payload. -/
-partial def validate (value : Json) (path : String := "$") : Except String Unit := do
+/-- Bounds apply to the expanded JSON tree, including repeated input aliases. -/
+def maxNodes : Nat := 1000000
+
+/-- Bounds recursive conversion in both the native and interpreted paths. -/
+def maxDepth : Nat := 256
+
+private partial def validateBudget (value : Json) (path : String)
+    (remaining depth : Nat) : Except String Nat := do
+  if depth > maxDepth then throw s!"{path}: JSON nesting exceeds {maxDepth}"
+  if remaining == 0 then throw s!"{path}: JSON tree exceeds {maxNodes} nodes"
+  let mut remaining := remaining - 1
   match value with
   | .num number =>
     match integer? number with
     | .ok _ => pure ()
     | .error error => throw s!"{path}: {error}"
   | .arr values =>
-    for i in [:values.size] do validate values[i]! s!"{path}[{i}]"
+    for i in [:values.size] do
+      remaining ← validateBudget values[i]! s!"{path}[{i}]" remaining (depth + 1)
   | .obj fields =>
-    for (key, value) in fields.toList do validate value (fieldPath path key)
+    for (key, value) in fields.toList do
+      remaining ← validateBudget value (fieldPath path key) remaining (depth + 1)
   | _ => pure ()
+  return remaining
+
+/-- Validate before native JSON-RPC serialization can round a numeric payload. -/
+def validate (value : Json) (path : String := "$") : Except String Unit := do
+  let _ ← validateBudget value path maxNodes 0
+  pure ()
 
 /-- Explicitly selected ToJson representation, checked before it crosses the wire. -/
 def encode [ToJson α] (value : α) : Except String Json := do

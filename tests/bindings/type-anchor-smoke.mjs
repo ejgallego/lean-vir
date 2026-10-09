@@ -135,6 +135,7 @@ declare function schedule(value: number): void;
         id: "bump",
         jsName: "bump",
         entry: "Demo.bump",
+        nameKey: "s44656d6f/s62756d70/",
         source: "Demo.lean",
         startup: false,
         args: [
@@ -148,6 +149,7 @@ declare function schedule(value: number): void;
         id: "getLabel",
         jsName: "getLabel",
         entry: "Demo.getLabel",
+        nameKey: "s44656d6f/s6765744c6162656c/",
         source: "Demo.lean",
         startup: false,
         args: [

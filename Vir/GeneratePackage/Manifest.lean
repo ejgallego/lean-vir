@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.GeneratePackage.Interface.Collect
-public import Vir.GeneratePackage.PackageFormat
+public import Vir.Package.Format
 
 public section
 
@@ -63,7 +63,7 @@ def collectInterfaceManifest
   let mut manifest : InterfaceManifest := {
     metadata := metadata,
     hostImports := hostImports,
-    diagnostics := hostDiagnostics ++ index.diagnostics.map (·.toPackageDiagnostic)
+    diagnostics := hostDiagnostics ++ index.diagnostics
   }
   for target in targets do
     let source := target.publicSource

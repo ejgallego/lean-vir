@@ -16,7 +16,7 @@ export function smokeRuntimeCalls(runtime) {
 
   for (const [input, expected] of fibCases) {
     const actual = runtime.call("fib", input);
-    if (actual !== String(expected)) {
+    if (actual !== BigInt(expected)) {
       throw new Error(`upstream fib ${input}: expected ${expected}, got ${actual}`);
     }
   }
@@ -30,27 +30,27 @@ export function smokeRuntimeCalls(runtime) {
   }
 
   const sortChecksum = runtime.call("SortDemo.demo");
-  if (sortChecksum !== "192") {
+  if (sortChecksum !== 192n) {
     throw new Error(`upstream SortDemo.demo: expected 192, got ${sortChecksum}`);
   }
 
   const genericFib = runtime.call("fib", 12);
-  if (genericFib !== "144") {
+  if (genericFib !== 144n) {
     throw new Error(`generic fib input: expected 144, got ${genericFib}`);
   }
 
   const editableChecksum = runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]);
-  if (editableChecksum !== "30") {
+  if (editableChecksum !== 30n) {
     throw new Error(`upstream SortDemo.demoFromArray: expected 30, got ${editableChecksum}`);
   }
 
   const genericEditableChecksum = runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]);
-  if (genericEditableChecksum !== "30") {
+  if (genericEditableChecksum !== 30n) {
     throw new Error(`generic SortDemo.demoFromArray: expected 30, got ${genericEditableChecksum}`);
   }
 
   const genericStringScore = runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z");
-  if (genericStringScore !== "1381") {
+  if (genericStringScore !== 1381n) {
     throw new Error(`generic String input: expected 1381, got ${genericStringScore}`);
   }
 
@@ -58,7 +58,7 @@ export function smokeRuntimeCalls(runtime) {
     "Vir.Fixtures.Basic.byteArrayInputScore",
     Uint8Array.from([65, 66, 67]),
   );
-  if (genericByteArrayScore !== "136") {
+  if (genericByteArrayScore !== 136n) {
     throw new Error(`generic ByteArray input: expected 136, got ${genericByteArrayScore}`);
   }
 

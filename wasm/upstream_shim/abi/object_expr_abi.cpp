@@ -63,8 +63,14 @@ static lean::object * mk_nat_from_decimal(char const * text, uint32_t len) {
     return lean::mk_nat_obj(value);
 }
 
+// The packed Expr metadata reserves 20 bits for the loose bound-variable
+// range.  The upstream constructor deliberately traps for larger values;
+// reject them at the string ABI so malformed client input returns the normal
+// null result instead of poisoning the Wasm call.
+constexpr uint32_t MAX_EXPR_BVAR_INDEX = 1048574;
+
 static lean::object * mk_name_from_dotted_string(char const * text, uint32_t len) {
-    if (text == nullptr && len != 0) {
+    if (!lean::is_supported_dotted_name(text, len)) {
         return nullptr;
     }
     lean::name name = lean::name_from_dotted(text, len);
@@ -116,6 +122,10 @@ extern "C" lean::object * vir_obj_literal_string(char const * text, uint32_t len
 extern "C" lean::object * vir_obj_expr_bvar(char const * text, uint32_t len) {
     lean::object * index = mk_nat_from_decimal(text, len);
     if (index == nullptr) return nullptr;
+    if (!lean_nat_le(index, lean_box(MAX_EXPR_BVAR_INDEX))) {
+        lean_dec(index);
+        return nullptr;
+    }
     return lean_expr_mk_bvar(index);
 }
 
@@ -209,15 +219,18 @@ extern "C" lean::object * vir_obj_expr_proj(
 
 extern "C" uint8_t vir_obj_expr_scalar_u8(lean::object * value, uint32_t object_fields) {
     if (value == nullptr || lean_is_scalar(value)) return 0;
-    if (lean_ctor_num_objs(value) > object_fields) {
-        return static_cast<uint8_t>(lean_unbox(lean_ctor_get(value, object_fields)));
-    }
+    // All supported Expr origins use the pinned generated packed layout.
+    if (lean_ctor_num_objs(value) != object_fields) return 0;
     return lean_ctor_get_uint8(value, lean_ctor_num_objs(value) * sizeof(void *) + sizeof(uint64_t));
 }
 
 extern "C" char const * vir_obj_name_string(lean::object * value) {
     if (value == nullptr) {
         g_obj_name_string_result.clear();
+        return nullptr;
+    } else if (!lean::is_supported_name(lean::name(value, true))) {
+        g_obj_name_string_result.clear();
+        return nullptr;
     } else {
         g_obj_name_string_result = lean::name(value, true).to_string();
     }

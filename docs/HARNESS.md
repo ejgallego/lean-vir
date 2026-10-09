@@ -1,7 +1,7 @@
 # Harness
 
 This guide covers maintainer setup, generated artifacts, check selection and CI.
-Start with the [quickstart](../README.md) to use VIR, the
+Start with the [workflow overview](../README.md) to use VIR, the
 [developer guide](DEVELOPER_GUIDE.md) to change its implementation, or
 [tests/README.md](../tests/README.md) to add a test.
 
@@ -18,10 +18,107 @@ npm run doctor
 `third_party/lean4-src/`. `doctor` fails for missing required commands/artifacts
 and warns when Chromium is unavailable for browser checks.
 
+**After updating VIR, users must refresh their build setup and deployed assets.**
+Rerun setup for the current checkout, then `npm run build:site` when serving the
+site or producing its SDK archives. JavaScript runtime modules and both Wasm
+profiles must come from the same revision/build; replace them together and
+refresh stale browser/deployment caches. Client applications should reacquire
+the matching runtime/SDK and rerun their own normal build, rather than run VIR's
+contributor setup commands.
+
+Mixed-revision JavaScript/Wasm assets are unsupported and have undefined
+behavior, even if instantiation succeeds. For now, refreshing them is the
+user's responsibility; mixed-revision failures are outside the supported
+contract. See [matching runtime assets](guides/JS_API.md#matching-runtime-assets).
+
 The Wasm build defaults to 4 MiB initial memory and a 1 MiB stack. Set
 `VIR_WASM_INITIAL_MEMORY` and `VIR_WASM_STACK_SIZE` in bytes to change them.
 The size explorer additionally requires GNU `objdump`, `readelf` and `c++filt`
 from binutils.
+
+## Toolchain Upgrades
+
+Before upgrading `lean-toolchain`:
+
+- Compare affected Lean adapters with the new upstream source, then update their
+  immutable source links.
+- Refresh `vir-resources/compatibility.json` and qualify a runtime bundle for
+  that compiler before changing `vir-resources/runtime.json`; preserve the
+  bundle's content identity rather than relabeling an older bundle.
+- Record catalog compatibility and the remaining migration work using the
+  roadmap below. Older producer pins preserve historical reproducibility;
+  they do not qualify a workload under the new toolchain.
+- Refresh compiler-specific artifacts and run the affected acquisition,
+  importer, fixture and downstream acceptance checks below.
+
+### Catalog Migration Roadmap
+
+The goal is for every active VIR catalog workload to work with the current
+`lean-toolchain`. Migrate in stages; completing the entire catalog is not a
+prerequisite for the initial toolchain/runtime support PR.
+
+| Stage | Work | Acceptance goal |
+| --- | --- | --- |
+| Toolchain foundation | Update the interpreter boundary, adapters, fixtures and matching runtime resources. | Core/native/Wasm checks pass with matching compiler identities; default runtime resources are publicly obtainable before merge. |
+| Catalog ports | Migrate prettyM's module export path, then Illuminate's client project, then lean-zip's module/native API boundary. | Each actual exporter and its package/browser checks pass under the current VIR toolchain. |
+| Catalog enforcement | Pin the qualified producer/client commits and enable the current-toolchain check in candidate CI. | Every active VIR workload is covered; historical comparison backends disclose their own compiler/source identities. |
+
+Give each remaining port an owner, next action and acceptance checks in its PR
+or tracking issue, or on the private `WORKBOARD.md` when present. Keep client
+source changes in their owning repositories and preserve source/compiler
+provenance. A source pin, an older green workflow or a unit-only check is not
+current-toolchain qualification. Keep unqualified migration candidates local;
+publish catalog pins only when their exact source commits are available.
+
+## Backports
+
+Development happens on `main`, with the toolchain pinned in `lean-toolchain`.
+VIR maintains zero or one older Lean line. This table owns the maintenance
+target; activation and retirement are explicit maintainer decisions.
+
+| Branch | Lean line | State |
+| --- | --- | --- |
+| `lean-v4.34` | 4.34 | Reserved; activate from the last accepted 4.34 checkpoint before upgrading `main`. |
+
+Until activation there is no active maintenance branch. Historical feature
+branches and local checkpoints do not imply supported release lines. On the
+next upgrade, retain at most one maintenance line and update this table.
+
+New features and fixes start on `main`. Select backports that the maintained
+line needs; include supporting tests or harness changes when necessary to keep
+the fix coherent. Toolchain upgrades themselves stay on `main`. Work directly
+on a maintenance line only for an explicitly requested line-specific repair.
+When a maintenance line is active, record the decision in the source PR:
+`Backport lean-v4.34: #<PR>`, `pending`, or `not needed: <reason>`. Deferred
+backports go on the canonical `WORKBOARD.md` with an owner and revisit trigger
+when that private board is present. In ordinary clones without the board, keep
+the decision and revisit trigger in the source PR or a tracking issue.
+
+Prefer backporting the landed commit so normal squash merges remain usable:
+
+```bash
+git fetch origin
+git worktree add .worktrees/backport-4.34-fix -b fix/backport-4.34-fix origin/lean-v4.34
+cd .worktrees/backport-4.34-fix
+git cherry-pick -x <landed-main-commit>
+scripts/pr-message.sh --base lean-v4.34 --backport-of <source-PR-number> \
+  --title 'fix: <behavior preserved on Lean 4.34>'
+```
+
+The helper only prints a PR scaffold. It does not fetch, create branches, push,
+or publish. For a dependent series, cherry-pick the required landed commits in
+order. Explain conflict adaptations and any omitted prerequisite in the
+backport PR; link the source PR and backport PR in both directions.
+
+Check `git status --short --branch` and `lean-toolchain` before implementation.
+Run the affected checks from this guide with the maintenance toolchain. Refresh
+the line's Lean source, Wasm and packages before runtime checks; artifacts from
+`main` do not qualify a backport. Use the existing PR CI for validation.
+
+This borrows the development/maintenance distinction, linked PRs and
+`cherry-pick -x` provenance from the
+[Verso Blueprint harness](https://github.com/leanprover/verso-blueprint/blob/v4.34.0/doc/MAINTAINER_GUIDE.md#working-from-linked-worktrees).
+Ordinary Git, this table and the existing PR helper cover VIR's single-line use.
 
 ## Generated Artifacts
 
@@ -32,9 +129,10 @@ maintainer requests a tracked fixture or report change.
 | --- | --- |
 | `web/public/vir-upstream.wasm`, `vir-upstream.dev.wasm` and browser `.irpkg` packages | `npm run build:demo`; runtime and no-build smoke checks reuse these files. |
 | Release Wasm and its debug companion | `npm run build:demo:release` strips the release file; the debug companion remains optimized and unstripped. SDK/local archives and SDK import smokes need both. |
+| Content-named runtime pack and provenance under `build/artifacts/runtime/` | Maintainers run `lake build vir_resource_pack` then `npm run package:runtime` with an already-qualified release Wasm and build identity. The destination must not exist; parent directories are created. This never builds Wasm or runs during application acquisition. |
 | `web/dist/`, including SDK/local archives and analysis pages | `npm run build:site`; required before `test:pages:browser`. |
 | Infoview JavaScript bundle under `build/generated/` | `lake build VirInfoview` requires npm dependencies. The default `Vir` library needs no npm bundle. |
-| Local `.irpkg` and reports | Follow [local packages](guides/PACKAGES.md#generate-a-local-package) or [package configuration](guides/PACKAGES.md#configure-package-generation). |
+| Local `.irpkg` and reports | Follow [config-based local package preparation](guides/PACKAGES.md#generate-a-local-package). |
 
 Other ignored outputs include object caches and reports under `build/`, package
 `.input.json` / `.report.md` files and `downloads/` under `web/public/`, the
@@ -60,6 +158,17 @@ semantics require the separate Chromium checks below.
 
 ### Package and fixture work
 
+- Runtime production/release tooling: `npm run test:resources:production` checks
+  missing-parent packaging, existing-output preservation and immutable release
+  upload/reuse/mismatch behavior. It requires npm and fetched Lean notices, but
+  uses synthetic Wasm and a fake GitHub CLI, not a public release or interpreter
+  qualification.
+- Embedded resource acquisition/tracing: `npm run test:resources:cache` includes
+  cold/warm rejection of empty, missing and valid ambient native-manifest settings,
+  direct native producer rejection, output preservation and unset recovery. It
+  also exercises cache-only artifacts, private implementation changes and stage
+  repair. Its default synthetic runtime tests build integrity,
+  not Wasm execution; supply an exact runtime pack for the real-pack campaign.
 - Interface head reduction and its rejection boundaries: `npm run test:interface`
   checks the classifier and export attributes locally and through a compiled
   module import, without Wasm or npm dependencies.
@@ -72,14 +181,27 @@ semantics require the separate Chromium checks below.
   use `npm run test:runtime -- module-cli` alongside package units.
 - Compiled import sharing: `npm run test:generator:imports` compares cached
   contexts to Lean's independent imports, including private visibility and
-  import-level upgrades. On Linux with GNU `/usr/bin/time`,
+  import-level upgrades. It repeats these checks with relocated resolved
+  artifacts and conventional project lookup disabled, including region reuse
+  and a fresh-context missing-root control. On Linux with GNU `/usr/bin/time`,
   `npm run test:generator:memory` measures the full demo-host generator and
   enforces an 8 GiB peak-RSS budget, retaining logs/package/results under
   `build/generator-memory-*`. Its `-- --no-build` option reuses prepared inputs.
   This is a resource regression, not a statistical latency benchmark.
 - Lake facets, marked-module selection, downstream input tracing, output
-  ownership or SDK installation: `npm run test:lake`. Its cache checks cover
-  the exercised scenarios; they do not establish cache-only artifact reuse.
+  ownership or SDK installation: `npm run test:lake`. For isolated cold,
+  cache-only (conventional root/dependency artifacts absent), restoration and
+  imported-body invalidation checks, use `npm run test:lake:cache`.
+  Once matching `web/public/vir-upstream.wasm` is available,
+  `npm run test:lake:cache:wasm` also executes every phase's real package set:
+  42 before the private-body change, 43 afterward. CI runs this after downloading
+  the demo artifacts; source-only Lake checks do not require Wasm.
+  CI runs `test:lake:facets` separately and executes the cache campaign only once,
+  with Wasm. Every phase checks descriptor hashes and byte lengths against files.
+  Failed cache campaigns retain and print their temporary workspace (including
+  captured process errors, logs, setup maps and artifacts); successful normal runs clean
+  up unless `--keep` is passed. CI uploads failed campaign workspaces for seven
+  days, including hidden Lake files. Missing Wasm fails before workspace creation.
 - Fixture behavior: `VIR_FIXTURE_FILTER=<substring> npm run test:fixtures`;
   omit the filter for the whole oracle suite. Expectations, structured
   diagnostics and runner configuration alone use `npm run test:fixtures:unit`,
@@ -92,6 +214,16 @@ semantics require the separate Chromium checks below.
 
 ### Native and host boundaries
 
+- Constructor providers: after `npm run build:demo`, run
+  `npm run test:constructor-providers`. This links the same Wasm objects used
+  by the probe and compares constructor metadata and reference counts with
+  the pinned native Lean library. The Wasm runner additionally checks rejection
+  of a foreign external class. Set `WASI_SDK_PATH` for a non-default SDK.
+- Resource root allocator: `npm run test:resource-roots` compiles the actual
+  allocator with test-only allocation/growth failure injection and checks
+  identity, rollback/retry, release, slot reuse and terminal clearing after a
+  trap. The `resource-roots` pure runtime suite checks integration and collection
+  of retired payloads while their runtime remains reachable.
 - Native declarations: `npm run check:native-externs`. Add
   `npm run check:client-native-externs` for client manifest selection, wrapper
   imports or provider handoff. Pure registry tooling uses
@@ -169,7 +301,8 @@ npm run test:runtime -- --group pure
 `VIR_RUNTIME_TEST_FILTER` also selects smokes; `VIR_RUNTIME_JOBS` controls worker
 count. The `pure` group reuses demo artifacts and runs in parallel. The `lean`
 group generates packages or checks SDK imports and runs serially to avoid
-concurrent writes to shared `build/lean-lib` and `.lake` outputs. Pure runtime
+concurrent writes to shared `.lake` outputs. `build:lean-lib` uses Lake's ordinary
+library target, not a second hand-ordered compilation tree. Pure runtime
 smokes are distinct from the artifact-free runner unit tests.
 
 ## Browser Smoke
@@ -198,24 +331,22 @@ CHROMIUM=/path/to/chromium node tests/browser/generation-gc.mjs
 They cover callback/JSL finalizers and whole-generation collection. The browser
 check bundles current source with real Wasm and official React Strict Mode and
 Suspense. Retention controls distinguish collection from explicit cleanup.
-Controlled-GC budgets are diagnostic: collection does not establish shared-map
-lease cleanup or a Wasm capacity plateau.
+Controlled-GC budgets are diagnostic: collection does not establish cleanup of
+application-owned shared services or a Wasm capacity plateau.
 
 For normal shell unmount/refresh and failed-setup teardown with real React and
 Lean continuation bodies, but mocked asset/package RPC:
 
 ```bash
-lake build VirInfoview vir_irpkg +ShellLifetime
-lake env .lake/build/bin/vir_irpkg \
-  build/shell-lifetime.irpkg build/shell-lifetime.report.md \
-  --target-module ShellLifetime \
-  Vir.Fixtures.ShellLifetime.createComponent Vir.Fixtures.ShellLifetime.mount
-CHROMIUM=/path/to/chromium node tests/browser/shell-lifetime.mjs
+CHROMIUM=/path/to/chromium npm run test:infoview:lifetime
 ```
 
-This checks generation isolation, retained application activity, stale guards,
-polling, failure cleanup and controlled GC. Mocked transport makes it separate
-from the actual-server checks below.
+The runner builds its fixture package and checks generation isolation, retained
+application activity, stale guards, prop-driven acquisition without polling,
+failure cleanup and controlled GC.
+A red/green control resolves a pending load after committed removal but before
+passive cleanup. Unexpected console diagnostics and unhandled rejections fail
+the checks. Transport is mocked; the actual-server checks remain separate.
 
 ### Infoview RPC and lifetime checks
 
@@ -223,8 +354,8 @@ from the actual-server checks below.
 CHROMIUM=/path/to/chromium npm run test:infoview:browser
 ```
 
-The aggregate runs support/cleanup/error-formatting units and both real-server checks
-sequentially, as in CI. Each builds its Lean fixtures and bundles current JS
+The aggregate runs support/cleanup/error-formatting units, both real-server checks
+and the shell lifetime harness sequentially, as in CI. Each browser harness builds its Lean fixtures and bundles current JS
 against official React, the pinned RPC client and a real `lake serve` process.
 They need npm dependencies and matching `web/public/vir-upstream.wasm`, but no
 site build; use `npm run build:demo` for missing or changed Wasm.
@@ -246,9 +377,11 @@ site build; use `npm run build:demo` for missing or changed Wasm.
   accessor supplies official sessions; runtime instrumentation observes
   generations and supplies test bindings. Package/source/artifact hashes are
   reported after awaited teardown. It also checks readable build errors, slow
-  initial packages with polling enabled or disabled, polling after installation,
-  and abandoned-candidate teardown. This is not GC, warm-refresh recovery or
-  server-restart acceptance.
+  initial acquisition, abandoned-candidate teardown, actual source edits,
+  out-of-order replies, invalid-definition removal and repair, and recovery from
+  failed initial acquisition with a new RPC context. These are real-server
+  lifecycle checks; controlled GC is covered separately, and server restart is
+  not covered here.
 
 The shared LSP/cancellation/response-gate/Chromium harness has focused units:
 `node --test tests/infoview/rpc-browser-harness.test.mjs`. The separate
@@ -269,7 +402,8 @@ records the pinned-version findings and their implications for hook adoption.
 ## CI Shape
 
 CI builds the release/debug Wasm pair and browser packages once, runs upstream
-smoke, and uploads demo artifacts plus a commit-addressed `lean-vir-sdk` archive.
+smoke, and uploads demo artifacts, a commit-addressed `lean-vir-sdk` archive,
+and a `lean-vir-runtime` artifact containing the content-named pack and provenance.
 Pure runtime jobs consume those artifacts without installing Lean;
 Lean-dependent runtime and fixture jobs reuse them while building their Lean
 inputs. They do not refetch Lean source or reinstall the WASI SDK.
@@ -280,12 +414,27 @@ The [workflow files](../.github/workflows) own job definitions. Pages runs
 `npm run build:site`; [surface analysis](development/SURFACE_ANALYSIS.md) explains its
 deployed surface/size explorers.
 
-## SDK Releases
+## Repository Protection
+
+To enforce the [PR landing workflow](../CONTRIBUTING.md#landing-and-completion)
+on GitHub, protect `main` and any active maintenance branch: require pull requests
+and apply the restrictions to administrators and the account used by agents.
+Review bypass permissions explicitly rather than assuming the agent account is
+covered. See
+[GitHub's branch protection settings](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches).
+These repository settings are configured separately from the tracked guidance;
+adding this policy to a PR does not enable them. Settings changes require their
+own explicit maintainer selection.
+
+## Runtime Releases
 
 Tags named `v<package.json version>` trigger
 [release-sdk.yml](../.github/workflows/release-sdk.yml), which validates tag and
 ABI versions, builds the SDK, imports its packaged modules and uploads the
-archive to the matching release. Create the tag from the final merged commit
+archive plus a content-named runtime pack to the matching release. Runtime pack
+publication uploads absent assets, verifies and reuses byte-identical assets on
+reruns, and rejects different bytes without replacing them. The SDK archive
+upload remains replaceable. Create the tag from the final merged commit
 so its manifest identifies the revision clients use. Before the tag exists,
 select `VIR_SDK_ARCHIVE` or the exact-commit artifact path; the zero-argument
 `:virSdk` facet targets the tagged release. See

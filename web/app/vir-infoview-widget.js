@@ -5,30 +5,21 @@ Author: Emilio J. Gallego Arias
 */
 
 import * as React from "react";
-import { EditorContext, useClientNotificationEffect, useRpcSession } from "@leanprover/infoview";
-import { createRoot } from "../src/vir-react-dom-client.js";
+import { DocumentPosition, EditorContext, InteractiveCode, TaggedText_stripTags, useClientNotificationEffect, useRpcSession } from "@leanprover/infoview";
 import { createBrowserHostBindings } from "../src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.js";
 import { createVirRuntime as createBundledVirRuntime } from "../src/vir-runtime.js";
-import { widgetErrorMessage as errorMessage } from "../src/vir-widget-errors.js";
+import { widgetErrorMessage as errorMessage } from "./vir-widget-errors.js";
 import { isEffectfulInterfaceEffect } from "../src/runtime/interface-effects.js";
 import { INTERFACE_TAG } from "../src/runtime/interface-tags.js";
-import {
-  collectCleanupError,
-  throwCollectedErrors,
-} from "../src/runtime/cleanup.js";
+import { collectCleanupError } from "../src/runtime/cleanup.js";
 
 const e = React.createElement;
-let nextMountId = 0;
 const wasmModuleCache = new Map();
 
 const shellStyle = {
   display: "grid",
   gap: "0.5rem",
-  minWidth: 0,
-};
-
-const mountStyle = {
   minWidth: 0,
 };
 
@@ -41,98 +32,107 @@ const statusStyle = {
 
 export default function VirInfoviewWidget(props) {
   const rpcSession = useRpcSession();
-  const editorConnection = React.useContext(EditorContext);
-  const hostContextRef = React.useRef({
-    rpcSession,
-    editorConnection,
-    position: null,
-  });
-  const setupHintRef = React.useRef("");
+  // Upstream can reconnect when this hook runs. Loading-state updates must not
+  // themselves manufacture fresh contexts and repeatedly retry a broken server.
+  return e(WidgetLoader, { widgetProps: props, rpcSession });
+}
+
+function WidgetLoader({ widgetProps: props, rpcSession }) {
+  const committedRequestRef = React.useRef({});
   const [status, setStatus] = React.useState({
     kind: "loading",
     message: "Loading VIR widget...",
   });
-  const [mountId] = React.useState(() => freshMountId(props.mountId));
-  const mountElementRef = React.useRef(null);
   const loadedRef = React.useRef(null);
-  const [reloadToken, setReloadToken] = React.useState(0);
-  const [runtimeToken, setRuntimeToken] = React.useState(0);
-  const irPackageRevisionRef = React.useRef("");
-  const refreshGenerationRef = React.useRef(0);
-  const surface = surfaceFromInfoviewProps(props, rpcSession);
-  const surfaceKey = surfaceCacheKey(surface);
-  const irPackageKey =
-    props.irPackage === null || props.irPackage === undefined
-      ? ""
-      : JSON.stringify(props.irPackage);
+  const [loaded, setLoaded] = React.useState(null);
+  const fatalRetirementRef = React.useRef(null);
+  const [fatalFailure, setFatalFailure] = React.useState(null);
+  // Counts acquisition attempts, including attempts that reuse the installed code.
+  const acquisitionSequenceRef = React.useRef(0);
+  const acquisitionRef = React.useRef(null);
+  const configurationKey = JSON.stringify([
+    props.pos?.uri,
+    props.wasmPath,
+    props.irPackage?.entry,
+  ]);
+
+  const requestKey = JSON.stringify([
+    configurationKey, props.irPackage?.fingerprint,
+  ]);
 
   React.useLayoutEffect(() => {
-    let position = null;
-    let setupHint = "";
-    try {
-      position = requiredPosition(props.pos, "pos");
-      setupHint = optionalString(props.setupHint, "setupHint");
-    } catch {
-      // The loading effect reports invalid widget configuration.
-    }
-    hostContextRef.current.rpcSession = rpcSession;
-    hostContextRef.current.editorConnection = editorConnection;
-    hostContextRef.current.position = position;
-    setupHintRef.current = setupHint;
-  }, [rpcSession, editorConnection, props.pos, props.setupHint]);
+    committedRequestRef.current.configurationKey = configurationKey;
+    committedRequestRef.current.requestKey = requestKey;
+    return () => {
+      // Invalidate pending candidates at removal, before passive cleanup runs.
+      committedRequestRef.current.configurationKey = null;
+    };
+  }, [configurationKey, requestKey]);
 
-  async function refreshLoadedWidget(isDisposed) {
+  async function acquireAndInstallWidget(attempt, acquisitionId) {
+    const obsolete = () => acquisitionId !== acquisitionSequenceRef.current ||
+      configurationKey !== committedRequestRef.current.configurationKey ||
+      requestKey !== committedRequestRef.current.requestKey;
     let setupHint = "";
-    let service = null;
+    // A fresh candidate is owned here until publication. Clear it when reused,
+    // disposed, or handed to React so failure cleanup only releases unpublished work.
+    let candidate = null;
     try {
       const config = widgetRuntimeConfigFromProps(props);
       setupHint = config.setupHint;
-      service = await loadRuntimeService({
-        rpcSession: hostContextRef.current.rpcSession,
-        hostContext: hostContextRef.current,
+      const installed = loadedRef.current?.configurationKey === configurationKey
+        ? loadedRef.current.service : null;
+      candidate = await loadRuntimeService({
+        rpcSession: attempt.rpcSession,
         config,
+        previous: installed,
       });
-      if (isDisposed()) {
-        disposeRuntimeService(service);
+      if (obsolete()) {
+        if (candidate !== installed) {
+          const abandoned = candidate;
+          candidate = null;
+          abandoned.runtime.dispose();
+        }
+        return;
+      }
+      if (candidate === installed) {
+        candidate = null;
+        setStatus({ kind: "ready", message: config.irPackage.entry });
         return;
       }
       const componentEntry = validateWidgetComponentEntry(
-        service.runtime,
-        config.componentEntry,
+        candidate.runtime,
+        config.irPackage.entry,
       );
-      const entry = validateWidgetEntry(service.runtime, config.entry);
-      const component = service.runtime.call(componentEntry.entry);
+      const component = candidate.runtime.call(componentEntry.entry);
       if (typeof component !== "function") {
         throw new Error(
           `VIR widget component entry ${componentEntry.entry} did not return a JavaScript function`,
         );
       }
-      irPackageRevisionRef.current = service.packageRevision;
-      const current = loadedRef.current;
-      loadedRef.current = null;
-      if (current !== null) {
-        current.root.unmount();
-      }
-      if (mountElementRef.current === null) {
-        throw new Error("VIR widget mount element is unavailable");
-      }
-      loadedRef.current = {
-        service,
-        root: createRoot(mountElementRef.current),
-        componentEntry,
-        component: withEditorContext(component, hostContextRef.current),
-        entry,
+      const next = {
+        service: candidate,
+        component,
+        configurationKey,
+        generation: acquisitionId,
       };
-      service = null;
-      setReloadToken(0);
-      setRuntimeToken((token) => token + 1);
+      const candidateRuntime = candidate.runtime;
+      next.disposeRuntime = () => candidateRuntime.dispose();
+      loadedRef.current = next;
+      setFatalFailure(null);
+      setLoaded(next);
+      candidate = null;
+      setStatus({ kind: "ready", message: componentEntry.entry });
     } catch (error) {
       const errors = [error];
-      if (service !== null) {
-        collectCleanupError(errors, () => disposeRuntimeService(service));
+      if (candidate !== null) {
+        collectCleanupError(errors, () => candidate.runtime.dispose());
       }
-      const failure = widgetCleanupError(errors, "VIR widget loading failed");
-      if (!isDisposed()) {
+      const failure = errors.length === 1
+        ? error
+        : new AggregateError(errors, "VIR widget loading failed");
+      if (!obsolete()) {
+        attempt.failed = true;
         setStatus({ kind: "error", message: errorMessage(failure, setupHint) });
       } else {
         console.error(failure);
@@ -140,135 +140,71 @@ export default function VirInfoviewWidget(props) {
     }
   }
 
-  React.useEffect(() => {
-    let disposed = false;
-    const generation = ++refreshGenerationRef.current;
-    refreshLoadedWidget(
-      () => disposed || generation !== refreshGenerationRef.current,
-    );
-    return () => {
-      disposed = true;
-      const loaded = loadedRef.current;
-      if (loaded !== null) {
-        // Detach shell ownership even when application effect cleanup throws.
-        // Surviving values still own this generation; only explicit shutdown
-        // and the separate failure paths below dispose it.
-        loadedRef.current = null;
-        loaded.root.unmount();
-      }
-    };
-  }, [
-    props.wasmPath,
-    irPackageKey,
-    props.componentEntry,
-    props.entry,
-    mountId,
-  ]);
-
-  React.useEffect(() => {
-    if (reloadToken === 0) {
-      return undefined;
-    }
-    let disposed = false;
-    const generation = ++refreshGenerationRef.current;
-    refreshLoadedWidget(
-      () => disposed || generation !== refreshGenerationRef.current,
-    );
-    return () => {
-      disposed = true;
-    };
-  }, [
-    props.wasmPath,
-    irPackageKey,
-    props.componentEntry,
-    props.entry,
-    mountId,
-    reloadToken,
-  ]);
-
-  React.useEffect(() => {
-    let intervalId = null;
-    let disposed = false;
-    let inFlight = false;
-    try {
-      const config = widgetRuntimeConfigFromProps(props);
-      if (config.autoReloadMs > 0) {
-        intervalId = setInterval(() => {
-          // The first package has no installed revision yet. Polling here can
-          // continually supersede a slow initial load before it can mount.
-          if (inFlight || loadedRef.current === null) {
-            return;
-          }
-          inFlight = true;
-          shouldReloadIRPackage({
-            rpcSession: hostContextRef.current.rpcSession,
-            irPackage: config.irPackage,
-            position: hostContextRef.current.position,
-            currentRevision: irPackageRevisionRef.current,
-          })
-            .then((shouldReload) => {
-              if (!disposed && shouldReload) {
-                setReloadToken((token) => token + 1);
-              }
-            })
-            .catch((error) => {
-              if (!disposed) {
-                setStatus({
-                  kind: "error",
-                  message: errorMessage(error, setupHintRef.current),
-                });
-              }
-            })
-            .finally(() => {
-              inFlight = false;
-            });
-        }, config.autoReloadMs);
-      }
-    } catch {
-      return undefined;
-    }
-    return () => {
-      disposed = true;
-      if (intervalId !== null) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [
-    props.wasmPath,
-    irPackageKey,
-    props.componentEntry,
-    props.entry,
-    props.autoReloadMs,
-  ]);
-
-  React.useEffect(() => {
-    const loaded = loadedRef.current;
-    if (loaded === null) {
-      return;
-    }
-    try {
-      loaded.service.runtime.call(
-        loaded.entry.entry,
-        loaded.root,
-        loaded.component,
-        surface,
-      );
-      setStatus({ kind: "ready", message: loaded.entry.entry });
-    } catch (error) {
-      if (loadedRef.current === loaded) {
-        loadedRef.current = null;
-      }
-      const errors = [error];
-      collectCleanupError(errors, () => disposeLoadedWidget(loaded));
+  React.useLayoutEffect(() => {
+    if (loaded === null) return;
+    const onFailure = (failure) => {
+      if (
+        loadedRef.current !== loaded ||
+        committedRequestRef.current.configurationKey !== configurationKey
+      ) return;
+      loadedRef.current = null;
+      fatalRetirementRef.current = { loaded, failure };
+      setFatalFailure(failure);
+      setLoaded((current) => current === loaded ? null : current);
       setStatus({
         kind: "error",
         message: errorMessage(
-          widgetCleanupError(errors, "VIR widget render failed"),
-          setupHintRef.current,
+          failure,
+          "This widget runtime has failed. Reload the Infoview panel or change the widget code to start a fresh runtime.",
         ),
       });
+    };
+    const stopObservingFailure = loaded.service.runtime.onFailure(onFailure);
+    loaded.stopObservingFailure = stopObservingFailure;
+    return stopObservingFailure;
+  }, [loaded, configurationKey]);
+
+  React.useEffect(() => {
+    return () => {
+      // React owns the descendant UI. Release shell ownership, not the
+      // runtime: surviving callbacks and JSL keep their generation.
+      loadedRef.current?.stopObservingFailure?.();
+      loadedRef.current = null;
+    };
+  }, [configurationKey]);
+
+  React.useEffect(() => {
+    return () => {
+      const retirement = fatalRetirementRef.current;
+      if (retirement?.loaded !== loaded) return;
+      fatalRetirementRef.current = null;
+      const errors = [retirement.failure];
+      collectCleanupError(errors, () => loaded.disposeRuntime());
+      if (errors.length > 1) {
+        console.error(new AggregateError(errors, "VIR widget runtime failed during disposal"));
+      }
+    };
+  }, [loaded]);
+
+  React.useEffect(() => {
+    const previousAttempt = acquisitionRef.current;
+    // Context changes leave healthy and pending acquisitions alone. A failed
+    // attempt may use a new context once, including one received while pending.
+    if (previousAttempt?.requestKey === requestKey &&
+        (!previousAttempt.failed || previousAttempt.rpcSession === rpcSession)) {
+      return;
     }
-  }, [runtimeToken, surfaceKey, mountId, rpcSession, editorConnection]);
+    const attempt = { requestKey, rpcSession, failed: false };
+    acquisitionRef.current = attempt;
+    if (loadedRef.current?.configurationKey !== configurationKey) {
+      loadedRef.current?.stopObservingFailure?.();
+      loadedRef.current = null;
+      setLoaded(null);
+      setStatus({ kind: "loading", message: "Loading VIR widget..." });
+    }
+    const acquisitionId = ++acquisitionSequenceRef.current;
+    acquireAndInstallWidget(attempt, acquisitionId);
+  }, [requestKey, rpcSession, status]);
 
   return e(
     "section",
@@ -281,12 +217,11 @@ export default function VirInfoviewWidget(props) {
       onPointerDown: stopInfoviewEvent,
       style: shellStyle,
     },
-    e("div", {
-      ref: mountElementRef,
-      id: mountId,
-      className: "vir-infoview-widget-mount",
-      style: mountStyle,
-    }),
+    e(FatalRuntimeBoundary, { requestKey, failure: fatalFailure },
+      loaded?.configurationKey === configurationKey
+        ? e(loaded.component, { ...props, key: loaded.generation })
+        : null,
+    ),
     status.kind === "ready"
       ? null
       : e(
@@ -297,43 +232,78 @@ export default function VirInfoviewWidget(props) {
   );
 }
 
+// Keep the shell mounted when removing a failed component invokes Lean-backed
+// effect cleanup. Such callbacks must still reject on a failed runtime; ordinary
+// rendering/cleanup errors continue to the upstream Infoview error boundary.
+class FatalRuntimeBoundary extends React.Component {
+  state = { error: null, requestKey: this.props.requestKey };
+
+  static getDerivedStateFromProps(props, state) {
+    return props.requestKey === state.requestKey
+      ? null
+      : { error: null, requestKey: props.requestKey };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error) {
+    // React may batch several cleanup errors into one render. Check every
+    // reported error, including ones replaced in the rendered error state.
+    if (this.props.failure === null ||
+        !isExpectedRetirementError(error, this.props.failure)) throw error;
+  }
+
+  render() {
+    if (this.state.error !== null) {
+      if (this.props.failure === null ||
+          !isExpectedRetirementError(this.state.error, this.props.failure)) {
+        throw this.state.error;
+      }
+      return null;
+    }
+    return this.props.children;
+  }
+}
+
 function stopInfoviewEvent(event) {
   event.stopPropagation();
 }
 
-// A separate React root does not inherit the outer infoview's context. Keep
-// this component type stable for the service, forwarding the native context.
-function withEditorContext(component, hostContext) {
-  return function InfoviewContext(props) {
-    return e(EditorContext.Provider, { value: hostContext.editorConnection },
-      e(component, props));
-  };
-}
-
-export function validateWidgetEntry(runtime, entryName) {
-  const entry = requireWidgetManifestEntry(runtime, entryName, "entry");
-  if (
-    !isEffectfulInterfaceEffect(entry.effect) ||
-    entry.args?.length !== 3 ||
-    entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
-    entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
-    entry.args[2]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE ||
-    entry.args[2]?.type?.name !== "Lean.Vir.Infoview.Surface" ||
-    entry.result?.interfaceTag !== INTERFACE_TAG.UNIT
-  ) {
-    throw new Error(
-      `VIR widget entry ${entryName} must be an effectful Root -> Component -> Surface -> Unit entry`,
-    );
+// Suppression requires every failure to be attributable to this retirement.
+// A mixed aggregate must reach the upstream boundary intact.
+function isExpectedRetirementError(error, failure, ancestors = new Set()) {
+  if (error === failure) return true;
+  if (error === null || (typeof error !== "object" && typeof error !== "function") || ancestors.has(error)) {
+    return false;
   }
-  return entry;
+  ancestors.add(error);
+  try {
+    const expected = value => isExpectedRetirementError(value, failure, ancestors);
+    const cause = error.cause;
+    if (error instanceof AggregateError) {
+      const errors = error.errors;
+      if (!Array.isArray(errors) || errors.length === 0) return false;
+      for (let index = 0; index < errors.length; index++) {
+        if (!expected(errors[index])) return false;
+      }
+      return cause === undefined || expected(cause);
+    }
+    return expected(cause);
+  } catch {
+    // Uninspectable errors cannot establish that suppression is appropriate.
+    return false;
+  } finally {
+    ancestors.delete(error);
+  }
 }
 
 export function validateWidgetComponentEntry(runtime, entryName) {
-  const entry = requireWidgetManifestEntry(
-    runtime,
-    entryName,
-    "component entry",
-  );
+  const entry = runtime.findManifestEntry(entryName);
+  if (entry === null || entry === undefined) {
+    throw new Error(`VIR widget component entry not found: ${entryName}`);
+  }
   if (
     !isEffectfulInterfaceEffect(entry.effect) ||
     entry.args?.length !== 0 ||
@@ -344,269 +314,6 @@ export function validateWidgetComponentEntry(runtime, entryName) {
     );
   }
   return entry;
-}
-
-function requireWidgetManifestEntry(runtime, entryName, label) {
-  const entry =
-    runtime.findManifestEntry?.(entryName) ??
-    runtime.interfaceManifest?.exports?.find(
-      (candidate) =>
-        candidate.entry === entryName ||
-        candidate.id === entryName ||
-        candidate.jsName === entryName,
-    );
-  if (entry === null || entry === undefined) {
-    throw new Error(`VIR widget ${label} not found: ${entryName}`);
-  }
-  return entry;
-}
-
-// Failed rendering remains an explicit shutdown boundary.
-function disposeLoadedWidget(loaded) {
-  const errors = [];
-  collectCleanupError(errors, () => loaded.root.unmount());
-  collectCleanupError(errors, () => disposeRuntimeService(loaded.service));
-  throwCollectedErrors(errors, "VIR widget cleanup failed");
-}
-
-export function surfaceFromInfoviewProps(props, rpcSession) {
-  const goals = arrayOrEmpty(props?.goals).map((goal, index) =>
-    goalFromInteractiveGoal(goal, index, "goal"),
-  );
-  const termGoal =
-    props?.termGoal === null || props?.termGoal === undefined
-      ? []
-      : [goalFromInteractiveGoal(props.termGoal, goals.length, "term")];
-  const cursor = documentPositionFromInfoviewPosition(props?.pos);
-  const selections = arrayOrEmpty(props?.selectedLocations).map(
-    selectedLocationFromInfoviewLocation,
-  );
-  return {
-    position: cursor.label,
-    cursor,
-    goals: [...goals, ...termGoal],
-    selectedLocations: selections.map((selection) => selection.label),
-    selections,
-    rpcSession,
-  };
-}
-
-export function surfaceCacheKey(surface) {
-  const { rpcSession: _rpcSession, ...serializableSurface } = surface;
-  return JSON.stringify(serializableSurface);
-}
-
-function goalFromInteractiveGoal(goal, index, kind) {
-  const userName = optionalStringValue(
-    readOption(goal?.userName ?? goal?.["userName?"]),
-  );
-  const mvarId = optionalStringValue(goal?.mvarId?.name ?? goal?.mvarId);
-  const title =
-    kind === "term"
-      ? "Term goal"
-      : userName.length === 0
-        ? `Goal ${index + 1}`
-        : `case ${userName}`;
-  const idSeed =
-    kind === "term" ? `term-${index}` : optionalStringValue(mvarId || userName);
-  const id = safeDomId(idSeed.length === 0 ? `${kind}-${index}` : idSeed);
-  return {
-    id,
-    kind,
-    index,
-    title,
-    userName: userName.length === 0 ? null : userName,
-    mvarId: mvarId.length === 0 ? null : mvarId,
-    status: goalStatus(goal, index, kind),
-    target: nonEmptyText(taggedTextToPlain(goal?.type), "(unavailable target)"),
-    hypotheses: arrayOrEmpty(goal?.hyps).map((hypothesis, hypothesisIndex) =>
-      hypothesisFromBundle(hypothesis, id, hypothesisIndex),
-    ),
-  };
-}
-
-function hypothesisFromBundle(hypothesis, goalId, index) {
-  const names = arrayOrEmpty(hypothesis?.names).filter(
-    (name) => typeof name === "string",
-  );
-  const fvarIds = arrayOrEmpty(hypothesis?.fvarIds)
-    .map(infoviewIdToString)
-    .filter((id) => id.length !== 0);
-  const idSeed =
-    names.length === 0
-      ? optionalStringValue(fvarIds[0] ?? `hyp-${index}`)
-      : names.join("-");
-  return {
-    id: safeDomId(`${goalId}-${idSeed}`),
-    names,
-    fvarIds,
-    type: nonEmptyText(
-      taggedTextToPlain(hypothesis?.type),
-      "(unavailable type)",
-    ),
-    value: optionalTaggedTextToPlain(hypothesis?.val ?? hypothesis?.["val?"]),
-  };
-}
-
-export function taggedTextToPlain(value) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value.map(taggedTextToPlain).join("");
-  }
-  if (typeof value !== "object") {
-    return String(value);
-  }
-  if (typeof value.text === "string") {
-    return value.text;
-  }
-  if (Array.isArray(value.append)) {
-    return value.append.map(taggedTextToPlain).join("");
-  }
-  if (Array.isArray(value.tag)) {
-    return taggedTextToPlain(value.tag[1]);
-  }
-  return "";
-}
-
-function optionalTaggedTextToPlain(value) {
-  const option = readOption(value);
-  return option === null ? null : taggedTextToPlain(option);
-}
-
-function readOption(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  if (typeof value === "object") {
-    if (value.kind === "none") {
-      return null;
-    }
-    if (value.kind === "some") {
-      return value.value;
-    }
-    if (Object.prototype.hasOwnProperty.call(value, "some")) {
-      return value.some;
-    }
-  }
-  return value;
-}
-
-function goalStatus(goal, index, kind) {
-  if (kind === "term") {
-    return "term";
-  }
-  if (readOption(goal?.isInserted ?? goal?.["isInserted?"]) === true) {
-    return "inserted";
-  }
-  if (readOption(goal?.isRemoved ?? goal?.["isRemoved?"]) === true) {
-    return "removed";
-  }
-  return index === 0 ? "active" : "pending";
-}
-
-function documentPositionFromInfoviewPosition(pos) {
-  const hasPosition = pos !== null && typeof pos === "object";
-  const line =
-    hasPosition && Number.isInteger(pos.line) && pos.line >= 0 ? pos.line : 0;
-  const character =
-    hasPosition && Number.isInteger(pos.character) && pos.character >= 0
-      ? pos.character
-      : 0;
-  const uri = hasPosition && typeof pos.uri === "string" ? pos.uri : "";
-  const fileName = fileNameFromUri(uri);
-  const label = hasPosition
-    ? formatDocumentPositionLabel(fileName, line, character)
-    : "unknown position";
-  return {
-    uri,
-    fileName,
-    line,
-    character,
-    label,
-  };
-}
-
-function formatDocumentPositionLabel(fileName, line, character) {
-  const label = `line ${line + 1}:${character + 1}`;
-  return fileName.length === 0
-    ? label
-    : `${fileName}:${line + 1}:${character + 1}`;
-}
-
-function fileNameFromUri(uri) {
-  if (uri.length === 0) {
-    return "";
-  }
-  return decodeURIComponent(uri).split(/[\\/]/).pop() ?? "";
-}
-
-function selectedLocationFromInfoviewLocation(location, index) {
-  const label = formatSelectedLocation(location, index);
-  const kind = selectedLocationKind(location);
-  return {
-    id: safeDomId(`${kind}-${label}-${index}`),
-    kind,
-    label,
-  };
-}
-
-function formatSelectedLocation(location, index) {
-  if (location === null || location === undefined) {
-    return `location-${index}`;
-  }
-  if (typeof location === "string") {
-    return location;
-  }
-  if (typeof location === "object") {
-    return (
-      optionalStringValue(location.kind ?? location.type ?? location.id) ||
-      `location-${index}`
-    );
-  }
-  return String(location);
-}
-
-function selectedLocationKind(location) {
-  if (location !== null && typeof location === "object") {
-    return optionalStringValue(location.kind ?? location.type) || "location";
-  }
-  return "location";
-}
-
-function infoviewIdToString(value) {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (value !== null && typeof value === "object") {
-    return optionalStringValue(value.name ?? value.id);
-  }
-  return "";
-}
-
-function arrayOrEmpty(value) {
-  return Array.isArray(value) ? value : [];
-}
-
-function optionalStringValue(value) {
-  return typeof value === "string" ? value : "";
-}
-
-function nonEmptyText(value, fallback) {
-  const text = optionalStringValue(value).trim();
-  return text.length === 0 ? fallback : text;
-}
-
-function safeDomId(value) {
-  const normalized = String(value)
-    .trim()
-    .replace(/[^A-Za-z0-9_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return normalized.length === 0 ? "item" : normalized;
 }
 
 function requiredString(value, label) {
@@ -631,13 +338,7 @@ function widgetRuntimeConfigFromProps(props) {
   return {
     wasmPath: requiredString(props.wasmPath, "wasmPath"),
     irPackage,
-    componentEntry: requiredString(props.componentEntry, "componentEntry"),
-    entry: requiredString(props.entry, "entry"),
     position: requiredPosition(props.pos, "pos"),
-    autoReloadMs: optionalNonNegativeInteger(
-      props.autoReloadMs,
-      "autoReloadMs",
-    ),
     setupHint: optionalString(props.setupHint, "setupHint"),
   };
 }
@@ -646,11 +347,10 @@ function requiredIRPackage(value, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`VIR widget ${label} must be an object`);
   }
-  const roots = requiredStringArray(value.roots, `${label}.roots`);
-  if (roots.length === 0) {
-    throw new Error(`VIR widget ${label}.roots must not be empty`);
-  }
-  return { roots };
+  return {
+    entry: requiredString(value.entry, `${label}.entry`),
+    fingerprint: requiredString(value.fingerprint, `${label}.fingerprint`),
+  };
 }
 
 function requiredPosition(value, label) {
@@ -673,227 +373,67 @@ function requiredPosition(value, label) {
   };
 }
 
-function optionalNonNegativeInteger(value, label) {
-  if (value === undefined || value === null) {
-    return 0;
-  }
-  if (!Number.isInteger(value) || value < 0) {
-    throw new Error(`VIR widget ${label} must be a non-negative integer`);
-  }
-  return value;
-}
-
-export async function loadRuntimeService({
-  rpcSession,
-  hostContext = null,
-  config,
-}) {
-  const sources = await resolveRuntimeSources(rpcSession, config);
-  return createRuntimeService({
-    rpcSession,
-    hostContext: hostContext ?? {
-      rpcSession,
-      editorConnection: null,
-      position: config.position,
-    },
-    sources,
-  });
-}
-
-async function createRuntimeService({ rpcSession, hostContext, sources }) {
-  const runtimeOptions = await loadRuntimeOptionsFromSources({
-    rpcSession,
-    sources,
-  });
-  runtimeOptions.defaultHostBindings = () =>
-    createBrowserHostBindings({
-      infoviewCommandDispatcher: createInfoviewCommandDispatcher({
-        hostContext,
-      }),
-      reactHostBindings: createBrowserReactHostBindings,
-      infoviewUseClientNotificationEffect: useClientNotificationEffect,
-    });
-  return {
-    packageRevision: sources.packageSource.revision ?? "",
-    disposed: false,
-    runtime: await createBundledVirRuntime(runtimeOptions),
-  };
-}
-
-function createInfoviewCommandDispatcher({ hostContext }) {
-  return {
-    revealPosition(position) {
-      const editorConnection = hostContext.editorConnection ?? null;
-      if (
-        editorConnection === null ||
-        typeof editorConnection !== "object" ||
-        typeof editorConnection.revealPosition !== "function"
-      ) {
-        return false;
-      }
-      editorConnection.revealPosition(position).catch((error) => {
-        console.error(error);
-      });
-      return true;
-    },
-    insertText(position, text) {
-      const editorConnection = hostContext.editorConnection ?? null;
-      if (
-        editorConnection === null ||
-        typeof editorConnection !== "object" ||
-        editorConnection.api === null ||
-        typeof editorConnection.api !== "object" ||
-        typeof editorConnection.api.applyEdit !== "function"
-      ) {
-        return false;
-      }
-      const cursor = { line: position.line, character: position.character };
-      const edit = editorConnection.api.applyEdit({
-        changes: {
-          [position.uri]: [
-            { range: { start: cursor, end: cursor }, newText: text },
-          ],
-        },
-      });
-      if (
-        edit !== null &&
-        typeof edit === "object" &&
-        typeof edit.catch === "function"
-      ) {
-        edit.catch((error) => {
-          console.error(error);
-        });
-      }
-      return true;
-    },
-  };
-}
-
-function disposeRuntimeService(service) {
-  if (!service.disposed) {
-    service.disposed = true;
-    service.runtime.dispose?.();
-  }
-}
-
-export async function shouldReloadIRPackage({
-  rpcSession,
-  irPackage,
-  position,
-  currentRevision,
-}) {
-  const info = await statIRPackage(rpcSession, irPackage, position);
-  return info.revision !== currentRevision;
-}
-
-export async function loadRuntimeOptions({
-  rpcSession,
-  wasmPath,
-  irPackage,
-  position,
-}) {
-  const sources = await resolveRuntimeSources(rpcSession, {
-    wasmPath,
-    irPackage,
-    position,
-  });
-  return loadRuntimeOptionsFromSources({ rpcSession, sources });
-}
-
-async function resolveRuntimeSources(rpcSession, config) {
-  const wasmSource = wasmAssetSource(config);
-  const packageSource = irPackageSource(config);
-  return {
-    wasmSource: await resolveAssetSource(rpcSession, wasmSource),
-    packageSource: await resolveAssetSource(rpcSession, packageSource),
-  };
-}
-
-async function resolveAssetSource(rpcSession, source) {
-  if (source.kind === "irPackage") {
-    const info = await statIRPackage(
-      rpcSession,
-      source.package,
-      source.position,
-    );
-    return { ...source, revision: info.revision, source: info.source };
-  }
-  const info = await statAsset(rpcSession, source.value);
-  return { ...source, revision: info.revision };
-}
-
-async function loadRuntimeOptionsFromSources({ rpcSession, sources }) {
-  const { wasmSource, packageSource } = sources;
-  const options = {};
-  options.wasmModule = await loadWasmModule(rpcSession, wasmSource);
-  const irPackage = await buildIRPackage(
-    rpcSession,
-    packageSource.package,
-    packageSource.position,
-  );
-  if (
-    (packageSource.revision ?? "") !== "" &&
-    irPackage.revision !== packageSource.revision
-  ) {
-    throw new Error(
-      "VIR IR package changed while loading; retrying with the latest Lean snapshot",
-    );
-  }
-  options.irPackageSet = [decodeBase64Bytes(irPackage.dataBase64)];
-  return options;
-}
-
-export async function loadWasmModule(rpcSession, source) {
-  const sourceKey = `${source.kind}:${source.value}`;
-  const key = assetSourceCacheKey(source);
-  let cached = wasmModuleCache.get(sourceKey);
-  if (cached?.key !== key) {
-    const module = compileWasmModule(rpcSession, source);
-    cached = { key, module };
-    wasmModuleCache.set(sourceKey, cached);
-    module.catch(() => {
-      if (wasmModuleCache.get(sourceKey) === cached) {
-        wasmModuleCache.delete(sourceKey);
-      }
-    });
-  }
-  return cached.module;
-}
-
-async function compileWasmModule(rpcSession, source) {
-  const bytes = await loadAssetBytes(rpcSession, source.value);
-  return WebAssembly.compile(bytes);
-}
-
-function assetSourceCacheKey(source) {
-  const revision = source.revision ?? "";
-  return revision.length === 0
-    ? `${source.kind}:${source.value}`
-    : `${source.kind}:${source.value}:${revision}`;
-}
-
-function wasmAssetSource(config) {
-  const wasmPath = config.wasmPath ?? "";
-  if (wasmPath.length === 0) {
-    throw new Error("VIR widget wasmPath must be a non-empty string");
-  }
-  return { kind: "path", value: wasmPath };
-}
-
-function irPackageSource(config) {
-  const irPackage = config.irPackage ?? null;
-  if (irPackage === null) {
+export async function loadRuntimeService({ rpcSession, config, previous = null }) {
+  const { wasmPath, irPackage, position } = config;
+  requiredString(wasmPath, "wasmPath");
+  if (irPackage === null || irPackage === undefined) {
     throw new Error("VIR widget irPackage must be set");
   }
-  if (config.position === null || config.position === undefined) {
+  if (position === null || position === undefined) {
     throw new Error("VIR widget irPackage requires an infoview position");
   }
-  return {
-    kind: "irPackage",
-    package: irPackage,
-    roots: irPackage.roots,
-    position: config.position,
-  };
+  const wasmModule = await loadWasmModule(rpcSession, wasmPath);
+  const builtPackage = await buildIRPackage(rpcSession, irPackage, position);
+  const packageBytes = decodeBase64Bytes(builtPackage.dataBase64);
+  const packageDigest = await contentDigest(packageBytes);
+  // Compare the complete artifact, including interfaces and initializers.
+  // Distinct descriptions can still emit identical bytes. Preserve the installed
+  // component when the acquired artifacts match.
+  if (
+    previous?.runtime?.failure === null &&
+    previous.runtime.disposed === false &&
+    previous.runtime.module === wasmModule &&
+    previous.packageDigest === packageDigest
+  ) {
+    return previous;
+  }
+  const runtime = await createBundledVirRuntime({
+    wasmModule,
+    irPackageSet: [packageBytes],
+    defaultHostBindings: () => createBrowserHostBindings({
+      infoviewEditorContext: EditorContext,
+      infoviewPositionToTdpp: DocumentPosition.toTdpp,
+      reactHostBindings: createBrowserReactHostBindings,
+      infoviewUseClientNotificationEffect: useClientNotificationEffect,
+      infoviewUseRpcSession: useRpcSession,
+      infoviewInteractiveCode: InteractiveCode,
+      infoviewStripTags: TaggedText_stripTags,
+    }),
+  });
+  return { runtime, packageDigest };
+}
+
+async function contentDigest(bytes) {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export async function loadWasmModule(rpcSession, path) {
+  // Relative paths and file metadata cannot identify bytes across projects.
+  // Read only on acquisition; ordinary proof/context updates never get here.
+  const bytes = await loadAssetBytes(rpcSession, path);
+  const digest = await contentDigest(bytes);
+  let module = wasmModuleCache.get(digest);
+  if (module === undefined) {
+    module = WebAssembly.compile(bytes);
+    wasmModuleCache.set(digest, module);
+    module.catch(() => {
+      if (wasmModuleCache.get(digest) === module) {
+        wasmModuleCache.delete(digest);
+      }
+    });
+  }
+  return module;
 }
 
 export async function loadAssetBytes(rpcSession, path) {
@@ -903,82 +443,32 @@ export async function loadAssetBytes(rpcSession, path) {
   return decodeBase64Bytes(assetDataBase64(response, path));
 }
 
-export async function statIRPackage(rpcSession, irPackage, position) {
-  const response = await rpcSession.call("Lean.Vir.Infoview.statIRPackage", {
-    package: irPackage,
-    pos: position,
-  });
-  return irPackageStatInfo(response, irPackage.roots);
-}
-
 export async function buildIRPackage(rpcSession, irPackage, position) {
+  const { entry, fingerprint } = requiredIRPackage(irPackage, "irPackage");
   const response = await rpcSession.call("Lean.Vir.Infoview.buildIRPackage", {
-    package: irPackage,
+    package: { entry, fingerprint },
     pos: position,
   });
-  return irPackageInfo(response, irPackage.roots);
-}
-
-export async function statAsset(rpcSession, path) {
-  const response = await rpcSession.call("Lean.Vir.Infoview.statAsset", {
-    path,
-  });
-  return assetInfo(response, path);
+  if (response?.entry !== entry) {
+    throw new Error(`VIR widget entry mismatch: expected ${entry}, got ${response?.entry}`);
+  }
+  if (response?.fingerprint !== fingerprint) {
+    throw new Error(
+      `VIR IR package fingerprint mismatch: expected ${fingerprint}, got ${response?.fingerprint}`,
+    );
+  }
+  return { entry, fingerprint,
+    dataBase64: requiredString(response?.dataBase64, "IR package dataBase64") };
 }
 
 function assetDataBase64(response, path) {
-  assetInfo(response, path);
-  return requiredString(response?.dataBase64, `asset ${path} dataBase64`);
-}
-
-function assetInfo(response, path) {
   const responsePath = requiredString(response?.path, `asset ${path} path`);
   if (responsePath !== path) {
     throw new Error(
       `VIR asset response path mismatch: expected ${path}, got ${responsePath}`,
     );
   }
-  return {
-    path: responsePath,
-    mime: requiredString(response?.mime, `asset ${path} mime`),
-    byteSize: requiredString(response?.byteSize, `asset ${path} byteSize`),
-    modified: requiredString(response?.modified, `asset ${path} modified`),
-    revision: requiredString(response?.revision, `asset ${path} revision`),
-  };
-}
-
-function irPackageInfo(response, roots) {
-  const info = irPackageStatInfo(response, roots);
-  return {
-    ...info,
-    byteSize: requiredString(response?.byteSize, "IR package byteSize"),
-    dataBase64: requiredString(response?.dataBase64, "IR package dataBase64"),
-    report: optionalString(response?.report, "IR package report"),
-  };
-}
-
-function irPackageStatInfo(response, roots) {
-  const responseRoots = requiredStringArray(
-    response?.roots,
-    "IR package roots",
-  );
-  if (JSON.stringify(responseRoots) !== JSON.stringify(roots)) {
-    throw new Error(
-      `VIR IR package roots mismatch: expected ${roots.join(", ")}, got ${responseRoots.join(", ")}`,
-    );
-  }
-  return {
-    source: requiredString(response?.source, "IR package source"),
-    roots: responseRoots,
-    revision: requiredString(response?.revision, "IR package revision"),
-  };
-}
-
-function requiredStringArray(value, label) {
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
-    throw new Error(`VIR widget ${label} must be an array of strings`);
-  }
-  return value;
+  return requiredString(response?.dataBase64, `asset ${path} dataBase64`);
 }
 
 export function decodeBase64Bytes(base64) {
@@ -988,17 +478,4 @@ export function decodeBase64Bytes(base64) {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
-}
-
-function freshMountId(value) {
-  const prefix =
-    typeof value === "string" && /^[A-Za-z][A-Za-z0-9_-]*$/.test(value)
-      ? value
-      : "vir-infoview-widget";
-  nextMountId += 1;
-  return `${prefix}-${nextMountId}`;
-}
-
-function widgetCleanupError(errors, message) {
-  return errors.length === 1 ? errors[0] : new AggregateError(errors, message);
 }

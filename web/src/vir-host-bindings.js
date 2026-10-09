@@ -16,9 +16,15 @@ import {
   createDOMTokenListHostBindings,
 } from "./host/vir-dom-host-bindings.js";
 import { createInfoviewHostBindings } from "./host/vir-infoview-host-bindings.js";
-import { createJsValueHostBindings } from "./host/vir-js-value-bindings.js";
-import { createJsCollectionHostBindings } from "./host/vir-js-collection-bindings.js";
-import { createJsonValueHostBindings } from "./host/vir-json-value-bindings.js";
+import { createInfoviewPanelBindings } from "./host/vir-infoview-panel-bindings.js";
+import {
+  createCommonHostBindings,
+  createConsoleHostBindings,
+} from "./host/vir-common-host-bindings.js";
+export {
+  createCommonHostBindings,
+  createConsoleHostBindings,
+} from "./host/vir-common-host-bindings.js";
 import { VIR_HOST_DISPOSE } from "./host-boundary.js";
 
 export {
@@ -32,23 +38,6 @@ export {
   createBrowserHtmlInputElementHostBindings,
 } from "./host/vir-dom-host-bindings.js";
 export { createInfoviewHostBindings } from "./host/vir-infoview-host-bindings.js";
-
-export function createCommonHostBindings() {
-  return {
-    ...createJsValueHostBindings(),
-    ...createJsCollectionHostBindings(),
-    ...createJsonValueHostBindings(),
-    "common.echoString": (value) => value,
-    "common.addNat": (lhs, rhs) => lhs + rhs,
-  };
-}
-
-export function createConsoleHostBindings() {
-  return {
-    "browser.console.current": () => browserConsole(),
-    "browser.console.log": (consoleValue, message) => consoleValue.log(message),
-  };
-}
 
 export function createBrowserDocumentHostBindings() {
   return {
@@ -134,9 +123,13 @@ export function createBrowserAnimationHostBindings(lifecycle) {
 }
 
 export function createBrowserHostBindings({
+  infoviewUseRpcSession = null,
+  infoviewInteractiveCode = null,
+  infoviewStripTags = null,
   infoviewUseClientNotificationEffect = null,
   lifecycle = createHostLifecycle(),
-  infoviewCommandDispatcher = null,
+  infoviewEditorContext = null,
+  infoviewPositionToTdpp = null,
   reactHostBindings = null,
 } = {}) {
   const reactBindings =
@@ -155,10 +148,17 @@ export function createBrowserHostBindings({
     ...createTimerHostBindings(lifecycle),
     ...createBrowserAnimationHostBindings(lifecycle),
     ...createInfoviewHostBindings({
-      commandDispatcher: infoviewCommandDispatcher,
       useClientNotificationEffect: infoviewUseClientNotificationEffect,
     }),
     ...reactBindings,
+    ...createInfoviewPanelBindings({
+      useRpcSession: infoviewUseRpcSession,
+      interactiveCode: infoviewInteractiveCode,
+      stripTags: infoviewStripTags,
+      editorContext: infoviewEditorContext,
+      positionToTdpp: infoviewPositionToTdpp,
+      lifecycle,
+    }),
     [VIR_HOST_DISPOSE]: () => lifecycle.dispose(),
   };
 }
@@ -187,16 +187,6 @@ function browserDocument() {
     );
   }
   return globalThis.document;
-}
-
-function browserConsole() {
-  const consoleValue = globalThis.console;
-  if (!consoleValue || typeof consoleValue.log !== "function") {
-    throw new Error(
-      "browser.console host binding requires globalThis.console or explicit hostBindings",
-    );
-  }
-  return consoleValue;
 }
 
 function browserAnimationFunction(name) {

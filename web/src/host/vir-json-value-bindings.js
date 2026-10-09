@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { isLeanObjectHandle } from "../runtime/object-values.js";
+import { isLeanObjectHandle } from "../runtime/object-core.js";
 
 const fieldPath = (path, key) => `${path}[${JSON.stringify(key)}]`;
 const diagnostics = new WeakMap();
@@ -19,7 +19,7 @@ function stringCheck(value, path) {
   if (!value.isWellFormed()) fail(path, "unpaired UTF-16 surrogate");
 }
 
-function inspectNode(value, path) {
+function inspectNode(value, path, remainingChildren = Infinity) {
   if (value === null) return { kind: "null" };
   if (typeof value === "boolean") return { kind: "bool", value };
   if (typeof value === "string") {
@@ -38,14 +38,16 @@ function inspectNode(value, path) {
   if (!array && prototype !== Object.prototype && prototype !== null)
     fail(path, "expected an ordinary object");
   if (array && prototype !== Array.prototype) fail(path, "expected an ordinary array");
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  const keys = Reflect.ownKeys(descriptors);
+  if (array && value.length > remainingChildren) fail(path, "JSON tree exceeds 1000000 nodes");
+  const keys = Reflect.ownKeys(value);
+  if (keys.length - (array ? 1 : 0) > remainingChildren)
+    fail(path, "JSON tree exceeds 1000000 nodes");
   if (keys.some((key) => typeof key !== "string")) fail(path, "symbol property");
   const children = [];
   for (const key of keys) {
     if (array && key === "length") continue;
     stringCheck(key, path);
-    const descriptor = descriptors[key];
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor.enumerable || !Object.hasOwn(descriptor, "value"))
       fail(fieldPath(path, key), "non-enumerable property or accessor");
     if (array) {
@@ -62,23 +64,42 @@ function inspectNode(value, path) {
 }
 
 function check(value) {
-  const active = new WeakSet(), complete = new WeakSet();
-  const stack = [{ value, path: "$" }];
+  // Cache expanded subtree sizes, not only visitation: aliases can otherwise
+  // validate as a tiny graph and expand exponentially during Lean conversion.
+  const active = new WeakSet(), complete = new WeakMap();
+  const stack = [{ value, path: "$", depth: 0 }];
+  let nodes = 0;
   let path = "$";
   try {
     while (stack.length) {
       const item = stack.pop();
       path = item.path;
-      if (item.close) { active.delete(item.value); complete.add(item.value); continue; }
-      const node = inspectNode(item.value, path);
-      if (node.kind !== "array" && node.kind !== "object") continue;
+      if (item.close) {
+        active.delete(item.value);
+        const height = item.children.reduce((max, child) =>
+          Math.max(max, 1 + (complete.get(child)?.height ?? 0)), 0);
+        complete.set(item.value, { nodes: nodes - item.before, height });
+        continue;
+      }
+      if (item.depth > 256) fail(path, "JSON nesting exceeds 256");
+      const before = nodes;
+      if (++nodes > 1000000) fail(path, "JSON tree exceeds 1000000 nodes");
       if (active.has(item.value)) fail(path, "cyclic value");
-      if (complete.has(item.value)) continue;
+      const cached = complete.get(item.value);
+      if (cached) {
+        if (item.depth + cached.height > 256) fail(path, "JSON nesting exceeds 256");
+        nodes += cached.nodes - 1;
+        if (nodes > 1000000) fail(path, "JSON tree exceeds 1000000 nodes");
+        continue;
+      }
+      const node = inspectNode(item.value, path, 1000000 - nodes);
+      if (node.kind !== "array" && node.kind !== "object") continue;
       active.add(item.value);
-      stack.push({ ...item, close: true });
+      const children = node.value.map(child => node.kind === "array" ? child : child.snd);
+      stack.push({ ...item, close: true, before, children });
       node.value.forEach((child, index) => stack.push(node.kind === "array"
-        ? { value: child, path: `${path}[${index}]` }
-        : { value: child.snd, path: fieldPath(path, child.fst) }));
+        ? { value: child, path: `${path}[${index}]`, depth: item.depth + 1 }
+        : { value: child.snd, path: fieldPath(path, child.fst), depth: item.depth + 1 }));
     }
     return { kind: "ok", value: null };
   } catch (error) {

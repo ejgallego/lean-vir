@@ -7,23 +7,16 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+import { validateInterfaceType } from "../../web/src/runtime/interface-manifest.js";
 import { normalizeCustomInductive } from "../../web/src/runtime/vir-value-normalizers.js";
 
 const scalarType = { type: "Unit", interfaceTag: INTERFACE_TAG.UNIT };
-let layoutReads = 0;
 function objectField(name, index) {
-  const layout = { kind: "object", index };
-  return {
-    name,
-    type: scalarType,
-    get layout() {
-      layoutReads += 1;
-      return layout;
-    },
-  };
+  return { name, type: scalarType, layout: { kind: "object", index } };
 }
 const nilCtor = {
   name: "Example.nil",
+  tag: 0,
   jsName: "nil",
   objectFieldCount: 0,
   usizeFieldCount: 0,
@@ -32,6 +25,7 @@ const nilCtor = {
 };
 const unaryCtor = {
   name: "Example.unary",
+  tag: 1,
   jsName: "unary",
   objectFieldCount: 1,
   usizeFieldCount: 0,
@@ -40,6 +34,7 @@ const unaryCtor = {
 };
 const pairCtor = {
   name: "Example.pair",
+  tag: 2,
   jsName: "pair",
   objectFieldCount: 2,
   usizeFieldCount: 0,
@@ -49,7 +44,11 @@ const pairCtor = {
     objectField("right", 1),
   ],
 };
-const type = { constructors: [nilCtor, unaryCtor, pairCtor] };
+const type = Object.freeze(validateInterfaceType({
+  type: "Example", kind: "customInductive", name: "Example",
+  interfaceTag: INTERFACE_TAG.CUSTOM_INDUCTIVE,
+  constructors: Object.freeze([nilCtor, unaryCtor, pairCtor]),
+}));
 const expectedShapes =
   '{ kind: "nil" } | { kind: "unary", value } | { kind: "pair", fields: { left, right } }';
 
@@ -58,8 +57,6 @@ assert.deepEqual(normalizeCustomInductive({ kind: "nil" }, type, "value"), {
   ctor: nilCtor,
   fields: {},
 });
-const layoutReadsAfterPlanConstruction = layoutReads;
-assert.equal(layoutReadsAfterPlanConstruction, 3);
 assert.deepEqual(normalizeCustomInductive({ kind: "unary", value: 1 }, type, "value"), {
   index: 1,
   ctor: unaryCtor,
@@ -70,14 +67,12 @@ assert.deepEqual(
   { index: 2, ctor: pairCtor, fields: { left: 1, right: 2 } },
 );
 
-// Exercise the cached path independently of the first plan construction and
-// prove that constructor layout validation is not repeated.
+// Exercise repeated normalization against the same admitted descriptor.
 assert.deepEqual(normalizeCustomInductive({ kind: "unary", value: 3 }, type, "repeat"), {
   index: 1,
   ctor: unaryCtor,
   fields: { arg1: 3 },
 });
-assert.equal(layoutReads, layoutReadsAfterPlanConstruction);
 assert.throws(
   () => normalizeCustomInductive({ kind: "Example.unary", value: 1 }, type, "value"),
   /unknown custom inductive constructor Example\.unary/,
@@ -112,15 +107,22 @@ assert.throws(
   /value\.pair\.right is missing; expected \{ kind: "pair", fields: \{ left, right \} \}/,
 );
 
-// Replacing the constructor array invalidates the plan without retaining the
-// old constructor lookup.
+// Independently admitted descriptors have independent normalization plans.
 const replacementCtor = { ...nilCtor, name: "Example.empty", jsName: "empty" };
-type.constructors = [replacementCtor];
-assert.equal(normalizeCustomInductive({ kind: "empty" }, type, "replacement").ctor, replacementCtor);
+const replacementType = Object.freeze(validateInterfaceType({
+  ...type, constructors: Object.freeze([replacementCtor]),
+}));
+assert.equal(normalizeCustomInductive({ kind: "empty" }, replacementType, "replacement").ctor, replacementCtor);
 assert.throws(
-  () => normalizeCustomInductive({ kind: "nil" }, type, "replacement"),
+  () => normalizeCustomInductive({ kind: "nil" }, replacementType, "replacement"),
   /replacement has unknown custom inductive constructor nil; expected \{ kind: "empty" \}/,
 );
+assert.equal(normalizeCustomInductive({ kind: "nil" }, type, "original").ctor, nilCtor);
+
+// Malformed metadata is rejected at admission, before any value conversion.
+const malformed = structuredClone(type);
+malformed.constructors[2].fields[0].layout.index = 5;
+assert.throws(() => validateInterfaceType(malformed), /outside objectFieldCount/);
 
 console.log("custom inductive normalization smoke ok");
 

@@ -10,22 +10,36 @@ import * as React from "react";
 import { createHostLifecycle } from "../../web/src/host/vir-active-host-bindings.js";
 import { createReactRootHostBindings } from "../../web/src/react/vir-react-root.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
+import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collection-bindings.js";
 
 const lifecycle = createHostLifecycle();
 const reactBindings = createBrowserReactHostBindings(lifecycle);
 
 {
-  const component = ({ leanProps }) => leanProps.label;
-  const leanProps = { label: "first" };
-  const firstNode = reactBindings["react.node.component"](component, leanProps);
+  const data = {};
+  const props = reactBindings["react.props.withData.make"](data);
+  const other = reactBindings["react.props.withData.make"](data);
+  assert.notEqual(props, other);
+  assert.equal(Object.getPrototypeOf(props), Object.prototype);
+  const component = p => reactBindings["react.props.withData.get"](p);
+  for (const children of [[], ["one"], ["one", "two"]]) {
+    const element = reactBindings["react.node.createElement"](component, props, children);
+    assert.notEqual(element.props, props);
+    assert.equal(element.type, component);
+    assert.equal(element.type(element.props), data);
+    assert.deepEqual(reactBindings["react.props.withData.children"](element.props),
+      children.length === 0 ? undefined : children.length === 1 ? children[0] : children);
+  }
+}
+
+{
+  const component = ({ label }) => label;
+  const props = { label: "first" };
+  const firstNode = reactBindings["react.node.createElement"](component, props, []);
   assert.equal(firstNode.type, component);
-  assert.equal(firstNode.props.leanProps, leanProps);
+  assert.equal(firstNode.props.label, "first");
   assert.equal(firstNode.type(firstNode.props), "first");
-  const keyed = reactBindings["react.node.keyedComponent"](
-    component,
-    leanProps,
-    "counter-key",
-  );
+  const keyed = reactBindings["react.node.createElement"](component, { ...props, key: "counter-key" }, []);
   assert.equal(keyed.key, "counter-key");
 }
 
@@ -52,14 +66,16 @@ for (const name of ["__proto__", "constructor", "prototype"]) {
 assert.equal(Object.getPrototypeOf(props), Object.prototype);
 
 const children = [];
-const first = reactBindings["react.node.text"]("goal: ");
-const second = reactBindings["react.node.text"]("⊢ True");
+const first = "goal: ";
+const second = "⊢ True";
 children.push(first, second);
 assert.deepEqual(children, [first, second]);
 
-const tag = reactBindings["react.elementType.tag"]("section");
-assert.equal(tag, "section");
-const element = reactBindings["react.node.createElement"](tag, props, children);
+const element = reactBindings["react.node.createElement"](
+  "section",
+  props,
+  children,
+);
 assert.equal(React.isValidElement(element), true);
 assert.equal(element.type, "section");
 assert.equal(element.props.onClick, callback);
@@ -72,32 +88,36 @@ assert.equal(React.isValidElement(fragment), true);
 assert.equal(fragment.type, React.Fragment);
 
 {
-  const conversions = reactBindings;
+  const conversions = createJsCollectionHostBindings();
   const property = { name: "title", value: { kind: "string", value: "proof" } };
   const reducer = (state, action) => ({ state, action });
   const calculate = () => property;
-  assert.equal(conversions["js.value.react.reducer"](reducer), reducer);
+  assert.equal(conversions["js.value.function.binary"](reducer), reducer);
   assert.equal(
-    conversions["js.value.react.memoCalculation"](calculate),
+    conversions["js.value.function.nullary"](calculate),
     calculate,
   );
-  assert.equal(conversions["js.value.react.callback"](callback), callback);
-  const setup = () => property;
-  const cleanup = (value) => value;
-  const effect = conversions["js.value.react.effectCallback"]({
-    setup,
-    cleanup,
-  });
-  assert.equal(effect()(), property);
-  const render = (leanProps) => leanProps;
-  const component = conversions["js.value.react.component"](render);
-  assert.equal(component({ leanProps: property }), property);
+  assert.equal(conversions["js.value.function.unaryVoid"](callback), callback);
+  let cleaned;
+  const cleanup = conversions["js.value.function.nullaryVoid"](() => { cleaned = property; });
+  const setup = () => cleanup;
+  const effect = conversions["js.value.function.nullary"](setup);
+  assert.equal(effect, setup);
+  assert.equal(effect(), cleanup, "setup returns the exact cleanup function");
+  assert.equal(effect()(), undefined);
+  assert.equal(cleaned, property);
+  const noCleanup = () => undefined;
+  assert.equal(conversions["js.value.function.nullary"](noCleanup)(), undefined);
+  for (const target of ["js.value.react.reducer", "js.value.react.memoCalculation",
+    "js.value.react.callback", "js.value.react.effectCallback", "react.state.modify"]) {
+    assert.equal(Object.hasOwn(reactBindings, target), false);
+  }
 }
 
 {
   let queuedUpdate = null;
   const update = (previous) => ({ previous });
-  reactBindings["react.state.modify"]((action) => {
+  createJsCollectionHostBindings()["js.function.callVoid"]((action) => {
     queuedUpdate = action;
   }, update);
   assert.equal(
@@ -173,14 +193,9 @@ assert.equal(fragment.type, React.Fragment);
   bindings["react.root.renderNode"](root, element);
   assert.equal(rendered.at(-1), element);
   const component = () => element;
-  const leanProps = {};
-  const componentNode = reactBindings["react.node.component"](
-    component,
-    leanProps,
-  );
+  const componentNode = reactBindings["react.node.createElement"](component, {}, []);
   bindings["react.root.renderNode"](root, componentNode);
   assert.equal(rendered.at(-1).type, component);
-  assert.equal(rendered.at(-1).props.leanProps, leanProps);
   bindings["react.root.unmount"](root);
   assert.equal(unmounts, 1);
   assert.equal(lifecycle.debugResourceCounts().active, 0);

@@ -4,13 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createVirRuntimeFactory as createBrowserVirRuntimeFactory } from "./vir-runtime.js";
+import { createVirRuntimeFactory as createRuntimeFactory } from "./runtime/factory.js";
 import {
   createCommonHostBindings,
   createConsoleHostBindings,
-  hasExternrefTableSupport,
-  requireExternrefTableSupport,
-} from "./vir-host-bindings.js";
+} from "./host/vir-common-host-bindings.js";
 
 export {
   createVirImports,
@@ -24,20 +22,20 @@ export {
   VIR_WASM_RELEASE_FILE,
   formatPackageTarget,
   packageTargetModeLabel,
-} from "./vir-runtime.js";
+} from "./runtime/factory.js";
 export {
   hasExternrefTableSupport,
   requireExternrefTableSupport,
-} from "./vir-host-bindings.js";
+} from "./host-boundary.js";
 
 export function createVirRuntimeFactory(options = {}) {
-  const { hostBindings = null, ...browserOptions } = options;
-  return createBrowserVirRuntimeFactory({
-    ...browserOptions,
-    defaultHostBindings: () => ({
+  const { hostBindings = null, ...factoryOptions } = options;
+  return createRuntimeFactory({
+    ...factoryOptions,
+    defaultHostBindings: options.defaultHostBindings ?? (() => ({
       ...createCommonHostBindings(),
       ...createConsoleHostBindings(),
-    }),
+    })),
     hostBindings,
   });
 }

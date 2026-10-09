@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import "./style.css";
 import {
+  constructorTemplate,
   inputDefault,
   interfaceInputTag,
   isJsonInputTag,
@@ -33,6 +34,7 @@ import {
   assetPathFor,
   errorMessage,
   formatBytes,
+  formatResult,
   setReadyState,
 } from "./pages/page-utils.js";
 import { createLatestLoadGate } from "./pages/latest-load.js";
@@ -55,6 +57,7 @@ const loadUrlButton = document.querySelector("#dev-load-url");
 const entrySelect = document.querySelector("#dev-entry-select");
 const inputFields = document.querySelector("#dev-input-fields");
 const runEntryButton = document.querySelector("#dev-run-entry");
+const reloadRuntimeButton = document.querySelector("#dev-reload-runtime");
 const resultOutput = document.querySelector("#dev-result");
 const runtimeFactory = createBrowserReactRuntimeFactory({
   wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}`,
@@ -65,21 +68,55 @@ let requestedAutoRun = query.get("run") === "1";
 
 let runtime = null;
 let interfaceEntries = [];
-let currentPackageQuery = null;
+let currentPackageSource = null;
+let packageLoadPending = false;
+let reloadingFailedRuntime = false;
 const packageLoadGate = createLatestLoadGate();
 
+function updateRuntimeControls() {
+  const failed = runtime?.failure != null;
+  runEntryButton.disabled =
+    packageLoadPending ||
+    runtime === null ||
+    failed ||
+    interfaceEntries.length === 0;
+  reloadRuntimeButton.hidden = !failed;
+  reloadRuntimeButton.disabled =
+    packageLoadPending || currentPackageSource === null;
+  entrySelect.disabled = reloadingFailedRuntime;
+  for (const field of inputFields.querySelectorAll("[data-input-index], [data-constructor-index]")) {
+    field.disabled = reloadingFailedRuntime;
+  }
+}
+
 function showError(error, status = "Failed") {
+  if (runtime?.failure != null) {
+    try {
+      runtime.dispose();
+    } catch (cleanupError) {
+      console.error("failed to dispose trapped runner runtime", cleanupError);
+    }
+  }
   resultOutput.textContent = errorMessage(error);
-  runEntryButton.disabled = runtime === null || interfaceEntries.length === 0;
+  updateRuntimeControls();
   setReadyState(statusEl, status, false);
   console.error(error);
 }
 
 function beginPackageLoad() {
   const token = packageLoadGate.begin();
-  runEntryButton.disabled = true;
+  packageLoadPending = true;
+  reloadingFailedRuntime = false;
+  updateRuntimeControls();
   setReadyState(statusEl, "Loading", false);
   return token;
+}
+
+function finishPackageLoad(token) {
+  if (!packageLoadGate.isCurrent(token)) return;
+  packageLoadPending = false;
+  reloadingFailedRuntime = false;
+  updateRuntimeControls();
 }
 
 function selectedInterfaceEntry() {
@@ -152,8 +189,8 @@ function renderInputFields(entry) {
     if (input.type?.interfaceTag === INTERFACE_TAG.SIMPLE_ENUM) {
       for (const ctor of input.type?.constructors ?? []) {
         const option = document.createElement("option");
-        option.value = ctor.jsName ?? ctor.name;
-        option.textContent = ctor.jsName ?? ctor.name;
+        option.value = ctor.jsName;
+        option.textContent = ctor.jsName;
         field.append(option);
       }
       field.value = inputDefault(input);
@@ -191,8 +228,70 @@ function renderInputFields(entry) {
       field.value = inputOverride(entry, input, index) ?? inputDefault(input);
     }
     label.append(caption, field);
-    inputFields.append(label);
+    if (isJsonInputTag(input.type?.interfaceTag)) {
+      const hint = document.createElement("small");
+      hint.id = `dev-entry-input-${index}-hint`;
+      hint.className = "dev-field-hint";
+      hint.textContent = 'For large integers, use quoted decimal strings, e.g. ["9007199254740993"].';
+      field.setAttribute("aria-describedby", hint.id);
+      label.append(hint);
+    }
+    if (input.type.interfaceTag === INTERFACE_TAG.TAGGED_UNION ||
+        input.type.interfaceTag === INTERFACE_TAG.CUSTOM_INDUCTIVE) {
+      const group = document.createElement("div");
+      group.className = "dev-constructor-input";
+      group.append(constructorControl(input, index, field), label);
+      inputFields.append(group);
+    } else {
+      inputFields.append(label);
+    }
   }
+}
+
+function constructorControl(input, index, field) {
+  const type = input.type;
+  const label = document.createElement("label");
+  label.className = "dev-field";
+  const caption = document.createElement("span");
+  caption.textContent = `Constructor for ${input.name}`;
+  const select = document.createElement("select");
+  select.id = `${field.id}-constructor`;
+  select.dataset.constructorIndex = String(index);
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Choose a constructor";
+  placeholder.disabled = true;
+  select.append(placeholder);
+  for (const ctor of type.constructors) {
+    const option = document.createElement("option");
+    option.value = ctor.jsName;
+    option.textContent = ctor.jsName;
+    select.append(option);
+  }
+  const syncSelection = () => {
+    try {
+      const value = JSON.parse(field.value);
+      select.value = type.constructors.some((ctor) => ctor.jsName === value?.kind)
+        ? value.kind : "";
+    } catch {
+      select.value = "";
+    }
+  };
+  field.addEventListener("input", syncSelection);
+  select.addEventListener("change", () => {
+    const ctor = type.constructors.find((ctor) => ctor.jsName === select.value);
+    if (ctor === undefined) return;
+    field.value = JSON.stringify(constructorTemplate(type, ctor), null, 2);
+    syncSelection();
+  });
+  syncSelection();
+  const hint = document.createElement("small");
+  hint.className = "dev-field-hint";
+  hint.id = `${select.id}-hint`;
+  hint.textContent = "Choosing a constructor replaces this input with an editable JSON template. Recursive placeholders may need editing before running.";
+  select.setAttribute("aria-describedby", hint.id);
+  label.append(caption, select, hint);
+  return label;
 }
 
 function inputOverride(entry, input, index) {
@@ -250,15 +349,15 @@ function renderManifestEntries(entries) {
 function entryUrl(entry) {
   const url = new URL(window.location.href);
   url.search = "";
-  if (currentPackageQuery !== null) {
-    url.searchParams.set("package", currentPackageQuery);
+  if (currentPackageSource?.packageQuery != null) {
+    url.searchParams.set("package", currentPackageSource.packageQuery);
   }
   url.searchParams.set("entry", entry.id);
   return url;
 }
 
 function updateLocationForSelectedEntry() {
-  if (currentPackageQuery === null) return;
+  if (currentPackageSource?.packageQuery == null) return;
   const entry = selectedInterfaceEntry();
   if (entry === null) return;
   window.history.replaceState(null, "", entryUrl(entry));
@@ -329,20 +428,19 @@ function parseInputValue(input, field) {
   }
 }
 
-function formatResult(value) {
-  if (value instanceof Uint8Array) return Array.from(value).join(", ");
-  if (value !== null && typeof value === "object")
-    return JSON.stringify(value, null, 2);
-  return String(value);
-}
-
 function renderResult(value) {
   const text = formatResult(value);
   resultOutput.textContent = text;
   resultOutput.dataset.multiline = String(text.includes("\n"));
 }
 
-async function loadPackageSet(token, label, irPackageSet, packageQuery = null) {
+async function loadPackageSet(
+  token,
+  packageSource,
+  irPackageSet,
+  restoreState = null,
+) {
+  const { label } = packageSource;
   const candidate = await runtimeFactory.createRuntime({ irPackageSet });
   if (packageLoadGate.discardStale(token, () => candidate.dispose())) return;
 
@@ -356,9 +454,9 @@ async function loadPackageSet(token, label, irPackageSet, packageQuery = null) {
 
   const previousRuntime = runtime;
   const previousEntries = interfaceEntries;
-  const previousPackageQuery = currentPackageQuery;
+  const previousPackageSource = currentPackageSource;
   runtime = candidate;
-  currentPackageQuery = packageQuery;
+  currentPackageSource = packageSource;
   try {
     syncPackagePreset();
     packageName.textContent = label;
@@ -366,14 +464,16 @@ async function loadPackageSet(token, label, irPackageSet, packageQuery = null) {
     declCount.textContent = String(candidate.packageInfo.count);
     ptrWidth.textContent = `${candidate.targetPointerBytes()} bytes`;
     renderManifestEntries(entries);
+    if (restoreState !== null) restoreRunnerState(restoreState);
     renderPackageMetadata(candidate.packageMetadata, candidate.packageInfo);
-    runEntryButton.disabled = interfaceEntries.length === 0;
+    updateRuntimeControls();
     setReadyState(statusEl, "Ready", true);
     updateLocationForSelectedEntry();
   } catch (error) {
     runtime = previousRuntime;
     interfaceEntries = previousEntries;
-    currentPackageQuery = previousPackageQuery;
+    currentPackageSource = previousPackageSource;
+    updateRuntimeControls();
     candidate.dispose();
     throw error;
   }
@@ -387,27 +487,90 @@ async function loadPackageSet(token, label, irPackageSet, packageQuery = null) {
   }
 }
 
+function captureRunnerState() {
+  return {
+    entryId: entrySelect.value,
+    inputs: Array.from(inputFields.querySelectorAll("[data-input-index]"), (field) => ({
+      value: field.value,
+      checked: field.checked,
+    })),
+  };
+}
+
+function restoreRunnerState(state) {
+  if (!interfaceEntries.some((entry) => entry.id === state.entryId)) return;
+  entrySelect.value = state.entryId;
+  renderInputFields(selectedInterfaceEntry());
+  for (const [index, saved] of state.inputs.entries()) {
+    const field = inputFields.querySelector(`[data-input-index='${index}']`);
+    if (field === null) continue;
+    field.value = saved.value;
+    field.checked = saved.checked;
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+
+function packageUrlSource(label) {
+  return {
+    label,
+    packageQuery: label,
+    load: async () => {
+      const url = assetPathFor(label, import.meta.env.BASE_URL);
+      return /\.irpkg-set\.json(?:[?#]|$)/u.test(label)
+        ? url
+        : [await fetchBytes(url)];
+    },
+  };
+}
+
 async function loadPackageUrl() {
   const token = beginPackageLoad();
   const label = packageUrl.value.trim() || defaultPackageFile;
+  const source = packageUrlSource(label);
   try {
-    const url = assetPathFor(label, import.meta.env.BASE_URL);
-    const packageInput = /\.irpkg-set\.json(?:[?#]|$)/u.test(label)
-      ? url
-      : [await fetchBytes(url)];
-    await loadPackageSet(token, label, packageInput, label);
+    await loadPackageSet(token, source, await source.load());
   } catch (error) {
     if (packageLoadGate.isCurrent(token)) showError(error, "Failed");
+  } finally {
+    finishPackageLoad(token);
   }
 }
 
 async function loadPackageFile(file) {
   const token = beginPackageLoad();
+  const source = {
+    label: file.name,
+    packageQuery: null,
+    load: async () => [new Uint8Array(await file.arrayBuffer())],
+  };
   try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    await loadPackageSet(token, file.name, [bytes]);
+    await loadPackageSet(token, source, await source.load());
   } catch (error) {
     if (packageLoadGate.isCurrent(token)) showError(error, "Failed");
+  } finally {
+    finishPackageLoad(token);
+  }
+}
+
+async function reloadFailedRuntime() {
+  const source = currentPackageSource;
+  if (runtime?.failure == null || source === null || packageLoadPending) return;
+  const state = captureRunnerState();
+  requestedAutoRun = false;
+  const token = beginPackageLoad();
+  reloadingFailedRuntime = true;
+  updateRuntimeControls();
+  try {
+    await loadPackageSet(token, source, await source.load(), state);
+    if (packageLoadGate.isCurrent(token)) {
+      resultOutput.textContent =
+        "Fresh runtime ready. Run the selected entry to continue.";
+      resultOutput.dataset.multiline = "false";
+    }
+  } catch (error) {
+    if (packageLoadGate.isCurrent(token)) showError(error, "Failed");
+  } finally {
+    finishPackageLoad(token);
   }
 }
 
@@ -424,8 +587,16 @@ function evaluateEntry(runtime, entry) {
   return runtime.call(entry.entry, ...values);
 }
 
+function observeRuntimeFailure() {
+  if (runtime?.failure != null) showError(runtime.failure, "Trap");
+}
+
 loadUrlButton.addEventListener("click", () => {
   void loadPackageUrl();
+});
+
+reloadRuntimeButton.addEventListener("click", () => {
+  void reloadFailedRuntime();
 });
 
 packagePreset.addEventListener("change", () => {
@@ -451,7 +622,7 @@ entrySelect.addEventListener("change", () => {
 });
 
 runEntryButton.addEventListener("click", () => {
-  if (runtime === null) return;
+  if (runtime === null || runtime.failure !== null || packageLoadPending) return;
   try {
     const entry = selectedInterfaceEntry();
     if (entry === null) {
@@ -461,7 +632,7 @@ runEntryButton.addEventListener("click", () => {
     renderResult(result);
     setReadyState(statusEl, "Ready", true);
   } catch (error) {
-    showError(error, "Trap");
+    showError(error, runtime.failure !== null ? "Trap" : "Failed");
   }
 });
 
@@ -470,6 +641,9 @@ window.addEventListener("beforeunload", () => {
   runtime?.dispose();
   runtime = null;
 });
+
+window.addEventListener("error", observeRuntimeFailure);
+window.addEventListener("unhandledrejection", observeRuntimeFailure);
 
 renderPackagePresets();
 packageUrl.value = query.get("package") ?? defaultPackageFile;

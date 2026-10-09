@@ -1,8 +1,24 @@
 # Contributing
 
-Lean VIR is experimental, but the review workflow should stay predictable:
+Lean VIR is a proof of concept with a defined [support scope](docs/SUPPORT.md)
+and experimental integrations. The review workflow should stay predictable:
 small branches, clear public PR text, and the smallest relevant local check
 before asking CI to do the rest.
+
+Review against the [supported-input assumptions](docs/development/REVIEW_ASSUMPTIONS.md):
+cooperative users following documented workflows, trusted generated artifacts,
+and explicit producer/consumer contracts. Do not infer an adversarial admission
+or Lean kernel-soundness guarantee from artifact validation.
+
+## API changes
+
+Maintain the current API and artifact contracts without legacy or backward
+compatibility layers. When replacing an interface, remove the retired code,
+aliases and fallback paths; update repository callers, documentation and tests
+together. A previously documented API alone is not a reason to retain it.
+Keep checks that enforce the current contract and implementations required by
+current supported hosts. Applications must refresh their build and deployed
+assets together; see [matching runtime assets](docs/guides/JS_API.md#matching-runtime-assets).
 
 ## Branches
 
@@ -13,8 +29,9 @@ before asking CI to do the rest.
 - Use `wip/<slug>` only for local exploratory branches that are not ready for
   review.
 
-Prefer short, descriptive slugs. This repository does not use tracked branch
-policy metadata or a backport workflow.
+Prefer short, descriptive slugs. The repository has no tracked branch-policy
+registry; see [backports](docs/HARNESS.md#backports) for the maintenance target
+and workflow.
 
 ## Worktrees
 
@@ -58,6 +75,34 @@ Keep the first line tight enough for `git log --oneline`. Avoid generic
 subjects such as `update files` or `misc cleanup`.
 
 ## Pull Requests
+
+Development targets `main`. Selected fixes may also target the single
+maintenance line; see [backports](docs/HARNESS.md#backports) for the current
+target, provenance, PR links and validation workflow.
+
+### Landing and completion
+
+Land repository changes through a PR, including documentation-only changes and
+maintenance fixes. For an authorized landing, requests to "wrap up", "land" or
+"merge" use this workflow. Direct pushes to `main` or a maintenance branch require
+an explicit maintainer request to bypass the PR workflow for that change.
+
+A request to prepare a PR authorizes branch publication and PR creation for
+review; merging requires landing authorization. Within an authorized landing,
+publish the task branch and open its PR if needed, complete the selected review,
+and verify that the applicable PR checks pass on the actual head being merged.
+
+Before reporting source changes as landed, verify GitHub's merged PR state and
+record the PR URL, validated head and merge commit in the task's completion
+evidence. A local review checkpoint or green CI establishes readiness while the
+PR is still open. For an explicitly requested direct push, record the maintainer
+instruction, target branch and landed commit instead, and verify the remote ref.
+Investigation and local preparation tasks can finish without claiming a landing.
+
+Maintainers configure [repository protection](docs/HARNESS.md#repository-protection)
+separately to enforce this workflow on GitHub.
+
+### PR metadata
 
 Before opening or editing a PR, run:
 

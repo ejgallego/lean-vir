@@ -8,8 +8,8 @@ unrelated responsibilities.
 
 ## Runtime Entry Points
 
-- `vir-runtime.js`: public package/SDK runtime facade, WASM instantiation, package loading
-  convenience helpers, and host import wiring.
+- `vir-runtime.js`: public package/SDK browser entry point selecting the default
+  host providers.
 - `vir-runtime-node.js`: public package/SDK Node wrapper that installs only
   environment-neutral JavaScript value and console bindings. Browser and React
   imports require an explicitly supplied external host.
@@ -25,37 +25,13 @@ unrelated responsibilities.
 
 ## Runtime Internals
 
-- `runtime/call-timing.js`: opt-in synchronous runtime call phase
-  attribution.
-- `runtime/vir-codec.js`: binary reader/writer and interface type descriptor
-  codec.
-- `runtime/callbacks.js`: private Lean closure roots associated with ordinary
-  JavaScript functions, plus runtime-disposal helpers.
-- `runtime/cleanup.js`: shared cleanup error collection and deterministic
-  single/aggregate reporting.
-- `runtime/core.js`: package loading, manifest export tables, call resolution,
-  memory helpers, and runtime/callback lifecycle.
-- `runtime/object-values.js`: object ABI lowering and lifting between
-  JavaScript values and owned Lean objects.
-- `runtime/host-state.js`: host import dispatch state, exact-value externref
-  roots, host-binding lookup, and host-binding disposal.
-- `runtime/object-abi.js`: object ABI support checks, layout planning, scalar
-  field packing, and unpacking helpers used by the object-value runtime.
-- `runtime/object-abi-exports.js`: shared object ABI export-name manifest used
-  by runtime availability checks and Wasm linker tooling.
-- `runtime/vir-value-normalizers.js`: JavaScript input normalization for the
-  object ABI lowering path.
-- `runtime/interface-manifest.js`: interface manifest validation, diagnostics,
-  and type formatting helpers.
-- `runtime/ir-package.js`: browser-safe package-envelope parsing and package-set
-  member identity validation.
-- `runtime/module-name.js`: normalized Lean module-name validation shared by
-  descriptors and embedded package member identities.
-- `runtime/interface-tags.js`: shared interface descriptor tag constants.
-- `runtime/package-targets.js`: validated package-target mode constants and
-  shared user-facing formatting.
-- `host-boundary.js`: exact-value externref roots and host-call rollback
-  transactions.
+The [managed runtime composition](../../docs/development/MANAGED_RUNTIME_COMPOSITION.md)
+is the canonical map of runtime modules, conversion layers and retained-value
+ownership. Those modules are revision-locked internals of the public entries.
+
+- `host-boundary.js`: host-call rollback transactions for unpublished resources.
+- `host/vir-common-host-bindings.js`: environment-neutral JavaScript value and
+  console providers, shared by the browser and Node entry points.
 - `host/vir-dom-host-bindings.js`: passive direct-value DOM provider helpers.
 - `host/vir-active-host-bindings.js`: explicit teardown for timers and frames.
   It does not represent passive JavaScript values.
@@ -70,7 +46,8 @@ Every shipped boundary layer has one of these explicit sources:
 
 | Files                                                                                           | Provenance and justification                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `host-boundary.js`, `runtime/host-state.js`, `runtime/object-values.js`, `runtime/callbacks.js` | VIR-owned Lean/Wasm ABI machinery. It roots exact `externref` values, translates the generated object ABI, and keeps foreign Lean closures alive. JavaScript and browser APIs provide no equivalent. |
+| `host-boundary.js`, `runtime/host-state.js`, `runtime/object-core.js`, `runtime/object-values.js` | VIR-owned Lean/Wasm ABI machinery for host-call rollback, terminal root clearing, object ABI conversion, and foreign Lean closure ownership. |
+| `wasm/upstream_shim/abi/resource_roots.cpp` | VIR-owned slot allocator and release operations over an engine-managed Wasm `externref` table. JavaScript references remain exact values; allocator metadata lives in linear memory. |
 | `vir-host-bindings.js`, `host/vir-dom-host-bindings.js`, `host/vir-js-*.js`                     | Thin handwritten providers for generated targets. Each target's TypeScript, VIR-owned, or local-contract provenance is recorded in `Vir/*.bindings.json` and checked by `npm run check:bindings`.    |
 | `host/vir-active-host-bindings.js`                                                              | VIR-owned lifecycle plus schedule/frame teardown and failed-publication rollback. React roots register with that lifecycle from the React module.                                                    |
 | `host/vir-infoview-host-bindings.js`                                                            | Repository-local infoview and ProofWidgets command contract. It validates the local protocol and delegates effects to the supplied browser integration.                                             |

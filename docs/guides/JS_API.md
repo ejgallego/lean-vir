@@ -1,14 +1,45 @@
 # JavaScript Runtime API
 
+The [support scope](../SUPPORT.md) covers runtime loading, object ownership and
+minimal two-way interop. This reference also describes experimental DOM/UI
+providers and automatic conversion of records and custom inductives. The default
+browser entry includes experimental providers; using that entry does not expand
+official support.
+
 `web/src/vir-runtime.js` loads `vir-upstream.wasm`, loads a non-empty set of
 manifest-bearing `.irpkg` members, and exposes their aggregate Lean declarations
 through a generic JavaScript call API without requiring callers to manage WASM
 memory. A focused `.irpkg` is loaded as a one-member set.
 
-For the end-to-end "my Lean function from my JavaScript code" workflow, start
-with `docs/guides/CALL_LEAN_FROM_JS.md`.
+Applications use `createProgram` with library-prepared runtime and program
+manifests; start with [application setup](EMBEDDED_RESOURCES.md).
+This page documents the underlying runtime API for contributors and existing
+hosts. [Direct runtime calls](CALL_LEAN_FROM_JS.md) is a repository development
+example, not another application workflow.
 
-The module is also exposed through the package entry point:
+## Entry points and distribution
+
+The resource loader and the SDK expose different interfaces to the same
+interpreter:
+
+| Distribution | JavaScript entry | Available interface |
+| --- | --- | --- |
+| Library-prepared application resources | The runtime bundle's `runtime.js` | `createProgram` loads runtime/program manifests and returns `status`, `call` and `dispose`. |
+| SDK archive for custom hosts and existing integrations | `js/vir-runtime.js` or `js/vir-runtime-node.js` | `createVirRuntime` and `createVirRuntimeFactory`, with the direct call, host-binding and object APIs documented below. |
+
+The current `createProgram` facade does not expose the underlying runtime or
+accept custom `hostBindings`. A host needing those APIs uses the SDK entry
+points and supplies a matching Wasm and package set. See
+[SDK acquisition](PACKAGES.md#install-the-browser-sdk) for its prerequisites.
+Official support still follows the [support scope](../SUPPORT.md) within each
+interface; experimental providers remain experimental in either distribution.
+
+### Imports from the checkout or SDK
+
+The module is also exposed through this checkout's package entry point. The
+repository npm package is private; the specifiers below assume a local package
+or a host-configured mapping, not an `npm install lean-vir` distribution. Prepared
+application assets use the loader described in the application guide.
 
 ```js
 import { createVirRuntime, VIR_HOST_DISPOSE } from "lean-vir";
@@ -43,18 +74,24 @@ import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
 ```
 
 When composing groups that create active registrations, pass the same
-`createHostLifecycle()` so runtime disposal can terminate them together.
+`createHostLifecycle()` so their owner can terminate them together. Return the
+composed map from a per-runtime `defaultHostBindings` function to transfer its
+cleanup to VIR; an application that supplies a preconstructed map owns its cleanup.
 Passive JavaScript values need no shared store.
 
 ## WASM Artifact Selection
 
-Distribution builds ship two interpreter artifacts:
+SDK archives ship two interpreter artifacts under `wasm/`:
 
 - `vir-upstream.wasm`: stripped release artifact, used by default.
 - `vir-upstream.dev.wasm`: optimized, unstripped companion artifact for
   debugging. It is not an `-O0` build.
 
-Applications that serve both files beside each other can opt into the debug
+The application resource pack contains its selected release interpreter as
+`runtime.wasm`. Its `createProgram` loader has no `debugWasm` option; the debug
+selection below belongs to the SDK API.
+
+Hosts that serve both SDK files beside each other can opt into the debug
 artifact by setting `debugWasm: true`:
 
 ```js
@@ -69,32 +106,37 @@ When `debugWasm` is true, the runtime derives `*.dev.wasm` from `wasmUrl`.
 Pass `wasmDebugUrl` when the debug artifact lives at a different URL. If no
 `wasmUrl` is supplied, the factory defaults to `vir-upstream.wasm`.
 
+### Matching runtime assets
+
+**Use JavaScript runtime modules and Wasm binaries from the same VIR
+revision/build. Users must refresh their build setup after updating VIR.**
+Rebuild or acquire the matching SDK/runtime, rerun the application's normal
+build to refresh its deployed assets, and replace the JavaScript modules and
+both Wasm profiles together. Refresh stale browser/deployment caches so they
+serve that same build. VIR contributors should follow the
+[repository setup and artifact commands](../HARNESS.md).
+
+Mixing old JavaScript with new Wasm, or the reverse, is unsupported and has
+undefined behavior. Instantiation may succeed without establishing compatible
+execution or disposal. An unchanged runtime ABI version number does not make
+different revisions interchangeable. VIR provides no compatibility guarantee or
+adapter for mixed runtime revisions; refreshing the build and deployed assets is
+the user's responsibility. Retired interfaces are removed under the
+[API change policy](../../CONTRIBUTING.md#api-changes).
+
 ## Runtime Module Map
 
-The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
+The browser app, Node wrapper and SDK share the same managed runtime.
 
-| Module                               | Role                                                                                                      |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `vir-runtime.js`                     | Public runtime facade, WASM instantiation, package loading helpers, and host import wiring.               |
-| `vir-runtime-node.js`                | Node wrapper with environment-neutral JavaScript value and console bindings.                             |
-| `runtime/call-timing.js`             | Internal accumulator for opt-in synchronous runtime call phase attribution.                               |
-| `runtime/callbacks.js`               | Private Lean closure roots associated with ordinary JavaScript functions.                                 |
-| `runtime/cleanup.js`                 | Cleanup error collection with deterministic single-error and aggregate reporting.                         |
-| `runtime/core.js`                    | Package loading, manifest export tables, call resolution, memory helpers, and runtime/callback lifecycle. |
-| `runtime/object-values.js`           | Object ABI lowering and lifting between JavaScript values and owned Lean objects.                         |
-| `runtime/vir-codec.js`               | Binary reader/writer and interface type descriptor codec.                                                 |
-| `runtime/host-state.js`              | Host import dispatch, exact-value externref roots, binding lookup, and disposal.                          |
-| `runtime/object-abi.js`              | Object ABI support checks, layout planning, scalar packing, and unpacking helpers.                        |
-| `runtime/object-abi-exports.js`      | Shared object ABI export-name manifest used by runtime checks and Wasm linker tooling.                    |
-| `runtime/vir-value-normalizers.js`   | Input normalization helpers used by object ABI lowering.                                                  |
-| `vir-host-bindings.js`               | Public common/browser host binding factories and stable re-exports.                                       |
-| `host-boundary.js`                   | Exact-value externref roots and host-call rollback transactions.                                          |
-| `host/vir-active-host-bindings.js`   | Shared active lifecycle plus schedule and frame teardown.                                                 |
-| `host/vir-infoview-host-bindings.js` | Repository-owned infoview/ProofWidgets command protocol and validation.                                   |
-| `react/vir-react-root.js`            | Exact React root creation, rendering, and teardown forwarding.                                            |
-| `vir-react-host-bindings.js`         | Browser React root/component/hook bindings; imports `react` and `react-dom/client`.                       |
-| `runtime/interface-manifest.js`      | Manifest validation, diagnostics, and type formatting helpers.                                            |
-| `runtime/interface-tags.js`          | Shared interface descriptor tag constants and JSON-input tag set.                                         |
+| Public entry | Role |
+| --- | --- |
+| `vir-runtime.js` | Browser runtime factories with default host providers. |
+| `vir-runtime-node.js` | Node runtime factories with environment-neutral value and console providers. |
+| `vir-host-bindings.js` | Common and browser host binding factories. |
+| `vir-react-host-bindings.js` | React bindings; imports `react` and `react-dom/client`. |
+
+See the [managed runtime composition](../development/MANAGED_RUNTIME_COMPOSITION.md)
+for the canonical internal module map and ownership boundaries.
 
 Application code normally imports only `lean-vir`, `lean-vir/vir-runtime-node`,
 `lean-vir/host-bindings`, or `lean-vir/react-host-bindings`. React browser
@@ -106,15 +148,26 @@ modules because those public entry files use relative imports. Treat those
 nested modules as revision-locked internals unless this document explicitly
 names an entry point above.
 
+Create managed runtimes through `createVirRuntime`, `createVirRuntimeFactory`,
+or the public `VirRuntimeFactory`. All these paths attach an internal host state,
+including in Node or when binding maps are null/empty. Direct construction of
+`runtime/core.js`'s `VirRuntime` is an internal harness operation, not a supported
+application creation API; its optional fields permit focused ABI test fixtures,
+not arbitrary combinations with the full factory lifecycle contract.
+
 ## Host Bindings
 
-The browser runtime installs the built-in `common.*` and `browser.*` host
-bindings by default. The complete target map, factory list, custom binding
-rules, and cleanup behavior are documented in
-`docs/reference/HOST_BINDINGS.md`.
+The browser runtime installs the built-in JavaScript value, browser and Infoview
+host bindings by default. The complete target map, factory list, custom binding
+rules, and cleanup behavior are documented in the
+[host bindings reference](../reference/HOST_BINDINGS.md#active-resources).
 
-`defaultHostBindings` may be either a binding map or a function returning a
-binding map. To enable browser React roots while keeping non-React imports free
+Preconstructed `hostBindings` and `defaultHostBindings` maps are application-owned.
+A `defaultHostBindings` function transfers ownership of each fresh provider and
+its cleanup scope to VIR. Use a map for shared services and a builder for
+per-runtime providers; the browser and Node entry points accept both forms.
+
+To enable browser React roots while keeping non-React imports free
 of React dependencies, compose the React binding group explicitly:
 
 ```js
@@ -192,10 +245,13 @@ console.log(vir.call("ModuleSetFixture.Root.answer"));
 
 `irPackageSet` accepts a descriptor URL, the structured value returned by
 `fetchIrPackageSet`, or a non-empty array of member bytes in descriptor order.
-On an existing factory-managed runtime,
-`vir.loadIrPackageSetBytes(members)` validates the complete set in a fresh WASM
-instance before handover. `packageInfo.count` is the aggregate declaration count;
-`packageInfo.byteLength` is the sum of all members.
+`factory.createRuntime()` may also omit `irPackageSet`; in that case,
+`vir.loadIrPackageSetBytes(members)` installs the first package set after the
+Wasm module has been compiled. A runtime owns at most one package generation.
+Calling the method after a successful installation throws before changing the
+installed generation; create another runtime from the same factory instead.
+`packageInfo.count` is the aggregate declaration count; `packageInfo.byteLength`
+is the sum of all members.
 
 To separate transport from runtime creation, use the factory fetch API:
 
@@ -254,38 +310,34 @@ const second = await factory.createRuntime({
 });
 ```
 
-## Replacing A Package Set
+## Runtime Generations
 
-`vir.loadIrPackageSetBytes(members)` is synchronous once the Wasm module has been
-compiled. Calling it on a loaded, factory-managed runtime preserves the public
-`vir` object but replaces its underlying Wasm instance:
+Use a factory to create a fresh runtime for each package generation. The
+compiled `WebAssembly.Module` is reused, while interpreter state, callbacks,
+handles, runtime-created host resources and package-local caches remain
+generation-local:
 
 ```js
 const factory = createVirRuntimeFactory({ wasmUrl: "vir-upstream.wasm" });
-const vir = await factory.createRuntime({
+let vir = await factory.createRuntime({
   irPackageSet: firstPackageMembers,
 });
 
-vir.loadIrPackageSetBytes(secondPackageMembers);
+const next = await factory.createRuntime({
+  irPackageSet: secondPackageMembers,
+});
+const previous = vir;
+vir = next;
+previous.dispose();
 console.log(vir.call("SecondPackage.entry"));
 ```
 
-The second package set is loaded and prepared, then manifest-validated before
-its initializers run in a fresh candidate instance. If that work fails, the candidate is
-disposed and the first package remains usable. After a successful handover,
-old object pointers, Lean-backed callback/JSL roots, externref roots, active
-registrations, and resolved call slots are invalid. The runtime releases the old set's resources once,
-reattaches the new host state to the same public wrapper, and rebuilds its
-manifest lookup and call caches.
-
-If cleanup of the old instance throws during handover, cleanup still attempts
-every old resource and callback, the candidate is discarded, and the public
-wrapper becomes disposed. This avoids exposing either a partially torn-down
-old instance or a partially adopted replacement.
-
-Factories reuse the compiled `WebAssembly.Module`, not interpreter state.
-User-supplied binding maps shared across a handover are reference-leased so
-their cleanup hook runs once when the final runtime using the map is disposed.
+If creation of `next` fails, the existing `vir` remains usable because it has
+not been disposed. Dispose a generation only when its callbacks, handles and
+runtime-owned host resources should become invalid. Select the new generation
+before disposing the previous one, so a cleanup error propagates while the caller
+still owns `vir`. User-supplied binding maps shared by multiple runtimes retain
+application ownership: VIR does not dispose supplied maps when runtimes shut down.
 
 ## Calls And Manifest
 
@@ -297,15 +349,22 @@ their cleanup hook runs once when the final runtime using the map is disposed.
 - `vir.packageMetadata` is `vir.interfaceManifest.metadata`, including the
   package format version, Lean toolchain, source targets, and resolved roots.
   Wall-clock generation time is intentionally confined to diagnostic reports.
-- `vir.call(name, ...args)` accepts a manifest `id`, `jsName`, or Lean
-  declaration name.
+- `vir.call(name, ...args)` accepts a manifest `entry`, `id`, or `jsName`.
+  These share one alias namespace: multiple
+  spellings may identify the same export, but a spelling cannot identify two
+  different exports. Ambiguous manifests are rejected before initialization.
 - `vir.callTimed(name, ...args)` performs the same call and returns
   `{ value, timings }` for opt-in phase attribution.
 - `vir.exportsByName.<jsName>(...args)` exposes valid generated JS names as
   methods.
 - `vir.runStartupEntries()` invokes zero-argument exports whose manifest entry
-  has `startup: true`, in manifest order. Successful hooks run once per loaded
-  package; a failed call can be retried without repeating earlier hooks.
+  has `startup: true`, in manifest order, once per runtime. After success,
+  repeated calls do nothing. Failure stops the sequence and throws the error;
+  later startup calls report failure without invoking any hooks. Effects already
+  performed are not rolled back. Ordinary exported calls can still return
+  recoverable errors; a fatal host failure or Wasm trap retires the runtime.
+  Synchronous reentry from a host callback leaves the active startup traversal
+  in charge; it does not invoke hooks recursively.
 - `vir.interfaceManifest.exports[].startup` distinguishes `@[vir_startup]`
   hooks from ordinary `@[vir_export]` calls.
 - `vir.packageInfo.interfaceExports` reports the number of generated exports.
@@ -358,10 +417,17 @@ and reporting UI remain consumer-owned and should be timed outside this API.
 This is a JavaScript runtime API addition; it requires no Wasm ABI, `.irpkg`
 package-format, or Lean toolchain version change.
 
-Supported interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
+The types below describe what the current marshaller accepts. Automatic array
+conversion is supported when its element representation is supported, such as
+`Array Nat`. Automatic conversion of records and custom inductives remains
+experimental even when package generation accepts its descriptor. See
+[choosing a representation](LEAN_VIR_LIBRARY.md#choose-a-boundary-representation)
+for minimal reference interop.
+
+Implemented interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
 `Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,
 recursive `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α`
-shapes over supported types, non-indexed user-defined structures including
+shapes over accepted types, non-indexed user-defined structures including
 parameterized instances, nullary inductive enums, non-indexed custom inductives
 with nullary or runtime-payload constructors, opaque host resources, and
 `Lean.Expr`. `Lean.Vir.Js α` is an opaque `Js` resource for JavaScript-owned
@@ -370,7 +436,10 @@ object lane. DOM and React object markers such as `Lean.Vir.Browser.Element`
 and `Lean.Vir.React.Root` must therefore appear as `Lean.Vir.Js ...` at the
 boundary.
 
-The broad structural surface above is the descriptor-guided object lowering
+The explicitly invoked [JSON converter API](../SUPPORT.md#planned-for-011) is
+planned for 0.1.1; it is separate from this automatic marshaling.
+
+This surface is the descriptor-guided object lowering
 surface for JavaScript-to-Lean export calls. Host imports are narrower than exports:
 low-level JavaScript imports use `Unit`, `Lean.Vir.Js α` resources,
 `Lean.Vir.Js.Nullable α` resources for JavaScript `null`, callback arguments
@@ -381,6 +450,9 @@ object behind a `Lean.Vir.JSL α` resource instead of decoding it to JavaScript.
 The JSL payload is an ordinary self-owning JavaScript object.
 Ordinary Lean references and JavaScript references use their respective native
 reachability rules; VIR does not expose a separate JSL retain/release protocol.
+
+For a complete model-and-function example using the public program facade, see
+[Keep application state in Lean](OPAQUE_LEAN_STATE.md).
 The retained Lean value is released when JavaScript collects the object on a
 host with finalization support, or synchronously when the package/runtime is
 disposed. Host imports may additionally receive Lean function values as
@@ -397,9 +469,43 @@ The JSON manifest records those as `effect: "pure"`, `"runtime"`, `"io"`,
 `"dom"`, or `"react"` for tooling and documentation. The wasm call payload
 still lowers them to pure versus effectful execution.
 
-Large exact integer values are returned as decimal strings. ByteArray results
-are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript
-numbers. Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them
+`Nat`, `Int`, `UInt64`, and `USize` inputs accept a safe integer JavaScript
+number, `BigInt`, or decimal string. Only `Int` accepts negative values.
+`UInt64` inputs must be in `0..2^64 - 1`; `USize` inputs must be in
+`0..2^32 - 1` for the supported wasm32 runtime. `USize` follows the Wasm
+execution target, regardless of the JavaScript host's pointer width.
+`Nat`, `Int`, and `UInt64` results are JavaScript `bigint`, including zero and
+small values. `USize` results are Numbers: the supported wasm32 type's entire
+range is exact in JavaScript. `UInt8`, `UInt16`, and `UInt32` also return Numbers.
+The result type depends on the Lean type, never the value. This mapping applies
+to ordinary calls, callback results, explicit object conversions and numeric
+fields nested in structures, inductives and collections.
+See the [fixed-width ABI](../reference/OBJECT_ABI.md#fixed-width-integers)
+for the underlying transport and low-level exports.
+
+Arithmetic uses native JavaScript values:
+
+```js
+const result = vir.call("fib", 12); // 144n
+console.log(result + 1n); // 145n
+```
+
+Plain `JSON.stringify` rejects bigint, including inside records and arrays.
+Choose an explicit wire format when serializing results; for example, preserve
+exact integers as decimal strings:
+
+```js
+const json = JSON.stringify({ result }, (_key, value) =>
+  typeof value === "bigint" ? value.toString() : value);
+// {"result":"144"}
+```
+
+`JSON.parse` then returns strings for those fields. A caller with the result
+schema can recover `BigInt(parsed.result)`; ordinary text fields stay strings.
+The runtime returns values directly and does not serialize call results.
+
+ByteArray results are returned as `Uint8Array`; `Float` and `Float32` values are
+JavaScript numbers. Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them
 use generated Lean `_boxed` declarations automatically.
 
 `Lean.Vir.JsValue.ofFloat` and `Lean.Vir.JsValue.toFloat` also accept every
@@ -407,7 +513,12 @@ JavaScript number and preserve NaN, infinities, and signed zero across the
 opaque `Lean.Vir.Js Float` resource boundary.
 
 Nullary inductive enums use their generated JavaScript constructor name in both
-directions.
+directions. For example, the Lean constructor `Example.Color.red` has the
+JavaScript value `"red"`. The manifest's required `jsName` field determines that
+spelling, also used for tagged-union and custom-inductive `kind` values.
+Constructor `name` identifies the Lean declaration and `tag` records its numeric
+ordinal; neither is a JavaScript value alias. See the
+[descriptor format](../reference/IRPKG_FORMAT.md#interface-descriptors).
 
 Options use `null` for `none` and the bare inner value for `some`. Products use
 `{ fst, snd }` in both directions. Arrays and lists use JavaScript arrays,
@@ -421,15 +532,15 @@ and multi-field constructors accept and return `{ kind, fields }`.
 Constructor fields whose Lean type is `optParam α default` use the same
 JavaScript representation as `α`; they are still explicit fields in the
 canonical constructor object when the runtime constructor stores them.
-For example, a recursive `Tree Nat` value with constructors
-`leaf (value : Nat)` and `branch (left right : Tree Nat)` is:
+For a recursive `Tree Nat` with constructors
+`leaf (value : Nat)` and `branch (left right : Tree Nat)`, a lifted value is:
 
 ```js
 {
   kind: "branch",
   fields: {
-    left: { kind: "leaf", value: 4 },
-    right: { kind: "leaf", value: 5 },
+    left: { kind: "leaf", value: 4n },
+    right: { kind: "leaf", value: 5n },
   },
 }
 ```
@@ -464,6 +575,27 @@ the same shape with `kind` values `zero`, `succ`, `max`, `imax`, `param`, and
 `mvar`. Resolved calls lower these values through the object ABI into real Lean
 expression objects. Metadata expression inputs are accepted by lowering their
 inner expression; metadata results preserve a structural `mdata` wrapper.
+
+Bound-variable indices must be in `0..1048574`: the pinned kernel stores
+`index + 1` in a 20-bit range. Larger indices reject before Wasm execution.
+This limit does not restrict arbitrary-precision Nat literals or projection indices.
+Expr results use bigint for these Nat-valued indices and literals, following
+the same mapping as other Nat results.
+
+Names inside these structural expression and level values use a restricted
+text spelling: non-empty Lean identifier components separated by single dots.
+Unicode components accepted by the pinned Lean identifier predicates are
+supported, such as `café` and `αβ₁`; these predicates differ from JavaScript's
+Unicode identifier grammar. JavaScript checks well-formed Unicode and rejects
+numeric, empty and escaped components such as `A.«B.C»`. The Wasm constructors
+and getters apply the pinned Lean identifier predicates to the remaining
+components. Unsupported spellings fail conversion instead of being normalized
+into a different `Lean.Name`; ordinary conversion failures leave the runtime
+usable.
+The empty string and `[anonymous]` are retained as explicit spellings for the
+anonymous name. Package and manifest names have their separate structural
+identity contract; this restriction applies only to the specialized Expr and
+Level adapter.
 
 Package loading validates the embedded interface manifest before any generated
 entry is exposed. Malformed type trees, invalid structure layouts, unsupported
@@ -504,7 +636,7 @@ The full Lean-side declaration list is maintained in
 `docs/guides/LEAN_VIR_LIBRARY.md`. The JavaScript target map, custom binding examples,
 and resource lifetime rules are maintained in `docs/reference/HOST_BINDINGS.md`.
 
-The built-in `common.*` and `browser.*` targets do not require a
+The built-in `js.*` and `browser.*` targets do not require a
 `hostBindings` option:
 
 ```js
@@ -525,6 +657,10 @@ the browser host. The Node wrapper does not provide document, event, or React
 operations. Supply an external host explicitly when a non-browser environment
 can implement them.
 
+The entry points select their default providers; acquisition and instantiation
+share an environment-neutral factory. Importing the Node entry does not load
+DOM, timer, animation, Infoview or React providers.
+
 Custom target bindings are passed through `hostBindings`; user bindings
 override defaults. Bindings receive the exact JavaScript values and return a
 value matching the manifest host boundary mode. `Js.Nullable` is the actual
@@ -537,7 +673,18 @@ awaited. Object-style `imports` factory options are treated as
 overrides on top of the generated import table. If you provide a custom
 `imports` function to `createVirRuntimeFactory`, call
 `createVirImports(module, overrides, hostState)` or otherwise install
-`env.vir_js_call_objects` plus the `env.vir_resource_*` root-table imports.
+`env.vir_js_call_objects` when the module requires it. Resource root/get/release
+operations are local to Wasm and no longer require JavaScript imports.
+
+The default import table recognizes the VIR hooks and the Preview 1 imports
+linked by the shipped reactor. It provides no WASI process arguments,
+environment, clock, file descriptors or polling service: these calls return
+`NOSYS` or `BADF`; `sched_yield` succeeds and `proc_exit` throws. Supply explicit
+overrides when an extension needs these services. Any other unresolved import
+is rejected by name before instantiation. Low-level `createVirImports` can link a
+module without an attached host state, but invoking its host-dispatch hook throws.
+This linking utility does not provide managed runtime construction or disposal;
+use the factory for that lifecycle.
 
 Custom imports can be declared directly:
 
@@ -554,7 +701,7 @@ def bumpFromJs (n : Nat) : Lean.Vir.RuntimeM Nat := do
 ```
 
 Bind custom targets when constructing the runtime. User bindings override the
-default `common.*`, `browser.*`, and `react.*` bindings:
+default `js.*`, `browser.*`, and `react.*` bindings:
 
 ```js
 const vir = await createVirRuntime({
@@ -565,7 +712,7 @@ const vir = await createVirRuntime({
   },
 });
 
-console.log(vir.call("bumpFromJs", 41)); // "42"
+console.log(vir.call("bumpFromJs", 41)); // 42n
 ```
 
 For callback ownership, failed-call rollback and exception propagation, see
@@ -583,10 +730,9 @@ can still enter Lean. Normal infoview shell unmount instead releases UI ownershi
 without hard disposal. The full rules, including failure teardown and collection
 limits, live in [HOST_BINDINGS.md](../reference/HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal).
 
-Package replacement is a separate operation: see
-[Replacing A Package Set](#replacing-a-package-set) for atomic handover, candidate
-failure and invalidation of old values. Neither disposal nor replacement makes
-an old Lean component function usable with a new interpreter.
+Each runtime generation is a separate operation. Disposal invalidates that
+generation's callbacks and handles; it does not transfer them to another
+runtime.
 
 ## Trust Boundary
 
@@ -617,15 +763,66 @@ root selection, configuration, inspection and the development runner. Supply
 the resulting bytes or descriptor URL through `irPackageSet`, as described in
 [Module Package Sets](#module-package-sets).
 
+## Errors and recovery
+
+Ordinary Lean IO errors in an installed package report their message and leave
+the runtime reusable. Unexpected JavaScript host exceptions abort the owning
+JavaScript invocation: the original `Error` is preserved, and other thrown
+values are wrapped with their raw value as `cause`, without coercing objects.
+Cleanup aggregation preserves raw thrown values without inspecting them; the
+owning error boundary normalizes only after committing quarantine or retirement.
+Effectful host imports transport the exception as an IO error, but this is not
+Lean-side recovery: even if Lean catches it, further host work in that invocation
+is blocked. A later pure import has no error carrier and traps, retiring the
+instance. A later JavaScript call may proceed if no exceptional Wasm unwind
+occurred. Expected host-domain failures should use explicit result values.
+
+A failed **pure** host import or an exception escaping Wasm execution makes the
+runtime unusable. Synchronous calls, callbacks, startup and package installation
+then throw; asynchronous factory creation rejects. Create a fresh runtime from
+the factory to recover. Catching a nested fatal callback in a host binding does
+not let the outer Lean call continue. Other runtime instances remain usable.
+
+`runtime.failure` is a read-only `Error | null` diagnostic. It is `null` while
+the runtime is healthy or after a recoverable effect failure; after a fatal
+host/Wasm failure it retains the original error when available. Guarded runtime
+methods still throw after the failure, so inspect this property for diagnostics
+and create a fresh runtime for continued execution. Failure state is private and
+cannot be reset through a public boundary object.
+
+`runtime.onFailure(listener)` returns an idempotent unsubscribe function. The
+listener receives the first failure once, in a microtask after the active call
+stack. Subscribing to an already failed runtime also schedules notification;
+unsubscribing before delivery cancels it. Listener exceptions are reported to
+`console.error` and cannot replace the original failure. Unsubscribe when an
+integration releases its runtime. Notification reports retirement even when the
+caller catches the exception locally; it does not perform recovery.
+
+Package initialization has a stricter lifetime boundary. Decode, preparation
+and manifest failures before initializers run may be retried on an empty
+runtime. Any failure after initialization begins requires a fresh instance,
+including ordinary Lean IO errors: initialization can publish persistent values
+and opaque handles before failing. The factory can reuse its compiled Wasm
+module while creating a fresh instance.
+
+`dispose()` remains idempotent after failure. It disposes runtime-owned fresh host
+providers, invalidates callbacks/handles, and terminally clears the Wasm-owned
+resource table through a narrow operation that does not enter the interpreter
+or inspect Lean heap objects. All ordinary execution and Lean heap cleanup stay
+blocked in a failed instance.
+Traps do not unwind the interpreter's C++ frames: its remaining allocations are
+reclaimed with the Wasm instance when no references retain it. Keep the
+runtime-owned `exports` facade intact; replacing it bypasses these guards.
+
 ## Current Limits
 
 The browser loads descriptor-ordered sets of format-11 `.irpkg` members. A
 focused package is represented as a one-member set. It does not load `.olean` or
 Lean's raw `.ir` format in the browser. Unsupported requested
 exports fail during package generation instead of being omitted silently.
-A failed replacement leaves the active runtime and its metadata intact; failed
-initial installation exposes no package. If old-runtime cleanup fails during
-handover, the wrapper becomes disposed, as described above.
+A failed first installation leaves the deferred runtime without a package;
+failed creation exposes no runtime to the caller. A failed new-generation
+creation leaves an already-owned runtime unchanged.
 JavaScript host imports execute synchronously and
 are limited to 128 imported declarations with IR arity at most 6. Native
 Promises may cross as exact `Js` values and be observed with ordinary Promise

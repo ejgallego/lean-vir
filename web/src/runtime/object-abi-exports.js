@@ -9,10 +9,9 @@ export const OBJECT_ABI_CALL_EXPORTS = [
   "vir_call_resolved_objects",
   "vir_call_error",
   "vir_call_error_size",
-  "vir_closure_call_objects",
+  "vir_closure_apply_objects",
   "vir_closure_call_error",
   "vir_closure_call_error_size",
-  "vir_closure_release",
 ];
 
 export const OBJECT_VALUE_EXPORTS = [
@@ -25,8 +24,6 @@ export const OBJECT_VALUE_EXPORTS = [
   "vir_obj_ctor",
   "vir_obj_ctor_layout",
   "vir_obj_ctor_scalar_data",
-  "vir_obj_ctor_usize_decimal",
-  "vir_obj_closure_root",
   "vir_obj_dec",
   "vir_obj_decimal_size",
   "vir_obj_expr_app",
@@ -73,13 +70,22 @@ export const OBJECT_VALUE_EXPORTS = [
   "vir_obj_tag",
   "vir_obj_uint32",
   "vir_obj_uint32_value",
-  "vir_obj_uint64",
-  "vir_obj_uint64_decimal",
-  "vir_obj_usize",
-  "vir_obj_usize_decimal",
+  "vir_obj_uint64_scalar",
+  "vir_obj_uint64_value",
+  "vir_obj_usize_scalar",
+  "vir_obj_usize_value",
+];
+
+// These operations do not enter the Lean heap and remain callable on retirement.
+export const RESOURCE_ROOT_EXPORTS = [
+  "vir_resource_roots_clear",
+  "vir_resource_roots_active",
+  "vir_resource_roots_capacity",
+  "vir_resource_roots_reusable",
 ];
 
 export const OBJECT_ABI_EXPORTS = [
   ...OBJECT_ABI_CALL_EXPORTS,
   ...OBJECT_VALUE_EXPORTS,
+  ...RESOURCE_ROOT_EXPORTS,
 ];

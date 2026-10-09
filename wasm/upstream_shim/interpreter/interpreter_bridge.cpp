@@ -7,7 +7,6 @@ Author: Emilio J. Gallego Arias
 #include "interpreter_bridge.h"
 
 #include "package/decl_provider.h"
-#include "runtime/name_utils.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -50,10 +49,6 @@ object * run_interpreter_function(object * fn_obj, size_t argc, object ** args) 
 
 } // namespace vir
 } // namespace lean
-
-extern "C" void vir_ensure_ir_interpreter_initialized(void) {
-    lean::vir::ensure_ir_interpreter_initialized();
-}
 
 extern "C" lean::object * lean_ir_find_env_decl(lean::object *, lean::object * n) {
     if (lean::object * decl = lean::vir::find_package_decl(n)) {

@@ -19,6 +19,11 @@ namespace Lean.Vir.Browser
 
 namespace DomM
 
+/-- Explicit identity conversion for a browser action used as a generic JS callback body. -/
+@[inline] def toRuntime (action : DomM α) : Lean.Vir.RuntimeM α := by
+  unfold DomM at action
+  exact action
+
 /-- Runs a browser/DOM action at an exported `IO` boundary. -/
 def run (action : DomM α) : IO α :=
   by

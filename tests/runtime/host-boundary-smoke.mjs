@@ -10,7 +10,6 @@ import {
   abortHostCallTransaction,
   beginHostCallTransaction,
   commitHostCallTransaction,
-  ExternrefRoots,
   registerHostCallRollback,
 } from "../../web/src/host-boundary.js";
 import {
@@ -25,26 +24,6 @@ import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collec
 import { VirHostState } from "../../web/src/runtime/host-state.js";
 import { HOST_IMPORT_BOUNDARY } from "../../web/src/runtime/interface-manifest.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
-
-{
-  const roots = new ExternrefRoots({ initial: 3 });
-  const object = { name: "same object" };
-  const values = [null, undefined, false, 0, -0, 3n, "text", object];
-  const ids = values.map((value) => roots.root(value));
-  values.forEach((value, index) => {
-    assert.equal(roots.has(ids[index]), true);
-    assert.equal(Object.is(roots.get(ids[index]), value), true);
-  });
-  assert.equal(roots.get(0), undefined);
-  assert.equal(roots.has(0), false);
-  roots.release(ids[0]);
-  assert.equal(roots.has(ids[0]), false);
-  const reused = roots.root("reused");
-  assert.equal(reused, ids[0]);
-  assert.equal(roots.get(reused), "reused");
-  roots.clear();
-  assert.equal(roots.debugCounts().active, 0);
-}
 
 {
   const events = [];
@@ -209,7 +188,6 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
   });
   hostState.attach({ memory: new WebAssembly.Memory({ initial: 1 }) });
   hostState.attachRuntime({
-    liveCallbacks: new Set(),
     makeJsObjectValue(_type, value) {
       return value;
     },
@@ -278,50 +256,6 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
   hostState.dispose();
 }
 
-{
-  const calls = [];
-  const bindings = createInfoviewHostBindings({
-    commandDispatcher: {
-      insertText(...payload) {
-        calls.push(payload);
-      },
-    },
-  });
-  const position = bindings["infoview.documentPosition"](
-    "file:///Main.lean",
-    "Main.lean",
-    3n,
-    7n,
-    "Main",
-  );
-  assert.equal(
-    bindings["infoview.command.insertText"](position, "exact text"),
-    true,
-  );
-  assert.deepEqual(calls, [
-    [
-      {
-        uri: "file:///Main.lean",
-        fileName: "Main.lean",
-        line: 3,
-        character: 7,
-        label: "Main",
-      },
-      "exact text",
-    ],
-  ]);
-  assert.throws(
-    () =>
-      bindings["infoview.documentPosition"](
-        "file:///Main.lean",
-        "Main.lean",
-        -1n,
-        0n,
-        "Main",
-      ),
-    /non-negative safe-integer coordinates/,
-  );
-}
 
 {
   const lifecycle = createHostLifecycle();
@@ -336,6 +270,12 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
   assert.equal(bindings["js.nullable.value"](object), object);
   assert.equal(bindings["js.nullable.value"](undefined), undefined);
   assert.throws(() => bindings["js.nullable.value"](null), /non-null/);
+  assert.equal(bindings["js.undefinedOr.isUndefined"](undefined), true);
+  for (const value of [null, object, false, 0, "", () => {}]) {
+    assert.equal(bindings["js.undefinedOr.isUndefined"](value), false);
+    assert.equal(bindings["js.undefinedOr.value"](value), value);
+  }
+  assert.throws(() => bindings["js.undefinedOr.value"](undefined), TypeError);
   lifecycle.dispose();
 }
 

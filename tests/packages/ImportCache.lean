@@ -29,9 +29,16 @@ private def importsFor (name : Name) : Array Import := #[
 
 private def options : Options := Elab.async.set {} false
 
-private unsafe def independent (imports : Array Import) : IO Environment := do
+-- The cache API must not let callers keep regions while changing resolution.
+example (_cache : CompiledImportCache) : True := by
+  fail_if_success
+    let _changed : CompiledImportCache := { _cache with importArts := {} }
+  trivial
+
+private unsafe def independent (imports : Array Import)
+    (arts : NameMap ImportArtifacts) : IO Environment := do
   enableInitializersExecution
-  Lean.importModules imports options (loadExts := true) (level := .exported)
+  Lean.importModules imports options (loadExts := true) (level := .exported) (arts := arts)
 
 private unsafe def cachedImport (cache : CompiledImportCache) (imports : Array Import) :
     IO (Environment × CompiledImportCache) := do
@@ -83,11 +90,21 @@ private unsafe def checkReuse (before after : CompiledImportCache) : IO Unit := 
       for a in parts, b in next do
         expect s!"{name}: remapped a cached region" <| ptrEq a.2 b.2
 
-private unsafe def checkModule : IO Unit := do
+private unsafe def checkResolution (arts : NameMap ImportArtifacts) (name : Name) : IO Unit := do
+  if arts.isEmpty then return
+  -- No conventional project search path is available in resolved mode. A new
+  -- context missing this root must fail, even after the successful cached reads.
+  let mut rejected := false
+  try
+    discard <| cachedImport (.empty (arts.erase name)) (importsFor name)
+  catch _ => rejected := true
+  expect "fresh resolution context reused an earlier root" rejected
+
+private unsafe def checkModule (arts : NameMap ImportArtifacts) : IO Unit := do
   let selected := `ModuleSetFixture.InputSelection
   let imports := importsFor selected
-  let baseline ← independent imports
-  let (cached, cache) ← cachedImport {} imports
+  let baseline ← independent imports arts
+  let (cached, cache) ← cachedImport (.empty arts) imports
   checkEnvironment "selected root" baseline cached
   let privateDecls := moduleDeclarations selected cached |>.filter (isPrivateName ·.name)
   expect "private input IR was not loaded" <| !privateDecls.isEmpty
@@ -97,7 +114,7 @@ private unsafe def checkModule : IO Unit := do
   -- A context loaded after the richer root must not inherit that root's names,
   -- import-all flags, hidden implementation modules, or markers.
   let leftImports := importsFor `ModuleSetFixture.Left
-  let leftBaseline ← independent leftImports
+  let leftBaseline ← independent leftImports arts
   let (left, cache) ← cachedImport cache leftImports
   checkEnvironment "isolated left" leftBaseline left
   expect "unrelated root leaked into left" <| (left.find? `ModuleSetFixture.Root.answer).isNone
@@ -109,25 +126,26 @@ private unsafe def checkModule : IO Unit := do
   let upgraded := (importsFor `ModuleSetFixture.Left).push {
     module := `ModuleSetFixture.Shared, importAll := true, isExported := false, isMeta := true
   }
-  let upgradeBaseline ← independent upgraded
+  let upgradeBaseline ← independent upgraded arts
   let (upgrade, cache) ← cachedImport cache upgraded
   checkEnvironment "import-level upgrade" upgradeBaseline upgrade
 
   -- Closure resolution opens private implementation owners separately.
   let ownerImports := importsFor `ModuleSetFixture.InternalBase
-  let ownerBaseline ← independent ownerImports
+  let ownerBaseline ← independent ownerImports arts
   let (owner, cache) ← cachedImport cache ownerImports
   checkEnvironment "private implementation owner" ownerBaseline owner
   expect "owner initializer missing" <| (getInitFnNameFor? owner `ModuleSetFixture.InternalBase.value).isSome
   let (again, after) ← cachedImport cache imports
   checkEnvironment "root after other contexts" baseline again
   checkReuse cache after
+  checkResolution arts selected
 
-private unsafe def checkHost : IO Unit := do
+private unsafe def checkHost (arts : NameMap ImportArtifacts) : IO Unit := do
   let name := `fixtures.HostInterop
   let imports := importsFor name
-  let baseline ← independent imports
-  let (cached, cache) ← cachedImport {} imports
+  let baseline ← independent imports arts
+  let (cached, cache) ← cachedImport (.empty arts) imports
   checkEnvironment "host fixture" baseline cached
   let mut hostCount := 0
   let mut privateCount := 0
@@ -149,14 +167,26 @@ private unsafe def checkHost : IO Unit := do
   let (again, after) ← cachedImport cache imports
   checkEnvironment "repeated host fixture" baseline again
   checkReuse cache after
+  checkResolution arts name
 
 /-- Run cases separately: upstream imports intentionally do not share regions,
 so retaining every reference oracle in one process would inflate the test itself. -/
 public unsafe def main (args : List String) : IO Unit := do
   enableInitializersExecution
   initSearchPath (← getBuildDir)
-  match args with
-  | ["module"] => checkModule
-  | ["host"] => checkHost
-  | _ => throw <| IO.userError "usage: ImportCache.lean module|host"
+  let (mode, arts) ← match args with
+    | [mode] => pure (mode, {})
+    | [mode, setup] => do
+      let setup ← ModuleSetup.load setup
+      expect "resolved artifact map is empty" (!setup.importArts.isEmpty)
+      -- The frontend has already loaded the test itself. Runtime imports may
+      -- now find project modules only through the explicit relocated mapping;
+      -- toolchain modules still exercise conventional fallback reads.
+      searchPathRef.set [(← getBuildDir) / "lib" / "lean"]
+      pure (mode, setup.importArts)
+    | _ => throw <| IO.userError "usage: ImportCache.lean module|host [setup.json]"
+  match mode with
+  | "module" => checkModule arts
+  | "host" => checkHost arts
+  | _ => throw <| IO.userError s!"unknown import cache case: {mode}"
   IO.println s!"import cache equivalence ok: {args.head!}"

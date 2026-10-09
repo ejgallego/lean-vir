@@ -4,11 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { releaseCallbackRoot } from "../../web/src/runtime/callbacks.js";
-
-export function createBenchmarkHostBindings(
-  releaseCallback = releaseCallbackRoot,
-) {
+export function createBenchmarkHostBindings() {
   const documentValue = { title: "" };
   return {
     "browser.document.current": () => documentValue,
@@ -17,16 +13,7 @@ export function createBenchmarkHostBindings(
       document.title = title;
       return undefined;
     },
-    "test.callNatCallback": (input, callback) => {
-      try {
-        return callback(input);
-      } finally {
-        // This benchmark binding never retains the callback. Keep its root
-        // lifetime deterministic without adding lifecycle fields to the exact
-        // JavaScript function exposed to ordinary hosts.
-        releaseCallback(callback);
-      }
-    },
+    "test.callNatCallback": (input, callback) => callback(input),
     "test.recordNat": () => undefined,
   };
 }

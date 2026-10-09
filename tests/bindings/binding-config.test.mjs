@@ -15,7 +15,7 @@ import {
 
 const browserPath = new URL("../../Vir/Browser.bindings.json", import.meta.url).pathname;
 const browser = JSON.parse(await readFile(browserPath, "utf8"));
-const infoviewPath = new URL("../../Vir/Infoview/Surface.bindings.json", import.meta.url).pathname;
+const infoviewPath = new URL("../../Vir/Infoview/Client.bindings.json", import.meta.url).pathname;
 const infoview = JSON.parse(await readFile(infoviewPath, "utf8"));
 
 test("the shared loader validates a complete binding library", async () => {
@@ -137,7 +137,7 @@ test("binding configuration requires a TypeScript declaration surface", async ()
 
 test("binding configuration requires a local declaration contract", async () => {
   const invalid = structuredClone(infoview);
-  delete invalid.roots.find((root) => root.id === "commands").upstream.declarations;
+  invalid.roots[0].upstream = { kind: "local", roots: ["LocalHost"] };
 
   await assert.rejects(
     validateBindingConfig(invalid, infoviewPath),
@@ -200,6 +200,18 @@ test("method policies are selected and schema checked", async () => {
   await assert.rejects(
     validateBindingConfig(vague, browserPath),
     /methodPolicies\/CanvasRenderingContext2D\.arc\/signature.*must/u,
+  );
+
+  const constrained = structuredClone(browser);
+  constrained.generation.methodPolicies["CanvasRenderingContext2D.arc"].typeParameters = ["α"];
+  constrained.generation.methodPolicies["CanvasRenderingContext2D.arc"].proofParameters = ["Lean.Vir.Browser.Canvas.Shape α"];
+  await assert.doesNotReject(validateBindingConfig(constrained, browserPath));
+
+  const malformedProof = structuredClone(constrained);
+  malformedProof.generation.methodPolicies["CanvasRenderingContext2D.arc"].proofParameters = ["Lean.Vir.Browser.Canvas.Shape β"];
+  await assert.rejects(
+    validateBindingConfig(malformedProof, browserPath),
+    /proof type argument "β" is not a declared type parameter/u,
   );
 });
 
@@ -290,8 +302,7 @@ test("private active-effect roles are fail-closed", async () => {
 
 test("local protocol relations identify their declaration member", async () => {
   const invalid = structuredClone(infoview);
-  delete invalid.generation.protocolOperations.find((operation) =>
-    operation.upstreamRelation.kind === "local-contract").upstreamRelation.member;
+  invalid.generation.protocolOperations[0].upstreamRelation = { kind: "local-contract" };
 
   await assert.rejects(
     validateBindingConfig(invalid, infoviewPath),

@@ -48,7 +48,7 @@ async function runNestedComponentIdentityProbe() {
   const root = createRoot(container);
   const state = { mounts: 0, cleanups: 0 };
   let setter = null;
-  const component = ({ leanProps: { label } }) => {
+  const component = ({ label }) => {
     const [count, setCount] = React.useState(0);
     setter = setCount;
     React.useEffect(() => {
@@ -57,25 +57,25 @@ async function runNestedComponentIdentityProbe() {
     }, []);
     return React.createElement("div", null, `${label}:${count}`);
   };
-  const replacement = ({ leanProps }) => component({ leanProps });
+  const replacement = (props) => component(props);
 
   try {
     flushSync(() =>
       root.render(
-        bindings["react.node.keyedComponent"](
+        bindings["react.node.createElement"](
           component,
-          { label: "first" },
-          "stable",
+          { label: "first", key: "stable" },
+          [],
         ),
       ),
     );
     flushSync(() => setter(1));
     flushSync(() =>
       root.render(
-        bindings["react.node.keyedComponent"](
+        bindings["react.node.createElement"](
           component,
-          { label: "second" },
-          "stable",
+          { label: "second", key: "stable" },
+          [],
         ),
       ),
     );
@@ -87,10 +87,10 @@ async function runNestedComponentIdentityProbe() {
     );
     flushSync(() =>
       root.render(
-        bindings["react.node.keyedComponent"](
+        bindings["react.node.createElement"](
           replacement,
-          { label: "replacement" },
-          "stable",
+          { label: "replacement", key: "stable" },
+          [],
         ),
       ),
     );
@@ -117,7 +117,7 @@ async function runRepeatedComponentSubmissionProbe() {
   const state = { mounts: 0, cleanups: 0 };
   let setter = null;
 
-  const component = ({ leanProps: { label } }) => {
+  const component = ({ label }) => {
     const [count, setCount] = React.useState(0);
     setter = setCount;
     React.useEffect(() => {
@@ -126,10 +126,10 @@ async function runRepeatedComponentSubmissionProbe() {
     }, []);
     return React.createElement("div", null, `${label}:${count}`);
   };
-  const replacement = ({ leanProps }) => component({ leanProps });
+  const replacement = (props) => component(props);
 
   function render(valueComponent, props) {
-    const node = bindings["react.node.component"](valueComponent, props);
+    const node = bindings["react.node.createElement"](valueComponent, props, []);
     bindings["react.root.renderNode"](root, node);
   }
 

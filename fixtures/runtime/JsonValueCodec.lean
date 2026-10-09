@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 public import JsonRpcFoo
-public import Vir.Infoview.Surface
+public import Vir.Infoview.Client
 public import Vir.JsonValue
 public import Vir.Js
 public section
@@ -20,6 +20,12 @@ def copy (value : Js.Any) : RuntimeM (Except String Js.Any) := do
   | .ok json => JsonValue.toJs json
 
 def sampleWire : RuntimeM (Except String Js.Any) := JsonValue.encodeJs sample
+
+/-- Native validation and output conversion share the host input nesting limit. -/
+def nestedWire (depth : Nat) : RuntimeM (Except String Js.Any) := do
+  let mut value := Json.null
+  for _ in [:depth] do value := .arr #[value]
+  JsonValue.toJs value
 
 def roundtripFoo (value : Js.Any) : RuntimeM (Except String Js.Any) := do
   match ← JsonValue.decodeJs (α := Foo) value with

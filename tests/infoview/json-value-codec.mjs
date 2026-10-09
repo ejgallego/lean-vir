@@ -73,6 +73,17 @@ export async function checkJsonValueCodec(wasmBytes, irPackage) {
       cases++;
     }
     assert.deepEqual(handle, {}, "rejecting a JSL does not mutate its payload");
+    let aliased = 0;
+    for (let i = 0; i < 40; i++) aliased = [aliased, aliased];
+    assert.match(call("copy", aliased).value, /1000000 nodes/);
+    let nested = null;
+    for (let i = 0; i < 256; i++) nested = [nested];
+    assert.deepEqual(call("copy", nested), { kind: "ok", value: nested });
+    assert.match(call("copy", [nested]).value, /nesting exceeds 256/);
+    assert.deepEqual(call("nestedWire", 256), { kind: "ok", value: nested });
+    assert.match(call("nestedWire", 257).value, /nesting exceeds 256/);
+    assert.deepEqual(call("copy", { still: "usable" }), { kind: "ok", value: { still: "usable" } });
+    cases += 6;
     return { cases, sharedFoo: true, nativePromise: true, leanContinuation: true };
   } finally {
     runtime.dispose();

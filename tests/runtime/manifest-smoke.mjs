@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import { createVirRuntime as createExportedBrowserVirRuntime } from "lean-vir";
 import {
@@ -34,7 +35,6 @@ import {
 import {
   assert,
   assertInvalidManifest,
-  assertManifestTypeDescriptorsRoundTrip,
   assertValidManifestShape,
   findTypeDescriptor,
   jsNatResourceValue,
@@ -241,10 +241,6 @@ assert.ok(
 assert.ok(
   runtime.interfaceManifest.exports.some((entry) => entry.entry === "fib"),
 );
-assertManifestTypeDescriptorsRoundTrip(runtime.interfaceManifest);
-assertManifestTypeDescriptorsRoundTrip(hostRuntime.interfaceManifest);
-assertManifestTypeDescriptorsRoundTrip(prettyRuntime.interfaceManifest);
-assertManifestTypeDescriptorsRoundTrip(leanRuntime.interfaceManifest);
 assertValidManifestShape();
 for (const { name, mutate, pattern, options } of invalidManifestCases) {
   try {
@@ -304,8 +300,8 @@ assert.equal(reactUseMemoImports[0]?.args[1]?.type?.type, "Js");
 assert.equal(reactUseMemoImports[0]?.args[1]?.type?.name, "Lean.Vir.Js");
 assert.equal(reactUseMemoImports[0]?.result?.type, "Js");
 for (const target of [
-  "js.value.react.reducer",
-  "js.value.react.memoCalculation",
+  "js.value.function.binary",
+  "js.value.function.nullary",
 ]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.boundary, "explicitConversion");
@@ -366,7 +362,7 @@ assert.deepEqual(
     .sort(),
   ["js.leanRef", "js.leanRef.value"],
 );
-for (const target of ["react.state.modify"]) {
+for (const target of ["js.function.callVoid"]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "runtime");
   assert.equal(entry?.boundary, "hostResource");
@@ -398,9 +394,21 @@ assert.equal(keyboardEventNarrowingImport?.result?.type, "Js");
 const keyboardEventKeyImport = hostImportTarget("browser.keyboardEvent.getKey");
 assert.equal(keyboardEventKeyImport?.args[0]?.type?.type, "KeyboardEvent");
 assert.equal(keyboardEventKeyImport?.result?.type, "Js");
-const eventTargetImport = hostImportTarget("browser.event.target");
-assert.equal(eventTargetImport?.args[0]?.type?.type, "Event");
+const eventTargetImport = hostImportTarget("react.syntheticEvent.currentTarget");
+assert.equal(eventTargetImport?.args[0]?.type?.type, "Js");
 assert.equal(eventTargetImport?.result?.type, "Js");
+const nativeEventImport = hostImportTarget("react.syntheticEvent.nativeEvent");
+assert.equal(nativeEventImport?.args[0]?.type?.type, "Js");
+assert.equal(nativeEventImport?.result?.type, "Event");
+for (const member of ["preventDefault", "stopPropagation"]) {
+  const entry = hostImportTarget(`react.syntheticEvent.${member}`);
+  assert.equal(entry?.effect, "react");
+  assert.equal(entry?.args[0]?.type?.type, "Js");
+  assert.equal(entry?.result?.type, "Unit");
+}
+for (const member of ["target", "currentTarget", "preventDefault", "stopPropagation"])
+  assert.equal(hostImportTarget(`browser.event.${member}`), undefined,
+    "React fixtures no longer import DOM event operations for synthetic events");
 const eventTargetNarrowingImport = hostImportTarget(
   "browser.eventTarget.asElement",
 );
@@ -476,8 +484,7 @@ if (reactRenderNodeImport !== undefined) {
   assert.equal(reactRenderNodeImport.result?.type, "Unit");
 }
 for (const target of [
-  "js.value.react.component",
-  "js.value.react.effectCallback",
+  "js.value.function.nullaryVoid",
 ]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "runtime");
@@ -490,29 +497,20 @@ assert.equal(
   ),
   false,
 );
-const reactTextImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "react.node.text",
-);
-assert.equal(reactTextImport?.args[0]?.type?.type, "Js");
-const reactElementTypeTagImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.elementType.tag",
-  );
-assert.equal(reactElementTypeTagImport?.effect, "react");
-assert.equal(reactElementTypeTagImport?.args[0]?.type?.type, "Js");
-assert.equal(reactElementTypeTagImport?.result?.type, "Js");
+for (const target of ["react.node.text", "react.elementType.tag"]) {
+  assert.equal(hostImportTarget(target), undefined);
+}
 const reactCreateElementImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "react.node.createElement",
 );
 assert.equal(reactCreateElementImport?.args[0]?.type?.type, "Js");
 assert.equal(reactCreateElementImport?.args[1]?.type?.type, "Js");
 assert.equal(reactCreateElementImport?.args[2]?.type?.type, "Js");
-for (const target of ["react.node.component", "react.node.keyedComponent"]) {
+for (const target of ["react.props.withData.make", "react.props.withData.get"]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "react");
   assert.equal(entry?.args[0]?.type?.type, "Js");
-  assert.equal(entry?.args[1]?.type?.type, "Js");
-  assert.equal(entry?.args[1]?.type?.kind, "resource");
+  assert.equal(entry?.args[0]?.type?.kind, "resource");
   assert.equal(entry?.result?.type, "Js");
 }
 const reactFragmentImport = hostRuntime.interfaceManifest.hostImports.find(
@@ -531,7 +529,7 @@ assert.throws(
 );
 const fibEntry = runtime.findManifestEntry("fib");
 assert.notEqual(fibEntry, null);
-assert.equal(runtime.call("fib", 12), "144");
+assert.equal(runtime.call("fib", 12), 144n);
 // Installed metadata is an owned, deeply frozen JSON tree. In particular,
 // mutating a descriptor after the first call cannot stale a cached call plan.
 for (const manifest of [
@@ -558,23 +556,23 @@ assert.throws(() => {
 assert.throws(() => {
   hostRuntime.interfaceManifest.hostImports[0].target = "unknown";
 }, TypeError);
-assert.equal(runtime.call("fib", 12), "144");
+assert.equal(runtime.call("fib", 12), 144n);
 // Freezing metadata must not freeze the real objects passed through host calls.
 assert.equal(Object.isFrozen(testDocument), false);
 assert.ok(
   (runtime.entryCallCache.get(fibEntry)?.callSlot ?? 0) > 0,
   "expected fib call slot to be cached",
 );
-assert.equal(runtime.exportsByName.fib(12), "144");
+assert.equal(runtime.exportsByName.fib(12), 144n);
 assert.equal(
   hostRuntime.call("HostInterop.titleHandshake", "runtime smoke"),
   "Lean VIR host: runtime smoke",
 );
-assert.equal(hostRuntime.call("HostInterop.callbackRoundTrip", 5), "12");
-assert.equal(hostRuntime.call("HostInterop.runtimeRefRoundTrip", 5), "714");
+assert.equal(hostRuntime.call("HostInterop.callbackRoundTrip", 5), 12n);
+assert.equal(hostRuntime.call("HostInterop.runtimeRefRoundTrip", 5), 714n);
 hostRuntime.dispose();
 assert.equal(
-  hostRuntime.liveCallbacks.size,
+  countLiveCallbacks(hostRuntime.hostState),
   0,
   "runtime disposal should release the key listener",
 );

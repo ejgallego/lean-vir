@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
@@ -53,7 +54,6 @@ try {
   const runtime = modules["vir-runtime.js"];
   const nodeRuntime = modules["vir-runtime-node.js"];
   const hostBindings = modules["vir-host-bindings.js"];
-  const codec = modules["runtime/vir-codec.js"];
   const interfaceManifest = modules["runtime/interface-manifest.js"];
   const interfaceTags = modules["runtime/interface-tags.js"];
   const packageTargets = modules["runtime/package-targets.js"];
@@ -70,7 +70,7 @@ try {
   );
   assert.equal(
     runtime.packageTargetModeLabel("markedModules"),
-    "marked declarations across imported modules",
+    null,
   );
   assert.equal(runtime.VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
   assert.equal(runtime.VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
@@ -80,23 +80,10 @@ try {
   );
   assert.equal(Object.hasOwn(runtime, "VirRuntime"), false);
   assert.equal(Object.hasOwn(runtime, "VIR_HOST_RESOLVE_BINDING"), false);
-  assert.equal(
-    Object.hasOwn(runtime, "roundTripInterfaceTypeDescriptor"),
-    false,
-  );
-  assert.equal(Object.hasOwn(runtime, "sameInterfaceTypeDescriptor"), false);
   assert.equal(nodeRuntime.debugWasmUrlFor, runtime.debugWasmUrlFor);
   assert.equal(typeof nodeRuntime.createVirRuntime, "function");
   assert.equal(Object.hasOwn(nodeRuntime, "VirRuntime"), false);
   assert.equal(Object.hasOwn(nodeRuntime, "VIR_HOST_RESOLVE_BINDING"), false);
-  assert.equal(
-    Object.hasOwn(nodeRuntime, "roundTripInterfaceTypeDescriptor"),
-    false,
-  );
-  assert.equal(
-    Object.hasOwn(nodeRuntime, "sameInterfaceTypeDescriptor"),
-    false,
-  );
   assert.equal(typeof hostBindings.createHostLifecycle, "function");
   assert.equal(
     Object.hasOwn(hostBindings, "createDOMTokenListHostBindings"),
@@ -106,8 +93,6 @@ try {
     Object.hasOwn(hostBindings, "createCSSStyleDeclarationHostBindings"),
     false,
   );
-  assert.equal(typeof codec.decodeTypeDescriptor, "function");
-  assert.equal(typeof codec.roundTripInterfaceTypeDescriptor, "function");
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
   assert.equal(
     packageTargets.formatPackageTarget({
@@ -123,26 +108,84 @@ try {
       mode: "markedModules",
       resolvedRoots: ["Example.value"],
     }),
-    "Example.lean [marked declarations across imported modules] roots: Example.value",
+    "Example.lean [unknown selection] roots: Example.value",
   );
-  assert.equal(typeof codec.sameInterfaceTypeDescriptor, "function");
   assert.equal(interfaceTags.INTERFACE_TAG.NAT, 0);
   assert.equal(
     interfaceTags.SUPPORTED_INTERFACE_TAGS.has(interfaceTags.INTERFACE_TAG.NAT),
     true,
   );
-  assert.equal(
-    interfaceTags.JSON_INPUT_INTERFACE_TAGS.has(
-      interfaceTags.INTERFACE_TAG.ARRAY,
-    ),
-    true,
-  );
-
-  const decoded = codec.roundTripInterfaceTypeDescriptor({
-    type: "Nat",
-    interfaceTag: interfaceTags.INTERFACE_TAG.NAT,
+  const packagedRuntime = await nodeRuntime.createVirRuntime({
+    wasmBytes: await readFile(join(jsDir, "..", "wasm", "vir-upstream.wasm")),
   });
-  assert.deepEqual(decoded, { interfaceTag: interfaceTags.INTERFACE_TAG.NAT });
+  try {
+    for (const name of [
+      "vir_obj_uint64", "vir_obj_uint64_decimal",
+      "vir_obj_usize", "vir_obj_usize_decimal", "vir_obj_ctor_usize_decimal",
+      "vir_obj_closure_root", "vir_closure_release", "vir_closure_call_objects",
+    ]) {
+      assert.equal(Object.hasOwn(packagedRuntime.exports, name), false, `${name} must not ship in the SDK`);
+    }
+    for (const [interfaceTag, value, expected] of [
+      [interfaceTags.INTERFACE_TAG.UINT64, "18446744073709551615", 18446744073709551615n],
+      [interfaceTags.INTERFACE_TAG.USIZE, "4294967295", 4294967295],
+      [interfaceTags.INTERFACE_TAG.NAT, "0", 0n],
+      [interfaceTags.INTERFACE_TAG.NAT, (1n << 256n).toString(), 1n << 256n],
+      [interfaceTags.INTERFACE_TAG.INT, (-1n << 256n).toString(), -1n << 256n],
+    ]) {
+      const type = { interfaceTag };
+      const object = packagedRuntime.makeObjectValue(type, value, "SDK scalar");
+      try {
+        assert.equal(packagedRuntime.liftObjectValue(type, object, "SDK scalar"), expected);
+      } finally {
+        packagedRuntime.exports.vir_obj_dec(object);
+      }
+    }
+    const type = {
+      interfaceTag: interfaceTags.INTERFACE_TAG.STRUCTURE,
+      typeName: "Sdk.USizeFields",
+      objectFieldCount: 0, usizeFieldCount: 2, scalarByteSize: 4,
+      fields: [
+        { name: "first", type: { interfaceTag: interfaceTags.INTERFACE_TAG.USIZE }, layout: { kind: "usize", index: 0 } },
+        { name: "second", type: { interfaceTag: interfaceTags.INTERFACE_TAG.USIZE }, layout: { kind: "usize", index: 1 } },
+        { name: "word", type: { interfaceTag: interfaceTags.INTERFACE_TAG.UINT32 }, layout: { kind: "scalar", offset: 0, size: 4 } },
+      ],
+    };
+    const value = { first: "4294967295", second: "0", word: 0xfffffffe };
+    const object = packagedRuntime.makeObjectValue(type, value, "SDK fields");
+    try {
+      assert.deepEqual(packagedRuntime.liftObjectValue(type, object, "SDK fields"),
+        { first: 4294967295, second: 0, word: 0xfffffffe });
+    } finally {
+      packagedRuntime.exports.vir_obj_dec(object);
+    }
+  } finally {
+    packagedRuntime.dispose();
+  }
+  const hostPackage = await readFile(new URL("../../web/public/demo-host.irpkg", import.meta.url));
+  for (const profile of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
+    let retained;
+    const callableRuntime = await nodeRuntime.createVirRuntime({
+      wasmBytes: await readFile(join(jsDir, "..", "wasm", profile)),
+      irPackageSet: [hostPackage],
+      hostBindings: {
+        "test.callNatCallback": (input, callback) => { retained = callback; return callback(input); },
+        "test.recordNat": () => undefined,
+      },
+    });
+    try {
+      assert.equal(callableRuntime.call("HostInterop.callbackRoundTrip", 3), 10n);
+      assert.equal(retained(4n), 11n);
+      assert.equal(countLiveCallbacks(callableRuntime.hostState), 1);
+      const wasm = callableRuntime.exports, host = callableRuntime.hostState;
+      callableRuntime.dispose();
+      assert.equal(host.leanObjectHandleCells.size, 0);
+      assert.equal(countLiveCallbacks(host), 0);
+      assert.equal(wasm.vir_resource_roots_active(), 0);
+      assert.throws(() => retained(1n), /disposed runtime/);
+    } finally { callableRuntime.dispose(); }
+  }
+
 } finally {
   await rm(isolatedDir, { recursive: true, force: true });
 }
@@ -164,10 +207,11 @@ try {
     typeof reactHostBindings.createBrowserReactHostBindings,
     "function",
   );
-  assert.equal(typeof bindings["react.node.text"], "function");
+  assert.equal(Object.hasOwn(bindings, "react.node.text"), false);
+  assert.equal(Object.hasOwn(bindings, "react.elementType.tag"), false);
   assert.equal(typeof bindings["react.node.createElement"], "function");
-  assert.equal(typeof bindings["js.value.react.component"], "function");
-  assert.equal(typeof bindings["js.value.react.effectCallback"], "function");
+  assert.equal(typeof bindings["react.props.withData.make"], "function");
+  assert.equal(Object.hasOwn(bindings, "js.value.react.effectCallback"), false);
   assert.equal(typeof bindings["react.root.create"], "function");
   assert.equal(typeof bindings["react.root.renderNode"], "function");
   assert.equal(typeof bindings["react.root.unmount"], "function");

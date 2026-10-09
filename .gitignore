@@ -2,6 +2,7 @@
 .agents/
 .beam/
 .lake/
+.vir-generated/
 .perf-artifacts/
 .tools/
 .worktrees/

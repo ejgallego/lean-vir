@@ -21,10 +21,9 @@ const requiredFunctionExports = [
   "vir_call_resolved_objects",
   "vir_call_error",
   "vir_call_error_size",
-  "vir_closure_call_objects",
+  "vir_closure_apply_objects",
   "vir_closure_call_error",
   "vir_closure_call_error_size",
-  "vir_closure_release",
   "vir_package_interface_manifest",
   "vir_package_interface_manifest_size",
   "vir_package_decl_count",
@@ -41,9 +40,7 @@ const requiredFunctionExports = [
   "vir_obj_array_get",
   "vir_obj_ctor",
   "vir_obj_ctor_layout",
-  "vir_obj_ctor_usize_decimal",
   "vir_obj_ctor_scalar_data",
-  "vir_obj_closure_root",
   "vir_obj_expr_app",
   "vir_obj_expr_bvar",
   "vir_obj_expr_const",
@@ -80,10 +77,10 @@ const requiredFunctionExports = [
   "vir_obj_int_decimal",
   "vir_obj_uint32",
   "vir_obj_uint32_value",
-  "vir_obj_uint64",
-  "vir_obj_uint64_decimal",
-  "vir_obj_usize",
-  "vir_obj_usize_decimal",
+  "vir_obj_uint64_scalar",
+  "vir_obj_uint64_value",
+  "vir_obj_usize_scalar",
+  "vir_obj_usize_value",
   "vir_obj_float",
   "vir_obj_float_value",
   "vir_obj_float32",
@@ -140,20 +137,24 @@ export function loadIrPackageSet(exports, packageMembers) {
   if (exports.vir_prepare_ir_package_set() === 0) {
     throw new Error("IR package-set validation failed");
   }
-  const loadedDecls = exports.vir_finish_ir_package_set();
-  if (loadedDecls === 0) throw new Error("IR package-set finalization failed");
-  if (exports.vir_package_decl_count() !== loadedDecls) {
-    throw new Error(
-      "loaded declaration count does not match package provider state",
-    );
+  if (exports.vir_finish_ir_package_set() === 0) {
+    throw new Error("IR package-set finalization failed");
   }
-  return loadedDecls;
+  return exports.vir_package_decl_count();
 }
 
 function assertRequiredExports(exports) {
   for (const name of requiredFunctionExports) {
     if (typeof exports[name] !== "function") {
       throw new Error(`${name} export is missing`);
+    }
+  }
+  for (const name of [
+    "vir_obj_uint64", "vir_obj_uint64_decimal",
+    "vir_obj_usize", "vir_obj_usize_decimal", "vir_obj_ctor_usize_decimal",
+  ]) {
+    if (exports[name] !== undefined) {
+      throw new Error(`removed ${name} export is still present`);
     }
   }
   if (exports.vir_resolve_call !== undefined) {

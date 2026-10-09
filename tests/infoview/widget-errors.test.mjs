@@ -5,7 +5,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { widgetErrorMessage } from "../../web/src/vir-widget-errors.js";
+import { widgetErrorMessage } from "../../web/app/vir-widget-errors.js";
 
 test("plain RPC failures retain their message and code", () => {
   assert.equal(widgetErrorMessage({ code: -32602, message: "VIR IR package failed" }, " Setup "),

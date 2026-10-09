@@ -3,19 +3,24 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
+import { countLiveCallbacks } from "../support/lean-ownership.js";
 
 import assert from "node:assert/strict";
 
-import { createVirCallback } from "../../web/src/runtime/callbacks.js";
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
 import { readRuntimeArtifacts } from "./shared.mjs";
 
 assert.equal(typeof globalThis.gc, "function", "GC smoke requires --expose-gc");
 
-const { wasmBytes, defaultPackageBytes } = await readRuntimeArtifacts();
+const { wasmBytes, hostPackageBytes } = await readRuntimeArtifacts();
+let callback = null;
 const runtime = await createVirRuntime({
   wasmBytes,
-  irPackageSet: [defaultPackageBytes],
+  irPackageSet: [hostPackageBytes],
+  hostBindings: {
+    "test.callNatCallback": (input, fn) => { callback = fn; return fn(input); },
+    "test.recordNat": () => undefined,
+  },
 });
 
 let object = makeObjectString(runtime, "self-owning JSL");
@@ -33,25 +38,10 @@ runtime.exports.vir_obj_dec(borrowed);
 const jslWeak = new WeakRef(jsl);
 jsl = null;
 
-let callbackReleases = 0;
-const callbackRoots = new Set();
-const callbackRuntime = {
-  hostState: null,
-  trackCallback(root) {
-    callbackRoots.add(root);
-  },
-  untrackCallback(root) {
-    callbackRoots.delete(root);
-  },
-  releaseClosure(rootId) {
-    assert.equal(rootId, 1);
-    callbackReleases++;
-  },
-};
-let callback = createVirCallback(callbackRuntime, 1, {
-  args: [],
-  result: { type: "Unit" },
-});
+assert.equal(runtime.call("HostInterop.callbackRoundTrip", 3), 10n);
+assert.equal(countLiveCallbacks(runtime.hostState), 1);
+assert.equal(runtime.hostState.leanObjectHandleCells.size, 2,
+  "JSL and actual Lean callback use the same tracking set");
 assert.equal(typeof callback, "function");
 assert.deepEqual(Object.keys(callback), []);
 const callbackWeak = new WeakRef(callback);
@@ -61,7 +51,7 @@ for (
   let attempt = 0;
   attempt < 300 &&
   (runtime.hostState.leanObjectHandleCells.size !== 0 ||
-    callbackReleases !== 1);
+    countLiveCallbacks(runtime.hostState) !== 0);
   attempt++
 ) {
   globalThis.gc();
@@ -75,12 +65,8 @@ assert.equal(
   "an unreachable JSL object must release its Lean root",
 );
 assert.equal(callbackWeak.deref(), undefined);
-assert.equal(
-  callbackReleases,
-  1,
-  "an unreachable callback must release its Lean root",
-);
-assert.equal(callbackRoots.size, 0);
+assert.equal(countLiveCallbacks(runtime.hostState), 0,
+  "an unreachable callback must release its shared ownership cell");
 
 runtime.dispose();
 console.log("raw JavaScript value GC smoke ok");

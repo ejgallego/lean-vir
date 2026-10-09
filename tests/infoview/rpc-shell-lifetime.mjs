@@ -37,7 +37,7 @@ function replaceOnce(source, before, after) {
 
 async function main() {
   // No copied Lean program or simulated package: the server imports these exact
-  // existing fixtures and the real shell invokes statIRPackage/buildIRPackage.
+  // existing fixtures and the real shell invokes buildIRPackage without polling.
   run(["build", "VirInfoview", "+ShellLifetime", "+tutorials.RpcReferenceWidget",
     "+JsonRpcFoo", "+Vir.Infoview.JsonRpc.Server"]);
   for (const fixture of [
@@ -67,7 +67,7 @@ async function main() {
             namespace: "rpc-shell-test",
           }));
           builder.onLoad({ filter: /.*/, namespace: "rpc-shell-test" }, () => ({
-            contents: `export { EditorConnection, EditorContext, useClientNotificationEffect }
+            contents: `export { DocumentPosition, EditorConnection, EditorContext, InteractiveCode, TaggedText_stripTags, useClientNotificationEffect }
               from ${JSON.stringify(fileURLToPath(import.meta.resolve("@leanprover/infoview")))};
             export function useRpcSession() { return globalThis.__rpcShell.session; }`,
             loader: "js",
@@ -111,7 +111,7 @@ async function main() {
     "fixtures/infoview/RpcBrowserServer.lean",
     "fixtures/infoview/RpcShellLifetimeServer.lean",
     "web/app/vir-infoview-widget.js",
-    "web/src/vir-widget-errors.js",
+    "web/app/vir-widget-errors.js",
     "tests/infoview/rpc-shell-lifetime-entry.js",
   ])
     sources[path] = sha256(await readFile(join(root, path)));

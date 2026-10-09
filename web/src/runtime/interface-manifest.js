@@ -14,8 +14,7 @@ import { validatePackageTargets } from "./package-targets.js";
 import { requireModuleIdentity } from "./module-name.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 8;
-export const MIN_INTERFACE_MANIFEST_VERSION = 6;
+export const INTERFACE_MANIFEST_VERSION = 9;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",
   EXPLICIT_CONVERSION: "explicitConversion",
@@ -23,8 +22,8 @@ export const HOST_IMPORT_BOUNDARY = Object.freeze({
 });
 
 export const INTERFACE_MANIFEST_SHAPE_ERROR =
-  `embedded interface manifest must be { version: ${MIN_INTERFACE_MANIFEST_VERSION} through ` +
-  `${INTERFACE_MANIFEST_VERSION}, metadata: {...}, exports: [...] }`;
+  `embedded interface manifest must be { version: ${INTERFACE_MANIFEST_VERSION}, metadata: {...}, exports: [...] }; ` +
+  "regenerate packages with the matching SDK";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -42,6 +41,24 @@ function requireOptionalString(value, label) {
   }
 }
 
+// Machine identity is independent of the user-facing display/call aliases.
+function requireNameKey(value, label) {
+  if (typeof value !== "string" || !/^(?:s(?:[0-9a-f]{2})*\/|n(?:0|[1-9][0-9]*)\/)*$/.test(value)) {
+    throw new Error(`${label} must be a canonical structural Lean name key`);
+  }
+  try {
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    for (const part of value.split("/")) {
+      if (part.startsWith("s")) {
+        const bytes = Uint8Array.from(part.slice(1).match(/../g) ?? [], byte => parseInt(byte, 16));
+        decoder.decode(bytes);
+      }
+    }
+  } catch {
+    throw new Error(`${label} contains invalid UTF-8 in a structural Lean name key`);
+  }
+}
+
 function requireNonNegativeInteger(value, label) {
   if (!Number.isInteger(value) || value < 0 || value > 0xffffffff) {
     throw new Error(`${label} must be a non-negative 32-bit integer`);
@@ -55,8 +72,7 @@ export function validateInterfaceManifest(
   if (
     !isRecord(manifest) ||
     !Number.isInteger(manifest.version) ||
-    manifest.version < MIN_INTERFACE_MANIFEST_VERSION ||
-    manifest.version > INTERFACE_MANIFEST_VERSION ||
+    manifest.version !== INTERFACE_MANIFEST_VERSION ||
     !isRecord(manifest.metadata) ||
     !Array.isArray(manifest.exports)
   ) {
@@ -87,7 +103,8 @@ export function validateInterfaceManifest(
     manifest.version,
     packageFormatVersion,
   );
-  const exports = validateManifestExports(manifest.exports, manifest.version);
+  const exports = manifest.exports;
+  validateManifestExports(exports);
   const hostImports = manifest.hostImports ?? [];
   validateManifestHostImports(hostImports);
   validatePackageSetSurface(
@@ -95,7 +112,7 @@ export function validateInterfaceManifest(
     exports,
     hostImports,
   );
-  return { ...manifest, exports };
+  return manifest;
 }
 
 function validateManifestMetadata(
@@ -132,17 +149,14 @@ function validateManifestMetadata(
       `${label}.packageFormatVersion must match package header version ${packageFormatVersion}`,
     );
   }
-  validatePackageTargets(metadata.targets, `${label}.targets`, {
-    manifestVersion,
-  });
+  validatePackageTargets(metadata.targets, `${label}.targets`);
   validatePackageSetMember(metadata.packageSetMember, metadata.targets, label);
 }
 
-function validateManifestExports(exports, manifestVersion) {
-  const entries = new Set();
-  const ids = new Set();
-  const jsNames = new Set();
-  return exports.map((entry, index) => {
+function validateManifestExports(exports) {
+  const aliases = new Map();
+  const identities = new Set();
+  exports.forEach((entry, index) => {
     const label = `embedded interface manifest exports[${index}]`;
     if (!isRecord(entry)) {
       throw new Error(`${label} must be an object`);
@@ -152,18 +166,22 @@ function validateManifestExports(exports, manifestVersion) {
     requireOptionalString(entry.jsName, `${label}.jsName`);
     requireOptionalString(entry.source, `${label}.source`);
     requireInterfaceEffect(entry.effect, `${label}.effect`);
-    if (manifestVersion >= 7 && typeof entry.startup !== "boolean") {
+    if (typeof entry.startup !== "boolean") {
       throw new Error(`${label}.startup must be a boolean`);
     }
-    if (manifestVersion < 7) {
-      if (entry.startup !== undefined && typeof entry.startup !== "boolean") {
-        throw new Error(`${label}.startup must be a boolean`);
+    // call(name) shares one namespace across all three spellings. Repeating a
+    // spelling for the same export is fine; selecting two exports is ambiguous.
+    for (const field of ["entry", "id", "jsName"]) {
+      const alias = entry[field];
+      if (alias === undefined || alias === "") continue;
+      const previous = aliases.get(alias);
+      if (previous !== undefined && previous !== index) {
+        throw new Error(
+          `${label}.${field} duplicates another interface export alias ${JSON.stringify(alias)} (exports[${previous}])`,
+        );
       }
+      aliases.set(alias, index);
     }
-    requireUnique(entries, entry.entry, `${label}.entry`);
-    if (entry.id !== undefined) requireUnique(ids, entry.id, `${label}.id`);
-    if (entry.jsName !== undefined)
-      requireUnique(jsNames, entry.jsName, `${label}.jsName`);
     if (!Array.isArray(entry.args)) {
       throw new Error(`${label}.args must be an array`);
     }
@@ -176,9 +194,8 @@ function validateManifestExports(exports, manifestVersion) {
       validateInterfaceRootType(arg.type, `${argLabel}.type`);
     });
     validateInterfaceRootType(entry.result, `${label}.result`);
-    return manifestVersion < 7 && entry.startup === undefined
-      ? { ...entry, startup: false }
-      : entry;
+    requireNameKey(entry.nameKey, `${label}.nameKey`);
+    requireUnique(identities, entry.nameKey, `${label}.nameKey`);
   });
 }
 
@@ -226,8 +243,8 @@ function validatePackageSetSurface(member, exports, hostImports) {
 }
 
 function validateManifestHostImports(hostImports) {
-  const names = new Set();
-  const symbols = new Set();
+  const identities = new Set();
+  const symbolAliases = new Map();
   hostImports.forEach((entry, index) => {
     const label = `embedded interface manifest hostImports[${index}]`;
     if (!isRecord(entry)) {
@@ -240,8 +257,15 @@ function validateManifestHostImports(hostImports) {
     for (const field of ["name", "source", "target", "symbol"]) {
       requireString(entry[field], `${label}.${field}`);
     }
-    requireUnique(names, entry.name, `${label}.name`, "host import");
-    requireUnique(symbols, entry.symbol, `${label}.symbol`, "host import");
+    for (const alias of [entry.symbol, `${entry.symbol}___boxed`]) {
+      const previous = symbolAliases.get(alias);
+      if (previous !== undefined && previous !== index) {
+        throw new Error(
+          `${label}.symbol alias ${JSON.stringify(alias)} belongs to more than one host import (hostImports[${previous}])`,
+        );
+      }
+      symbolAliases.set(alias, index);
+    }
     requireNonNegativeInteger(entry.arity, `${label}.arity`);
     requireNonNegativeInteger(
       entry.erasedPrefixArgs,
@@ -270,6 +294,8 @@ function validateManifestHostImports(hostImports) {
       );
     }
     requireHostImportBoundary(entry.boundary, `${label}.boundary`);
+    requireNameKey(entry.nameKey, `${label}.nameKey`);
+    requireUnique(identities, entry.nameKey, `${label}.nameKey`, "host import");
   });
 }
 
@@ -342,6 +368,69 @@ export function validateInterfaceType(type, label = "interface type") {
 function validateInterfaceRootType(type, label) {
   validateInterfaceType(type, label);
   validateNoDanglingRecursiveSelf(type, label);
+}
+
+// A comparison key for the existing callable ABI, not a second type grammar.
+// Keep validation here beside the format authority. Parameter display names and
+// diagnostic extensions are not ABI identity; ordered fields/layouts are.
+export function interfaceSignatureKey({ args, result, effect }) {
+  if (!Array.isArray(args)) throw new TypeError("signature.args must be an array");
+  requireInterfaceEffect(effect, "signature.effect");
+  for (const arg of args) validateInterfaceRootType(arg, "signature argument");
+  validateInterfaceRootType(result, "signature.result");
+  return JSON.stringify([args.map(interfaceTypeShape), interfaceTypeShape(result), effect]);
+}
+
+function interfaceTypeShape(type) {
+  const counts = owner => [owner.objectFieldCount, owner.usizeFieldCount, owner.scalarByteSize];
+  const layout = value => [value.kind, value.index ?? null, value.offset ?? null, value.size ?? null];
+  const header = ctor => [ctor.name, ctor.jsName, ctor.tag];
+  const fields = owner => owner.fields.map(field => [field.name,
+    interfaceTypeShape(field.type), layout(field.layout), field.subobject === true]);
+  const base = [type.type, type.interfaceTag];
+  switch (type.interfaceTag) {
+    case INTERFACE_TAG.SIMPLE_ENUM:
+      return [...base, type.kind, type.constructors.map(header)];
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
+      return [...base, interfaceTypeShape(type.element)];
+    case INTERFACE_TAG.PROD:
+      return [...base, interfaceTypeShape(type.fst), interfaceTypeShape(type.snd)];
+    case INTERFACE_TAG.STRUCTURE:
+      return [...base, type.kind, type.name, counts(type), type.trivialFieldIndex ?? null, fields(type)];
+    case INTERFACE_TAG.TAGGED_UNION:
+      return [...base, type.kind, type.name, type.constructors.map(ctor =>
+        [header(ctor), counts(ctor), layout(ctor.layout), interfaceTypeShape(ctor.type)])];
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
+      return [...base, type.kind, type.name, type.constructors.map(ctor =>
+        [header(ctor), counts(ctor), fields(ctor)])];
+    case INTERFACE_TAG.RECURSIVE_SELF:
+    case INTERFACE_TAG.RESOURCE:
+      return [...base, type.kind, type.name];
+    case INTERFACE_TAG.FUNCTION:
+      return [...base, type.kind, type.effect,
+        type.args.map(arg => interfaceTypeShape(arg.type)), interfaceTypeShape(type.result)];
+    case INTERFACE_TAG.LEAN_OBJECT:
+      return [...base, type.kind];
+    case INTERFACE_TAG.NAT:
+    case INTERFACE_TAG.INT:
+    case INTERFACE_TAG.BOOL:
+    case INTERFACE_TAG.STRING:
+    case INTERFACE_TAG.UINT8:
+    case INTERFACE_TAG.UINT16:
+    case INTERFACE_TAG.UINT32:
+    case INTERFACE_TAG.UINT64:
+    case INTERFACE_TAG.USIZE:
+    case INTERFACE_TAG.BYTE_ARRAY:
+    case INTERFACE_TAG.FLOAT:
+    case INTERFACE_TAG.FLOAT32:
+    case INTERFACE_TAG.EXPR:
+    case INTERFACE_TAG.UNIT:
+      return base;
+    default:
+      throw new Error("signature comparison does not support this interface tag");
+  }
 }
 
 function validateSimpleEnumType(type, label) {

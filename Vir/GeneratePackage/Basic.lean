@@ -6,11 +6,13 @@ Author: Emilio J. Gallego Arias
 
 module
 
+public import Vir.Package.Set
+
 public import Lean.Compiler.IR.CompilerM
-public import Vir.GeneratePackage.CachedImports
-public import Vir.GeneratePackage.NativeExterns
-public import Vir.Interface.Model
-public import Vir.IRDependencies
+public import Vir.Compiler.CachedImports
+public import Vir.Compiler.NativeExterns
+public import Vir.Compiler.Interface.Model
+public import Vir.Compiler.IRDependencies
 
 public section
 
@@ -87,7 +89,8 @@ structure LoadedDecl where
   module? : Option Name := none
   decl : Decl
 
-structure DeclIndexDiagnostic where
+/-- A generation diagnostic shared by input acquisition and interface collection. -/
+structure PackageDiagnostic where
   name : Name
   source : String
   reason : String
@@ -104,14 +107,14 @@ structure DeclSource where
 def DeclSource.display (source : DeclSource) : String := source.origin.display
 
 structure DeclIndex where
-  compiledImports : CompiledImportCache := {}
+  compiledImports : CompiledImportCache := .empty
   localDecls : NameMap LoadedDecl := {}
   sources : Array DeclSource := #[]
   clientNativeExternSpecs : Array NativeExternSpec := #[]
   virExports : NameSet := {}
   virStartups : NameSet := {}
   loadedModules : NameSet := {}
-  diagnostics : Array DeclIndexDiagnostic := #[]
+  diagnostics : Array PackageDiagnostic := #[]
 
 def DeclIndex.sourceForTarget? (index : DeclIndex) (target : Target) : Option DeclSource :=
   index.sources.find? (fun source => source.origin == target.origin)
@@ -156,34 +159,10 @@ structure HostImport where
   result : InterfaceType
   effect : InterfaceEffect
 
-structure PackageDiagnostic where
-  name : Name
-  source : String
-  reason : String
-
-def DeclIndexDiagnostic.toPackageDiagnostic (diagnostic : DeclIndexDiagnostic) : PackageDiagnostic :=
-  {
-    name := diagnostic.name
-    source := diagnostic.source
-    reason := diagnostic.reason
-  }
-
 structure PackageTargetMetadata where
   origin : PackageTargetOrigin
   mode : TargetMode
   resolvedRoots : Array Name
-
-inductive PackageSetMemberRole where
-  | dependency
-  | root
-
-namespace PackageSetMemberRole
-
-def label : PackageSetMemberRole → String
-  | .dependency => "dependency"
-  | .root => "root"
-
-end PackageSetMemberRole
 
 structure PackageSetMemberMetadata where
   moduleName : Name

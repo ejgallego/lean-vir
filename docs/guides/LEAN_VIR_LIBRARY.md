@@ -1,5 +1,9 @@
 # Vir Library
 
+This guide covers core interop and experimental conveniences. DOM, React/JSX,
+widgets and broad generated JS bindings are outside the official
+[support scope](../SUPPORT.md), even when included by `import Vir`.
+
 Import `Vir.*` modules to use APIs in the `Lean.Vir.*` namespace. These APIs
 call JavaScript while Lean runs through VIR's Wasm interpreter. This guide
 helps choose modules, effects and value representations; use the
@@ -12,20 +16,46 @@ Change the binding configuration when changing a generated declaration; the
 [binding translation contract](../reference/BINDING_MODALITIES.md) explains conversions,
 effects and reviewed protocol operations.
 
+## Choose a boundary representation
+
+Minimal interop lets you choose where a value lives and when to convert it:
+
+| Need | Use | What crosses the boundary |
+| --- | --- | --- |
+| Call a basic Lean function from JavaScript | An exported `String` or `Nat` function, as in the [application example](EMBEDDED_RESOURCES.md) | The runtime constructs Lean arguments and reads the result using the manifest's representation. |
+| Pass a JavaScript value to Lean and back | `Js α` | The exact JavaScript value; object identity is preserved. The phantom `α` describes the expected shape. |
+| Store a Lean value in JavaScript without decoding its contents | `JSL α`, using `LeanRef.toJSL` / `LeanRef.fromJSL` | An opaque JavaScript carrier retaining the Lean value. |
+| Let JavaScript invoke a Lean closure | Explicit `Js.Function.ofLean` / `ofLeanVoid` conversions and their arity variants | A JavaScript function backed by the Lean closure, within the [callback signature limits](#packages-and-host-imports). |
+| Construct or inspect Lean objects in a custom host | The [object API](../reference/OBJECT_ABI.md) | Lean objects with explicit construction, inspection and ownership rules. |
+
+For example, `String`, `Js String` and `JSL String` are different contracts:
+a Lean string, a native JavaScript string, and an opaque carrier holding a Lean
+string. `JsValue.ofString` / `toString` explicitly convert between the first two;
+`LeanRef.toJSL` keeps the Lean value opaque instead. Their details are below.
+
+Automatic array conversion is supported when the element representation is
+supported, for example `Array Nat`. Automatic conversion of records and custom
+inductives remains experimental; see the
+[implemented call representations](JS_API.md#calls-and-manifest).
+Explicit host-value conversions and opaque carriers do not encode JSON. The
+[planned 0.1.1 JSON converters](../SUPPORT.md#planned-for-011) are a separate API.
+
+Passing a DOM or React value through `Js` uses core reference interop; the DOM or
+React operation itself remains experimental. Choose focused imports below when
+useful; the umbrella import is a convenience, not a support classification.
+
 ## Modules And Effects
 
 | Import | Use it for |
 | --- | --- |
-| `Vir` | The common library, browser/React helpers, ProofWidgets notation and package markers. |
+| `Vir` | Convenience umbrella for core interop, package markers and experimental browser/React/ProofWidgets helpers. |
 | `Vir.Runtime` | `RuntimeM` and Lean-owned mutable `RuntimeRef` cells. |
 | `Vir.Js` | Exact JavaScript values, collections, functions, Promises and explicit conversions. |
-| `Vir.Common` | Small environment-neutral helpers such as string echo and natural-number addition. |
-| `Vir.Browser` | DOM receivers, events, timers, animation and canvas. |
-| `Vir.React.Core` | Native React nodes, roots, components and hooks. |
-| `Vir.React.Builders` | Optional Lean property, event and HTML builders. |
-| `Vir.React` | Convenience import for core and builders. |
-| `Vir.ProofWidgets` | Optional HTML/JSX notation over native React values. |
-| `Vir.Infoview` | The optional widget shell, proof surface, RPC and local editor capabilities. |
+| `Vir.Browser` | Experimental DOM receivers, events, timers, animation and canvas. |
+| `Vir.React.Core` | Experimental native React nodes, roots, components and hooks. |
+| `Vir.React` | Convenience import for experimental native React bindings. |
+| `Vir.ProofWidgets` | Experimental HTML/JSX notation over native React values. |
+| `Vir.Infoview` | Experimental widget shell, native panel props, RPC and local editor capabilities. |
 | `Vir.Attributes` / `Vir.ExternFallback` | Package markers / explicit use of a Lean extern reference body. |
 
 Choose the effect according to the operation:
@@ -34,18 +64,18 @@ Choose the effect according to the operation:
 | --- | --- |
 | `RuntimeM` | Allocate or inspect JS values, update `RuntimeRef` cells, call state setters and perform runtime bookkeeping. |
 | `Browser.DomM` | Read or mutate the DOM, handle events, and manage React roots. |
-| `React.ReactM` | Construct React values and use component render APIs. |
+| `React.ReactM` | Transparent `RuntimeM` alias naming React construction and hooks. |
 
-`RuntimeM` lifts into both `DomM` and `ReactM`; `ReactM` also lifts into
-`DomM`. Use `RuntimeM.run` or `DomM.run` at an explicit exported `IO`
-boundary. These effects identify the intended host operations; they do not
-enforce React purity or hook ordering.
+`RuntimeM` (also spelled `ReactM`) lifts into `DomM`. Use `RuntimeM.run` or
+`DomM.run` at an explicit exported `IO` boundary. The source-level `react`
+classification remains available to tooling; it does not enforce purity or
+hook ordering, and requires no separate monad implementation.
 
 `RuntimeRef α` holds Lean-owned mutable state shared by callbacks. Its
 `new`, `get`, `set`, `modify` and `modifyGet` operations run in
 `RuntimeM`; replacing the contents follows Lean reference counting.
 
-Repository package commands build the core library automatically.
+Repository package commands build the library automatically.
 The optional infoview integration requires `lake build VirInfoview` and the
 repository npm dependencies because it generates a JavaScript bundle. For a
 downstream project, follow [Lake integration](PACKAGES.md).
@@ -56,6 +86,12 @@ downstream project, follow [Lake integration](PACKAGES.md).
 the expected shape; it neither decodes that value as Lean `α` nor validates
 an arbitrary incoming value. DOM markers therefore appear as `Js Element`
 or `Js Event`, rather than naked Lean marker types.
+
+`Js α` is an irreducible phantom alias over one opaque handle type. Ordinary
+type checking keeps shapes distinct; explicit casts unfold the alias and return
+the same handle. The built-in widenings and JSX-generated casts use these
+identity terms, without cast axioms, unsafe implementations or runtime wrappers.
+This is static API discipline, not a proof of a JavaScript value's shape.
 
 Use `JSL α` when JavaScript should store an opaque Lean-owned value.
 `LeanRef.toJSL` creates this carrier and `LeanRef.fromJSL` recovers the
@@ -85,6 +121,17 @@ index and returns `Js.Nullable`; convert its result explicitly with
 `Js.Nullable.toOption` when a Lean `Option` is needed. Collection lengths are
 JavaScript numbers too.
 
+`Js.Array.filter`, `find`, `some` and `every` forward native predicates. Their
+results may have any JS shape: JavaScript truthiness decides the match.
+Callbacks receive value, number index and the original array; unary native
+functions can be used with an explicit predicate-result shape, for example
+`Js.Array.filter (β := Bool) values predicate`. `find` returns `Js.UndefinedOr α` and visits
+holes; the other predicates and `forEach` skip them. `forEach` takes a void
+callback. `join` takes a `Js.UndefinedOr String` separator (`undefined` uses
+the native comma default). No intermediate Lean array is constructed.
+These signatures select ordinary predicates, not TypeScript type-guard
+narrowing overloads, and leave `thisArg` at its native default.
+
 ## Explicit Conversions
 
 `JsValue` converts between Lean values and their JavaScript representations.
@@ -110,12 +157,10 @@ that range. It checks the bound in `Nat` before Float conversion, rejecting
 even exactly representable larger integers because they exceed the
 safe-integer range.
 
-The infoview `documentPosition` adapter checks coordinates against
-`0..Number.MAX_SAFE_INTEGER` before converting accepted bigints to numbers.
-It rejects out-of-range coordinates instead of rounding or clamping them.
 These host-value conversions are distinct from the
 [structural export representation](JS_API.md#calls-and-manifest) used when
-JavaScript calls a Lean entrypoint.
+JavaScript calls a Lean entrypoint. Automatic Nat export results also use bigint,
+including values nested in records and collections and returned from callbacks.
 
 For values whose shape is unknown, `Js.erase` forgets only the phantom type
 and returns the same value as `Js.Any`, including JS primitives, `null` and
@@ -125,18 +170,77 @@ effect. A successful check preserves identity.
 
 Dynamic `Js.Object.get` returns `Js.Any`, including `undefined` for a
 missing property. Prefer a generated getter for a known field contract.
-For a primitive string, `Js.String.fromAny` checks the exact value and throws
-`TypeError` on other kinds, including boxed strings; it does not coerce.
+`Js.String.fromAny`, `Js.Number.fromAny` and `Js.Boolean.fromAny` check the
+primitive kind and return the exact value, throwing `TypeError` for other
+kinds. They do not coerce or accept boxed primitives. Their `isString`,
+`isNumber` and `isBoolean` predicates return native `Js Bool` values.
+The corresponding `Js.Cast RuntimeM` instances support `Js.cast?` and
+`Js.cast` when absence or a Lean error value is preferable to an exception:
+
+```lean
+let number : Option (Js Float) ← Js.cast? unknown
+```
+
+These checks establish only the JavaScript primitive kind: `NaN`, infinities
+and negative zero are all numbers and remain unchanged.
 
 `Js.Nullable α` represents native `null` or a `Js α` value.
 `Js.Nullable.toOption` and `ofOption` explicitly convert that view at the
 Lean API edge.
 
-`Js.Function1 argument result` describes an exact unary JavaScript function.
-Native functions need no conversion; `Js.Function.call` and `callVoid`
-invoke them. Use `Js.Function.ofLean` or `ofLeanVoid` when converting a
-Lean closure into a JavaScript function. The call-shape parameters describe
-Lean boundary views, such as `Js α` and `Unit`.
+`Js.Function0` through `Js.Function3` describe exact JavaScript functions.
+`Js.Function.call0`, `call`, `call2`, and `call3` invoke those arities directly,
+without a `this` receiver. Their `Void` variants discard the native return;
+a value-returning call can instead return a rooted JavaScript `undefined`.
+The shape parameters describe full Lean boundary views, such as `Js α` and
+`Unit`, not just the inner JavaScript shape. Lean-closure conversion is
+explicit: `ofLean`/`ofLeanVoid` (unary), `ofLean0`/`ofLean0Void` (nullary),
+and `ofLean2`/`ofLean2Void`, `ofLean3`/`ofLean3Void`. A void callback's Lean
+`Unit` result becomes JavaScript `undefined`, not a transported unit object.
+The ternary constructors support native array value/index/source callbacks.
+
+`call2`, `call3` and `call3Void` use inline identity-only instantiations of
+monomorphic `Function.Internal` imports: otherwise erased type parameters
+would exceed the current host ABI's six-argument limit. They add no JavaScript
+wrapper, argument array or value conversion.
+
+## Native Primitive Operations
+
+These operations keep their inputs and results native; they do not decode
+values into Lean or add coercions beyond the selected JavaScript operation.
+
+| Surface | JavaScript domain | Operations |
+| --- | --- | --- |
+| `Js.String` on `Js String` | UTF-16 string | `equal`, `concat`, `slice`, `includes`, `startsWith`, `endsWith`, `trim`, `toLowerCase`, `toUpperCase` |
+| `Js.Number` on `Js Float` | Number | `add`, `sub`, `mul`, `div`, `rem`, `neg`, `equal`, `lt`, `le`, `isNaN`, `isFinite`, `isInteger`, `toString` |
+| `Js.Nat` on `Js Nat` | Nonnegative bigint | `add`, `mul`, `equal`, `lt`, `le`, `toString` |
+| `Js.Boolean` on `Js Bool` | Boolean | `not`, `equal` |
+
+Predicates return `Js Bool`; use `JsValue.toBool` only where Lean control flow
+needs a `Bool`. Equality is JavaScript `===`, so `NaN` is unequal to itself
+and positive and negative zero compare equal. Number arithmetic preserves
+infinities, negative zero and `NaN`; `rem` is `%`, not mathematical modulo.
+The bigint surface intentionally excludes operations such as subtraction
+that would leave its nonnegative domain.
+
+String methods preserve UTF-16 code units, including lone surrogates.
+`slice` takes native number indices and an explicit `Js.UndefinedOr Float`
+end. `concat` takes one string; search predicates use the native default
+position. These are selected native arities, not implementations of every
+TypeScript overload. Boolean short-circuiting remains control flow, not an
+eager host function.
+
+`Js.Number.toString` and `Js.Nat.toString` return native strings and accept
+an explicit `Js.UndefinedOr Float` radix. They use the native method, including
+its range errors. Unlike `JsValue.toString`, they do not decode into Lean.
+
+With `open scoped Lean.Vir.Js`, `js#!"Count: {count}"` interpolates native
+`Js` values using JavaScript template-string conversion. Holes evaluate and
+convert once, left-to-right; exceptions propagate (including Symbol rejection).
+Use `{← action}` for an effectful hole. Literal text uses Lean interpolation
+escapes; no Lean `ToString` instance is used. Like `js#"text"`, this notation
+is an action, automatically lifted in native object/array construction and JSX
+attributes; elsewhere write `← js#!"Count: {count}"`.
 
 `Js.Promise.catchValue` receives a `Js.Any` rejection value and recovers
 to the original Promise's result type. Check rejection values before typed
@@ -157,8 +261,10 @@ a transparent extern's Lean reference body without changing native compilation.
 Use the [fallback workflow](PACKAGES.md#use-a-lean-extern-reference-body)
 for its restrictions and ownership rules.
 
-Exported Lean functions may use the supported
+Exported Lean functions may use the implemented
 [structural interface types](../reference/IRPKG_FORMAT.md#interface-descriptors).
+Automatic conversion of records and custom inductives remains experimental as
+described above; arrays inherit the support status of their elements.
 Ordinary `@[vir_js "target.name"]` host imports have a narrower boundary:
 `Unit`, exact `Js`/nullable values, and top-level Lean callback arguments
 whose own arguments and result are `Unit` or JS values. Nested callbacks
@@ -205,10 +311,17 @@ ID. Use it inside a component, not as a list key or application identity.
 
 For `Vir.Infoview`, follow [Infoview widgets](INFOVIEW.md#widget-activation)
 for activation and the [RPC tutorial](../../examples/tutorials/RpcReferenceWidget.md)
-for server calls. Its clipboard and editor-command helpers expose local
-synchronous capabilities with Lean `Bool` results. In particular,
-`Infoview.Clipboard.writeText` does not claim the asynchronous browser
-Clipboard API contract; native RPC calls return exact Promises.
+for server calls. `Hooks.useContext (← Infoview.editorContext)` returns the
+native editor connection. `EditorConnection.revealPosition` and
+`EditorApi.copyToClipboard` / `insertText` return the upstream Promises;
+errors remain observable by the caller. There is no clipboard fallback or
+Boolean dispatch status. `PanelPosition.toTdpp` delegates to the upstream
+conversion when insertion needs an LSP document/position pair. An infoview
+factory has type `RuntimeM (React.FunctionComponent Infoview.PanelWidgetProps)`:
+React passes those native props directly, while `Infoview.useRpcSession` is the
+actual surrounding-context hook. Position coordinates remain JavaScript numbers
+as `Js Float`; optional upstream fields remain `Js.UndefinedOr` until an
+application explicitly converts them.
 
 ## Troubleshooting
 

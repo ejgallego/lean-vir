@@ -3,6 +3,10 @@
 This guide describes the JavaScript-driven construction and inspection path for
 Lean runtime objects.
 
+Object construction, inspection and ownership belong to the official
+[support scope](../SUPPORT.md). DOM/React examples and automatic conversion of
+records and custom inductives remain experimental conveniences above that API.
+
 The object ABI is the JavaScript runtime call surface for package
 entrypoints, host imports, callbacks, and resources. Interface descriptors
 remain in the embedded JSON manifest and JavaScript runtime helpers; the C++
@@ -20,18 +24,41 @@ There are two distinct lanes:
   rejected by package generation.
 - Plain Lean values cross as ordinary manifest value types. This includes
   scalars, strings, byte arrays, arrays, options, structures, and custom
-  inductives over supported fields. They are copied/lowered/lifted values, not
+  inductives over accepted fields. They are copied/lowered/lifted values, not
   JavaScript identity handles.
+
+Low-level object construction and ownership stay within the supported scope.
+Automatic array conversion is supported when its element representation is
+supported. Automatic conversion of structures and custom inductives remains
+experimental; accepting their manifest shapes does not extend official support
+to their automatic conversion. See
+[choosing a representation](../guides/LEAN_VIR_LIBRARY.md#choose-a-boundary-representation)
+for explicit JS values, opaque Lean carriers and callbacks.
 
 The object ABI does not change the public Lean signature policy. It is the
 runtime implementation path for the plain-value lane: JavaScript constructs
-Lean objects directly for supported manifest value types. `Lean.Vir.Js α`
+Lean objects directly for implemented manifest value types. `Lean.Vir.Js α`
 remains the explicit resource lane for host-owned objects.
 
 ### Externref and foreign values
 
 The [externref table](HOST_BINDINGS.md#interpreter-transport) roots the exact
 JavaScript payload; a Lean external object stores only its private root ID.
+The shim encodes the unsigned 32-bit ID directly in the external object's
+opaque `void *` payload through `uintptr_t`. It never dereferences that payload
+and allocates no separate root-ID record. The Lean external wrapper still
+allocates normally; its finalizer releases the JavaScript root once the last
+Lean reference is dropped. Root ID `0` is reserved for failure. External-class
+registration precedes root acquisition, and Lean wrapper allocation follows
+Lean's fatal out-of-memory policy.
+
+The current build is explicitly guarded to wasm32. The encoding itself also
+fits a wasm64 payload: widening the unsigned ID preserves all 32 bits and
+decoding recovers them. Root IDs are handles, not linear-memory addresses, so
+64-bit memory does not require 64-bit IDs. Enabling wasm64 must separately
+qualify the Lean/JavaScript pointer ABI and relax the target guard; the width
+requirement is that `uintptr_t` can hold the root ID.
+
 Reference types remove serialization for these values, but do not construct
 ordinary Lean structures, arrays or inductives. Those still need this ABI's
 manifest-driven lowering/inspection API.
@@ -81,8 +108,7 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_array_get`           | Read one Lean `Array` element.                                                                    | Returns a new owned reference to the element.                                                                       |
 | `vir_obj_ctor`                | Allocate a constructor with object fields only.                                                   | Consumes all field objects on success; returns an owned constructor object.                                         |
 | `vir_obj_ctor_layout`         | Allocate a constructor with object fields, `USize` slots, and packed scalar bytes.                | Consumes object fields on success; returns an owned constructor object.                                             |
-| `vir_obj_ctor_usize_decimal`  | Inspect one constructor `USize` slot as decimal text.                                             | Returns a borrowed pointer into shim-owned decimal scratch storage.                                                 |
-| `vir_obj_ctor_scalar_data`    | Inspect the packed scalar byte area of a constructor.                                             | Returns a borrowed pointer into the live constructor object.                                                        |
+| `vir_obj_ctor_scalar_data`    | Inspect constructor scalar data after skipping the supplied number of `USize` slots.              | Returns a borrowed pointer into the live constructor object.                                                        |
 | `vir_obj_scalar`              | Build an immediate scalar constructor value.                                                      | Returns a non-null Lean scalar object value; refcount operations are no-ops.                                        |
 | `vir_obj_is_scalar`           | Test whether an object is an immediate scalar.                                                    | No object ownership.                                                                                                |
 | `vir_obj_scalar_value`        | Read an immediate scalar value.                                                                   | No object ownership.                                                                                                |
@@ -94,10 +120,10 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_int_decimal`         | Inspect a Lean `Int` as signed decimal text.                                                      | Returns a borrowed pointer into shim-owned decimal scratch storage.                                                 |
 | `vir_obj_uint32`              | Build a Lean `UInt32`.                                                                            | Returns an owned boxed `UInt32` object.                                                                             |
 | `vir_obj_uint32_value`        | Inspect a Lean `UInt32`.                                                                          | No object ownership.                                                                                                |
-| `vir_obj_uint64`              | Build a Lean `UInt64` from decimal text.                                                          | Returns an owned boxed `UInt64` object.                                                                             |
-| `vir_obj_uint64_decimal`      | Inspect a Lean `UInt64` as decimal text.                                                          | Returns a borrowed pointer into shim-owned decimal scratch storage.                                                 |
-| `vir_obj_usize`               | Build a Lean `USize` from decimal text.                                                           | Returns an owned boxed `USize` object.                                                                              |
-| `vir_obj_usize_decimal`       | Inspect a Lean `USize` as decimal text.                                                           | Returns a borrowed pointer into shim-owned decimal scratch storage.                                                 |
+| `vir_obj_uint64_scalar`       | Build a Lean `UInt64` from an unsigned 64-bit Wasm scalar (JS BigInt).                              | Returns an owned boxed `UInt64` object, including for zero.                                                          |
+| `vir_obj_uint64_value`        | Inspect a Lean `UInt64` as a 64-bit Wasm scalar.                                                   | Borrows the object; JS must interpret the signed i64 result as unsigned.                                             |
+| `vir_obj_usize_scalar`        | Build a Lean `USize` from a pointer-width Wasm scalar (i32 on wasm32).                              | Returns an owned boxed `USize` object, including for zero.                                                           |
+| `vir_obj_usize_value`         | Inspect a Lean `USize` as a pointer-width Wasm scalar.                                             | Borrows the object; JS must interpret the signed i32 result as unsigned on wasm32.                                  |
 | `vir_obj_float`               | Build a Lean `Float`.                                                                             | Returns an owned boxed float object.                                                                                |
 | `vir_obj_float_value`         | Inspect a Lean `Float`.                                                                           | No object ownership.                                                                                                |
 | `vir_obj_float32`             | Build a Lean `Float32`.                                                                           | Returns an owned boxed float32 object.                                                                              |
@@ -107,11 +133,11 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_level_succ`          | Build `Lean.Level.succ`.                                                                          | Consumes the child level on success; returns an owned level object.                                                 |
 | `vir_obj_level_max`           | Build `Lean.Level.max`.                                                                           | Consumes both level arguments on success; returns an owned level object.                                            |
 | `vir_obj_level_imax`          | Build `Lean.Level.imax`.                                                                          | Consumes both level arguments on success; returns an owned level object.                                            |
-| `vir_obj_level_param`         | Build `Lean.Level.param` from a dotted name.                                                      | Returns an owned level object.                                                                                      |
-| `vir_obj_level_mvar`          | Build `Lean.Level.mvar` from a dotted name.                                                       | Returns an owned level object.                                                                                      |
+| `vir_obj_level_param`         | Build `Lean.Level.param` from a restricted dotted name.                                            | Returns an owned level object; numeric, escaped, empty and non-identifier components are rejected.                 |
+| `vir_obj_level_mvar`          | Build `Lean.Level.mvar` from a restricted dotted name.                                             | Returns an owned level object; numeric, escaped, empty and non-identifier components are rejected.                 |
 | `vir_obj_literal_nat`         | Build a `Lean.Literal.natVal`.                                                                    | Returns an owned literal object.                                                                                    |
 | `vir_obj_literal_string`      | Build a `Lean.Literal.strVal`.                                                                    | Returns an owned literal object.                                                                                    |
-| `vir_obj_expr_bvar`           | Build `Lean.Expr.bvar`.                                                                           | Returns an owned expression object.                                                                                 |
+| `vir_obj_expr_bvar`           | Build `Lean.Expr.bvar` with index `0..1048574`.                                                    | Returns an owned expression object; returns `0` outside the cached loose-variable range.                            |
 | `vir_obj_expr_fvar`           | Build `Lean.Expr.fvar`.                                                                           | Returns an owned expression object.                                                                                 |
 | `vir_obj_expr_mvar`           | Build `Lean.Expr.mvar`.                                                                           | Returns an owned expression object.                                                                                 |
 | `vir_obj_expr_sort`           | Build `Lean.Expr.sort`.                                                                           | Consumes the level on success; returns an owned expression object.                                                  |
@@ -123,16 +149,18 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_expr_lit`            | Build `Lean.Expr.lit`.                                                                            | Consumes the literal on success; returns an owned expression object.                                                |
 | `vir_obj_expr_proj`           | Build `Lean.Expr.proj`.                                                                           | Consumes the structure expression on success; returns an owned expression object.                                   |
 | `vir_obj_expr_scalar_u8`      | Inspect packed `Lean.Expr` scalar metadata such as binder info.                                   | No object ownership.                                                                                                |
-| `vir_obj_name_string`         | Inspect a Lean `Name` object as dotted text.                                                      | Returns a borrowed pointer into shim-owned string scratch storage.                                                  |
+| `vir_obj_name_string`         | Inspect a Lean `Name` object as restricted dotted text.                                            | Returns a borrowed pointer into shim-owned string scratch storage; returns `0` for unsupported structural components.              |
 | `vir_obj_name_string_size`    | Return the byte length of `vir_obj_name_string`.                                                  | No object ownership.                                                                                                |
 | `vir_obj_resource`            | Represent an exact JavaScript `externref` value as a Lean object.                                 | Returns an owned Lean external object whose finalizer releases its externref-table slot.                            |
 | `vir_obj_resource_externref`  | Recover the exact JavaScript value from a Lean resource object.                                   | No ownership change; JavaScript identity is preserved.                                                              |
-| `vir_obj_resource_is_valid`   | Check whether a Lean object is a live JavaScript-value external object.                           | No ownership change.                                                                                                |
-| `vir_obj_closure_root`        | Root a Lean function object so JavaScript can call it later.                                      | Retains the function through the closure root table; input object ownership is unchanged.                           |
-| `vir_closure_call_objects`    | Call a rooted Lean closure with owned Lean object arguments.                                      | Consumes all argument objects after accepting a non-null `argv`; returns one owned result object or `0` on failure. |
+| `vir_obj_resource_is_valid`   | Check whether a Lean object has the resource external class and a nonzero root ID.                | No allocation or ownership change; does not independently check root-table or generation liveness.                  |
+| `vir_resource_roots_clear`    | Terminally drop all JavaScript roots for this instance.                                           | Idempotent; forbids future rooting, retains metadata until instance collection, and is allowed after a fatal trap. |
+| `vir_resource_roots_active`   | Count live JavaScript roots.                                                                      | Diagnostic only; allowed after a fatal trap.                                                                        |
+| `vir_resource_roots_capacity` | Count allocated root slots, excluding reserved zero.                                               | Diagnostic only; capacity remains allocated after clearing.                                                        |
+| `vir_resource_roots_reusable` | Count currently reusable root slots.                                                              | Diagnostic only; returns zero after terminal clearing.                                                              |
+| `vir_closure_apply_objects` | Apply a borrowed Lean function with its effect and owned object arguments. | Borrows the live function from the managed ownership cell; acquires an invocation reference. Consumes object arguments after accepting a non-null `argv`; returns one owned result or `0`. |
 | `vir_closure_call_error`      | Return a borrowed pointer to the last closure-call diagnostic.                                    | Borrowed until the next closure call or runtime teardown.                                                           |
 | `vir_closure_call_error_size` | Return the byte length of `vir_closure_call_error`.                                               | No object ownership.                                                                                                |
-| `vir_closure_release`         | Release a rooted Lean closure by root id.                                                         | Releases the root-table reference; returns whether the root id was live.                                            |
 | `vir_obj_inc`                 | Retain one Lean object reference.                                                                 | Adds one reference for heap objects; scalar objects are no-ops.                                                     |
 | `vir_obj_dec`                 | Release one Lean object reference.                                                                | Drops one reference for heap objects; scalar objects are no-ops.                                                    |
 
@@ -154,13 +182,59 @@ variant: JavaScript supplies dense object fields, dense `USize` slots, and the
 packed scalar-byte area described by the interface manifest. If construction
 fails before consuming object fields, JavaScript still owns those field
 references. `vir_obj_field` returns a new owned reference to the requested
-object field, so JavaScript must release it. `vir_obj_ctor_usize_decimal`
-returns a borrowed pointer into the same shim-owned decimal scratch buffer as
-the scalar decimal helpers. `vir_obj_ctor_scalar_data` returns a borrowed
-pointer into the live Lean object; JavaScript must read it before releasing the
-object.
+object field, so JavaScript must release it.
+`vir_obj_ctor_scalar_data(object, usize_field_count)`
+returns a borrowed pointer into the live Lean object after skipping that many
+pointer-width `USize` slots. Pass the constructor's full `USize` field count to
+reach packed scalar bytes, or zero to read the `USize` slots themselves.
+JavaScript must read the data before releasing the object and create memory views
+after the accessor returns, so they use the current buffer after memory growth.
+The caller must supply a live constructor with a matching layout. This accessor
+returns zero for an immediate scalar; it does not validate slot counts or the
+constructor's allocation size. A nonzero pointer does not establish that an
+arbitrary requested field exists.
+
+### Fixed-width integers
+
+The ordinary boxed `UInt64` codec uses `vir_obj_uint64_scalar` and
+`vir_obj_uint64_value`: an i64 parameter/result crosses the Wasm boundary as
+JavaScript BigInt. The wasm32 `USize` codec uses `vir_obj_usize_scalar` and
+`vir_obj_usize_value` with an exact 32-bit Number. Wasm results are signed;
+the codec recovers unsigned values with `BigInt.asUintN(64, result)` and
+`result >>> 0`, respectively. UInt64 results are unsigned JavaScript bigint;
+wasm32 USize results are Numbers, whose entire 32-bit range is exact.
+
+Both codecs still accept safe integer Number, BigInt and unsigned decimal
+String inputs, including surrounding whitespace and leading zeros. Validation
+rejects negatives, unsafe or fractional Numbers, malformed strings and values
+above the type's maximum before calling the scalar constructor. The scalar ABI
+itself carries integer bits; raw callers must validate their inputs before Wasm
+coercion. Direct USize lowering and lifting require a wasm32 runtime, rather than
+truncating a wider target through i32. Accessors borrow correctly typed live Lean
+objects; constructors return owned heap boxes even for numeric zero.
+
+Manifest-guided constructor `USize` fields also use binary transport: the codec
+borrows `vir_obj_ctor_scalar_data(object, 0)` and reads each validated dense slot
+index as an unsigned little-endian 32-bit Number.
+This borrows the parent object without acquiring or releasing a field reference.
+A null data pointer signals an unavailable field; a field containing zero remains
+valid data.
+
+Low-level fixed-width callers use the scalar constructors/getters and borrowed
+constructor data above. Decimal text transport remains in use for Nat/Int.
+Use [matching JavaScript/Wasm assets](../guides/JS_API.md#matching-runtime-assets)
+and refresh the runtime and generated SDK together after updating VIR.
 
 ## Ownership
+
+Resource inspection requires a valid, live Lean object reference. A boxed
+JavaScript `null` is a valid resource and unboxes to `null`; a non-resource
+object also unboxes to `null`. Use `vir_obj_resource_is_valid` to distinguish
+them. That predicate checks the external class and nonzero ID, while the
+runtime's root table and generation lifecycle govern root availability. Root
+allocation metadata lives in linear memory; the references themselves live in
+the unexported Wasm table. Metadata growth precedes table growth, and failed
+growth publishes no root. Release needs no allocation.
 
 Object constructors return an owned Lean object pointer. JavaScript owns
 that reference and must release it with `vir_obj_dec` unless a call helper
@@ -184,31 +258,49 @@ JS should use; Lean's runtime treats scalars as no-ops for refcounting.
 Object pointers are scoped to one wasm runtime instance. They must not survive:
 
 - `VirRuntime.dispose`
-- package reload
+- runtime generation disposal
 - wasm instance teardown
+
+`vir_closure_apply_objects(fn, is_io, argv, argc)` borrows a live function and
+consumes accepted argument references. The caller supplies the trusted calling
+description; `argc` is the single argument-count input, not an independent
+function-type check. An invocation-owned function reference protects active calls
+from reentrant retirement of their JavaScript carrier.
 
 Longer-lived Lean values need an explicit Lean root. Closures and JSL values
 already follow that pattern through private state associated with ordinary
 JavaScript functions and objects.
 
+If a pure host failure or other exception escapes an exported Wasm function,
+the generation is abandoned. Recoverable effectful host errors do not retire it. The call has already consumed its argument objects; JavaScript
+cleanup must not attempt to re-enter the failed instance to release or inspect
+them. Disposal releases JavaScript-owned resources, while the abandoned Wasm
+objects are reclaimed with the instance. Create a fresh runtime for subsequent
+object calls.
+
+Terminal resource-table clearing and its three count diagnostics are the narrow
+exceptions to the failed-generation guard. They do not inspect or release Lean
+heap objects; see the [allocator design](../development/WASM_RESOURCE_ROOTS.md).
+
 ## Call path
 
-The runtime value path uses owned Lean objects. Primitive lane helpers are
-still useful for the hottest exact scalar signatures because they avoid object
-allocation, but the JavaScript-facing runtime no longer has a value byte
-fallback.
+The runtime value path uses owned Lean objects, including immediate scalar
+objects. There is no separate primitive call lane or value-byte fallback.
 `VirRuntime.call` lowers and lifts the
-[supported manifest value types](../guides/JS_API.md#calls-and-manifest).
+[implemented manifest value types](../guides/JS_API.md#calls-and-manifest).
 Constructors may mix object fields, raw `USize` slots and packed scalar fields,
 including recursive references through supported fields. `Lean.Expr` uses
 constructor-backed `vir_obj_expr_*` and `vir_obj_level_*`
 helpers; the public Lean type remains `Lean.Expr`, but the helpers call Lean's
 real constructors so cached expression data is preserved. Resources, callbacks,
-host imports, and effectful calls also use object arguments/results. Decimal
-scalar calls lower through the corresponding `vir_obj_*` constructor, call
+host imports, and effectful calls also use object arguments/results. `Nat` and
+`Int` calls lower through the corresponding decimal `vir_obj_*` constructor, call
 `vir_call_resolved_objects`, lift the result with the matching decimal
-inspection helper plus
-`vir_obj_decimal_size`, and release the owned result with `vir_obj_dec`.
+inspection helper plus `vir_obj_decimal_size`, convert that text to JavaScript
+bigint in the shared primitive codec, and release the owned result with
+`vir_obj_dec`. Specialized Expr Nat indices and literals use the same Nat codec.
+`UInt64` and `USize` calls use [fixed-width scalar transport](#fixed-width-integers)
+and return bigint and Number respectively, including nested scalar/USize fields.
 Byte-array calls use `vir_obj_byte_array` and lift the result with
 `vir_obj_byte_array_data` / `vir_obj_byte_array_size`. Sequence calls lower each
 supported element to an owned object. Arrays pack those objects with

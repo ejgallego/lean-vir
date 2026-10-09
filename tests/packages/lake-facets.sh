@@ -11,14 +11,23 @@ cd "$(dirname "$0")/../.."
 repo="$(pwd -P)"
 node tests/packages/infoview-bundle-downstream.mjs
 sdk_version="$(node -p 'require("./package.json").version')"
+sdk_abi="$(node --input-type=module -e 'import {RUNTIME_ABI_VERSION} from "./scripts/packages/package-versions.mjs"; console.log(RUNTIME_ABI_VERSION)')"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/lean-vir-lake-facets.XXXXXX")"
-trap 'rm -rf "$tmp"' EXIT
+cleanup() {
+  local status=$?
+  if [ "$status" -eq 0 ]; then
+    rm -rf "$tmp"
+  else
+    echo "Lake facet failure evidence retained at $tmp" >&2
+  fi
+}
+trap cleanup EXIT
 
 write_sdk_manifest() {
   local sdk_dir="$1"
   local commit="$2"
   local hash="$3"
-  local abi="${4:-2}"
+  local abi="${4:-$sdk_abi}"
   printf '%s\n' 'export const companion = true;' > "$sdk_dir/js/sdk-helper.js"
   local helper_hash
   helper_hash="$(sha256sum "$sdk_dir/js/sdk-helper.js" | cut -d' ' -f1)"
@@ -107,6 +116,9 @@ if grep -E 'Built .*ModuleSetFixture[.]Root:vir' "$tmp/no-op.stdout" "$tmp/no-op
   exit 1
 fi
 
+# The facets acquire vir_program, not the standalone generator used below.
+# Fetch this test-only prerequisite explicitly, including in a cold checkout.
+lake build vir_irpkg
 for repro_dir in "$tmp/repro-a" "$tmp/repro-b"; do
   mkdir -p "$repro_dir/Root.parts"
   lake env .lake/build/bin/vir_irpkg \
@@ -268,7 +280,7 @@ printf '%s\n' \
   'module' \
   '' \
   'meta import Vir.Attributes' \
-  'public import Vir.HostValidation' \
+  'public import Vir.Compiler.HostValidation' \
   '' \
   '#check vir_export' \
   '#check vir_startup' \
@@ -420,15 +432,17 @@ grep -q 'checksum mismatch for js/sdk-helper.js:' "$tmp/bad-sdk.stderr"
 
 mkdir -p "$tmp/sdk-old-abi/lean-vir-sdk/js"
 cp "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js" "$tmp/sdk-old-abi/lean-vir-sdk/js/vir-runtime.js"
-write_sdk_manifest "$tmp/sdk-old-abi/lean-vir-sdk" "lake-facet-smoke" "$sdk_hash" 1
-tar -czf "$tmp/lean-vir-sdk-old-abi.tar.gz" -C "$tmp/sdk-old-abi" lean-vir-sdk
-if lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk-old-abi.tar.gz" --out "$tmp/existing-sdk" \
-    > "$tmp/old-abi-sdk.stdout" 2> "$tmp/old-abi-sdk.stderr"; then
-  echo "SDK archive with the obsolete runtime ABI unexpectedly installed" >&2
-  exit 1
-fi
-test "$(cat "$tmp/existing-sdk/marker.txt")" = 'keep-existing-sdk'
-grep -q 'unsupported SDK runtime ABI version: 1' "$tmp/old-abi-sdk.stderr"
+for wrong_sdk_abi in "$((sdk_abi - 1))" "$((sdk_abi + 1))"; do
+  write_sdk_manifest "$tmp/sdk-old-abi/lean-vir-sdk" "lake-facet-smoke" "$sdk_hash" "$wrong_sdk_abi"
+  tar -czf "$tmp/lean-vir-sdk-old-abi.tar.gz" -C "$tmp/sdk-old-abi" lean-vir-sdk
+  if lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk-old-abi.tar.gz" --out "$tmp/existing-sdk" \
+      > "$tmp/abi-$wrong_sdk_abi.stdout" 2> "$tmp/abi-$wrong_sdk_abi.stderr"; then
+    echo "SDK archive with an unsupported runtime ABI unexpectedly installed" >&2
+    exit 1
+  fi
+  test "$(cat "$tmp/existing-sdk/marker.txt")" = 'keep-existing-sdk'
+  grep -q "unsupported SDK runtime ABI version: $wrong_sdk_abi" "$tmp/abi-$wrong_sdk_abi.stderr"
+done
 
 if lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk.tar.gz" --expect-version 9.9.9 \
     --out "$tmp/existing-sdk" > "$tmp/version-sdk.stdout" 2> "$tmp/version-sdk.stderr"; then
@@ -437,6 +451,12 @@ if lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk.tar.gz" --expect-version 
 fi
 test "$(cat "$tmp/existing-sdk/marker.txt")" = 'keep-existing-sdk'
 grep -q 'SDK version mismatch' "$tmp/version-sdk.stderr"
+
+lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk.tar.gz" --out "$tmp/existing-sdk" \
+    > "$tmp/good-sdk.stdout" 2> "$tmp/good-sdk.stderr"
+test ! -e "$tmp/existing-sdk/marker.txt"
+cmp "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js" "$tmp/existing-sdk/js/vir-runtime.js"
+test -f "$tmp/existing-sdk/lean-vir-artifact.json"
 
 lake -d "$tmp" build Smoke.InterfaceClassifier
 lake -d "$tmp" build Smoke.PackagePipeline
@@ -560,6 +580,17 @@ if lake -d "$tmp" build +Smoke.NewRuntime:vir \
 fi
 test ! -e "$module_descriptor"
 test ! -e "$module_package"
+test ! -e "$module_dependency"
+test -f "${module_package%.irpkg}.report.md"
+
+# A different rejection must not republish the prior generation's report.
+printf '%s\n' 'def Smoke.NewRuntime.value : Nat := 1' > "$tmp/Smoke/NewRuntime.lean"
+if lake -d "$tmp" build +Smoke.NewRuntime:vir > "$tmp/rejected-after-failure.log" 2>&1; then
+  echo "non-module replacement after a failed generation unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -q 'requires a `module` header and compiled IR' "$tmp/rejected-after-failure.log"
+test ! -e "${module_package%.irpkg}.report.md"
 
 client_native_package="$tmp/.lake/build/vir/module-sets/Smoke/ClientNative.irpkg"
 client_native_report="$tmp/.lake/build/vir/module-sets/Smoke/ClientNative.report.md"

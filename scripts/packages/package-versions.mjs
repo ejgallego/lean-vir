@@ -4,14 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { IR_PACKAGE_VERSION } from "../../web/src/runtime/ir-package.js";
-
-export const PACKAGE_FORMAT_VERSION = IR_PACKAGE_VERSION;
-export const INTERFACE_MANIFEST_VERSION = 8;
-export const RUNTIME_ABI_VERSION = 2;
-
-export const PACKAGE_VERSIONS = {
-  packageFormatVersion: PACKAGE_FORMAT_VERSION,
-  manifestVersion: INTERFACE_MANIFEST_VERSION,
-  runtimeAbiVersion: RUNTIME_ABI_VERSION,
-};
+export {
+  PACKAGE_FORMAT_VERSION,
+  INTERFACE_MANIFEST_VERSION,
+  RUNTIME_ABI_VERSION,
+  VIR_COMPATIBILITY_VERSION,
+  PACKAGE_VERSIONS,
+} from "../../web/src/runtime/versions.js";

@@ -70,6 +70,24 @@ test("cycles are excluded", () => {
   assert.match(check(cycle).value, /cyclic/);
 });
 
+test("bounds count expanded aliases and nesting before recursive conversion", () => {
+  assert.match(check(Array(1000001)).value, /1000000 nodes/);
+  let aliased = 0;
+  for (let i = 0; i < 40; i++) aliased = [aliased, aliased];
+  assert.match(check(aliased).value, /1000000 nodes/);
+  let accepted = 0;
+  for (let i = 0; i < 18; i++) accepted = [accepted, accepted];
+  assert.equal(check(accepted).kind, "ok");
+  let nested = 0;
+  for (let i = 0; i < 256; i++) nested = [nested];
+  assert.equal(check(nested).kind, "ok");
+  assert.match(check([nested]).value, /nesting exceeds 256/);
+  assert.match(check([[[nested]]]).value, /nesting exceeds 256/);
+  let cached = 0;
+  for (let i = 0; i < 255; i++) cached = [cached];
+  assert.match(check([[cached], cached]).value, /nesting exceeds 256/);
+});
+
 test("ordinary field names do not imply RPC reference provenance", () => {
   for (const value of [{ p: "hello" }, { __rpcref: "ordinary" },
     { nested: { p: "7" } }, { p: 7 }, { p: "7", ordinary: true }]) {

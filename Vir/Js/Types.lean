@@ -14,8 +14,11 @@ public section
 
 namespace Lean.Vir
 
-/-- Opaque handle to a JavaScript-owned value with a Lean-side phantom shape. -/
-opaque Js (α : Type) : Type
+/-- Raw rooted JavaScript handle; its runtime representation is an external object. -/
+opaque JsHandle : Type
+
+/-- A JavaScript handle with an explicit phantom shape. Unfold only at a reviewed cast. -/
+@[expose, irreducible] def Js (_α : Type) : Type := JsHandle
 
 namespace Js
 
@@ -67,16 +70,20 @@ abbrev UndefinedOr (α : Type) : Type :=
 
 namespace UndefinedOr
 
-@[inline] unsafe def ofJsImpl {α : Type} (value : Lean.Vir.Js α) : UndefinedOr α :=
-  unsafeCast value
-
 /-- Widens the phantom type without changing the value, root, or lifetime. -/
-@[implemented_by ofJsImpl]
-axiom ofJs {α : Type} (value : Lean.Vir.Js α) : UndefinedOr α
+@[inline] def ofJs {α : Type} (value : Lean.Vir.Js α) : UndefinedOr α := by
+  unfold UndefinedOr Lean.Vir.Js at *
+  exact value
 
 end UndefinedOr
 
 namespace Function
+
+/-- Exact zero-argument JavaScript function; `result` is its Lean boundary view. -/
+opaque Nullary (result : Type) : Type
+
+/-- Exact binary JavaScript function; parameters describe Lean boundary views. -/
+opaque Binary (first second result : Type) : Type
 
 /--
 Phantom shape for an exact unary JavaScript function.
@@ -87,23 +94,53 @@ its signature dynamically inspectable.
 -/
 opaque Unary (argument result : Type) : Type
 
+/--
+Phantom shape for an exact ternary JavaScript function.
+
+The argument and result types describe the Lean boundary views used when the
+function is called; this marker neither wraps the JavaScript function nor
+changes its native invocation arity.
+-/
+opaque Ternary (first second third result : Type) : Type
+
+/--
+Closed evidence for the JavaScript function shapes VIR can invoke directly.
+The proposition is erased; it neither validates a JavaScript value nor changes
+its native call signature.
+-/
+class inductive Shape : Type → Prop where
+  | nullary (result : Type) : Shape (Nullary result)
+  | unary (argument result : Type) : Shape (Unary argument result)
+  | binary (first second result : Type) : Shape (Binary first second result)
+  | ternary (first second third result : Type) : Shape (Ternary first second third result)
+
+attribute [instance] Shape.nullary Shape.unary Shape.binary Shape.ternary
+
 end Function
+
+/-- Exact zero-argument JavaScript function with a statically described result. -/
+abbrev Function0 (result : Type) : Type :=
+  Lean.Vir.Js (Function.Nullary result)
+
+/-- Exact binary JavaScript function with statically described arguments and result. -/
+abbrev Function2 (first second result : Type) : Type :=
+  Lean.Vir.Js (Function.Binary first second result)
 
 /-- Exact unary JavaScript function with a statically described call shape. -/
 abbrev Function1 (argument result : Type) : Type :=
   Lean.Vir.Js (Function.Unary argument result)
 
-/-- Runtime implementation of `Js.erase`; public so module importers can compile it. -/
-@[inline] unsafe def eraseImpl {α : Type}
-    (value : Lean.Vir.Js α) : Lean.Vir.Js.Any :=
-  unsafeCast value
+/-- Exact ternary JavaScript function with a statically described call shape. -/
+abbrev Function3 (first second third result : Type) : Type :=
+  Lean.Vir.Js (Function.Ternary first second third result)
 
 /--
 Forgets the phantom shape of a JavaScript value without changing its value,
 identity, root, or lifetime.
 -/
-@[implemented_by eraseImpl]
-axiom erase {α : Type} (value : Lean.Vir.Js α) : Lean.Vir.Js.Any
+@[inline] def erase {α : Type} (value : Lean.Vir.Js α) : Lean.Vir.Js.Any := by
+  unfold Any Lean.Vir.Js at *
+  exact value
 
 namespace Nullable
 
@@ -127,6 +164,29 @@ end Array
 abbrev Array (α : Type) : Type :=
   Lean.Vir.Js (Array.Value α)
 
+namespace Function
+
+/-- The unary view of Array.map's callback, not general function subtyping.
+Only the phantom type changes; the original JS function still receives all
+arguments. Lean unary bridges ignore index/source as ordinary unary TS callbacks may. -/
+@[inline] instance instUnaryArrayMap {α β : Type} :
+    CoeHead (Function1 (Lean.Vir.Js α) (Lean.Vir.Js β))
+      (Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Array α) (Lean.Vir.Js β)) where
+  coe value := by
+    unfold Function1 Function3 Lean.Vir.Js at *
+    exact value
+
+/-- The native unary-void subset of an Array.forEach callback. The callback
+still receives all native arguments; the Lean bridge ignores unused ones. -/
+@[inline] instance instUnaryArrayForEach {α : Type} :
+    CoeHead (Function1 (Lean.Vir.Js α) Unit)
+      (Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Array α) Unit) where
+  coe value := by
+    unfold Function1 Function3 Lean.Vir.Js at *
+    exact value
+
+end Function
+
 namespace Tuple2
 
 /-- Phantom shape for an exact native tuple with two independently typed positions. -/
@@ -134,7 +194,7 @@ opaque Value (α β : Type) : Type
 
 end Tuple2
 
-/-- Exact JavaScript two-element tuple; parameters describe each position's Lean view. -/
+/-- Exact JavaScript two-element tuple; parameters describe each position's JavaScript shape. -/
 abbrev Tuple2 (α β : Type) : Type :=
   Lean.Vir.Js (Tuple2.Value α β)
 
