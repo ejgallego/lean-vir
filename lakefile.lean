@@ -83,9 +83,14 @@ lean_lib VirInfoview where
 /-- Non-default, buildable sources used by the public VIR examples. -/
 lean_lib VirExamples where
   srcDir := "examples"
-  roots := #[`SlidesCanvas, `Fib, `Quickstart, `MergeSort, `HostInterop,
+  roots := #[`SlidesCanvas, `Fib, `MergeSort, `HostInterop,
     `Tamagotchi, `VirNativeInfoview, `ReactTamagotchiWidget, `tutorials.ReactProofWidgetHello,
     `tutorials.RpcReferenceWidget]
+
+/-- Shared tutorial source, also used by the loose-package developer example. -/
+lean_lib QuickstartProgram where
+  srcDir := "examples/tutorials/quickstart"
+  roots := #[`QuickstartApp.Program]
 
 /-- Authored browser fixtures; paths are preserved for source navigation. -/
 lean_lib VirBrowserFixtures where

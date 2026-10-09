@@ -291,9 +291,11 @@ npm run prepare:irpkg -- examples/fib.virpkg.json
 npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json
 ```
 
-For the bundled quickstart, run `npm run prepare:irpkg -- examples/quickstart.virpkg.json`,
+For the retained explicit-root developer example, run `npm run prepare:irpkg -- examples/quickstart.virpkg.json`,
 then `npm run dev -- --port 5173` and open
 `http://127.0.0.1:5173/dev.html?package=local-quickstart.irpkg`.
+It uses the same Lean source as the [application tutorial](../../examples/tutorials/quickstart/README.md);
+it is not a second application setup path.
 
 The command builds the module and generator with Lake, then loads compiled IR.
 Source commands such as `#eval` run during compilation, never again during
@@ -347,7 +349,7 @@ complete module sets. Application code uses `irPackageSet` for either form.
 Deep links select a package and entry:
 
 ```text
-dev.html?package=local-quickstart.irpkg&entry=Quickstart.total
+dev.html?package=local-quickstart.irpkg&entry=QuickstartApp.Program.total
 ```
 
 `entry` accepts a manifest `entry`, `id`, or `jsName` alias from the

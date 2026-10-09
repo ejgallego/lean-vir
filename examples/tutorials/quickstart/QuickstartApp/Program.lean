@@ -6,13 +6,16 @@ Author: Emilio J. Gallego Arias
 
 module
 
+meta import Vir.Attributes
+
 public section
 
-namespace Quickstart
+namespace QuickstartApp.Program
 
 def double (n : Nat) : Nat :=
   n + n
 
+@[vir_export]
 def greet (name : String) : String :=
   "Hello, " ++ name
 
@@ -44,4 +47,4 @@ def validateName (name : String) : Except String String :=
 #eval classify 4
 #eval validateName "Lean"
 
-end Quickstart
+end QuickstartApp.Program

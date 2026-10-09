@@ -1,14 +1,14 @@
 {
   "version": 2,
-  "module": "Quickstart",
+  "module": "QuickstartApp.Program",
   "package": "web/public/local-quickstart.irpkg",
   "report": "build/generated/local-quickstart.report.md",
   "roots": [
-    "Quickstart.double",
-    "Quickstart.greet",
-    "Quickstart.total",
-    "Quickstart.choose",
-    "Quickstart.classify",
-    "Quickstart.validateName"
+    "QuickstartApp.Program.double",
+    "QuickstartApp.Program.greet",
+    "QuickstartApp.Program.total",
+    "QuickstartApp.Program.choose",
+    "QuickstartApp.Program.classify",
+    "QuickstartApp.Program.validateName"
   ]
 }

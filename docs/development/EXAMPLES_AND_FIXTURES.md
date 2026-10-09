@@ -33,6 +33,11 @@ of this viewer.
 
 Tutorials under `examples/tutorials/` teach one API with small, copyable code:
 
+- [Quickstart](../../examples/tutorials/quickstart/README.md) is the ordinary
+  application starting point: one marked program, module-owned assets, a native
+  publisher and a one-shot JavaScript call. Its Lean source also supplies the
+  retained explicit-root developer package; there is no second greeting project.
+- The following React/editor tutorials are experimental, not first-use prerequisites.
 - [ReactCounter](../../examples/tutorials/ReactCounter.lean) introduces state and
   callbacks.
 - [ReactProofWidgetHello](../../examples/tutorials/ReactProofWidgetHello.lean)
@@ -63,7 +68,15 @@ regression entries.
 catalog. Its cases are available in `/demo.html` and the package runner;
 public application pages do not present the fixture catalog.
 
-## Adding client code
+## Writing an application or tutorial
+
+Use the [Quickstart project](../../examples/tutorials/quickstart/README.md) and
+[application guide](../guides/EMBEDDED_RESOURCES.md). Register the program in its
+owner, request `+Module:virResourcePack` from the asset library, include the
+selected module and publish `forSite`'s files through the application's writer.
+No repository package catalog or npm packaging step is needed.
+
+## Contributing repository packages and oracle fixtures
 
 Browser packages contain focused compiled `Lean.IR.Decl` closures. Lake builds
 the Lean modules; regenerating their `.irpkg` files normally needs no rebuild

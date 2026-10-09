@@ -57,15 +57,15 @@ try {
     { version: 2, module: "Fib", package: join(scratch, "config-fib.irpkg") },
     {
       version: 2,
-      module: "Quickstart",
-      roots: ["Quickstart.double"],
+      module: "QuickstartApp.Program",
+      roots: ["QuickstartApp.Program.double"],
       package: join(scratch, "quickstart.bundle"),
       report: join(scratch, "custom.md"),
     },
     {
       version: 2,
-      module: "Quickstart",
-      roots: ["Quickstart.total"],
+      module: "QuickstartApp.Program",
+      roots: ["QuickstartApp.Program.total"],
       package: join(scratch, "total.irpkg"),
     },
   ];
@@ -77,7 +77,7 @@ try {
   }
   const prepared = run("scripts/packages/prepare-irpkg.mjs", configPaths);
   assert.match(prepared.stdout, /mode:\s+public module definitions from Fib/);
-  assert.match(prepared.stdout, /roots:\s+Quickstart.double/);
+  assert.match(prepared.stdout, /roots:\s+QuickstartApp.Program.double/);
   assert.deepEqual(
     await readFile(configs[0].package),
     singleBytes,
@@ -87,10 +87,10 @@ try {
   const manifest = readIrPackageInfo(quickstartBytes).manifest;
   assert.deepEqual(
     manifest.exports.map((entry) => entry.entry),
-    ["Quickstart.double"],
+    ["QuickstartApp.Program.double"],
   );
   assert.equal(manifest.metadata.targets[0].mode, "explicit");
-  assert.match(await readFile(configs[1].report, "utf8"), /Quickstart.double/);
+  assert.match(await readFile(configs[1].report, "utf8"), /QuickstartApp.Program.double/);
 
   const factory = createVirRuntimeFactory({
     wasmBytes: await readFile(
@@ -99,8 +99,8 @@ try {
   });
   for (const [bytes, entry, input, expected] of [
     [singleBytes, "fib", 8, 21n],
-    [quickstartBytes, "Quickstart.double", 21, 42n],
-    [await readFile(configs[2].package), "Quickstart.total", [2, 3, 5], 10n],
+    [quickstartBytes, "QuickstartApp.Program.double", 21, 42n],
+    [await readFile(configs[2].package), "QuickstartApp.Program.total", [2, 3, 5], 10n],
   ]) {
     const runtime = await factory.createRuntime({ irPackageSet: [bytes] });
     try {

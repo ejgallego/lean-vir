@@ -87,23 +87,23 @@ export async function distAssetPathContaining(fragment) {
   assert.fail(`missing built JavaScript asset containing ${JSON.stringify(fragment)}`);
 }
 
-export async function serveDist() {
+export async function serveDist(root = distRoot, prefix = basePath) {
   const server = createServer(async (request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
     if (url.pathname === "/") {
-      response.writeHead(302, { location: basePath });
+      response.writeHead(302, { location: prefix });
       response.end();
       return;
     }
-    if (!url.pathname.startsWith(basePath)) {
+    if (!url.pathname.startsWith(prefix)) {
       response.writeHead(404);
       response.end("not found");
       return;
     }
 
-    const relativePath = decodeURIComponent(url.pathname.slice(basePath.length)) || "index.html";
-    const filePath = resolve(distRoot, relativePath);
-    if (!isInside(resolve(distRoot), filePath)) {
+    const relativePath = decodeURIComponent(url.pathname.slice(prefix.length)) || "index.html";
+    const filePath = resolve(root, relativePath);
+    if (!isInside(resolve(root), filePath)) {
       response.writeHead(403);
       response.end("forbidden");
       return;
