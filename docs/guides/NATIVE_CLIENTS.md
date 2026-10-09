@@ -169,6 +169,19 @@ remains supported. Exhaustive error matches should handle the new
 `InterfaceClassifierError.recursiveCallback owner` case. Use `interfaceType`
 for ordinary complete type classification.
 
+Classifier recursion keys are fully applied Lean expressions compared with
+`ExprStructEq`. Outer metadata is stripped as before; binder names and annotations,
+nested metadata and universe levels participate in structural equality. No alpha
+or definitional equality is added. Constructors and projections substitute the
+applied type's declaration universe parameters before classifying their fields.
+This keeps valid universe-polymorphic recursion uniform.
+
+Low-level `RecursiveSeen` values now contain `ExprStructEq` keys rather than
+Name/debug-string pairs. `recursiveVisit` takes the applied expression and derives
+its constant head; ordinary `interfaceType` callers and encoded descriptors are
+unchanged. Different applications of an already visited recursive type remain
+nonuniform, and earlier stack matches remain mutual-recursion errors.
+
 ## Regression example
 
 `fixtures/native-client` is a minimal native-precompiled consumer. Run:

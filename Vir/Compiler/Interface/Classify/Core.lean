@@ -105,11 +105,10 @@ partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
   let (name, args) := e.getAppFnArgs
   if name.isAnonymous then
     return .error (.unsupportedType e)
-  let seenKey := toString e
   let env ← getEnv
   let some (.inductInfo indInfo) := env.find? name
     | return .error (.unsupportedType e)
-  match recursiveVisit seenTypes .inductive name seenKey indInfo.isRec with
+  match recursiveVisit seenTypes .inductive e indInfo.isRec with
   | .selfReference =>
       return .ok (.recursiveSelf name (exprTypeLabel e))
   | .error error =>
@@ -128,7 +127,9 @@ partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
           | return .error (.constructorMissingDeclaration ctorName)
         if ctorInfo.induct != name then
           return .error (.constructorOwnerMismatch ctorName name ctorInfo.induct)
-        let some instantiated := instantiateForallPrefix? ctorInfo.type args
+        -- Recursive fields must use the applied aggregate's universe instance.
+        let ctorType := ctorInfo.toConstantVal.instantiateTypeLevelParams e.getAppFn.constLevels!
+        let some instantiated := instantiateForallPrefix? ctorType args
           | return .error (.constructorInvalidType ctorName ctorInfo.type)
         let some fieldExprs := constructorFieldTypes? instantiated
           | return .error (.constructorImplicitFields ctorName)
@@ -162,13 +163,12 @@ partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
   let (name, args) := e.getAppFnArgs
   if name.isAnonymous then
     return .error (.unsupportedType e)
-  let seenKey := toString e
   let env ← getEnv
   let some (.inductInfo indInfo) := env.find? name
     | return .error (.unsupportedType e)
   let some structInfo := getStructureInfo? env name
     | return .error (.unsupportedType e)
-  match recursiveVisit seenTypes .structure name seenKey indInfo.isRec with
+  match recursiveVisit seenTypes .structure e indInfo.isRec with
   | .selfReference =>
       return .ok (.recursiveSelf name (exprTypeLabel e))
   | .error error =>
@@ -206,7 +206,8 @@ partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
           | return .error (.structureFieldMissingProjection fieldName name)
         let some info := env.find? projName
           | return .error (.structureFieldMissingProjectionDeclaration fieldName name)
-        let some fieldExpr := projectionFieldType? indInfo.numParams args info.type
+        let projType := info.instantiateTypeLevelParams e.getAppFn.constLevels!
+        let some fieldExpr := projectionFieldType? indInfo.numParams args projType
           | return .error (.structureFieldInvalidProjectionType fieldName name info.type)
         match ← interfaceType fieldExpr nextSeen with
         | .ok fieldType =>

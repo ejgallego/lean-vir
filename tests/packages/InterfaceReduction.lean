@@ -70,6 +70,27 @@ inductive OrdinaryTree where
   | leaf
   | next (child : Option OrdinaryTree)
 
+universe u
+
+inductive PolyTree (α : Type u) where
+  | leaf (value : α)
+  | next (child : Option (PolyTree α))
+
+structure PolyCell (α : Type u) where
+  value : α
+  next : Option (PolyCell α)
+
+inductive UniverseTree : Type u where
+  | leaf
+  | next (child : Option UniverseTree)
+
+@[vir_export] def polymorphicTreeIdentity (value : PolyTree Nat) : PolyTree Nat := value
+@[vir_export] def polymorphicCellIdentity (value : PolyCell Nat) : PolyCell Nat := value
+
+inductive FamilyTree (β : Nat → Type) where
+  | leaf (value : β 0)
+  | next (child : Option (FamilyTree β))
+
 -- A complete callback result descriptor owns its own recursion.
 def treeCallback (_f : Unit → OrdinaryTree) : Unit := ()
 
@@ -192,13 +213,53 @@ run_elab do
     #[( ``«Constructor.names».«left.value», "«left.value»"), (``«Constructor.names».right, "right")]
   expectConstructorNames (mkConst ``Status) #[( ``Status.ready, "ready"), (``Status.done, "done")]
 
+  -- Applied declaration universes reach recursively synthesized field types.
+  let polyTree := mkApp (mkConst ``PolyTree [.zero]) nat
+  let .ok (.customInductive name _ variants) ← interfaceType polyTree
+    | throwError "universe-polymorphic tree classification failed"
+  expect "polymorphic tree owner" (name == ``PolyTree)
+  let some next := variants[1]? | throwError "polymorphic tree next constructor missing"
+  let some child := next.fields[0]? | throwError "polymorphic tree child field missing"
+  expect "polymorphic tree self field"
+    (child.type == .option (.recursiveSelf ``PolyTree "InterfaceReduction.PolyTree Nat"))
+  let polyCell := mkApp (mkConst ``PolyCell [.zero]) nat
+  let .ok (.structure name _ descriptor) ← interfaceType polyCell
+    | throwError "universe-polymorphic structure classification failed"
+  expect "polymorphic structure owner" (name == ``PolyCell)
+  let some next := descriptor.fields[1]? | throwError "polymorphic structure next field missing"
+  expect "polymorphic projection self field"
+    (next.type == .option (.recursiveSelf ``PolyCell "InterfaceReduction.PolyCell Nat"))
+  let universeTree := mkConst ``UniverseTree [.zero]
+  let .ok (.customInductive _ _ _) ← interfaceType universeTree
+    | throwError "universe-polymorphic parameter-free recursion failed"
+  let .ok (.recursiveSelf _ _) ← interfaceType (.mdata {} universeTree) #[⟨universeTree⟩]
+    | throwError "outer metadata must not alter recursion identity"
+  let .error universeError ← interfaceType (mkConst ``UniverseTree [.succ .zero]) #[⟨universeTree⟩]
+    | throwError "different universe instances must not share recursion identity"
+  expect "universe identity reason" (errorCause universeError == .nonUniformRecursive .inductive ``UniverseTree)
+  -- Existing metadata values, rather than their debug spelling, determine identity.
+  let annotated (id : Nat) := mkApp (mkConst ``PolyTree [.zero])
+    (.mdata (({} : MData).setNat `origin id) nat)
+  let .error metadataError ← interfaceType (annotated 2) #[⟨annotated 1⟩]
+    | throwError "distinct nested metadata must have distinct recursion keys"
+  expect "nested metadata identity reason" (errorCause metadataError == .nonUniformRecursive .inductive ``PolyTree)
+  let family (name : Name) (binder : BinderInfo) :=
+    mkApp (mkConst ``FamilyTree) (.lam name nat string binder)
+  for (original, changed) in #[
+      (family `left .default, family `right .default),
+      (family `left .default, family `left .implicit)] do
+    expect "alpha equality is broader than recursion identity" (original == changed)
+    let .error binderError ← interfaceType changed #[⟨original⟩]
+      | throwError "binder syntax must remain part of structural identity"
+    expect "binder identity reason" (errorCause binderError == .nonUniformRecursive .inductive ``FamilyTree)
+
   -- Callback invocation has no enclosing aggregate owner: fail finitely.
   let node := mkConst ``CallbackNode
   let .error nodeError ← interfaceType node
     | throwError "recursive callback aggregate must be rejected"
   expect "recursive callback result reason"
     (errorCause nodeError == .recursiveCallback ``CallbackNode)
-  let context : RecursiveSeen := #[(``CallbackNode, toString node)]
+  let context : RecursiveSeen := #[⟨node⟩]
   for type in #[
       .forallE `_arg node (mkConst ``Unit) .default,
       mkApp (mkConst ``IO) node,
@@ -221,7 +282,7 @@ run_elab do
   let stringInstance := mkApp (mkConst ``CallbackParam [.zero]) string
   let .error nonuniformError ← interfaceType
       (.forallE `_arg (mkConst ``Unit) stringInstance .default)
-      #[(``CallbackParam, toString natInstance)]
+      #[⟨natInstance⟩]
     | throwError "nonuniform recursive callback context must be rejected"
   expect "nonuniform callback recursion reason"
     (errorCause nonuniformError == .nonUniformRecursive .inductive ``CallbackParam)

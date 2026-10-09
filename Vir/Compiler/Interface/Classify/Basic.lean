@@ -21,8 +21,10 @@ namespace Vir.Interface
 open Lean.IR
 open Vir.InterfaceValidation
 
-/-- Aggregate applications already visited while classifying recursive interface types. -/
-abbrev RecursiveSeen := Array (Name × String)
+/-- Fully applied aggregate types visited during classification, after stripping
+outer metadata. Lean's structural equality includes binder names/annotations,
+nested metadata and universe levels; no alpha or definitional reduction is used. -/
+abbrev RecursiveSeen := Array ExprStructEq
 
 def InterfaceEffect.ofEffectKind : Vir.InterfaceValidation.EffectKind → InterfaceEffect
   | .runtime => .runtime
@@ -218,16 +220,14 @@ def fieldLayout? : Lean.Compiler.LCNF.CtorFieldInfo → Option FieldLayout
   | .scalar size offset _ => some (.scalar size offset)
   | .erased | .void => none
 
-def recursiveSeenContains (seen : RecursiveSeen) (name : Name) (key : String) : Bool :=
-  seen.any fun (seenName, seenKey) => seenName == name && seenKey == key
+def recursiveSeenContains (seen : RecursiveSeen) (key : ExprStructEq) : Bool :=
+  seen.contains key
 
 def recursiveSeenContainsName (seen : RecursiveSeen) (name : Name) : Bool :=
-  seen.any fun (seenName, _) => seenName == name
+  seen.any fun key => key.val.getAppFn.constName == name
 
-def recursiveSeenLastMatches (seen : RecursiveSeen) (name : Name) (key : String) : Bool :=
-  match seen[seen.size - 1]? with
-  | some (seenName, seenKey) => seenName == name && seenKey == key
-  | none => false
+def recursiveSeenLastMatches (seen : RecursiveSeen) (key : ExprStructEq) : Bool :=
+  seen.back? == some key
 
 inductive RecursiveVisit where
   | selfReference
@@ -235,18 +235,20 @@ inductive RecursiveVisit where
   | error (error : InterfaceClassifierError)
 
 def recursiveVisit
-    (seen : RecursiveSeen) (kind : InterfaceAggregateKind) (name : Name) (key : String)
+    (seen : RecursiveSeen) (kind : InterfaceAggregateKind) (type : Lean.Expr)
     (isRec : Bool) :
     RecursiveVisit :=
-  if recursiveSeenContains seen name key then
-    if recursiveSeenLastMatches seen name key then
+  let key : ExprStructEq := ⟨type.consumeMData⟩
+  let name := key.val.getAppFn.constName
+  if recursiveSeenContains seen key then
+    if recursiveSeenLastMatches seen key then
       .selfReference
     else
       .error (.mutuallyRecursive kind name)
   else if isRec && recursiveSeenContainsName seen name then
     .error (.nonUniformRecursive kind name)
   else
-    .descend (seen.push (name, key))
+    .descend (seen.push key)
 
 def binderArgName (fallback : Nat) (name : Name) : String :=
   let candidate := name.toString
