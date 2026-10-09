@@ -10,6 +10,7 @@ public import Vir.GeneratePackage.Closure
 public import Vir.Host
 public import Vir.Compiler.HostValidation
 public import Vir.Compiler.InterfaceValidation
+import Vir.Compiler.Interface.Classify.Basic
 
 public section
 

@@ -54,6 +54,20 @@ assert.match(run(["lake", "env", "lean", visibility], "codec-private-json", 1),
 writeFileSync(visibility, "module\npublic meta import Vir.Compiler.Interface.Encode\n" +
   "public meta import Vir.Package.Json\n#check Vir.GeneratePackage.jsonString\n");
 run(["lake", "env", "lean", visibility], "codec-explicit-json");
+// Ordinary imports expose complete operations, not traversal state or reduction.
+const classifierVisibility = join(client, "ClassifierVisibility.lean");
+const privateClassifierHelpers = ["RecursiveSeen", "recursiveVisit", "functionType", "inductiveType",
+  "structureType", "taggedUnionType", "classifyType", "reduceTypeAliases"];
+writeFileSync(classifierVisibility, "module\npublic meta import Vir.Compiler.Interface.Classify.Signature\n" +
+  "#check Vir.Interface.interfaceType\n#check Vir.Interface.analyzeExportInterface\n" +
+  "#check Vir.Interface.classifyExportSignature\n#check Vir.Interface.classifyHostImportSignature\n" +
+  privateClassifierHelpers.map(
+      (name) => `#check Vir.Interface.${name}\n`).join(""));
+const classifierVisibilityOutput = run(["lake", "env", "lean", classifierVisibility], "classifier-private-helpers", 1);
+for (const name of privateClassifierHelpers) {
+  assert.ok(classifierVisibilityOutput.includes(`Unknown identifier \`Vir.Interface.${name}\``),
+    `classifier helper ${name} must stay private`);
+}
 const modules = ["Vir", ...readdirSync(join(producer, "Vir"), { recursive: true })
   .filter((path) => path.endsWith(".lean"))
   .map((path) => "Vir." + path.slice(0, -5).replaceAll("/", ".").replaceAll("\\", "."))];

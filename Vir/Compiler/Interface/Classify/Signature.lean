@@ -7,6 +7,9 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.Compiler.Interface.Classify.Core
+public import Vir.Compiler.InterfaceValidation
+import Vir.Compiler.Interface.Classify.Basic
+import Vir.Compiler.Interface.Classify.Reduce
 
 public section
 
@@ -28,49 +31,36 @@ public def ExportInterfaceValidationError.toMessageData :
   | .signature error => error.toMessageData
   | .classification error => error.toMessageData
 
-private def classifyResult (result : Lean.Expr) :
-    CoreM (Except InterfaceClassifierError (InterfaceType × InterfaceEffect)) := do
+private abbrev ClassifyM := ExceptT InterfaceClassifierError CoreM
+
+private def classifyResult (result : Lean.Expr) : ClassifyM (InterfaceType × InterfaceEffect) := do
   let effectResult ← effectResult? result
   let (effect, result) := effectResult.getD (.pure, result)
-  match ← interfaceType result with
-  | .error error => return .error (.inContext (.signatureResult result) error)
-  | .ok resultType => return .ok (resultType, effect)
+  let resultType ← ExceptT.adapt (.inContext (.signatureResult result)) (ExceptT.mk (interfaceType result))
+  return (resultType, effect)
 
-/--
-Classify a marker-preflighted export signature without rescanning its binders.
--/
+/-- Classify a marker-preflighted export signature without rescanning its binders. -/
 def classifyExportSignature (signature : ExportSignature) :
-    CoreM (Except InterfaceClassifierError ClassifiedSignature) := do
+    CoreM (Except InterfaceClassifierError ClassifiedSignature) := ExceptT.run do
   let mut args : Array InterfaceArg := #[]
   for binder in signature.args do
-    match ← interfaceType binder.type with
-    | .error error =>
-        return .error (.inContext (.signatureArgument binder.type) error)
-    | .ok argType =>
-        args := args.push {
-          name := binderArgName (args.size + 1) binder.name
-          type := argType
-        }
-  match ← classifyResult signature.result with
-  | .error error => return .error error
-  | .ok (result, effect) => return .ok { args, result, effect }
+    let argType ← ExceptT.adapt (.inContext (.signatureArgument binder.type))
+      (ExceptT.mk (interfaceType binder.type))
+    args := args.push { name := binderArgName (args.size + 1) binder.name, type := argType }
+  let (result, effect) ← classifyResult signature.result
+  return { args, result, effect }
 
 /-- Validate and classify a declaration's complete JavaScript export interface. -/
 public def analyzeExportInterface (type : Lean.Expr) :
-    CoreM (Except ExportInterfaceValidationError ClassifiedSignature) := do
-  match ← analyzeExportSignature type with
-  | .error error => return .error (.signature error)
-  | .ok signature =>
-      match ← classifyExportSignature signature with
-      | .error error => return .error (.classification error)
-      | .ok signature => return .ok signature
+    CoreM (Except ExportInterfaceValidationError ClassifiedSignature) := ExceptT.run do
+  let signature ← ExceptT.adapt .signature (ExceptT.mk (analyzeExportSignature type))
+  ExceptT.adapt .classification (ExceptT.mk (classifyExportSignature signature))
 
 private partial def classifyHostImportSignatureLoop
     (type : Lean.Expr)
     (proofBinders : Array Bool)
     (args : Array InterfaceArg)
-    (erasedPrefixArgs : Nat) :
-    CoreM (Except InterfaceClassifierError ClassifiedSignature) := do
+    (erasedPrefixArgs : Nat) : ClassifyM ClassifiedSignature := do
   let type := type.consumeMData
   match type with
   | .forallE name domain body binderInfo =>
@@ -78,19 +68,16 @@ private partial def classifyHostImportSignatureLoop
         if args.isEmpty then
           classifyHostImportSignatureLoop body proofBinders args (erasedPrefixArgs + 1)
         else
-          return .error (.runtimeErasedParameterAfterArguments name)
+          throwThe InterfaceClassifierError (.runtimeErasedParameterAfterArguments name)
       else if binderInfo != .default then
-        return .error (.implicitOrInstanceArgument name)
+        throwThe InterfaceClassifierError (.implicitOrInstanceArgument name)
       else
-        match ← interfaceType domain with
-        | .error error => return .error (.inContext (.signatureArgument domain) error)
-        | .ok argType =>
-            let arg := { name := binderArgName (args.size + 1) name, type := argType }
-            classifyHostImportSignatureLoop body proofBinders (args.push arg) erasedPrefixArgs
+        let argType ← ExceptT.adapt (.inContext (.signatureArgument domain)) (ExceptT.mk (interfaceType domain))
+        let arg := { name := binderArgName (args.size + 1) name, type := argType }
+        classifyHostImportSignatureLoop body proofBinders (args.push arg) erasedPrefixArgs
   | result =>
-      match ← classifyResult result with
-      | .error error => return .error error
-      | .ok (result, effect) => return .ok { args, result, effect, erasedPrefixArgs }
+      let (result, effect) ← classifyResult result
+      return { args, result, effect, erasedPrefixArgs }
 
 /-- Classify a JavaScript host import signature and its leading type/proof slots.
 Proof classification uses the elaborated telescope, never an instance's name or
@@ -99,6 +86,6 @@ def classifyHostImportSignature (type : Lean.Expr) :
     CoreM (Except InterfaceClassifierError ClassifiedSignature) := do
   let proofs ← Meta.MetaM.run' <| Meta.forallTelescope type fun binders _ =>
     binders.mapM Meta.isProof
-  classifyHostImportSignatureLoop type proofs #[] 0
+  (classifyHostImportSignatureLoop type proofs #[] 0).run
 
 end Vir.Interface
