@@ -272,7 +272,7 @@ try {
   await measureResourceRetention(cdp, async (observations) => {
     await writeFile(join(output, "retention.json"), JSON.stringify({
       browserVersion,
-      scope: "4.34 resource instances; scalar Format score, not dynamic PrettyM or callbacks",
+      scope: `Lean revision ${runtime.descriptor.compatibility.leanRevision} resource instances; scalar Format score, not dynamic PrettyM or callbacks`,
       method: "WeakRef memories after explicit CDP GC; heap/capacity are observations, not leak thresholds",
       observations,
     }, null, 2));

@@ -221,14 +221,8 @@ export async function buildVirBrowserRuntime({
   return { wasiSdk: basename(wasiSdk) };
 }
 
-async function readToolchain(root) {
-  return (await readFile(join(root, "lean-toolchain"), "utf8")).trim();
-}
-
-export async function requireToolchain(root, label, expected) {
-  const actual = await readToolchain(root);
-  if (actual !== expected) {
-    throw new Error(`${label} must use ${expected}, got ${actual}`);
-  }
-  return actual;
+export async function readToolchain(root) {
+  const toolchain = (await readFile(join(root, "lean-toolchain"), "utf8")).trim();
+  if (!toolchain) throw new Error(`empty lean-toolchain in ${root}`);
+  return toolchain;
 }
