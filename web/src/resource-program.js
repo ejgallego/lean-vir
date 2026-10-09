@@ -159,11 +159,21 @@ async function fetchManifest(url, kind, signal, perform) {
 
 async function fetchPayloads(envelope, url, signal, perform) {
   const files = new Map();
+  // Notices stay in the published inventory. Runtime execution uses only its
+  // declared module and Wasm; program members still require complete admission.
+  const inventory =
+    envelope.descriptor.kind === "runtime"
+      ? envelope.descriptor.files.filter((info) =>
+          envelope.descriptor.fileEntries.some(
+            (entry) => ["runtimeModule", "wasm"].includes(entry.role) && entry.path === info.path,
+          ),
+        )
+      : envelope.descriptor.files;
   // A small bounded worker pool: do not start thousands of requests at once.
   let next = 0;
   const worker = async () => {
-    while (next < envelope.descriptor.files.length) {
-      const info = envelope.descriptor.files[next++];
+    while (next < inventory.length) {
+      const info = inventory[next++];
       const fileUrl = new URL(info.path, url);
       const mime =
         info.mediaType === "application/wasm"
@@ -196,7 +206,7 @@ async function fetchPayloads(envelope, url, signal, perform) {
   };
   await Promise.all(
     Array.from(
-      { length: Math.min(4, envelope.descriptor.files.length) },
+      { length: Math.min(4, inventory.length) },
       worker,
     ),
   );
