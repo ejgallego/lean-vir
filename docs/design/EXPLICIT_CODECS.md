@@ -35,6 +35,12 @@ not choose a nullable representation based on the surrounding type or payload.
 
 ## Proposed first boundary
 
+Keep ordinary interop on the existing value/object codecs and exact `Js`/opaque
+`JSL` reference paths. Restrict JSON conversion to an application requirement for
+JSON text, such as an external protocol or an existing persisted format. It adds
+JSON construction/parsing and string allocation; the correctness cases below do
+not measure that cost or recommend JSON as the normal call transport.
+
 Use explicitly invoked, concrete Lean converters between JSON text and a typed
 opaque `JSL` value. Applications can transform that value in Lean and invoke
 the encoder when they want JSON. Thin opted-in wrappers or generated entrypoints
