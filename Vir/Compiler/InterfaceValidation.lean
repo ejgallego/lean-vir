@@ -107,14 +107,9 @@ public def StartupSignatureError.toMessageData : StartupSignatureError → Lean.
   | .malformedEffect effect argumentCount =>
       m!"VIR startup effect `{effect.label}` expects one result type, got {argumentCount}"
 
-/-- Remove metadata wrappers without reducing the underlying interface type. -/
-public partial def stripMData : Lean.Expr → Lean.Expr
-  | .mdata _ type => stripMData type
-  | type => type
-
 private def unfoldAbbrevHead?
     (preserveHead : Lean.Name → Bool) (e : Lean.Expr) : Lean.CoreM (Option Lean.Expr) := do
-  let e := stripMData e
+  let e := e.consumeMData
   let (_, args) := e.getAppFnArgs
   match e.getAppFn with
   | .const name levels =>
@@ -124,9 +119,9 @@ private def unfoldAbbrevHead?
         let env ← Lean.getEnv
         match env.find? name with
         | some (.defnInfo info) =>
-            if info.hints == .abbrev then
+            if info.hints.isAbbrev then
               let value := (Lean.ConstantInfo.defnInfo info).instantiateValueLevelParams! levels
-              let unfolded := stripMData (value.beta args)
+              let unfolded := (value.beta args).consumeMData
               if unfolded == e then return none else return some unfolded
             else
               return none
@@ -142,7 +137,7 @@ public partial def reduceTypeAliases
     (preserveHead : Lean.Name → Bool) (e : Lean.Expr) : Lean.CoreM Lean.Expr := do
   match ← unfoldAbbrevHead? preserveHead e with
   | some unfolded => reduceTypeAliases preserveHead unfolded
-  | none => return stripMData e
+  | none => return e.consumeMData
 
 private def preserveMarkerTypeHead (name : Lean.Name) : Bool :=
   name == `Unit || isEffectHead name
@@ -159,11 +154,11 @@ only when they expose additional function binders; result aliases remain intact.
 public partial def analyzeExportSignature
     (type : Lean.Expr) (args : Array ExportBinder := #[]) :
     Lean.CoreM (Except ExportSignatureError ExportSignature) := do
-  let type := stripMData type
+  let type := type.consumeMData
   match type with
   | .forallE name domain body binderInfo =>
-      let domain := stripMData domain
-      if domain matches .sort _ then
+      let domain := domain.consumeMData
+      if domain.isSort then
         return .error (.erasedTypeParameter name)
       else if binderInfo != .default then
         return .error (.implicitOrInstanceParameter name)

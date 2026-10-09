@@ -45,7 +45,7 @@ def InterfaceType.interfaceTag : InterfaceType → Nat
   | .expr => 15
   | .leanObject => 27
 
-def StructureFieldLayout.toJson : StructureFieldLayout → String
+def FieldLayout.toJson : FieldLayout → String
   | .object index =>
       jsonObject #[
         ("kind", jsonString "object"),
@@ -63,33 +63,38 @@ def StructureFieldLayout.toJson : StructureFieldLayout → String
         ("offset", jsonNat offset)
       ]
 
+private def ConstructorStorage.jsonFields (storage : ConstructorStorage) : Array (String × String) := #[
+  ("objectFieldCount", jsonNat storage.objectFieldCount),
+  ("usizeFieldCount", jsonNat storage.usizeFieldCount),
+  ("scalarByteSize", jsonNat storage.scalarByteSize)
+]
+
+mutual
+
 partial def InterfaceType.toJson (ty : InterfaceType) : String :=
+  let encode (fields : Array (String × String)) :=
+    jsonObject (#[
+      ("type", jsonString ty.label),
+      ("interfaceTag", jsonNat ty.interfaceTag)
+    ] ++ fields)
   match ty with
   | .array element =>
-      jsonObject #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag),
+      encode #[
         ("kind", jsonString "array"),
         ("element", element.toJson)
       ]
   | .list element =>
-      jsonObject #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag),
+      encode #[
         ("kind", jsonString "list"),
         ("element", element.toJson)
       ]
   | .option element =>
-      jsonObject #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag),
+      encode #[
         ("kind", jsonString "option"),
         ("element", element.toJson)
       ]
   | .prod fst snd =>
-      jsonObject #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag),
+      encode #[
         ("kind", jsonString "prod"),
         ("fst", fst.toJson),
         ("snd", snd.toJson)
@@ -101,125 +106,96 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
           ("jsName", jsonString (constructorLabel name ctor)),
           ("tag", jsonNat idx)
         ]
-      jsonObject #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag),
+      encode #[
         ("kind", jsonString "simpleEnum"),
         ("constructors", jsonArray ctorJson)
       ]
   | .taggedUnion name _ constructors =>
-      let ctorJson := constructors.mapIdx fun idx (ctorName, jsName, fieldType, fieldLayout, objectFields, usizeFields, scalarBytes) =>
-        jsonObject #[
-          ("name", jsonName ctorName),
-          ("jsName", jsonString jsName),
+      let ctorJson := constructors.mapIdx fun idx constructor =>
+        jsonObject (#[
+          ("name", jsonName constructor.constructorName),
+          ("jsName", jsonString (constructorLabel name constructor.constructorName)),
           ("tag", jsonNat idx),
-          ("type", fieldType.toJson),
-          ("layout", fieldLayout.toJson),
-          ("objectFieldCount", jsonNat objectFields),
-          ("usizeFieldCount", jsonNat usizeFields),
-          ("scalarByteSize", jsonNat scalarBytes)
-        ]
-      jsonObject #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag),
+          ("type", constructor.payloadType.toJson),
+          ("layout", constructor.payloadLayout.toJson)
+        ] ++ constructor.storage.jsonFields)
+      encode #[
         ("kind", jsonString "taggedUnion"),
         ("name", jsonName name),
         ("constructors", jsonArray ctorJson)
       ]
   | .recursiveSelf name _ =>
-      jsonObject #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag),
+      encode #[
         ("kind", jsonString "recursiveSelf"),
         ("name", jsonName name)
       ]
   | .customInductive name _ constructors =>
-      let ctorJson := constructors.mapIdx fun idx (ctorName, jsName, objectFields, usizeFields, scalarBytes, fields) =>
-        let fieldJson := fields.map fun (fieldName, fieldType, fieldLayout) =>
+      let ctorJson := constructors.mapIdx fun idx constructor =>
+        let fieldJson := constructor.fields.map fun field =>
           jsonObject #[
-            ("name", jsonString fieldName),
-            ("type", fieldType.toJson),
-            ("layout", fieldLayout.toJson)
+            ("name", jsonString field.name),
+            ("type", field.type.toJson),
+            ("layout", field.layout.toJson)
           ]
-        jsonObject #[
-          ("name", jsonName ctorName),
-          ("jsName", jsonString jsName),
-          ("tag", jsonNat idx),
-          ("objectFieldCount", jsonNat objectFields),
-          ("usizeFieldCount", jsonNat usizeFields),
-          ("scalarByteSize", jsonNat scalarBytes),
+        jsonObject (#[
+          ("name", jsonName constructor.constructorName),
+          ("jsName", jsonString (constructorLabel name constructor.constructorName)),
+          ("tag", jsonNat idx)
+        ] ++ constructor.storage.jsonFields ++ #[
           ("fields", jsonArray fieldJson)
-        ]
-      jsonObject #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag),
+        ])
+      encode #[
         ("kind", jsonString "customInductive"),
         ("name", jsonName name),
         ("constructors", jsonArray ctorJson)
       ]
-  | .structure name _ trivialField? objectFields usizeFields scalarBytes fields =>
-      let fieldJson := fields.map fun (fieldName, fieldType, fieldLayout, isSubobject) =>
+  | .structure name _ descriptor =>
+      let fieldJson := descriptor.fields.map fun field =>
         let fieldFields := #[
-          ("name", jsonString fieldName),
-          ("type", fieldType.toJson),
-          ("layout", fieldLayout.toJson)
+          ("name", jsonString field.name),
+          ("type", field.type.toJson),
+          ("layout", field.layout.toJson)
         ]
         let fieldFields :=
-          if isSubobject then fieldFields.push ("subobject", jsonBool true) else fieldFields
+          if field.isSubobject then fieldFields.push ("subobject", jsonBool true) else fieldFields
         jsonObject fieldFields
       let structureFields := #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "structure"),
-        ("name", jsonName name),
-        ("objectFieldCount", jsonNat objectFields),
-        ("usizeFieldCount", jsonNat usizeFields),
-        ("scalarByteSize", jsonNat scalarBytes)
-      ]
+        ("name", jsonName name)
+      ] ++ descriptor.storage.jsonFields
       let structureFields :=
-        match trivialField? with
+        match descriptor.trivialField? with
         | some idx => structureFields.push ("trivialFieldIndex", jsonNat idx)
         | none => structureFields
-      jsonObject (structureFields.push ("fields", jsonArray fieldJson))
+      encode (structureFields.push ("fields", jsonArray fieldJson))
   | .resource name _ =>
-      jsonObject #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag),
+      encode #[
         ("kind", jsonString "resource"),
         ("name", jsonName name)
       ]
   | .function args result effect =>
-      let argJson := args.map fun (argName, argType) =>
-        jsonObject #[
-          ("name", jsonString argName),
-          ("type", argType.toJson)
-        ]
-      jsonObject #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag),
+      let argJson := args.map InterfaceArg.toJson
+      encode #[
         ("kind", jsonString "function"),
         ("effect", jsonString effect.label),
         ("args", jsonArray argJson),
         ("result", result.toJson)
       ]
   | .leanObject =>
-      jsonObject #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag),
+      encode #[
         ("kind", jsonString "leanObject")
       ]
   | _ =>
-      jsonObject #[
-        ("type", jsonString ty.label),
-        ("interfaceTag", jsonNat ty.interfaceTag)
-      ]
+      encode #[]
 
 /-- Encode a named argument without depending on generator metadata. -/
-def InterfaceArg.toJson (arg : InterfaceArg) : String :=
+partial def InterfaceArg.toJson (arg : InterfaceArg) : String :=
   jsonObject #[
     ("name", jsonString arg.name),
     ("type", arg.type.toJson)
   ]
+
+end
 
 def InterfaceEffect.toJson (effect : InterfaceEffect) : String :=
   jsonString effect.label

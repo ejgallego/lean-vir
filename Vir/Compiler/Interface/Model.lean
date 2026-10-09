@@ -14,8 +14,10 @@ open Lean
 
 namespace Vir.Interface
 
-/-- The runtime storage class of a field in Lean's compiled representation. -/
-inductive StructureFieldLayout where
+/-- Storage kind and location of a field in Lean's compiled representation.
+Object and usize indices select their respective slot arrays; scalar sizes and
+offsets count bytes in the constructor's scalar storage. -/
+inductive FieldLayout where
   | object (index : Nat)
   | usize (index : Nat)
   | scalar (size offset : Nat)
@@ -48,6 +50,17 @@ def InterfaceEffect.display : InterfaceEffect → String
   | .dom => "DomM"
   | .react => "ReactM"
 
+/-- Runtime storage counts from Lean's compiled constructor layout. These count
+object and usize slots and scalar bytes, not source-level constructor arguments;
+FieldLayout separately identifies each field's location. -/
+structure ConstructorStorage where
+  objectFieldCount : Nat
+  usizeFieldCount : Nat
+  scalarByteSize : Nat
+  deriving BEq, Repr
+
+mutual
+
 /-- A Lean type classified for VIR's JavaScript interface. -/
 inductive InterfaceType where
   | unit
@@ -69,18 +82,59 @@ inductive InterfaceType where
   | prod (fst snd : InterfaceType)
   | simpleEnum (name : Name) (constructors : Array Name)
   | taggedUnion (name : Name) (label : String)
-      (constructors : Array (Name × String × InterfaceType × StructureFieldLayout × Nat × Nat × Nat))
+      (constructors : Array TaggedUnionVariant)
   | recursiveSelf (name : Name) (label : String)
   | customInductive (name : Name) (label : String)
-      (constructors : Array (Name × String × Nat × Nat × Nat × Array (String × InterfaceType × StructureFieldLayout)))
-  | structure (name : Name) (label : String) (trivialField? : Option Nat)
-      (objectFields usizeFields scalarBytes : Nat)
-      (fields : Array (String × InterfaceType × StructureFieldLayout × Bool))
+      (constructors : Array InductiveConstructor)
+  | structure (name : Name) (label : String) (descriptor : StructureDescriptor)
   | resource (name : Name) (label : String)
-  | function (args : Array (String × InterfaceType)) (result : InterfaceType) (effect : InterfaceEffect)
+  | function (args : Array InterfaceArg) (result : InterfaceType) (effect : InterfaceEffect)
   | expr
   | leanObject
   deriving BEq, Repr
+
+structure TaggedUnionVariant where
+  constructorName : Name
+  payloadType : InterfaceType
+  payloadLayout : FieldLayout
+  storage : ConstructorStorage
+  deriving BEq, Repr
+
+structure InductiveField where
+  name : String
+  type : InterfaceType
+  layout : FieldLayout
+  deriving BEq, Repr
+
+structure InductiveConstructor where
+  constructorName : Name
+  storage : ConstructorStorage
+  fields : Array InductiveField
+  deriving BEq, Repr
+
+structure StructureField where
+  name : String
+  type : InterfaceType
+  layout : FieldLayout
+  /-- An inherited parent retains its own layout; host object keys are flattened. -/
+  isSubobject : Bool
+  deriving BEq, Repr
+
+structure StructureDescriptor where
+  /-- Index into fields of the value representing Lean's trivial wrapper.
+  This is a declaration/projection-order index, not a runtime storage slot. -/
+  trivialField? : Option Nat
+  storage : ConstructorStorage
+  fields : Array StructureField
+  deriving BEq, Repr
+
+/-- One named JavaScript-visible argument, shared by callbacks and exports. -/
+structure InterfaceArg where
+  name : String
+  type : InterfaceType
+  deriving BEq, Repr
+
+end
 
 def InterfaceType.label : InterfaceType → String
   | .unit => "Unit"
@@ -112,17 +166,10 @@ def InterfaceType.label : InterfaceType → String
 
 /-- The JavaScript-facing constructor name relative to its inductive type. -/
 def constructorLabel (inductiveName ctorName : Name) : String :=
-  let prefixText := inductiveName.toString ++ "."
-  let text := ctorName.toString
-  if text.startsWith prefixText then
-    (text.drop prefixText.length).toString
+  if ctorName == inductiveName then
+    ctorName.toString
   else
-    text
-
-/-- One named JavaScript-visible function argument. -/
-structure InterfaceArg where
-  name : String
-  type : InterfaceType
+    (ctorName.replacePrefix inductiveName .anonymous).toString
 
 /-- A JavaScript-boundary signature after interface type classification. -/
 structure ClassifiedSignature where

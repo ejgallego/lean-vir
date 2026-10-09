@@ -82,9 +82,9 @@ def jsNameFor (n : Name) : String :=
 
 private partial def interfaceTypeNeedsBoxedCallBoundary : InterfaceType → Bool
   | .float | .float32 | .uint64 => true
-  | .structure _ _ (some idx) _ _ _ fields =>
-      match fields[idx]? with
-      | some (_, fieldType, _, _) => interfaceTypeNeedsBoxedCallBoundary fieldType
+  | .structure _ _ descriptor =>
+      match descriptor.trivialField?.bind (descriptor.fields[·]?) with
+      | some field => interfaceTypeNeedsBoxedCallBoundary field.type
       | none => false
   | _ => false
 
