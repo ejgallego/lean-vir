@@ -24,6 +24,9 @@ options:
   --mailbox PATH         use an explicit mailbox
   --archive              inspect archived threads with check or list
   --all                  include terminal threads when listing
+  --brief                emit one compact line per listed thread
+  --details              show full thread metadata and advisory warnings
+  --completed            explicitly archive a completed historical handoff
   --json                 emit JSON when listing
   -h, --help             show this help`);
 }
@@ -38,6 +41,9 @@ function parseArgs(argv) {
     command,
     all: false,
     archive: false,
+    brief: true,
+    details: false,
+    completed: false,
     json: false,
     mailbox: null,
     threadId: null,
@@ -47,6 +53,9 @@ function parseArgs(argv) {
     const argument = rest[index];
     if (argument === "--all") options.all = true;
     else if (argument === "--archive") options.archive = true;
+    else if (argument === "--brief") options.brief = true;
+    else if (argument === "--details") { options.details = true; options.brief = false; }
+    else if (argument === "--completed") options.completed = true;
     else if (argument === "--json") options.json = true;
     else if (argument === "--mailbox") {
       options.mailbox = rest[index + 1];
@@ -58,9 +67,10 @@ function parseArgs(argv) {
     else if (command === "deliver" && !options.draft) options.draft = argument;
     else throw new Error(`unknown argument ${JSON.stringify(argument)}`);
   }
-  if (command !== "list" && (options.all || options.json)) {
-    throw new Error("`--all` and `--json` are list options");
+  if (command !== "list" && (options.all || options.details || options.json || rest.includes("--brief"))) {
+    throw new Error("`--all`, `--brief`, `--details`, and `--json` are list options");
   }
+  if (options.completed && command !== "archive") throw new Error("`--completed` is an archive option");
   if (!new Set(["check", "list"]).has(command) && options.archive) {
     throw new Error("`--archive` inspects the archive with check or list");
   }
@@ -97,7 +107,7 @@ function list(result, options) {
     process.exitCode = 1;
     return;
   }
-  const threads = result.threads.filter((thread) => options.archive || options.all || !thread.archivable);
+  let threads = result.threads.filter((thread) => options.archive || options.all || !thread.archivable);
   if (options.json) {
     console.log(JSON.stringify({
       protocol: mailboxProtocol,
@@ -108,12 +118,32 @@ function list(result, options) {
     }, null, 2));
     return;
   }
-  printWarnings(result);
   if (threads.length === 0) {
     console.log(options.archive ? "no archived v1 mailbox threads"
       : options.all ? "no v1 mailbox threads" : "no active v1 mailbox threads");
     return;
   }
+  if (options.brief) {
+    if (!options.all && threads.length > 20) {
+      const count = threads.length;
+      threads = [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.threadId.localeCompare(b.threadId)).slice(0, 20);
+      console.log(`showing 20 of ${count} threads (latest activity); use --details, --all or --json for the full index`);
+    }
+    const warningCount = result.warnings.length;
+    const ignoredCount = result.ignoredFiles?.length ?? 0;
+    if (warningCount > 0 || ignoredCount > 0) {
+      console.warn(
+        `warning: ${warningCount} advisory warning(s), ${ignoredCount} ignored file(s); run mailbox:check for details`,
+      );
+    }
+    for (const thread of threads) {
+      const owner = thread.owner ?? thread.from;
+      const head = thread.head ? ` head=${thread.head.slice(0, 12)}` : "";
+      console.log(`${thread.state} ${thread.threadId} owner=${owner}${head} — ${thread.subject}`);
+    }
+    return;
+  }
+  printWarnings(result);
   for (const thread of threads) {
     const owner = thread.owner ? ` owner=${thread.owner}` : "";
     const disposition = thread.disposition ? ` disposition=${thread.disposition}` : "";
@@ -152,7 +182,7 @@ if (options?.help) {
       throw new Error(`mailbox does not exist: ${mailboxPath}`);
     }
     if (options.command === "archive") {
-      const archived = archiveThread(mailboxPath, options.threadId);
+      const archived = archiveThread(mailboxPath, options.threadId, { completed: options.completed });
       console.log(`archived ${archived.threadId}: ${archived.messageCount} message(s) -> ${archived.destination}`);
     } else if (options.command === "deliver") {
       const delivered = deliverMessage(mailboxPath, options.draft);

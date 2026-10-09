@@ -65,6 +65,52 @@ async function put(mailbox, id, source) {
   await writeFile(join(mailbox, `${id}.md`), source);
 }
 
+test("default index is bounded with explicit omission notice and full JSON available", async () => {
+  await withMailbox(async mailbox => {
+    for (let i = 0; i < 22; i++) {
+      const id = `note-${String(i).padStart(2, "0")}`;
+      await put(mailbox, id, message({ id, kind: null, time: `2026-08-13T14:${String(i).padStart(2, "0")}:00+02:00` }));
+    }
+    const compact = spawnSync(process.execPath, [script, "list", "--mailbox", mailbox], { encoding: "utf8" });
+    assert.equal(compact.status, 0, compact.stderr);
+    assert.match(compact.stdout, /showing 20 of 22/);
+    assert.equal(compact.stdout.trim().split("\n").length, 21);
+    assert.match(compact.stdout, /note-21/);
+    assert.doesNotMatch(compact.stdout, /note-00/);
+    const full = spawnSync(process.execPath, [script, "list", "--json", "--mailbox", mailbox], { encoding: "utf8" });
+    assert.equal(full.status, 0, full.stderr);
+    assert.equal(JSON.parse(full.stdout).threads.length, 22);
+  });
+});
+
+test("completed handoffs require explicit archival and retain their original state", async () => {
+  await withMailbox(async mailbox => {
+    const id = "historical-done";
+    const source = message({ id, kind: null, state: "completed" });
+    await put(mailbox, id, source);
+    assert.throws(() => archiveThread(mailbox, id), /nonterminal replies/);
+    assert.equal(inspectMailbox(mailbox).messages.length, 1);
+    archiveThread(mailbox, id, { completed: true });
+    assert.equal(readFileSync(join(mailbox, "archive", id, `${id}.md`), "utf8"), source);
+    const archived = inspectArchive(mailbox);
+    assert.deepEqual(archived.errors, []);
+    assert.equal(archived.threads[0].state, "completed");
+    assert.equal(inspectMailbox(mailbox).messages.length, 0);
+  });
+});
+
+test("completed archival cannot hide an unresolved sibling branch", async () => {
+  await withMailbox(async mailbox => {
+    const id = "forked-handoff";
+    await put(mailbox, id, message({ id, kind: null }));
+    await put(mailbox, "done-branch", message({ id: "done-branch", thread: id, reply: id, kind: null, state: "completed" }));
+    await put(mailbox, "pending-branch", message({ id: "pending-branch", thread: id, reply: id, kind: null, state: "blocked" }));
+    assert.throws(() => archiveThread(mailbox, id, { completed: true }), /nonterminal replies/);
+    assert.equal(inspectMailbox(mailbox).messages.length, 3);
+    assert.equal(existsSync(join(mailbox, "archive", id)), false);
+  });
+});
+
 test("documentation message examples conform to the protocol", () => {
   const source = readFileSync(repositoryPath("docs", "development", "MAILBOX_PROTOCOL.md"), "utf8");
   const examples = [...source.matchAll(/```markdown\n(---\n[\s\S]*?\n---\n[\s\S]*?)\n```/g)]
@@ -995,9 +1041,13 @@ test("CLI lists active threads and hides terminal threads by default", async () 
     });
     assert.equal(listed.status, 0, listed.stderr);
     assert.match(listed.stdout, /active request/);
-    assert.match(listed.stdout, /lane: branch=fix\/active-request base=abc1234 publication=local-only/);
-    assert.match(listed.stdout, /parent: ROOT-VIR-20260812-001/);
-    assert.match(listed.stdout, /depends on: ROOT-VIR-20260812-002, ROOT-VIR-20260812-003/);
+    assert.equal(listed.stdout.trim().split("\n").length, 1);
+    assert.doesNotMatch(listed.stdout, /lane:|depends on:/);
+    const detailed = spawnSync(process.execPath, [script, "list", "--details", "--mailbox", mailbox], { encoding: "utf8" });
+    assert.equal(detailed.status, 0, detailed.stderr);
+    assert.match(detailed.stdout, /lane: branch=fix\/active-request base=abc1234 publication=local-only/);
+    assert.match(detailed.stdout, /parent: ROOT-VIR-20260812-001/);
+    assert.match(detailed.stdout, /depends on: ROOT-VIR-20260812-002, ROOT-VIR-20260812-003/);
     assert.doesNotMatch(listed.stdout, /closed request/);
 
     const all = spawnSync(process.execPath, [script, "list", "--mailbox", mailbox, "--all", "--json"], {
