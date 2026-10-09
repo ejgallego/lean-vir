@@ -256,8 +256,34 @@ export const browserRunnerCaseSpecs = [
     entryName: "Vir.Fixtures.RecursiveTypes.chainRootScore",
     expected: {
       inputTags: ["TEXTAREA"],
-      runInputs: [`{"label":"browser","next":{"label":"leaf","next":null}}`],
+      runInputs: [`{"label":"browser","next":{"kind":"some","value":{"label":"leaf","next":{"kind":"none"}}}}`],
       result: "211",
+    },
+  },
+  {
+    packageFile: "fixtures-basic.irpkg",
+    entryName: "Vir.Fixtures.InterfaceShapes.optionNatBump",
+    expected: {
+      input: `{"kind":"none"}`,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"kind":"some","value":41}`],
+      result: `{
+  "kind": "some",
+  "value": "42"
+}`,
+    },
+  },
+  {
+    packageFile: "fixtures-basic.irpkg",
+    entryName: "Vir.Fixtures.InterfaceShapes.optionStringBang",
+    expected: {
+      input: `{"kind":"none"}`,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"kind":"none"}`],
+      result: `{
+  "kind": "some",
+  "value": "empty"
+}`,
     },
   },
   {

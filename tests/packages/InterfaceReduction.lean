@@ -223,19 +223,27 @@ run_elab do
   expect "polymorphic tree owner" (name == ``PolyTree)
   let some next := variants[1]? | throwError "polymorphic tree next constructor missing"
   let some child := next.fields[0]? | throwError "polymorphic tree child field missing"
+  let .customInductive `Option _ optionCtors := child.type
+    | throwError "polymorphic tree Option must use generic constructors"
+  let some optionSome := optionCtors[1]? | throwError "missing Option.some"
+  let some optionValue := optionSome.fields[0]? | throwError "missing Option.some payload"
   expect "polymorphic tree self field"
-    (child.type == .option (.recursiveSelf ``PolyTree "InterfaceReduction.PolyTree Nat"))
+    (optionValue.type == .recursiveRef ``PolyTree "InterfaceReduction.PolyTree Nat" 1)
   let polyCell := mkApp (mkConst ``PolyCell [.zero]) nat
   let .ok (.structure name _ descriptor) ← interfaceType polyCell
     | throwError "universe-polymorphic structure classification failed"
   expect "polymorphic structure owner" (name == ``PolyCell)
   let some next := descriptor.fields[1]? | throwError "polymorphic structure next field missing"
+  let .customInductive `Option _ optionCtors := next.type
+    | throwError "polymorphic projection Option must use generic constructors"
+  let some optionSome := optionCtors[1]? | throwError "missing Option.some"
+  let some optionValue := optionSome.fields[0]? | throwError "missing Option.some payload"
   expect "polymorphic projection self field"
-    (next.type == .option (.recursiveSelf ``PolyCell "InterfaceReduction.PolyCell Nat"))
+    (optionValue.type == .recursiveRef ``PolyCell "InterfaceReduction.PolyCell Nat" 1)
   let universeTree := mkConst ``UniverseTree [.zero]
   let .ok (.customInductive _ _ _) ← interfaceType universeTree
     | throwError "universe-polymorphic parameter-free recursion failed"
-  let .ok (.recursiveSelf _ _) ← (classifyType (.mdata {} universeTree) #[⟨universeTree⟩]).run
+  let .ok (.recursiveRef _ _ 0) ← (classifyType (.mdata {} universeTree) #[⟨universeTree⟩]).run
     | throwError "outer metadata must not alter recursion identity"
   let .error universeError ← (classifyType (mkConst ``UniverseTree [.succ .zero]) #[⟨universeTree⟩]).run
     | throwError "different universe instances must not share recursion identity"

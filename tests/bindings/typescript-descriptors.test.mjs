@@ -339,8 +339,14 @@ test("the comparator fails closed on TypeScript absence semantics", async () => 
         args: [],
         result: {
           type: "Option String",
-          interfaceTag: INTERFACE_TAG.OPTION,
-          element: { type: "String", interfaceTag: INTERFACE_TAG.STRING },
+          interfaceTag: INTERFACE_TAG.CUSTOM_INDUCTIVE,
+          kind: "customInductive", name: "Option",
+          constructors: [
+            { name: "Option.none", jsName: "none", tag: 0, objectFieldCount: 0, usizeFieldCount: 0, scalarByteSize: 0, fields: [] },
+            { name: "Option.some", jsName: "some", tag: 1, objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0, fields: [
+              { name: "val", type: { type: "String", interfaceTag: INTERFACE_TAG.STRING }, layout: { kind: "object", index: 0 } },
+            ] },
+          ],
         },
         effect: "pure",
       }],
@@ -352,8 +358,8 @@ test("the comparator fails closed on TypeScript absence semantics", async () => 
     assert.deepEqual(
       report.results.map((result) => [result.id, result.status, result.diagnostics[0]?.code]),
       [
-        ["maybe_undefined", "weak", "typescript_undefined_not_represented"],
-        ["missing_absence", "weak", "typescript_absence_provenance_missing"],
+        ["maybe_undefined", "weak", "descriptor_kind_mismatch"],
+        ["missing_absence", "weak", "descriptor_kind_mismatch"],
         ["optional_property", "weak", "typescript_optional_property_not_represented"],
       ],
     );

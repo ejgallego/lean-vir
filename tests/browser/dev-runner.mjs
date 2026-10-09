@@ -303,6 +303,11 @@ export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
 export async function smokeConstructorTemplates(cdp, origin) {
   for (const spec of [
     {
+      entry: "Vir.Fixtures.InterfaceShapes.optionNatScore", kind: "some",
+      template: { kind: "some", value: 0 },
+      edited: { kind: "none" }, result: "7",
+    },
+    {
       entry: "Vir.Fixtures.ListOption.sumScore", kind: "inr",
       template: { kind: "inr", value: 0 },
       edited: { kind: "inr", value: 7 }, result: "70",

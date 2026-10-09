@@ -184,8 +184,8 @@ assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 0), {
 assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 5), {
   kind: "ok",
   value: {
-    kind: "inr",
-    value: 5n,
+    kind: "some",
+    value: { kind: "inr", value: 5n },
   },
 });
 assert.equal(
@@ -279,24 +279,24 @@ const float32Entry = manifestEntry(
 );
 assert.equal(float32Entry.args[0].type.interfaceTag, INTERFACE_TAG.FLOAT32);
 assert.equal(float32Entry.result.interfaceTag, INTERFACE_TAG.FLOAT32);
-assert.equal(
-  runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", null),
-  0n,
+assert.deepEqual(
+  runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", { kind: "none" }),
+  { kind: "some", value: 0n },
+);
+assert.deepEqual(
+  runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", { kind: "some", value: 41 }),
+  { kind: "some", value: 42n },
+);
+assert.deepEqual(
+  runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", { kind: "none" }),
+  { kind: "some", value: "empty" },
+);
+assert.deepEqual(
+  runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", { kind: "some", value: "ok" }),
+  { kind: "some", value: "ok!" },
 );
 assert.equal(
-  runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", 41),
-  42n,
-);
-assert.equal(
-  runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", null),
-  "empty",
-);
-assert.equal(
-  runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", "ok"),
-  "ok!",
-);
-assert.equal(
-  runtime.call("Vir.Fixtures.InterfaceShapes.optionNatScore", 6),
+  runtime.call("Vir.Fixtures.InterfaceShapes.optionNatScore", { kind: "some", value: 6 }),
   17n,
 );
 assert.deepEqual(
@@ -317,11 +317,11 @@ assert.equal(
   9n,
 );
 assert.equal(
-  runtime.call("Vir.Fixtures.InterfaceShapes.optionArrayNatSum", [4, 5, 6]),
+  runtime.call("Vir.Fixtures.InterfaceShapes.optionArrayNatSum", { kind: "some", value: [4, 5, 6] }),
   15n,
 );
 assert.equal(
-  runtime.call("Vir.Fixtures.InterfaceShapes.optionArrayNatSum", null),
+  runtime.call("Vir.Fixtures.InterfaceShapes.optionArrayNatSum", { kind: "none" }),
   0n,
 );
 assert.equal(
@@ -350,12 +350,12 @@ assert.equal(
 );
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.optionExprBump", {
-    kind: "bvar",
-    index: 6,
+    kind: "some",
+    value: { kind: "bvar", index: 6 },
   }),
   {
-    kind: "bvar",
-    index: 7n,
+    kind: "some",
+    value: { kind: "bvar", index: 7n },
   },
 );
 assert.deepEqual(
@@ -403,7 +403,7 @@ assert.deepEqual(
   {
     label: "lean:2",
     total: 14n,
-    bonus: 14n,
+    bonus: { kind: "some", value: 14n },
   },
 );
 assert.equal(
@@ -416,7 +416,7 @@ assert.equal(
     summary: {
       label: "lean:2",
       total: 14,
-      bonus: 14,
+      bonus: { kind: "some", value: 14 },
     },
   }),
   48n,
@@ -716,7 +716,7 @@ assert.throws(
 );
 assert.throws(
   () => runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSum", [4, 5]),
-  /must be a pair \{ fst, snd \}/,
+  /must be an object/,
 );
 assert.throws(
   () => runtime.call("Vir.Fixtures.ListOption.sumScore", { inl: 12 }),

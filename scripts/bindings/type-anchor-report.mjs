@@ -355,11 +355,7 @@ function leanNamedDescriptor(type) {
 function leanChildren(type) {
   switch (leanInterfaceTag(type)) {
     case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
       return [type.element];
-    case WIRE.PROD:
-      return [type.fst, type.snd];
     case WIRE.STRUCTURE:
       return (type.fields ?? []).map((field) => field.type);
     case WIRE.TAGGED_UNION:
@@ -409,12 +405,7 @@ function leanShape(type) {
     case WIRE.EXPR:
       return { kind: "opaque", name: "Lean.Expr" };
     case WIRE.ARRAY:
-    case WIRE.LIST:
       return { kind: "array", element: leanShape(type.element) };
-    case WIRE.OPTION:
-      return { kind: "option", element: leanShape(type.element) };
-    case WIRE.PROD:
-      return { kind: "tuple", elements: [leanShape(type.fst), leanShape(type.snd)] };
     case WIRE.SIMPLE_ENUM:
       return {
         kind: "enum",
@@ -436,6 +427,7 @@ function leanShape(type) {
         ])),
       };
     case WIRE.CUSTOM_INDUCTIVE:
+      if (type.name === "List") return { kind: "array", element: leanShape(type.constructors[1].fields[0].type) };
       return {
         kind: "variant",
         name: type.name ?? type.type,
@@ -444,7 +436,7 @@ function leanShape(type) {
           { fields: Object.fromEntries((ctor.fields ?? []).map((field) => [field.name, leanShape(field.type)])) },
         ])),
       };
-    case WIRE.RECURSIVE_SELF:
+    case WIRE.RECURSIVE_REF:
       return { kind: "ref", id: type.name ?? type.type };
     case WIRE.RESOURCE:
       return { kind: "resource", name: type.name ?? type.type };
@@ -589,27 +581,6 @@ function compareShapes(lean, tsShape, tsSymbols, seen) {
   switch (lean.kind) {
     case "array":
       return compareShapes(lean.element, ts.element, tsSymbols, seen);
-    case "option": {
-      const element = compareShapes(lean.element, ts.element, tsSymbols, seen);
-      const absence = ts.absence;
-      if (absence === undefined) {
-        return comparison("weak", [
-          diagnostic(
-            "typescript_absence_provenance_missing",
-            "TypeScript option is missing null-versus-undefined absence provenance",
-          ),
-          ...element.diagnostics,
-        ]);
-      }
-      if (absence === "null") return element;
-      return comparison("weak", [
-        diagnostic(
-          "typescript_undefined_not_represented",
-          `Lean Option does not preserve TypeScript ${absence} absence semantics`,
-        ),
-        ...element.diagnostics,
-      ]);
-    }
     case "tuple":
       return compareSequence(lean.elements, ts.elements, tsSymbols, seen, "tuple element");
     case "record":

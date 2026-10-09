@@ -25,8 +25,35 @@ const resourceType = {
 const stringType = { type: "String", interfaceTag: INTERFACE_TAG.STRING };
 const optionResourceType = {
   type: "Option Resource",
-  interfaceTag: INTERFACE_TAG.OPTION,
-  element: resourceType,
+  interfaceTag: INTERFACE_TAG.CUSTOM_INDUCTIVE,
+  kind: "customInductive",
+  name: "Option",
+  constructors: [
+    {
+      name: "Option.none",
+      jsName: "none",
+      tag: 0,
+      objectFieldCount: 0,
+      usizeFieldCount: 0,
+      scalarByteSize: 0,
+      fields: [],
+    },
+    {
+      name: "Option.some",
+      jsName: "some",
+      tag: 1,
+      objectFieldCount: 1,
+      usizeFieldCount: 0,
+      scalarByteSize: 0,
+      fields: [
+        {
+          name: "val",
+          type: resourceType,
+          layout: { kind: "object", index: 0 },
+        },
+      ],
+    },
+  ],
 };
 
 const rootCounts = () => runtime.hostState.resourceRootCounts();

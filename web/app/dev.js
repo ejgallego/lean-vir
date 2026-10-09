@@ -237,7 +237,7 @@ function renderInputFields(entry) {
       label.append(hint);
     }
     if (input.type.interfaceTag === INTERFACE_TAG.TAGGED_UNION ||
-        input.type.interfaceTag === INTERFACE_TAG.CUSTOM_INDUCTIVE) {
+        (input.type.interfaceTag === INTERFACE_TAG.CUSTOM_INDUCTIVE && input.type.name !== "List")) {
       const group = document.createElement("div");
       group.className = "dev-constructor-input";
       group.append(constructorControl(input, index, field), label);
@@ -416,9 +416,6 @@ function parseInputValue(input, field) {
       return text.trim();
     case INTERFACE_TAG.EXPR:
     case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
-    case INTERFACE_TAG.PROD:
     case INTERFACE_TAG.STRUCTURE:
     case INTERFACE_TAG.TAGGED_UNION:
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:

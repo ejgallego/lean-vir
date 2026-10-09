@@ -24,7 +24,7 @@ const callbackHostResultReason =
 const explicitConversionReason =
   /declaration is marked with `@\[vir_js_explicit_conversion\]`, but `js\.value\.bad\.action` does not convert between exactly one `Lean\.Vir\.Js \.\.\.` resource and one Lean value/;
 const indexedPairReason =
-  /unsupported argument type `Array \((?:[^`]*\.)?IndexedPair 0 × Option \((?:[^`]*\.)?IndexedPair 1\)\)`: unsupported Array element type: unsupported Prod fst type: indexed inductive `(?:[^`]*\.)?IndexedPair` is not supported/;
+  /unsupported argument type `Array \((?:[^`]*\.)?IndexedPair 0 × Option \((?:[^`]*\.)?IndexedPair 1\)\)`: unsupported Array element type: field `fst` of structure `Prod` has unsupported type `(?:[^`]*\.)?IndexedPair 0`: indexed inductive `(?:[^`]*\.)?IndexedPair` is not supported/;
 const indexedPairElaborationEvidence =
   /unsupported argument type `[^`]*(?:OfNat|ofNat)[^`]*`/;
 const indexedPairPackageReason = new RegExp(
@@ -207,13 +207,13 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /array `Array Js` is not a JavaScript boundary type/,
     /jsListLength/,
     /unsupported JavaScript import argument `listItems`/,
-    /list `List Js` is not a JavaScript boundary type/,
+    /inductive `List \(Lean\.Vir\.Js Nat\)` is not a JavaScript boundary type/,
     /jsOptionValue/,
     /unsupported JavaScript import argument `value`/,
-    /option `Option Js` is not a JavaScript boundary type/,
+    /inductive `Option \(Lean\.Vir\.Js Nat\)` is not a JavaScript boundary type/,
     /jsProdValue/,
     /unsupported JavaScript import argument `value`/,
-    /product `Js × Js` is not a JavaScript boundary type/,
+    /structure `Lean\.Vir\.Js Nat × Lean\.Vir\.Js Nat` is not a JavaScript boundary type/,
   ], [
     "freshCustomBump",
     "freshCustomCounter",

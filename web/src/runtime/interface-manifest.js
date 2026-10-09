@@ -14,7 +14,7 @@ import { validatePackageTargets } from "./package-targets.js";
 import { requireModuleIdentity } from "./module-name.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 9;
+export const INTERFACE_MANIFEST_VERSION = 10;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",
   EXPLICIT_CONVERSION: "explicitConversion",
@@ -315,6 +315,12 @@ function requireUnique(seen, value, label, owner = "interface export") {
 }
 
 export function validateInterfaceType(type, label = "interface type") {
+  validateTypeDescriptor(type, label);
+  validateRecursiveReferences(type, [], label);
+  return type;
+}
+
+function validateTypeDescriptor(type, label) {
   if (!isRecord(type)) {
     throw new Error(`${label} must be an object`);
   }
@@ -330,13 +336,7 @@ export function validateInterfaceType(type, label = "interface type") {
       validateSimpleEnumType(type, label);
       break;
     case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
-      validateInterfaceType(type.element, `${label}.element`);
-      break;
-    case INTERFACE_TAG.PROD:
-      validateInterfaceType(type.fst, `${label}.fst`);
-      validateInterfaceType(type.snd, `${label}.snd`);
+      validateTypeDescriptor(type.element, `${label}.element`);
       break;
     case INTERFACE_TAG.STRUCTURE:
       validateStructureType(type, label);
@@ -347,8 +347,8 @@ export function validateInterfaceType(type, label = "interface type") {
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       validateCustomInductiveType(type, label);
       break;
-    case INTERFACE_TAG.RECURSIVE_SELF:
-      validateRecursiveSelfType(type, label);
+    case INTERFACE_TAG.RECURSIVE_REF:
+      validateRecursiveRefType(type, label);
       break;
     case INTERFACE_TAG.RESOURCE:
       validateResourceType(type, label);
@@ -367,7 +367,6 @@ export function validateInterfaceType(type, label = "interface type") {
 
 function validateInterfaceRootType(type, label) {
   validateInterfaceType(type, label);
-  validateNoDanglingRecursiveSelf(type, label);
 }
 
 // A comparison key for the existing callable ABI, not a second type grammar.
@@ -392,11 +391,7 @@ function interfaceTypeShape(type) {
     case INTERFACE_TAG.SIMPLE_ENUM:
       return [...base, type.kind, type.constructors.map(header)];
     case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
       return [...base, interfaceTypeShape(type.element)];
-    case INTERFACE_TAG.PROD:
-      return [...base, interfaceTypeShape(type.fst), interfaceTypeShape(type.snd)];
     case INTERFACE_TAG.STRUCTURE:
       return [...base, type.kind, type.name, counts(type), type.trivialFieldIndex ?? null, fields(type)];
     case INTERFACE_TAG.TAGGED_UNION:
@@ -405,7 +400,8 @@ function interfaceTypeShape(type) {
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return [...base, type.kind, type.name, type.constructors.map(ctor =>
         [header(ctor), counts(ctor), fields(ctor)])];
-    case INTERFACE_TAG.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_REF:
+      return [...base, type.kind, type.name, type.depth];
     case INTERFACE_TAG.RESOURCE:
       return [...base, type.kind, type.name];
     case INTERFACE_TAG.FUNCTION:
@@ -468,7 +464,7 @@ function validateStructureType(type, label) {
   const names = new Set();
   type.fields.forEach((field, index) => {
     const fieldLabel = `${label}.fields[${index}]`;
-    validateInterfaceField(field, fieldLabel, names, type, type.name);
+    validateInterfaceField(field, fieldLabel, names, type);
     if (field.subobject !== undefined && typeof field.subobject !== "boolean") {
       throw new Error(`${fieldLabel}.subobject must be a boolean`);
     }
@@ -542,7 +538,7 @@ function validateTaggedUnionType(type, label) {
     );
     validateRuntimeCounts(ctor, ctorLabel);
     validateStructureFieldLayout(ctor.layout, ctor, `${ctorLabel}.layout`);
-    validateInterfaceType(ctor.type, `${ctorLabel}.type`);
+    validateTypeDescriptor(ctor.type, `${ctorLabel}.type`);
   });
 }
 
@@ -581,7 +577,7 @@ function validateCustomInductiveType(type, label) {
     const fieldNames = new Set();
     ctor.fields.forEach((field, fieldIndex) => {
       const fieldLabel = `${ctorLabel}.fields[${fieldIndex}]`;
-      validateInterfaceField(field, fieldLabel, fieldNames, ctor, type.name);
+      validateInterfaceField(field, fieldLabel, fieldNames, ctor);
     });
   });
 }
@@ -612,7 +608,6 @@ function validateInterfaceField(
   fieldLabel,
   names,
   layoutOwner,
-  recursiveOwnerName,
 ) {
   if (!isRecord(field)) {
     throw new Error(`${fieldLabel} must be an object`);
@@ -624,92 +619,45 @@ function validateInterfaceField(
     layoutOwner,
     `${fieldLabel}.layout`,
   );
-  validateInterfaceType(field.type, `${fieldLabel}.type`);
-  validateRecursiveSelfOwner(
-    field.type,
-    recursiveOwnerName,
-    `${fieldLabel}.type`,
-  );
+  validateTypeDescriptor(field.type, `${fieldLabel}.type`);
+
 }
 
-function validateRecursiveSelfType(type, label) {
-  if (type.kind !== "recursiveSelf") {
-    throw new Error(`${label}.kind must be recursiveSelf`);
+function validateRecursiveRefType(type, label) {
+  if (type.kind !== "recursiveRef") {
+    throw new Error(`${label}.kind must be recursiveRef`);
   }
   requireString(type.name, `${label}.name`);
+  requireNonNegativeInteger(type.depth, `${label}.depth`);
 }
 
-function validateRecursiveSelfOwner(type, ownerName, label) {
-  switch (type?.interfaceTag) {
-    case INTERFACE_TAG.RECURSIVE_SELF:
-      if (type.name !== ownerName) {
-        throw new Error(`${label}.name must match ${ownerName}`);
-      }
+// One lexical ownership check at admission. Complete aggregates bind a type;
+// transparent arrays/Sum/Except keep the enclosing scopes. Callback signatures
+// must be closed independently of the object that captures the callback.
+function validateRecursiveReferences(type, owners, label) {
+  switch (type.interfaceTag) {
+    case INTERFACE_TAG.RECURSIVE_REF: {
+      const owner = owners[type.depth];
+      if (owner === undefined) throw new Error(`${label}.depth has no enclosing recursive descriptor`);
+      if (owner.name !== type.name) throw new Error(`${label}.name must match ${owner.name}`);
       break;
+    }
     case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
-      validateRecursiveSelfOwner(type.element, ownerName, `${label}.element`);
-      break;
-    case INTERFACE_TAG.PROD:
-      validateRecursiveSelfOwner(type.fst, ownerName, `${label}.fst`);
-      validateRecursiveSelfOwner(type.snd, ownerName, `${label}.snd`);
+      validateRecursiveReferences(type.element, owners, `${label}.element`);
       break;
     case INTERFACE_TAG.STRUCTURE:
-      // A complete nested structure descriptor owns any recursiveSelf markers
-      // below it; validateStructureType has already checked that owner locally.
-      break;
-    case INTERFACE_TAG.TAGGED_UNION:
-      for (const ctor of type.constructors ?? []) {
-        validateRecursiveSelfOwner(
-          ctor.type,
-          ownerName,
-          `${label}.${ctor.jsName}`,
-        );
-      }
+      for (const field of type.fields) validateRecursiveReferences(field.type, [type, ...owners], `${label}.${field.name}`);
       break;
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      // A complete nested custom inductive descriptor owns any recursiveSelf
-      // markers below it; validateCustomInductiveType has checked them locally.
-      break;
-    case INTERFACE_TAG.FUNCTION:
-      for (const arg of type.args ?? []) {
-        validateRecursiveSelfOwner(arg.type, ownerName, `${label}.${arg.name}`);
-      }
-      validateRecursiveSelfOwner(type.result, ownerName, `${label}.result`);
-      break;
-    default:
-      break;
-  }
-}
-
-function validateNoDanglingRecursiveSelf(type, label) {
-  switch (type?.interfaceTag) {
-    case INTERFACE_TAG.RECURSIVE_SELF:
-      throw new Error(
-        `${label} cannot be recursiveSelf outside a recursive descriptor`,
-      );
-    case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
-      validateNoDanglingRecursiveSelf(type.element, `${label}.element`);
-      break;
-    case INTERFACE_TAG.PROD:
-      validateNoDanglingRecursiveSelf(type.fst, `${label}.fst`);
-      validateNoDanglingRecursiveSelf(type.snd, `${label}.snd`);
+      for (const ctor of type.constructors) for (const field of ctor.fields)
+        validateRecursiveReferences(field.type, [type, ...owners], `${label}.${ctor.jsName}.${field.name}`);
       break;
     case INTERFACE_TAG.TAGGED_UNION:
-      for (const ctor of type.constructors ?? []) {
-        validateNoDanglingRecursiveSelf(ctor.type, `${label}.${ctor.jsName}`);
-      }
+      for (const ctor of type.constructors) validateRecursiveReferences(ctor.type, owners, `${label}.${ctor.jsName}`);
       break;
     case INTERFACE_TAG.FUNCTION:
-      for (const arg of type.args ?? []) {
-        validateNoDanglingRecursiveSelf(arg.type, `${label}.${arg.name}`);
-      }
-      validateNoDanglingRecursiveSelf(type.result, `${label}.result`);
-      break;
-    default:
+      for (const arg of type.args) validateRecursiveReferences(arg.type, [], `${label}.${arg.name}`);
+      validateRecursiveReferences(type.result, [], `${label}.result`);
       break;
   }
 }
@@ -741,9 +689,9 @@ function validateFunctionType(type, label) {
       throw new Error(`${argLabel} must be an object`);
     }
     requireString(arg.name, `${argLabel}.name`);
-    validateInterfaceType(arg.type, `${argLabel}.type`);
+    validateTypeDescriptor(arg.type, `${argLabel}.type`);
   });
-  validateInterfaceType(type.result, `${label}.result`);
+  validateTypeDescriptor(type.result, `${label}.result`);
 }
 
 function validateFlattenedStructureFields(type, label) {
@@ -795,18 +743,12 @@ export function formatInterfaceType(type) {
       return type.type ?? "Enum";
     case INTERFACE_TAG.ARRAY:
       return `Array<${formatInterfaceType(type.element)}>`;
-    case INTERFACE_TAG.LIST:
-      return `List<${formatInterfaceType(type.element)}>`;
-    case INTERFACE_TAG.OPTION:
-      return `Option<${formatInterfaceType(type.element)}>`;
-    case INTERFACE_TAG.PROD:
-      return `Prod<${formatInterfaceType(type.fst)}, ${formatInterfaceType(type.snd)}>`;
     case INTERFACE_TAG.STRUCTURE:
       return type.type ?? type.name ?? "Structure";
     case INTERFACE_TAG.TAGGED_UNION:
       return type.type ?? type.name ?? "TaggedUnion";
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-    case INTERFACE_TAG.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_REF:
       return type.type ?? type.name ?? "Recursive";
     case INTERFACE_TAG.RESOURCE:
       return type.type ?? type.name ?? "Resource";

@@ -325,8 +325,8 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   const freshChain = {
     label: "root",
     next: {
-      label: "leaf",
-      next: null,
+      kind: "some",
+      value: { label: "leaf", next: { kind: "none" } },
     },
   };
   assert.deepEqual(
@@ -336,7 +336,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(freshRuntime.call("freshChainScore", freshChain), 208n);
   assert.deepEqual(freshRuntime.call("freshChainPush", "new", freshChain), {
     label: "new",
-    next: freshChain,
+    next: { kind: "some", value: freshChain },
   });
   const freshChainEntry = manifestEntry(freshManifest, "freshChainIdentity");
   assert.equal(
@@ -345,15 +345,15 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   );
   assert.equal(
     freshChainEntry.args[0].type.fields[1].type.interfaceTag,
-    INTERFACE_TAG.OPTION,
+    INTERFACE_TAG.CUSTOM_INDUCTIVE,
   );
   assert.equal(
-    freshChainEntry.args[0].type.fields[1].type.element.interfaceTag,
-    INTERFACE_TAG.RECURSIVE_SELF,
+    freshChainEntry.args[0].type.fields[1].type.constructors[1].fields[0].type.interfaceTag,
+    INTERFACE_TAG.RECURSIVE_REF,
   );
   assert.equal(
-    freshChainEntry.args[0].type.fields[1].type.element.kind,
-    "recursiveSelf",
+    freshChainEntry.args[0].type.fields[1].type.constructors[1].fields[0].type.kind,
+    "recursiveRef",
   );
 
   const freshTree = {
@@ -389,13 +389,13 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     INTERFACE_TAG.CUSTOM_INDUCTIVE,
   );
   assert.equal(
-    freshTreeEntry.args[0].type.constructors[1].fields[0].type.element
+    freshTreeEntry.args[0].type.constructors[1].fields[0].type.constructors[1].fields[0].type
       .interfaceTag,
-    INTERFACE_TAG.RECURSIVE_SELF,
+    INTERFACE_TAG.RECURSIVE_REF,
   );
   assert.equal(
-    freshTreeEntry.args[0].type.constructors[1].fields[0].type.element.kind,
-    "recursiveSelf",
+    freshTreeEntry.args[0].type.constructors[1].fields[0].type.constructors[1].fields[0].type.kind,
+    "recursiveRef",
   );
 
   const term = {
@@ -493,22 +493,22 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   );
   assert.equal(freshJsonEntry.args[0].type.constructors[0].fields.length, 0);
   assert.equal(
-    freshJsonEntry.args[0].type.constructors[3].fields[0].type.element
+    freshJsonEntry.args[0].type.constructors[3].fields[0].type.constructors[1].fields[0].type
       .interfaceTag,
-    INTERFACE_TAG.RECURSIVE_SELF,
+    INTERFACE_TAG.RECURSIVE_REF,
   );
   assert.equal(
-    freshJsonEntry.args[0].type.constructors[3].fields[0].type.element.kind,
-    "recursiveSelf",
+    freshJsonEntry.args[0].type.constructors[3].fields[0].type.constructors[1].fields[0].type.kind,
+    "recursiveRef",
   );
   assert.equal(
-    freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd
+    freshJsonEntry.args[0].type.constructors[4].fields[0].type.constructors[1].fields[0].type.fields[1].type
       .interfaceTag,
-    INTERFACE_TAG.RECURSIVE_SELF,
+    INTERFACE_TAG.RECURSIVE_REF,
   );
   assert.equal(
-    freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.kind,
-    "recursiveSelf",
+    freshJsonEntry.args[0].type.constructors[4].fields[0].type.constructors[1].fields[0].type.fields[1].type.kind,
+    "recursiveRef",
   );
 
   const spellingSource = join(freshDir, "ConstructorSpelling.lean");
