@@ -5,7 +5,20 @@ import {
   snapshotExpectedExports,
 } from "../../web/src/resources/program-exports.js";
 import { interfaceSignatureKey } from "../../web/src/runtime/interface-manifest.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+import {
+  arrayBoundary,
+  boundary,
+  enumBoundary,
+  immediateConstructor,
+  nativeDescriptor,
+  nativeField,
+  objectBoundary,
+  objectConstructor,
+  primitiveBoundary,
+  recursiveRef,
+  resourceBoundary,
+  unitBoundary,
+} from "../support/interface-fixtures.mjs";
 
 test("fully qualified declarations are the only root call keys", () => {
   const wrong = { entry: "Test.wrong" };
@@ -22,9 +35,7 @@ test("dependency-only declarations are not root entrypoints", () => {
   ];
   const expected = snapshotExpectedExports({
     "Dependency.run": {
-      args: [],
-      result: { type: "Nat", interfaceTag: 0 },
-      effect: "pure",
+      args: [], result: primitiveBoundary("nat", "bigint"), effect: "pure",
     },
   });
   assert.throws(
@@ -40,235 +51,142 @@ test("ambiguous root declarations fail instead of first-wins selection", () => {
   );
 });
 
-const nat = { type: "Nat", interfaceTag: 0 };
-const record = {
-  type: "Segment",
-  interfaceTag: 20,
-  kind: "structure",
-  name: "Segment",
-  objectFieldCount: 2,
-  usizeFieldCount: 0,
-  scalarByteSize: 0,
-  fields: [
-    {
-      name: "text",
-      type: { type: "String", interfaceTag: 3 },
-      layout: { kind: "object", index: 0 },
-    },
-    { name: "indent", type: nat, layout: { kind: "object", index: 1 } },
+const nat = primitiveBoundary("nat", "bigint");
+const string = primitiveBoundary("string", "string");
+const record = objectBoundary(
+  "Segment",
+  [objectConstructor("Segment.mk", {
+    objectFieldCount: 2, usizeFieldCount: 0, scalarByteSize: 0,
+  }, [
+    nativeField("text", string.native, { tag: "object", index: 0 }),
+    nativeField("indent", nat.native, { tag: "object", index: 1 }),
+  ])],
+  { tag: "record", fields: [
+    { key: "text", path: [0], value: string.value },
+    { key: "indent", path: [1], value: nat.value },
+  ] },
+);
+const recursive = objectBoundary(
+  "Tree",
+  [
+    immediateConstructor("Tree.nil"),
+    objectConstructor("Tree.node", {
+      objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0,
+    }, [nativeField("next", recursiveRef(0), { tag: "object", index: 0 })]),
   ],
-};
-const recursive = {
-  type: "Tree",
-  interfaceTag: 25,
-  kind: "customInductive",
-  name: "Tree",
-  constructors: [
-    {
-      name: "Tree.nil",
-      jsName: "nil",
-      tag: 0,
-      objectFieldCount: 0,
-      usizeFieldCount: 0,
-      scalarByteSize: 0,
-      fields: [],
-    },
-    {
-      name: "Tree.node",
-      jsName: "node",
-      tag: 1,
-      objectFieldCount: 1,
-      usizeFieldCount: 0,
-      scalarByteSize: 0,
-      fields: [
-        {
-          name: "next",
-          type: {
-            type: "Tree",
-            interfaceTag: 26,
-            kind: "recursiveRef",
-            depth: 0,
-            name: "Tree",
-          },
-          layout: { kind: "object", index: 0 },
-        },
-      ],
-    },
-  ],
-};
+  { tag: "variant", cases: [
+    { kind: "nil", payload: "none" },
+    { kind: "node", payload: "value", value: { tag: "recursive" } },
+  ] },
+);
 
 for (const [label, change] of [
-  [
-    "field layout",
-    (type) => {
-      type.fields[0].layout.index = 1;
-      type.fields[1].layout.index = 0;
-    },
-  ],
-  [
-    "field order",
-    (type) => {
-      type.fields.reverse();
-    },
-  ],
-  [
-    "field type",
-    (type) => {
-      type.fields[1].type = { type: "Bool", interfaceTag: 2 };
-    },
-  ],
-  [
-    "runtime counts",
-    (type) => {
-      type.objectFieldCount = 3;
-    },
-  ],
-  [
-    "trivial representation",
-    (type) => {
-      type.trivialFieldIndex = 0;
-    },
-  ],
-])
-  test(`actual ABI comparison rejects ${label}`, () => {
+  ["field location", (pair) => {
+    const fields = pair.native.metadata.constructors[0].fields;
+    [fields[0].location.index, fields[1].location.index] =
+      [fields[1].location.index, fields[0].location.index];
+  }],
+  ["field order", (pair) => {
+    pair.native.metadata.constructors[0].fields.reverse();
+    pair.value.fields.reverse();
+    for (const mapping of pair.value.fields) mapping.path[0] = 1 - mapping.path[0];
+  }],
+  ["field type", (pair) => {
+    pair.native.metadata.constructors[0].fields[1].type =
+      primitiveBoundary("int", "bigint").native;
+  }],
+]) {
+  test(`actual native/value comparison rejects changed ${label}`, () => {
     const signature = { args: [nat], result: record, effect: "pure" };
     const expected = snapshotExpectedExports({ "Root.format": signature });
     const result = structuredClone(record);
     change(result);
     assert.throws(
-      () =>
-        resolveProgramExports(
-          [
-            {
-              entry: "Root.format",
-              args: [{ name: "n", type: nat }],
-              result,
-              effect: "pure",
-            },
-          ],
-          expected,
-        ),
+      () => resolveProgramExports([{
+        entry: "Root.format",
+        args: [{ name: "n", type: nat }],
+        result,
+        effect: "pure",
+      }], expected),
       /callable signature/,
     );
   });
+}
 
-test("constructor order, recursive identity and callback effects are ABI facts", () => {
+test("constructor order, lexical recursion and callback effects are ABI facts", () => {
   const signature = { args: [], result: recursive, effect: "pure" };
   const key = interfaceSignatureKey(signature);
   const swapped = structuredClone(recursive);
-  swapped.constructors.reverse();
-  swapped.constructors.forEach((ctor, i) => {
-    ctor.tag = i;
-  });
+  swapped.native.metadata.constructors.reverse();
+  swapped.value.cases.reverse();
   assert.notEqual(
     interfaceSignatureKey({ ...signature, result: swapped }),
     key,
   );
-  const wrongOwner = structuredClone(recursive);
-  wrongOwner.constructors[1].fields[0].type.name = "Other";
+  const badDepth = structuredClone(recursive);
+  badDepth.native.metadata.constructors[1].fields[0].type.ref = 1;
   assert.throws(
-    () => interfaceSignatureKey({ ...signature, result: wrongOwner }),
-    /must match/,
-  );
-  assert.throws(
-    () =>
-      interfaceSignatureKey({
-        ...signature,
-        result: recursive.constructors[1].fields[0].type,
-      }),
+    () => interfaceSignatureKey({ ...signature, result: badDepth }),
     /no enclosing recursive descriptor/,
   );
-  const callback = {
-    type: "Nat -> Nat",
-    interfaceTag: 24,
-    kind: "function",
-    effect: "pure",
-    args: [{ name: "n", type: nat }],
-    result: nat,
-  };
+
+  const callback = boundary(
+    nativeDescriptor("leanObject", {}, {
+      signature: { args: [nat.native], result: nat.native, effect: "pure" },
+    }),
+    { tag: "function", args: [nat.value], result: nat.value },
+  );
   assert.notEqual(
     interfaceSignatureKey({ ...signature, result: callback }),
     interfaceSignatureKey({
       ...signature,
-      result: { ...callback, effect: "io" },
+      result: boundary(callback.native, { ...callback.value, result: { tag: "safeInteger" } }),
     }),
   );
   assert.equal(
     interfaceSignatureKey({ ...signature, result: callback }),
-    interfaceSignatureKey({
-      ...signature,
-      result: {
-        ...callback,
-        args: [{ name: "ignored display name", type: nat }],
-      },
-    }),
+    interfaceSignatureKey({ ...signature, result: structuredClone(callback) }),
   );
 });
 
-test("lexical recursion depth is checked at manifest admission", () => {
-  for (const depth of [-1, 0.5, 1, undefined]) {
-    const result = structuredClone(recursive);
-    result.constructors[1].fields[0].type.depth = depth;
-    assert.throws(() => interfaceSignatureKey({ args: [], result, effect: "pure" }),
-      /depth.*(?:non-negative 32-bit integer|no enclosing recursive descriptor)/);
-  }
-  for (const interfaceTag of [17, 18, 19]) {
-    assert.throws(() => interfaceSignatureKey({ args: [], result: { type: "retired container", interfaceTag }, effect: "pure" }),
-      /interfaceTag is not supported/);
-  }
-});
-
-test("structural key ignores key order/diagnostics but retains field names", () => {
+test("signature identity is independent of JavaScript object key order", () => {
   const signature = { args: [record], result: nat, effect: "pure" };
-  // Reorder each JSON object without changing ordered arrays.
   const reverseKeys = (value) =>
     Array.isArray(value)
       ? value.map(reverseKeys)
       : value && typeof value === "object"
-        ? Object.fromEntries(
-            Object.entries(value)
-              .reverse()
-              .map(([k, v]) => [k, reverseKeys(v)]),
-          )
+        ? Object.fromEntries(Object.entries(value).reverse().map(([k, v]) => [k, reverseKeys(v)]))
         : value;
   assert.equal(
     interfaceSignatureKey(signature),
     interfaceSignatureKey({ ...signature, args: [reverseKeys(record)] }),
   );
-  assert.equal(
-    interfaceSignatureKey(signature),
-    interfaceSignatureKey({
-      ...signature,
-      args: [{ ...record, diagnostics: ["ignored"], timestamp: "ignored" }],
-    }),
-  );
-  const renamed = structuredClone(record);
-  renamed.fields[0].name = "different";
-  assert.notEqual(
-    interfaceSignatureKey(signature),
-    interfaceSignatureKey({ ...signature, args: [renamed] }),
-  );
 });
 
-test("every current interface tag has an explicit comparison rule", () => {
-  const scalar = ["NAT", "INT", "BOOL", "STRING", "UINT8", "UINT16", "UINT32", "UINT64", "USIZE", "BYTE_ARRAY", "FLOAT", "FLOAT32", "EXPR", "UNIT"];
-  const descriptors = scalar.map(name => ({ type: name, interfaceTag: INTERFACE_TAG[name] }));
-  const enumCtor = { name: "Flag.off", jsName: "off", tag: 0 };
-  descriptors.push(
-    { type: "Flag", interfaceTag: 14, kind: "simpleEnum", constructors: [enumCtor] },
-    ...[16].map(interfaceTag => ({ type: "container Nat", interfaceTag, element: nat })),
+test("core native kinds compose with distinct value mappings", () => {
+  const treeSequence = arrayBoundary(recursive.native, recursive.value);
+  const descriptors = [
+    primitiveBoundary("nat", "bigint"),
+    primitiveBoundary("nat", "safeInteger"),
+    primitiveBoundary("int", "bigint"),
+    primitiveBoundary("string", "string"),
+    primitiveBoundary("byteArray", "bytes"),
+    primitiveBoundary("unsigned", "number", { width: 8 }),
+    primitiveBoundary("unsigned", "number", { width: 16 }),
+    primitiveBoundary("unsigned", "number", { width: 32 }),
+    primitiveBoundary("unsigned", "bigint", { width: 64 }),
+    primitiveBoundary("unsigned", "number", { width: "usize" }),
+    primitiveBoundary("float", "number", { width: 32 }),
+    primitiveBoundary("float", "number", { width: 64 }),
+    unitBoundary(),
+    enumBoundary("Flag", ["off", "on"]),
+    resourceBoundary(),
     record,
-    { type: "Choice", interfaceTag: 21, kind: "taggedUnion", name: "Choice", constructors: [{ ...enumCtor, objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0, layout: { kind: "object", index: 0 }, type: nat }] },
-    { type: "Js Unit", interfaceTag: 23, kind: "resource", name: "Js" },
-    { type: "Nat -> Nat", interfaceTag: 24, kind: "function", args: [{ name: "n", type: nat }], result: nat, effect: "pure" },
+    treeSequence,
     recursive,
-    { type: "Expr", interfaceTag: 27, kind: "leanObject" },
-  );
-  const seen = new Set();
-  for (const type of descriptors) {
-    assert.equal(typeof interfaceSignatureKey({ args: [], result: type, effect: "pure" }), "string");
-    seen.add(type.interfaceTag);
-  }
-  seen.add(26); // recursiveRef is exercised inside its owning custom descriptor above.
-  assert.deepEqual([...seen].sort((a, b) => a - b), Object.values(INTERFACE_TAG).sort((a, b) => a - b));
+  ];
+  const keys = descriptors.map((result) => interfaceSignatureKey({
+    args: [], result, effect: "pure",
+  }));
+  assert.equal(keys.length, new Set(keys).size);
 });

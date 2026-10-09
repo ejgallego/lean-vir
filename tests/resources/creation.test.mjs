@@ -6,6 +6,7 @@ import {
   sha256Hex,
 } from "../../web/src/resources/descriptor.js";
 import { VIR_COMPATIBILITY_VERSION } from "../../web/src/runtime/versions.js";
+import { primitiveBoundary } from "../support/interface-fixtures.mjs";
 
 // Exercise the real loader, envelope integrity and export resolver. Substitute
 // only the expensive package/runtime boundaries; browser.mjs admits real IR/Wasm.
@@ -39,7 +40,7 @@ const compiled = await build({
 const { createProgram } = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].contents).toString("base64")}`
 );
-const nat = { type: "Nat", interfaceTag: 0 };
+const nat = primitiveBoundary("nat", "bigint");
 const entry = {
   entry: "Root.run",
   args: [],
@@ -292,7 +293,7 @@ function trackedController() {
 test("wrong ABI is rejected before runtime creation", async () =>
   fixture(async (s) => {
     const exports = expected();
-    exports["Root.run"].result = { type: "String", interfaceTag: 3 };
+    exports["Root.run"].result = primitiveBoundary("string", "string");
     // The public option is recognized by own-property presence, not enumeration.
     Object.defineProperty(s.options, "expectedExports", { value: exports });
     s.creation.resolve(s.runtime);
@@ -344,7 +345,7 @@ for (const [name, change] of [
   [
     "result type",
     (e) => {
-      e["Root.run"].result = { type: "String", interfaceTag: 3 };
+      e["Root.run"].result = primitiveBoundary("string", "string");
     },
   ],
   [
@@ -375,11 +376,9 @@ test("expected full name and signature snapshot survive caller mutation", async 
     s.runtime.interfaceManifest.exports[0].args = [
       { name: "other display name", type: nat },
     ];
-    exports["Root.run"].args = [
-      { interfaceTag: 0, type: "Nat", diagnostics: { ignored: true } },
-    ];
+    exports["Root.run"].args = [structuredClone(nat)];
     const pending = createProgram({ ...s.options, expectedExports: exports });
-    exports["Root.run"].args[0].interfaceTag = 3;
+    exports["Root.run"].args[0].native.type.tag = "string";
     await s.started.promise;
     s.creation.resolve(s.runtime);
     const program = await pending;
@@ -664,7 +663,7 @@ test("same arity with wrong argument type rejects at admission", async () =>
   fixture(async (s) => {
     s.manifest.exports[0].args = [{ name: "n", type: nat }];
     const exports = expected();
-    exports["Root.run"].args = [{ type: "String", interfaceTag: 3 }];
+    exports["Root.run"].args = [primitiveBoundary("string", "string")];
     await assert.rejects(
       createProgram({ ...s.options, expectedExports: exports }),
       (e) => e.phase === "program-validation",
@@ -680,7 +679,7 @@ test("installed interface is checked again and rejected instances are disposed",
         exports: [
           {
             ...entry,
-            result: { type: "String", interfaceTag: 3 },
+            result: primitiveBoundary("string", "string"),
           },
         ],
       },

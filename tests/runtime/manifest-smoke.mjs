@@ -545,7 +545,7 @@ for (const manifest of [
   }
 }
 assert.throws(() => {
-  fibEntry.args[0].type.interfaceTag = 1;
+  fibEntry.args[0].type.native.type.tag = "int";
 }, TypeError);
 assert.throws(() => {
   runtime.interfaceManifest.exports.reverse();

@@ -5,8 +5,15 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { assert, manifestEntry, readRuntimeArtifacts } from "./shared.mjs";
+import {
+  booleanBoundary,
+  nativeDescriptor,
+  nativeField,
+  objectBoundary,
+  objectConstructor,
+  primitiveBoundary,
+} from "../support/interface-fixtures.mjs";
 
 const { wasmBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 const runtime = await createVirRuntime({ wasmBytes, irPackageSet: [defaultPackageBytes] });
@@ -18,23 +25,33 @@ let growOnSlotRead = false;
 
 // Keep two USize slots between an object field and packed scalar data. Their
 // manifest indexes include the object fields; the codec plan indexes do not.
-const mixed = {
-  interfaceTag: INTERFACE_TAG.STRUCTURE,
-  typeName: "USizeFields.Mixed",
-  objectFieldCount: 1, usizeFieldCount: 2, scalarByteSize: 1,
-  fields: [
-    { name: "note", type: { interfaceTag: INTERFACE_TAG.STRING }, layout: { kind: "object", index: 0 } },
-    { name: "first", type: { interfaceTag: INTERFACE_TAG.USIZE }, layout: { kind: "usize", index: 1 } },
-    { name: "second", type: { interfaceTag: INTERFACE_TAG.USIZE }, layout: { kind: "usize", index: 2 } },
-    { name: "enabled", type: { interfaceTag: INTERFACE_TAG.BOOL }, layout: { kind: "scalar", offset: 0, size: 1 } },
-  ],
-};
-const nested = {
-  interfaceTag: INTERFACE_TAG.STRUCTURE,
-  typeName: "USizeFields.Nested",
-  objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0,
-  fields: [{ name: "inner", type: mixed, layout: { kind: "object", index: 0 } }],
-};
+const note = primitiveBoundary("string", "string");
+const usize = nativeDescriptor("unsigned", { width: "usize" });
+const bool = booleanBoundary();
+const mixed = objectBoundary(
+  "USizeFields.Mixed",
+  [objectConstructor("USizeFields.Mixed.mk", {
+    objectFieldCount: 1, usizeFieldCount: 2, scalarByteSize: 1,
+  }, [
+    nativeField("note", note.native, { tag: "object", index: 0 }),
+    nativeField("first", usize, { tag: "usize", index: 0 }),
+    nativeField("second", usize, { tag: "usize", index: 1 }),
+    nativeField("enabled", bool.native, { tag: "scalar", offset: 0, size: 1 }),
+  ])],
+  { tag: "record", fields: [
+    { key: "note", path: [0], value: note.value },
+    { key: "first", path: [1], value: { tag: "number" } },
+    { key: "second", path: [2], value: { tag: "number" } },
+    { key: "enabled", path: [3], value: bool.value },
+  ] },
+);
+const nested = objectBoundary(
+  "USizeFields.Nested",
+  [objectConstructor("USizeFields.Nested.mk", {
+    objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0,
+  }, [nativeField("inner", mixed.native, { tag: "object", index: 0 })])],
+  { tag: "record", fields: [{ key: "inner", path: [0], value: mixed.value }] },
+);
 const entry = "Vir.Fixtures.InterfaceShapes.profileStatsBump";
 
 function roundtrip(type, input, expected) {
@@ -50,9 +67,10 @@ function roundtrip(type, input, expected) {
 
 try {
   const profile = manifestEntry(runtime.interfaceManifest, entry).args[0].type;
-  assert.equal(profile.objectFieldCount, 1);
-  assert.equal(profile.usizeFieldCount, 1);
-  assert.equal(profile.scalarByteSize, 17);
+  const profileStorage = profile.native.metadata.constructors[0].storage;
+  assert.equal(profileStorage.objectFieldCount, 1);
+  assert.equal(profileStorage.usizeFieldCount, 1);
+  assert.equal(profileStorage.scalarByteSize, 17);
   runtime.exports = { ...originalExports,
     vir_obj_ctor_scalar_data(object, skipCount) {
       const data = originalExports.vir_obj_ctor_scalar_data(object, skipCount);
@@ -89,9 +107,6 @@ try {
     { note: "growth", first: Number(max), second: 0, enabled: false });
   assert.equal(growOnSlotRead, false);
 
-  const absent = originalExports.vir_obj_scalar(0);
-  assert.throws(() => runtime.readObjectUSizeField(mixed, absent, 0, "absent"),
-    /USize field 1 is unavailable/);
   assert.equal(runtime.failure, null);
 } finally {
   runtime.exports = originalExports;

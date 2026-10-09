@@ -9,7 +9,6 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { repositoryRoot } from "../repository-paths.mjs";
-import { INTERFACE_TAG, SUPPORTED_INTERFACE_TAGS } from "../../web/src/runtime/interface-tags.js";
 import {
   HOST_IMPORT_BOUNDARY,
   INTERFACE_MANIFEST_ARTIFACT,
@@ -64,28 +63,6 @@ function leanCtorToConstantKey(name) {
   return name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase();
 }
 
-function leanInterfaceTags(source) {
-  const start = source.indexOf("def InterfaceType.interfaceTag");
-  if (start < 0) {
-    throw new Error("missing Lean InterfaceType.interfaceTag definition");
-  }
-  const end = source.indexOf("\n\n", start);
-  const block = source.slice(start, end < 0 ? undefined : end);
-  const tags = new Map();
-  for (const match of block.matchAll(/\|\s+\.([A-Za-z0-9_]+)\b[^=]*=>\s*(\d+)/g)) {
-    const key = leanCtorToConstantKey(match[1]);
-    const value = Number(match[2]);
-    if (tags.has(key)) {
-      throw new Error(`duplicate Lean interface descriptor tag key ${key}`);
-    }
-    tags.set(key, value);
-  }
-  if (tags.size === 0) {
-    throw new Error("Lean InterfaceType.interfaceTag definition had no parseable cases");
-  }
-  return tags;
-}
-
 function leanHostImportBoundaries(source) {
   const start = source.indexOf("def HostImportBoundary.label");
   if (start < 0) {
@@ -120,7 +97,7 @@ function duplicateValues(entries, label) {
     }
   }
   if (duplicates.length !== 0) {
-    throw new Error(`${label} has duplicate descriptor tag values: ${duplicates.join("; ")}`);
+    throw new Error(`${label} has duplicate values: ${duplicates.join("; ")}`);
   }
 }
 
@@ -240,34 +217,9 @@ for (const [leanName, cppName, jsName] of packageSections) {
   );
 }
 
-const interfaceSource = await readRepoText("Vir/Compiler/Interface/Encode.lean");
-const leanTags = leanInterfaceTags(interfaceSource);
-const jsTags = new Map(Object.entries(INTERFACE_TAG));
-
-duplicateValues(leanTags, "Lean InterfaceType.interfaceTag");
-duplicateValues(jsTags, "JavaScript INTERFACE_TAG");
-
-for (const [key, value] of jsTags) {
-  if (!leanTags.has(key)) {
-    throw new Error(`JavaScript INTERFACE_TAG.${key} is missing from Lean InterfaceType.interfaceTag`);
-  }
-  if (leanTags.get(key) !== value) {
-    throw new Error(`interface descriptor tag mismatch for ${key}: Lean=${leanTags.get(key)} JavaScript=${value}`);
-  }
-  if (!SUPPORTED_INTERFACE_TAGS.has(value)) {
-    throw new Error(`SUPPORTED_INTERFACE_TAGS is missing INTERFACE_TAG.${key}=${value}`);
-  }
-}
-
-for (const [key] of leanTags) {
-  if (!jsTags.has(key)) {
-    throw new Error(`Lean InterfaceType.interfaceTag case ${key} is missing from JavaScript INTERFACE_TAG`);
-  }
-}
-
-if (SUPPORTED_INTERFACE_TAGS.size !== jsTags.size) {
-  throw new Error(`SUPPORTED_INTERFACE_TAGS has ${SUPPORTED_INTERFACE_TAGS.size} entries; INTERFACE_TAG has ${jsTags.size}`);
-}
+// Type and value descriptors are validated as a manifest pair. Their string
+// tags are part of the versioned manifest grammar, not duplicated numeric ABI
+// constants in Lean and JavaScript.
 
 const interfaceModelSource = await readRepoText("Vir/Compiler/Interface/Model.lean");
 const leanBoundaries = leanHostImportBoundaries(interfaceModelSource);
@@ -325,5 +277,5 @@ if (args.includes("--write")) {
 
 console.log(
   `package ABI guardrails ok: magic, package-set descriptor, versions, ${packageSections.length} package sections, ` +
-  `${jsTags.size} interface descriptor tags, ${jsBoundaries.size} host import boundaries, host limits ${hostSlots}/${hostArity}, and SDK ${packageJson.version} agree`,
+  `${jsBoundaries.size} host import boundaries, host limits ${hostSlots}/${hostArity}, and SDK ${packageJson.version} agree`,
 );

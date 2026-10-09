@@ -19,7 +19,6 @@ import {
 } from "../../scripts/bindings/type-anchor-format.mjs";
 import { renderTypeAnchorReport } from "../../scripts/bindings/type-anchor-renderer.mjs";
 import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 
 test("semantic type operators remain opaque while readonly array/tuple views are preserved", async () => {
   const directory = await mkdtemp(join(tmpdir(), "lean-vir-ts-operators-"));
@@ -336,15 +335,32 @@ test("the comparator fails closed on TypeScript absence semantics", async () => 
         startup: false,
         args: [],
         result: {
-          type: "Option String",
-          interfaceTag: INTERFACE_TAG.CUSTOM_INDUCTIVE,
-          kind: "customInductive", name: "Option",
-          constructors: [
-            { name: "Option.none", jsName: "none", tag: 0, objectFieldCount: 0, usizeFieldCount: 0, scalarByteSize: 0, fields: [] },
-            { name: "Option.some", jsName: "some", tag: 1, objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0, fields: [
-              { name: "val", type: { type: "String", interfaceTag: INTERFACE_TAG.STRING }, layout: { kind: "object", index: 0 } },
-            ] },
-          ],
+          native: {
+            type: { tag: "leanObject" },
+            metadata: {
+              declaration: "Option",
+              constructors: [
+                { name: "Option.none", representation: "immediate", fields: [] },
+                {
+                  name: "Option.some",
+                  representation: "object",
+                  storage: { objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0 },
+                  fields: [{
+                    name: "val",
+                    type: { type: { tag: "string" } },
+                    location: { tag: "object", index: 0 },
+                  }],
+                },
+              ],
+            },
+          },
+          value: {
+            tag: "variant",
+            cases: [
+              { kind: "none", payload: "none" },
+              { kind: "some", payload: "value", value: { tag: "string" } },
+            ],
+          },
         },
         effect: "pure",
       }],

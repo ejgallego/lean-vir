@@ -13,6 +13,15 @@ import { fileURLToPath } from "node:url";
 import { interfaceSignatureKey } from "../../web/src/runtime/interface-manifest.js";
 import { snapshotExpectedExports, resolveProgramExports } from "../../web/src/resources/program-exports.js";
 import { readIrPackageInfo } from "../../web/src/runtime/ir-package.js";
+import {
+  arrayBoundary,
+  immediateConstructor,
+  nativeField,
+  objectBoundary,
+  objectConstructor,
+  primitiveBoundary,
+  unitBoundary,
+} from "../support/interface-fixtures.mjs";
 
 // Independent producer and cold native-precompiled consumer: a developer's
 // dependency cache could conceal accidental umbrella imports. Retain evidence.
@@ -102,52 +111,29 @@ const expectedExports = {
   "NativeClient.nested": JSON.parse(nestedSignature),
 };
 const signatures = snapshotExpectedExports(expectedExports);
-for (const [declaration, type, tag] of [
-  ["NativeClient.greet", "String", 3], ["NativeClient.double", "Nat", 0],
+for (const [declaration, expectedType] of [
+  ["NativeClient.greet", primitiveBoundary("string", "string")],
+  ["NativeClient.double", primitiveBoundary("nat", "bigint")],
 ]) {
-  const expectedType = { type, interfaceTag: tag };
   assert.deepEqual(expectedExports[declaration].args, [expectedType],
     "caller arguments contain types only, without parameter display names");
   assert.equal(signatures.get(declaration),
     interfaceSignatureKey({ args: [expectedType], result: expectedType, effect: "pure" }));
 }
 
-const nat = { type: "Nat", interfaceTag: 0 };
-const string = { type: "String", interfaceTag: 3 };
-const unit = { type: "Unit", interfaceTag: 22 };
-const nested = {
-  type: "Array Option Nat",
-  interfaceTag: 16,
-  kind: "array",
-  element: {
-    type: "Option Nat",
-    interfaceTag: 25,
-    kind: "customInductive",
-    name: "Option",
-    constructors: [
-      {
-        name: "Option.none",
-        jsName: "none",
-        tag: 0,
-        objectFieldCount: 0,
-        usizeFieldCount: 0,
-        scalarByteSize: 0,
-        fields: [],
-      },
-      {
-        name: "Option.some",
-        jsName: "some",
-        tag: 1,
-        objectFieldCount: 1,
-        usizeFieldCount: 0,
-        scalarByteSize: 0,
-        fields: [
-          { name: "val", type: nat, layout: { kind: "object", index: 0 } },
-        ],
-      },
-    ],
-  },
-};
+const nat = primitiveBoundary("nat", "bigint");
+const string = primitiveBoundary("string", "string");
+const unit = unitBoundary();
+const option = objectBoundary("Option", [
+  immediateConstructor("Option.none"),
+  objectConstructor("Option.some", {
+    objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0,
+  }, [nativeField("val", nat.native, { tag: "object", index: 0 })]),
+], { tag: "variant", cases: [
+  { kind: "none", payload: "none" },
+  { kind: "some", payload: "value", value: nat.value },
+] });
+const nested = arrayBoundary(option.native, option.value);
 for (const [declaration, args, result, effect] of [
   ["NativeClient.nullary", [], unit, "pure"],
   ["NativeClient.multiple", [string, nat], nat, "pure"],

@@ -4,20 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { INTERFACE_TAG } from "../../src/runtime/interface-tags.js";
-import { constructorValue } from "../../src/runtime/vir-value-normalizers.js";
+const JSON_VALUE_TAGS = new Set(["expr", "record", "sequence", "variant"]);
 
-const JSON_INPUT_INTERFACE_TAGS = new Set([
-  INTERFACE_TAG.EXPR,
-  INTERFACE_TAG.ARRAY,
-  INTERFACE_TAG.STRUCTURE,
-  INTERFACE_TAG.TAGGED_UNION,
-  INTERFACE_TAG.CUSTOM_INDUCTIVE,
-]);
-
-export function interfaceInputTag(type) {
-  if (type?.interfaceTag === INTERFACE_TAG.SIMPLE_ENUM) return "SELECT";
-  if (isJsonInputTag(type?.interfaceTag)) return "TEXTAREA";
+export function interfaceInputTag(pair) {
+  if (pair?.value?.tag === "enum") return "SELECT";
+  if (isJsonInput(pair)) return "TEXTAREA";
   return "INPUT";
 }
 
@@ -33,95 +24,148 @@ export function parseBoolText(text) {
   return false;
 }
 
-export function isJsonInputTag(tag) {
-  return JSON_INPUT_INTERFACE_TAGS.has(tag);
+export function isJsonInput(pair) {
+  return JSON_VALUE_TAGS.has(pair?.value?.tag);
 }
 
-export function defaultValueForType(type, bindings = [], depth = 0) {
-  switch (type?.interfaceTag) {
-    case INTERFACE_TAG.UNIT:
-      return null;
-    case INTERFACE_TAG.RECURSIVE_REF:
-      return bindings[type.depth] && depth < 2
-        ? defaultValueForType(
-            bindings[type.depth],
-            bindings.slice(type.depth + 1),
-            depth + 1,
-          )
-        : null;
-    case INTERFACE_TAG.NAT:
-    case INTERFACE_TAG.INT:
-    case INTERFACE_TAG.UINT8:
-    case INTERFACE_TAG.UINT16:
-    case INTERFACE_TAG.UINT32:
-    case INTERFACE_TAG.UINT64:
-    case INTERFACE_TAG.USIZE:
-    case INTERFACE_TAG.FLOAT:
-    case INTERFACE_TAG.FLOAT32:
+export function defaultValueForType(pair, bindings = [], depth = 0) {
+  if (pair?.native?.ref !== undefined || pair?.value?.tag === "recursive") {
+    if (depth >= 2) return null;
+    const target = resolvePair(pair, bindings);
+    return target === null
+      ? null
+      : defaultValueForType(target, bindings, depth + 1);
+  }
+  const resolved = resolvePair(pair, bindings);
+  if (resolved === null) return null;
+  const view = resolved.value;
+  switch (view?.tag) {
+    case "bigint":
+    case "number":
+    case "safeInteger":
       return 0;
-    case INTERFACE_TAG.BOOL:
+    case "string":
+      return "";
+    case "bytes":
+      return [];
+    case "unit":
+      return null;
+    case "boolean":
       return false;
-    case INTERFACE_TAG.STRING:
-      return "";
-    case INTERFACE_TAG.BYTE_ARRAY:
-      return [];
-    case INTERFACE_TAG.EXPR:
+    case "enum":
+      return view.cases[0] ?? "";
+    case "expr":
       return { kind: "const", name: "Nat", levels: [] };
-    case INTERFACE_TAG.ARRAY:
+    case "record":
+      return defaultRecordValue(resolved, bindings, depth);
+    case "variant":
+      return view.cases.length === 0
+        ? null
+        : constructorTemplate(resolved, 0, bindings, depth);
+    case "sequence":
       return [];
-    case INTERFACE_TAG.STRUCTURE:
-      return defaultStructureValue(type, bindings, depth);
-    case INTERFACE_TAG.TAGGED_UNION:
-    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      return type.name === "List"
-        ? []
-        : constructorTemplate(type, type.constructors[0], depth, bindings);
-    case INTERFACE_TAG.SIMPLE_ENUM:
-      return type.constructors[0].jsName;
+    case "recursive":
+    case "function":
+    case "jsReference":
+    case "leanReference":
     default:
-      return "";
+      return null;
   }
 }
 
-function defaultStructureValue(type, bindings, depth = 0) {
-  const value = {};
-  for (const field of type?.fields ?? []) {
-    if (field.subobject === true) {
-      Object.assign(
-        value,
-        defaultValueForType(field.type, [type, ...bindings], depth + 1),
-      );
-    } else {
-      value[field.name] = defaultValueForType(
-        field.type,
-        [type, ...bindings],
+function defaultRecordValue(pair, bindings, depth) {
+  const fields = pair.value.fields ?? [];
+  const result = {};
+  for (const field of fields) {
+    const resolvedField = nativeFieldAtPath(
+      pair.native,
+      field.path,
+      0,
+      [pair, ...bindings],
+    );
+    result[field.key] = defaultValueForType(
+      { native: resolvedField?.native ?? null, value: field.value },
+      resolvedField?.bindings ?? [pair, ...bindings],
+      depth + 1,
+    );
+  }
+  return result;
+}
+
+// The editable template follows the chosen JS case and resolves native fields
+// only to obtain the child descriptor; constructor indices come from the view.
+export function constructorTemplate(pair, caseIndex, bindings = [], depth = 0) {
+  const resolved = resolvePair(pair, bindings);
+  if (resolved === null || resolved.value?.tag !== "variant") return null;
+  const view = resolved.value.cases[caseIndex];
+  if (view === undefined) return null;
+  if (view.payload === "none") return { kind: view.kind };
+
+  const localBindings = [resolved, ...bindings];
+  if (view.payload === "value") {
+    const resolvedField = nativeFieldAtPath(
+      resolved.native,
+      [0],
+      caseIndex,
+      localBindings,
+    );
+    return {
+      kind: view.kind,
+      value: defaultValueForType(
+        { native: resolvedField?.native ?? null, value: view.value },
+        resolvedField?.bindings ?? localBindings,
         depth + 1,
-      );
-    }
+      ),
+    };
   }
-  return value;
+
+  const fields = {};
+  for (const field of view.fields) {
+    const resolvedField = nativeFieldAtPath(
+      resolved.native,
+      field.path,
+      caseIndex,
+      localBindings,
+    );
+    fields[field.key] = defaultValueForType(
+      { native: resolvedField?.native ?? null, value: field.value },
+      resolvedField?.bindings ?? localBindings,
+      depth + 1,
+    );
+  }
+  return { kind: view.kind, fields };
 }
 
-// Editable suggestion for admitted descriptors; recursive positions may need edits.
-export function constructorTemplate(type, ctor, depth = 0, bindings = []) {
-  if (type.interfaceTag === INTERFACE_TAG.TAGGED_UNION) {
-    return constructorValue(
-      type,
-      ctor,
-      defaultValueForType(ctor.type, bindings, depth + 1),
-    );
+function resolvePair(pair, bindings) {
+  if (pair?.value?.tag === "recursive" && pair.native?.ref === undefined) {
+    return bindings[0] ?? null;
   }
-  if (ctor.fields.length === 1)
-    return constructorValue(
-      type,
-      ctor,
-      defaultValueForType(ctor.fields[0].type, [type, ...bindings], depth + 1),
-    );
-  const values = Object.fromEntries(
-    ctor.fields.map((field) => [
-      field.name,
-      defaultValueForType(field.type, [type, ...bindings], depth + 1),
-    ]),
-  );
-  return constructorValue(type, ctor, values);
+  if (pair?.native?.ref !== undefined) {
+    const target = bindings[pair.native.ref];
+    return target === undefined ? null : resolvePair(target, bindings.slice(pair.native.ref + 1));
+  }
+  return pair;
+}
+
+function resolveNative(native, bindings) {
+  if (native?.ref !== undefined) {
+    return bindings[native.ref]?.native ?? null;
+  }
+  return native;
+}
+
+function nativeFieldAtPath(native, path, firstConstructor, bindings) {
+  let current = resolveNative(native, bindings);
+  let owners = bindings;
+  for (const [position, fieldIndex] of path.entries()) {
+    const constructorIndex = position === 0 ? firstConstructor : 0;
+    const ctor = current?.metadata?.constructors?.[constructorIndex];
+    const field = ctor?.fields?.[fieldIndex];
+    if (field === undefined) return null;
+    if (position === path.length - 1) return { native: field.type, bindings: owners };
+    current = resolveNative(field.type, owners);
+    if (current === null) return null;
+    owners = [current, ...owners];
+  }
+  return path.length === 0 ? { native: current, bindings: owners } : null;
 }

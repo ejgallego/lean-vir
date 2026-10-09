@@ -22,6 +22,7 @@ import {
   prepareVirIrpkgSync,
 } from "../../scripts/packages/irpkg-generator.mjs";
 import { createTestModuleProject } from "../support/module-project.mjs";
+import { primitiveBoundary } from "../support/interface-fixtures.mjs";
 import {
   INTERFACE_MANIFEST_ARTIFACT,
   INTERFACE_MANIFEST_VERSION,
@@ -114,8 +115,8 @@ const validManifestShape = {
       entry: "ok",
       nameKey: "s6f6b/",
       source: "Ok.lean",
-      args: [{ name: "arg1", type: { type: "Nat", interfaceTag: 0 } }],
-      result: { type: "Nat", interfaceTag: 0 },
+      args: [{ name: "arg1", type: primitiveBoundary("nat", "bigint") }],
+      result: primitiveBoundary("nat", "bigint"),
       effect: "pure",
       startup: false,
     },
@@ -143,10 +144,10 @@ export function assertValidManifestShape() {
       args: [
         {
           name: "value",
-          type: { type: "Nat", interfaceTag: 0 },
+          type: primitiveBoundary("nat", "bigint"),
         },
       ],
-      result: { type: "Nat", interfaceTag: 0 },
+      result: primitiveBoundary("nat", "bigint"),
       effect: "pure",
     },
   ];

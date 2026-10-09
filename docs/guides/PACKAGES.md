@@ -147,7 +147,7 @@ See the [descriptor schema](../reference/IRPKG_FORMAT.md#package-set-descriptor)
 ordering, integrity and duplicate-identity rules. Browsers load neither
 `.olean` nor Lean's raw `.ir` files.
 
-The supported compatibility tuple is manifest 9, package format 11 and runtime
+The supported compatibility tuple is manifest 12, package format 11 and runtime
 ABI 4. Generate the package set and install the JavaScript/Wasm SDK from the
 same `lean_vir` revision. After changing that revision or the generator,
 regenerate the `.irpkg` members and descriptor and reinstall the matching SDK.

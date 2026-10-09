@@ -5,18 +5,22 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { assert, readRuntimeArtifacts } from "./shared.mjs";
+import {
+  arrayBoundary,
+  boundary,
+  nativeDescriptor,
+} from "../support/interface-fixtures.mjs";
 
 const { wasmBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 const runtime = await createVirRuntime({ wasmBytes, irPackageSet: [defaultPackageBytes] });
 const max64 = (1n << 64n) - 1n;
 const max32 = (1n << 32n) - 1n;
 const cases = [
-  ["UInt64", INTERFACE_TAG.UINT64, max64,
+  ["UInt64", 64, "bigint", max64,
     [0n, 1n, (1n << 32n) - 1n, 1n << 32n, (1n << 53n) - 1n, (1n << 53n) + 1n,
       (1n << 63n) - 1n, 1n << 63n, max64], "uint64Bump"],
-  ["USize", INTERFACE_TAG.USIZE, max32,
+  ["USize", "usize", "number", max32,
     [0n, 1n, (1n << 31n) - 1n, 1n << 31n, max32], "baseUSizeBump"],
 ];
 const originalExports = runtime.exports;
@@ -33,8 +37,11 @@ for (const name of Object.keys(transport)) {
 try {
   assert.equal(runtime.targetPointerBytes(), 4);
   runtime.exports = { ...originalExports };
-  for (const [name, interfaceTag, max, values, entry] of cases) {
-    const type = { type: name, interfaceTag };
+  for (const [name, width, valueTag, max, values, entry] of cases) {
+    const type = boundary(
+      nativeDescriptor("unsigned", { width }),
+      { tag: valueTag },
+    );
     const inputs = values.flatMap(n => n <= BigInt(Number.MAX_SAFE_INTEGER)
       ? [n, String(n), Number(n)] : [n, String(n)]);
     inputs.push(-0, " 00041 ");
@@ -45,14 +52,14 @@ try {
       try {
         assert.equal(runtime.exports.vir_obj_is_scalar(object), 0);
         const output = runtime.liftObjectValue(type, object, name);
-        assert.equal(output, interfaceTag === INTERFACE_TAG.USIZE ? Number(BigInt(input)) : BigInt(input));
-        assert.equal(typeof output, interfaceTag === INTERFACE_TAG.USIZE ? "number" : "bigint");
+        assert.equal(output, width === "usize" ? Number(BigInt(input)) : BigInt(input));
+        assert.equal(typeof output, valueTag);
         assert.deepEqual(transport, { allocBytes: 0, freeBytes: 0, readWasmString: 0 });
       } finally {
         runtime.exports.vir_obj_dec(object);
       }
       assert.equal(runtime.call(`Vir.Fixtures.InterfaceShapes.${entry}`, input),
-        interfaceTag === INTERFACE_TAG.USIZE
+        width === "usize"
           ? Number((BigInt(input) + 1n) & max)
           : (BigInt(input) + 1n) & max);
     }
@@ -76,19 +83,20 @@ try {
     }
     assert.equal(runtime.failure, null);
     assert.equal(runtime.call(`Vir.Fixtures.InterfaceShapes.${entry}`, max),
-      interfaceTag === INTERFACE_TAG.USIZE ? 0 : 0n);
+      width === "usize" ? 0 : 0n);
   }
 
   for (const entry of ["boxUInt64Bump", "uint64BoxBump"]) {
     assert.deepEqual(runtime.call(`Vir.Fixtures.InterfaceShapes.${entry}`, { value: max64 }), { value: 0n });
   }
-  for (const interfaceTag of [INTERFACE_TAG.UINT64, INTERFACE_TAG.USIZE]) {
-    const type = { interfaceTag: INTERFACE_TAG.ARRAY, element: { interfaceTag } };
-    const values = interfaceTag === INTERFACE_TAG.UINT64 ? [0n, 1n << 63n, max64] : [0n, 1n << 31n, max32];
+  for (const width of [64, "usize"]) {
+    const elementNative = nativeDescriptor("unsigned", { width });
+    const type = arrayBoundary(elementNative, { tag: width === "usize" ? "number" : "bigint" });
+    const values = width === 64 ? [0n, 1n << 63n, max64] : [0n, 1n << 31n, max32];
     const object = runtime.makeObjectValue(type, values, "nested");
     try {
       assert.deepEqual(runtime.liftObjectValue(type, object, "nested"),
-        interfaceTag === INTERFACE_TAG.USIZE ? values.map(Number) : values);
+        width === "usize" ? values.map(Number) : values);
     } finally {
       runtime.exports.vir_obj_dec(object);
     }

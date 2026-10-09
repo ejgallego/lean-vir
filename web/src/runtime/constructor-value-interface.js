@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-// First executable slice of the descriptor/view contract. This compiles the JS
-// constructor shape only; native layouts and child codecs stay with the caller.
+// Bind the selected JavaScript constructor shape. Native layouts and child
+// codecs stay with the construction kernel.
 // Descriptors are admitted before binding. No metadata is checked per value.
 export function compileConstructorValueInterface(native, view) {
   const constructors = native.metadata?.constructors;
@@ -40,18 +40,19 @@ export function compileConstructorValueInterface(native, view) {
       build = payload => ({ kind, value: payload });
       wrap = build;
     } else if (entry.payload === "fields") {
-      const used = new Set(), fieldKeys = new Set();
+      const used = new Set(), fieldKeys = new Set(), paths = new Set();
       const mappings = entry.fields.map(field => {
-        // This first slice handles immediate fields. Nested record paths are a
-        // separate plan operation, not a second interpretation of native layout.
-        if (field.path.length !== 1 || !Number.isInteger(field.path[0]) ||
-            field.path[0] < 0 || field.path[0] >= fields.length || used.has(field.path[0])) {
+        // The construction plan resolves logical paths, including inherited records.
+        if (field.path.length === 0 || !Number.isInteger(field.path[0]) ||
+            field.path[0] < 0 || field.path[0] >= fields.length) {
           throw new Error("constructor field paths must cover distinct immediate fields");
         }
         if (typeof field.key !== "string" || fieldKeys.has(field.key)) {
           throw new Error("constructor field keys must be unique strings");
         }
-        used.add(field.path[0]); fieldKeys.add(field.key);
+        const path = JSON.stringify(field.path);
+        if (paths.has(path)) throw new Error("duplicate constructor field path");
+        paths.add(path); used.add(field.path[0]); fieldKeys.add(field.key);
         return { key: field.key, index: field.path[0] };
       });
       if (used.size !== fields.length) throw new Error("payload must cover every native field");

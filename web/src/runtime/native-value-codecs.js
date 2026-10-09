@@ -4,360 +4,297 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { INTERFACE_TAG } from "./interface-tags.js";
-import { PrimitiveObjectRuntime } from "./primitive-values.js";
+import { compileConstructorValueInterface } from "./constructor-value-interface.js";
+import { compilePrimitiveValueCodec } from "./primitive-values.js";
 import {
-  objectLayoutPlan,
-  objectLayoutSlotsFromPlan,
-  writeObjectScalarField,
-} from "./object-abi.js";
-import { normalizeBoundedUnsignedBigInt } from "./primitive-value-normalizers.js";
-import {
-  constructorValue,
-  customInductiveConstructorAt,
-  enumValue,
-  flattenStructureSubobjects,
-  normalizeArray,
-  normalizeCustomInductive,
-  normalizeEnum,
-  normalizeStructure,
-  normalizeTaggedUnion,
-  taggedUnionConstructorAt,
-} from "./vir-value-normalizers.js";
-import { trivialStructureField } from "./object-boundary.js";
+  normalizeInteger,
+} from "./primitive-value-normalizers.js";
 
-// Compile one immutable admitted descriptor into native JS conversions. The
-// lexical bindings are compiler-owned constructor scopes, not layout owners.
-// Cache the resulting root codec at the call site; never re-validate descriptors
-// while converting values. Only dynamic values, ordinals and fields are checked.
-export function compileNativeValueCodec(runtime, type, bindings = []) {
-  const codec = {};
-  const compile = (child, scope = bindings) =>
-    compileNativeValueCodec(runtime, child, scope);
-  const lowerPrimitive = (value, label) =>
-    PrimitiveObjectRuntime.prototype.makeObjectValue.call(
-      runtime,
-      type,
-      value,
-      label,
-    );
-  const liftPrimitive = (obj, label) =>
-    PrimitiveObjectRuntime.prototype.liftObjectValue.call(
-      runtime,
-      type,
-      obj,
-      label,
-    );
+// Bind immutable admitted compiler facts to the selected JS representation.
+// Plans reuse managed allocation/ownership and construct values directly.
+// No intermediate normalized tree or second descriptor interpretation is needed.
+export function compileNativeValueCodec(runtime, pair) {
+  return compileValueCodec(runtime, pair.native, pair.value);
+}
 
-  function layoutCodec(owner, scope, singlePayload = false) {
-    const plan = objectLayoutPlan(owner, "constructor layout");
-    const fields = plan.fields.map((fieldPlan) => ({
-      ...fieldPlan,
-      codec:
-        fieldPlan.kind === "object"
-          ? compile(fieldPlan.field.type, scope)
-          : null,
-    }));
-    function liftField(field, obj, label) {
-      const fieldLabel = `${label}.${field.field.name}`;
-      if (field.kind === "object") {
-        const acquired = runtime.ownedObjectField(obj, field.index, fieldLabel);
-        try {
-          return field.codec.lift(acquired, fieldLabel);
-        } finally {
-          runtime.exports.vir_obj_dec(acquired);
-        }
-      }
-      if (field.kind === "usize")
-        return runtime.readObjectUSizeField(
-          owner,
-          obj,
-          field.index,
-          fieldLabel,
-        );
-      return runtime.readObjectScalarField(
-        owner,
-        obj,
-        field.field.type,
-        field.field.layout,
-        fieldLabel,
-        field.offset,
-      );
-    }
-
-    // Object-only layouts need no scalar buffers or layout record per node.
-    // This is a storage specialization for every admitted constructor, not a
-    // separate policy for Option or Prod.
-    const lowerObjects = singlePayload
-      ? (tag, value, label, scratch) => {
-          const field = fields[0];
-          const objects = [
-            field.codec.lower(value, `${label}.${field.field.name}`, scratch),
-          ];
-          try {
-            return scratch.createObjects(tag, objects, label);
-          } finally {
-            runtime.releaseOwnedObjects(objects);
-          }
-        }
-      : (tag, values, label, scratch) => {
-          const objects = Array(plan.objectFieldCount).fill(0);
-          try {
-            for (const field of fields)
-              objects[field.index] = field.codec.lower(
-                values[field.field.name],
-                `${label}.${field.field.name}`,
-                scratch,
-              );
-            return scratch.createObjects(tag, objects, label);
-          } finally {
-            runtime.releaseOwnedObjects(objects);
-          }
-        };
-    const objectOnly = plan.usizeFieldCount === 0 && plan.scalarByteSize === 0;
-    return {
-      lower: objectOnly
-        ? lowerObjects
-        : (tag, values, label, scratch) => {
-            const layout = objectLayoutSlotsFromPlan(plan);
-            try {
-              for (const field of fields) {
-                const value = singlePayload ? values : values[field.field.name];
-                const fieldLabel = `${label}.${field.field.name}`;
-                if (field.kind === "object")
-                  layout.objectFields[field.index] = field.codec.lower(
-                    value,
-                    fieldLabel,
-                    scratch,
-                  );
-                else if (field.kind === "usize")
-                  layout.usizeFields[field.index] =
-                    normalizeBoundedUnsignedBigInt(
-                      value,
-                      fieldLabel,
-                      runtime.usizeMaxValue(),
-                      "USize",
-                    );
-                else
-                  writeObjectScalarField(
-                    layout.scalarBytes,
-                    field.field.type,
-                    field.field.layout,
-                    value,
-                    fieldLabel,
-                    field.offset,
-                  );
-              }
-              return scratch.create(tag, layout, label);
-            } finally {
-              runtime.releaseOwnedObjects(layout.objectFields);
-            }
-          },
-      lift(obj, label) {
-        if (singlePayload) return liftField(fields[0], obj, label);
-        const values = {};
-        for (const field of fields)
-          values[field.field.name] = liftField(field, obj, label);
-        return values;
-      },
-    };
+function compileValueCodec(runtime, native, view, bindings = []) {
+  if ("ref" in native) {
+    if (view.tag !== "recursive" || bindings[native.ref] === undefined)
+      throw new Error("unbound recursive interface");
+    return bindings[native.ref];
   }
-
-  switch (type.interfaceTag) {
-    case INTERFACE_TAG.RECURSIVE_REF: {
-      const owner = bindings[type.depth];
-      if (owner === undefined)
-        throw new Error("recursive codec reference has no enclosing binding");
-      return owner;
-    }
-    case INTERFACE_TAG.SIMPLE_ENUM:
-      codec.lower = (value, label) =>
-        runtime.makeObjectScalar(normalizeEnum(value, type, label), label);
-      codec.lift = (obj, label) =>
-        enumValue(type, runtime.readObjectScalar(obj, label));
-      break;
-    case INTERFACE_TAG.EXPR:
-      codec.lower = (value, label) => runtime.makeObjectExpr(value, label);
-      codec.lift = (obj, label) => runtime.liftObjectExpr(obj, label);
-      break;
-    case INTERFACE_TAG.FUNCTION:
-      codec.lower = (_value, label) => {
-        throw new Error(
-          `${label} cannot be a JavaScript function at this boundary`,
-        );
-      };
-      codec.lift = (obj, label) => runtime.liftObjectFunction(type, obj, label);
-      break;
-    case INTERFACE_TAG.ARRAY: {
-      const element = compile(type.element);
-      codec.lower = (value, label, scratch) => {
-        const values = normalizeArray(value, label);
-        const objects = [];
-        try {
-          for (let i = 0; i < values.length; i++)
-            objects.push(element.lower(values[i], `${label}[${i}]`, scratch));
-          return runtime.makeObjectArrayFromOwnedElements(objects, label);
-        } finally {
-          runtime.releaseOwnedObjects(objects);
-        }
-      };
-      codec.lift = (obj, label) => {
-        const values = [],
-          size = runtime.exports.vir_obj_array_size(obj);
-        for (let i = 0; i < size; i++) {
-          const field = runtime.exports.vir_obj_array_get(obj, i);
-          if (field === 0) throw new Error(`${label}[${i}] is unavailable`);
-          try {
-            Object.defineProperty(values, i, {
-              __proto__: null,
-              value: element.lift(field, `${label}[${i}]`),
-              writable: true,
-              enumerable: true,
-              configurable: true,
-            });
-          } finally {
-            runtime.exports.vir_obj_dec(field);
-          }
-        }
-        return values;
-      };
-      break;
-    }
-    case INTERFACE_TAG.STRUCTURE: {
-      const scope = [codec, ...bindings];
-      const trivial = trivialStructureField(type, type.fields);
-      const child = trivial === null ? null : compile(trivial.type, scope);
-      const layout = trivial === null ? layoutCodec(type, scope) : null;
-      codec.lower = (value, label, scratch) => {
-        const record = normalizeStructure(value, type.fields, label);
-        return child === null
-          ? layout.lower(0, record, label, scratch)
-          : child.lower(
-              record[trivial.name],
-              `${label}.${trivial.name}`,
-              scratch,
-            );
-      };
-      const hasSubobjects = type.fields.some(
-        (field) => field.subobject === true,
-      );
-      codec.lift = (obj, label) => {
-        const value =
-          child === null
-            ? layout.lift(obj, label)
-            : { [trivial.name]: child.lift(obj, `${label}.${trivial.name}`) };
-        return hasSubobjects ? flattenStructureSubobjects(type, value) : value;
-      };
-      break;
-    }
-    case INTERFACE_TAG.TAGGED_UNION: {
-      const constructors = type.constructors.map((ctor) => ({
-        layout: layoutCodec(ctor, bindings, true),
-        ctor,
-      }));
-      codec.lower = (value, label, scratch) => {
-        const { index, ctor, payload } = normalizeTaggedUnion(
-          value,
-          type,
-          label,
-        );
-        return constructors[index].layout.lower(index, payload, label, scratch);
-      };
-      codec.lift = (obj, label) => {
-        const tag = runtime.exports.vir_obj_tag(obj),
-          ctor = taggedUnionConstructorAt(type, tag, label);
-        return constructorValue(
-          type,
-          ctor,
-          constructors[tag].layout.lift(obj, label),
-        );
-      };
-      break;
-    }
-    case INTERFACE_TAG.CUSTOM_INDUCTIVE: {
-      const scope = [codec, ...bindings];
-      if (type.name === "List") {
-        // An iterative codec adapter, not a dedicated manifest type or runtime
-        // constructor-layout assumption. All tags/field positions come from Lean.
-        const [nil, cons] = type.constructors;
-        const plan = objectLayoutPlan(cons, "List constructor");
-        const [head, tail] = plan.fields;
-        const element = compile(head.field.type, scope);
+  const primitive = compilePrimitiveValueCodec(runtime, native, view);
+  if (primitive !== null) return primitive;
+  const type = native.type;
+  const codec = {};
+  const compile = (type, value, scope = bindings) =>
+    compileValueCodec(runtime, type, value, scope);
+  switch (type.tag) {
+    case "leanObject": {
+      if (view.tag === "expr") {
+        codec.lower = (value, label) => runtime.makeObjectExpr(value, label);
+        codec.lift = (obj, label) => runtime.liftObjectExpr(obj, label);
+        break;
+      }
+      if (view.tag === "function") {
+        codec.lower = (_value, label) => { throw new Error(`${label} cannot be a JavaScript function at this boundary`); };
+        codec.lift = (obj, label) => runtime.liftObjectFunction({ native, value: view }, obj, label);
+        break;
+      }
+      if (view.tag === "sequence" && view.chain === undefined) {
+        const elementType = native.metadata?.arrayElement;
+        if (elementType === undefined) throw new Error("array codec requires native array metadata");
+        const element = compile(elementType, view.element);
         codec.lower = (value, label, scratch) => {
-          const values = normalizeArray(value, label);
-          let cursor = runtime.makeObjectScalar(nil.tag, `${label}.nil`);
+          requireArray(value, label);
+          const objects = [];
           try {
-            for (let i = values.length - 1; i >= 0; i--) {
-              const objects = Array(plan.objectFieldCount).fill(0);
-              try {
-                objects[head.index] = element.lower(
-                  values[i],
-                  `${label}[${i}]`,
-                  scratch,
-                );
-                objects[tail.index] = cursor;
-                cursor = 0;
-                cursor = scratch.createObjects(
-                  cons.tag,
-                  objects,
-                  `${label}[${i}]`,
-                );
-              } finally {
-                runtime.releaseOwnedObjects(objects);
-              }
-            }
-            const result = cursor;
-            cursor = 0;
-            return result;
-          } finally {
-            if (cursor !== 0) runtime.exports.vir_obj_dec(cursor);
-          }
-        };
-        codec.lift = (obj, label) =>
-          runtime.liftObjectConstructorList(
-            obj,
-            label,
-            (field, index) => element.lift(field, `${label}[${index}]`),
-            {
-              nilTag: nil.tag,
-              consTag: cons.tag,
-              headIndex: head.index,
-              tailIndex: tail.index,
-            },
-          );
-      } else {
-        const constructors = type.constructors.map((ctor) => ({
-          ctor,
-          layout: layoutCodec(ctor, scope, ctor.fields.length === 1),
-        }));
-        codec.lower = (value, label, scratch) => {
-          const { index, ctor, payload } = normalizeCustomInductive(
-            value,
-            type,
-            label,
-          );
-          return ctor.fields.length === 0
-            ? runtime.makeObjectScalar(index, label)
-            : constructors[index].layout.lower(index, payload, label, scratch);
+            for (let i = 0; i < value.length; i++) objects.push(element.lower(value[i], `${label}[${i}]`, scratch));
+            return runtime.makeObjectArrayFromOwnedElements(objects, label);
+          } finally { runtime.releaseOwnedObjects(objects); }
         };
         codec.lift = (obj, label) => {
-          const tag = runtime.exports.vir_obj_tag(obj),
-            ctor = customInductiveConstructorAt(type, tag, label);
-          return constructorValue(
-            type,
-            ctor,
-            ctor.fields.length === 0
-              ? null
-              : constructors[tag].layout.lift(obj, `${label}.${ctor.jsName}`),
-          );
+          const values = [], size = runtime.exports.vir_obj_array_size(obj);
+          for (let i = 0; i < size; i++) {
+            const child = runtime.exports.vir_obj_array_get(obj, i);
+            if (child === 0) throw new Error(`${label}[${i}] is unavailable`);
+            try { own(values, i, element.lift(child, `${label}[${i}]`)); }
+            finally { runtime.exports.vir_obj_dec(child); }
+          }
+          return values;
         };
+        break;
       }
+      const constructors = native.metadata?.constructors;
+      if (!["unit", "boolean", "enum", "sequence", "variant", "record"].includes(view.tag))
+        throw new Error(`unsupported object view ${view.tag}`);
+      if (constructors === undefined) throw new Error("structural codec requires constructor metadata");
+      const scope = [codec, ...bindings];
+      if (view.tag === "sequence") {
+        Object.assign(codec, compileChain(runtime, constructors, view, scope, compile));
+      } else if (view.tag === "variant") {
+        const shape = compileConstructorValueInterface(native, view);
+        const plans = constructors.map((ctor, index) => {
+          const entry = view.cases[index];
+          const mappings = entry.payload === "none" ? [] : entry.payload === "value"
+            ? [{ path: [0], value: entry.value }] : entry.fields;
+          return constructorKernel(runtime, ctor, mappings, scope, compile,
+            entry.payload === "value" ? () => value => value : key => value => value[key],
+            entry.payload === "value", shape.cases[index].wrap);
+        });
+        codec.lower = (value, label, scratch) => {
+          const index = shape.select(value, label);
+          const payload = shape.cases[index].read(value, label);
+          return plans[index].lower(index, payload, label, scratch);
+        };
+        codec.lift = (obj, label) => {
+          const index = runtime.exports.vir_obj_tag(obj);
+          if (!Number.isInteger(index) || index < 0 || index >= plans.length)
+            throw new Error(`${label} constructor is out of range`);
+          return plans[index].lift(obj, label);
+        };
+      } else if (view.tag === "record") {
+        if (constructors.length !== 1) throw new Error("record view requires one constructor");
+        const fieldKeys = view.fields.map(field => field.key);
+        if (fieldKeys.some(key => typeof key !== "string")) throw new Error("record keys must be strings");
+        const keys = new Set(fieldKeys);
+        const ctor = constructorKernel(runtime, constructors[0], view.fields, scope, compile,
+          key => value => value[key], false, value => value);
+        codec.lower = (value, label, scratch) => {
+          requireRecord(value, keys, label);
+          return ctor.lower(0, value, label, scratch);
+        };
+        codec.lift = (obj, label) => ctor.lift(obj, label);
+      } else throw new Error(`unsupported constructor view ${view.tag}`);
       break;
     }
-    default:
-      codec.lower = lowerPrimitive;
-      codec.lift = liftPrimitive;
-      break;
+    default: throw new Error(`unsupported native type ${type.tag}`);
   }
   return Object.freeze(codec);
+}
+
+function constructorKernel(runtime, ctor, mappings, scope, compile, reader, single, build) {
+  const groups = new Map();
+  for (const mapping of mappings) {
+    const index = mapping.path[0];
+    if (!Number.isInteger(index) || !ctor.fields[index]) throw new Error("unknown constructor field path");
+    let group = groups.get(index);
+    if (group === undefined) { group = []; groups.set(index, group); }
+    group.push(mapping);
+  }
+  if (groups.size !== ctor.fields.length) throw new Error("view must cover native fields");
+  const fields = ctor.fields.map((field, index) => {
+    const group = groups.get(index);
+    if (group.length === 1 && group[0].path.length === 1) {
+      const mapping = group[0];
+      return { field, codec: compile(field.type, mapping.value, scope),
+        read: reader(mapping.key), key: mapping.key, keys: [mapping.key], nested: false };
+    }
+    if (single || group.some(mapping => mapping.path.length === 1)) throw new Error("overlapping constructor field paths");
+    const nested = group.map(mapping => ({ ...mapping, path: mapping.path.slice(1) }));
+    return { field, codec: compile(field.type, { tag: "record", fields: nested }, scope),
+      read: value => Object.fromEntries(group.map(mapping => [mapping.key, reader(mapping.key)(value)])),
+      keys: group.map(mapping => mapping.key), nested: true };
+  });
+  // Prepare writable own fields once; __proto__ never invokes an inherited setter.
+  const outputTemplate = single ? null
+    : Object.freeze(Object.fromEntries(mappings.map(entry => [entry.key, undefined])));
+  function append(output, entry, value) {
+    if (entry.nested) for (const key of entry.keys) output[key] = value[key];
+    else output[entry.key] = value;
+  }
+  if (ctor.representation === "immediate") return {
+    lower: (index, _value, label) => runtime.makeObjectScalar(index, label),
+    lift: () => build(undefined),
+  };
+  if (ctor.representation === "identity") return {
+    lower: (_index, value, label, scratch) => fields[0].codec.lower(fields[0].read(value), label, scratch),
+    lift(obj, label) {
+      const value = fields[0].codec.lift(obj, label);
+      if (single) return build(value);
+      const output = { ...outputTemplate }; append(output, fields[0], value); return build(output);
+    },
+  };
+  const storage = ctor.storage, objectOnly = storage.usizeFieldCount === 0 && storage.scalarByteSize === 0;
+  // Physical slots are admitted facts. Bind the common small object layouts
+  // once instead of branching on every field's location at every value.
+  const objectFields = objectOnly ? [...fields].sort((a, b) => a.field.location.index - b.field.location.index) : null;
+  const lowerObjectField = (entry, value, label, scratch) => entry.codec.lower(
+    entry.read(value), `${label}.${entry.field.name}`, scratch);
+  let lowerObjects;
+  if (objectOnly && objectFields.length === storage.objectFieldCount) {
+    if (objectFields.length === 1) {
+      const first = objectFields[0];
+      lowerObjects = (index, value, label, scratch) => {
+        const objects = [0];
+        try {
+          objects[0] = lowerObjectField(first, value, label, scratch);
+          return scratch.createObjects(index, objects, label);
+        } finally { runtime.releaseOwnedObjects(objects); }
+      };
+    } else if (objectFields.length === 2) {
+      const [first, second] = objectFields;
+      lowerObjects = (index, value, label, scratch) => {
+        const objects = [0, 0];
+        try {
+          objects[0] = lowerObjectField(first, value, label, scratch);
+          objects[1] = lowerObjectField(second, value, label, scratch);
+          return scratch.createObjects(index, objects, label);
+        } finally { runtime.releaseOwnedObjects(objects); }
+      };
+    }
+  }
+  function liftField({ field, codec }, obj, label) {
+    const at = field.location;
+    if (at.tag === "object") {
+      const child = runtime.ownedObjectField(obj, at.index, label);
+      try { return codec.lift(child, label); }
+      finally { runtime.exports.vir_obj_dec(child); }
+    }
+    const ptr = runtime.exports.vir_obj_ctor_scalar_data(obj, at.tag === "usize" ? 0 : storage.usizeFieldCount);
+    if (ptr === 0) throw new Error(`${label} scalar field is unavailable`);
+    if (at.tag === "usize") return new DataView(runtime.exports.memory.buffer, ptr, storage.usizeFieldCount * 4).getUint32(at.index * 4, true);
+    return codec.scalar.read(new DataView(runtime.exports.memory.buffer, ptr, storage.scalarByteSize), at.offset, at.size, label);
+  }
+  let liftObjects;
+  if (lowerObjects !== undefined) {
+    // These readers contain the bound codec and physical slot, with no location
+    // interpretation in the hot path. Each acquired child is still released.
+    const readers = fields.map(entry => {
+      const { field, codec } = entry;
+      const index = field.location.index, name = field.name;
+      return { ...entry, lift(obj, label) {
+        const fieldLabel = `${label}.${name}`;
+        const child = runtime.ownedObjectField(obj, index, fieldLabel);
+        try { return codec.lift(child, fieldLabel); }
+        finally { runtime.exports.vir_obj_dec(child); }
+      } };
+    });
+    if (single) {
+      const first = readers[0];
+      liftObjects = (obj, label) => build(first.lift(obj, label));
+    } else if (readers.length === 1) {
+      const first = readers[0];
+      liftObjects = (obj, label) => {
+        const output = { ...outputTemplate };
+        append(output, first, first.lift(obj, label)); return build(output);
+      };
+    } else {
+      const [first, second] = readers;
+      liftObjects = (obj, label) => {
+        const output = { ...outputTemplate };
+        append(output, first, first.lift(obj, label));
+        append(output, second, second.lift(obj, label)); return build(output);
+      };
+    }
+  }
+  return {
+    lower: lowerObjects ?? ((index, value, label, scratch) => {
+      const objects = Array(storage.objectFieldCount).fill(0);
+      const usize = objectOnly ? null : Array(storage.usizeFieldCount).fill(0n);
+      const bytes = objectOnly ? null : new Uint8Array(storage.scalarByteSize);
+      const scalars = objectOnly ? null : new DataView(bytes.buffer);
+      try {
+        for (const entry of fields) {
+          const at = entry.field.location, child = entry.read(value);
+          const fieldLabel = `${label}.${entry.field.name}`;
+          if (at.tag === "object") objects[at.index] = entry.codec.lower(child, fieldLabel, scratch);
+          else if (at.tag === "usize") usize[at.index] = BigInt(normalizeInteger(child, fieldLabel, 0, 0xffffffff));
+          else entry.codec.scalar.write(scalars, at.offset, at.size, child, fieldLabel);
+        }
+        return objectOnly ? scratch.createObjects(index, objects, label)
+          : scratch.create(index, { objectFields: objects, usizeFields: usize, scalarBytes: bytes }, label);
+      } finally { runtime.releaseOwnedObjects(objects); }
+    }),
+    lift: liftObjects ?? (single ? (obj, label) => build(liftField(fields[0], obj, label))
+      : (obj, label) => {
+          const output = { ...outputTemplate };
+          for (const entry of fields)
+            append(output, entry, liftField(entry, obj, `${label}.${entry.field.name}`));
+          return build(output);
+        }),
+  };
+}
+
+function compileChain(runtime, constructors, view, scope, compile) {
+  const { nil, cons, head, tail } = view.chain ?? {};
+  const empty = constructors[nil], cell = constructors[cons];
+  if (constructors.length !== 2 || empty?.representation !== "immediate" || cell?.representation !== "object" ||
+      cell.fields.length !== 2 || head === tail || !cell.fields[head] || !cell.fields[tail] ||
+      !Object.hasOwn(cell.fields[tail].type, "ref") || cell.fields[tail].type.ref !== 0 ||
+      cell.storage.objectFieldCount !== 2 ||
+      cell.storage.usizeFieldCount !== 0 || cell.storage.scalarByteSize !== 0 ||
+      !cell.fields.every(field => field.location.tag === "object")) throw new Error("unsupported chain traversal");
+  const element = compile(cell.fields[head].type, view.element, scope);
+  const headIndex = cell.fields[head].location.index, tailIndex = cell.fields[tail].location.index;
+  return {
+    lower(value, label, scratch) {
+      requireArray(value, label);
+      let cursor = runtime.makeObjectScalar(nil, label);
+      try {
+        for (let i = value.length - 1; i >= 0; i--) {
+          const objects = [0, 0];
+          try {
+            objects[headIndex] = element.lower(value[i], `${label}[${i}]`, scratch);
+            objects[tailIndex] = cursor; cursor = 0;
+            cursor = scratch.createObjects(cons, objects, label);
+          } finally { runtime.releaseOwnedObjects(objects); }
+        }
+        const result = cursor; cursor = 0; return result;
+      } finally { if (cursor !== 0) runtime.exports.vir_obj_dec(cursor); }
+    },
+    lift: (obj, label) => runtime.liftObjectConstructorList(obj, label,
+      (child, index) => element.lift(child, `${label}[${index}]`),
+      { nilTag: nil, consTag: cons, headIndex, tailIndex }),
+  };
+}
+
+function requireArray(value, label) { if (!Array.isArray(value)) throw new Error(`${label} must be an array`); }
+function requireRecord(value, keys, label) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be a record`);
+  for (const key of Object.keys(value)) if (!keys.has(key)) throw new Error(`${label}.${key} is unexpected`);
+  for (const key of keys) if (!Object.hasOwn(value, key)) throw new Error(`${label}.${key} is missing`);
+}
+function own(target, key, value) {
+  Object.defineProperty(target, key, { value, writable: true, enumerable: true, configurable: true });
 }

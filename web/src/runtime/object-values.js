@@ -5,11 +5,9 @@ Author: Emilio J. Gallego Arias
 */
 
 import { interfaceEffectRuntimeTag } from "./interface-effects.js";
-import { INTERFACE_TAG } from "./interface-tags.js";
 import {
   objectArgumentSupported,
   objectResultSupported,
-  readObjectScalarField as readObjectScalarFieldValue,
 } from "./object-abi.js";
 import { normalizeArray } from "./vir-value-normalizers.js";
 import { ConstructorScratch } from "./constructor-scratch.js";
@@ -42,7 +40,8 @@ export function withObjectValues(Base) {
       this.requireLiveLeanObjectCell(cell, "callback");
       this.requireFunction("vir_closure_apply_objects");
       const type = cell.callType;
-      const fnArgs = type.args;
+      const signature = type.native.metadata.signature;
+      const fnArgs = signature.args;
       const argObjs = [];
       try {
         let argvPtr = 0;
@@ -52,12 +51,12 @@ export function withObjectValues(Base) {
           // undefined, and convert each declared argument normally.
           fnArgs.forEach((arg, index) => {
             argObjs.push(
-              this.makeObjectValue(arg.type, args[index], `callback argument ${arg.name}`),
+              this.makeObjectValue({ native: arg, value: type.value.args[index] }, args[index], `callback argument ${index + 1}`),
             );
           });
           if (this.hostState?.callError) throw this.hostState.callError;
           this.requireLiveLeanObjectCell(cell, "callback");
-          const effect = interfaceEffectRuntimeTag(type.effect);
+          const effect = interfaceEffectRuntimeTag(signature.effect);
           if (argObjs.length !== 0) {
             argvPtr = this.allocByteLength(
               argObjs.length * 4, "callback argv pointer array",
@@ -80,7 +79,7 @@ export function withObjectValues(Base) {
             throw new Error(this.lastClosureCallError() || "closure call failed");
           }
           return this.liftObjectValue(
-            type.result, resultObj, "callback result",
+            { native: signature.result, value: type.value.result }, resultObj, "callback result",
           );
         } finally {
           if (argvPtr !== 0) this.freeBytes(argvPtr);
@@ -913,38 +912,7 @@ export function withObjectValues(Base) {
       }
     }
 
-    readObjectUSizeField(owner, obj, index, label) {
-      this.requireWasm32USize();
-      const data = this.exports.vir_obj_ctor_scalar_data(obj, 0);
-      if (data === 0) {
-        throw new Error(
-          `${label} USize field ${owner.objectFieldCount + index} is unavailable`,
-        );
-      }
-      const fields = new DataView(
-        this.exports.memory.buffer,
-        data,
-        owner.usizeFieldCount * 4,
-      );
-      return fields.getUint32(index * 4, true);
-    }
 
-    readObjectScalarField(owner, obj, type, layout, label, offset = null) {
-      const data = this.exports.vir_obj_ctor_scalar_data(
-        obj,
-        owner.usizeFieldCount,
-      );
-      if (data === 0) {
-        throw new Error(`${label} scalar data is unavailable`);
-      }
-      return readObjectScalarFieldValue(
-        new DataView(this.exports.memory.buffer, data, owner.scalarByteSize),
-        type,
-        layout,
-        label,
-        offset,
-      );
-    }
   };
 }
 

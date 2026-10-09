@@ -10,7 +10,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { defaultValueForType } from "../../web/app/pages/interface-inputs.js";
 import { generateIrPackage } from "./shared.mjs";
 
@@ -69,7 +68,7 @@ try {
         assert.deepEqual(call("bundleIdentity", bundle), bundle);
         assert.equal(call("bundleObservation", bundle), 1104n);
         // Option fields follow the same required-field rule as other records.
-        assert.throws(() => call("bundleIdentity", { items: [], pair: { fst: none, snd: none } }), /missing field nested/);
+        assert.throws(() => call("bundleIdentity", { items: [], pair: { fst: none, snd: none } }), /argument value\.nested is missing/);
         assert.equal(runtime.failure, null);
         assert.deepEqual(call("bundleIdentity", bundle), bundle);
         for (const value of [tree, { kind: "next", value: none }, { kind: "next", value: some({ kind: "inr", value: false }) }]) {

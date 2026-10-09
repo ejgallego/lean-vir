@@ -512,12 +512,13 @@ use generated Lean `_boxed` declarations automatically.
 JavaScript number and preserve NaN, infinities, and signed zero across the
 opaque `Lean.Vir.Js Float` resource boundary.
 
-Nullary inductive enums use their generated JavaScript constructor name in both
-directions. For example, the Lean constructor `Example.Color.red` has the
-JavaScript value `"red"`. The manifest's required `jsName` field determines that
-spelling, also used for tagged-union and custom-inductive `kind` values.
-Constructor `name` identifies the Lean declaration and `tag` records its numeric
-ordinal; neither is a JavaScript value alias. See the
+Nullary inductive enums use the selected string spelling in both directions.
+For example, the Lean constructor `Example.Color.red` can have the JavaScript
+value `"red"`. The manifest's `value` interface lists enum spellings in native
+constructor order; tagged-union and custom-inductive `kind` strings are selected
+there as well. Constructor `name` identifies the Lean declaration, while its
+position in the native constructor table is the ordinal. Neither is a JavaScript
+value alias. See the
 [descriptor format](../reference/IRPKG_FORMAT.md#interface-descriptors).
 
 Options use `{ kind: "none" }` and `{ kind: "some", value }` in both directions,
@@ -534,7 +535,9 @@ See the [Option representation decision](../design/OPTION_VALUES.md).
 The optional converter compiles admitted compiler layouts into cached JavaScript
 codecs. Option uses the ordinary zero/one-field constructor codec and Prod uses
 the ordinary record codec. List has an iterative adapter over its generic nil/cons
-layout; these types have no dedicated interface descriptor tags. Recursive
+layout. These types use the same native `leanObject` tag as other Lean-owned
+objects; their constructor layouts and selected `variant`, `record`, or
+`sequence` views provide the structural conversion facts. Recursive descriptor
 references identify their lexical constructor scope, including through nested
 container owners. The managed foundation still owns calls and references.
 
@@ -619,9 +622,9 @@ identity contract; this restriction applies only to the specialized Expr and
 Level adapter.
 
 Package loading validates the embedded interface manifest before any generated
-entry is exposed. Malformed type trees, invalid structure layouts, unsupported
-interface descriptor tags, duplicate export names, and bad enum constructor
-metadata are reported as package-load errors.
+entry is exposed. Malformed native/value pairs, incompatible value mappings,
+invalid recursive references, incomplete field or constructor mappings, and
+duplicate export names are reported as package-load errors.
 
 ## Lean To JavaScript Host Imports
 

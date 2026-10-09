@@ -6,9 +6,16 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
 import { readRuntimeArtifacts } from "./shared.mjs";
+import {
+  immediateConstructor,
+  nativeField,
+  objectBoundary,
+  objectConstructor,
+  primitiveBoundary,
+  resourceBoundary,
+} from "../support/interface-fixtures.mjs";
 
 const { wasmBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 const runtime = await createVirRuntime({
@@ -16,45 +23,17 @@ const runtime = await createVirRuntime({
   irPackageSet: [defaultPackageBytes],
 });
 
-const resourceType = {
-  type: "Resource",
-  interfaceTag: INTERFACE_TAG.RESOURCE,
-  kind: "resource",
-  name: "Lean.Vir.Js",
-};
-const stringType = { type: "String", interfaceTag: INTERFACE_TAG.STRING };
-const optionResourceType = {
-  type: "Option Resource",
-  interfaceTag: INTERFACE_TAG.CUSTOM_INDUCTIVE,
-  kind: "customInductive",
-  name: "Option",
-  constructors: [
-    {
-      name: "Option.none",
-      jsName: "none",
-      tag: 0,
-      objectFieldCount: 0,
-      usizeFieldCount: 0,
-      scalarByteSize: 0,
-      fields: [],
-    },
-    {
-      name: "Option.some",
-      jsName: "some",
-      tag: 1,
-      objectFieldCount: 1,
-      usizeFieldCount: 0,
-      scalarByteSize: 0,
-      fields: [
-        {
-          name: "val",
-          type: resourceType,
-          layout: { kind: "object", index: 0 },
-        },
-      ],
-    },
-  ],
-};
+const resourceType = resourceBoundary();
+const stringType = primitiveBoundary("string", "string");
+const optionResourceType = objectBoundary("Option", [
+  immediateConstructor("Option.none"),
+  objectConstructor("Option.some", {
+    objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0,
+  }, [nativeField("val", resourceType.native, { tag: "object", index: 0 })]),
+], { tag: "variant", cases: [
+  { kind: "none", payload: "none" },
+  { kind: "some", payload: "value", value: resourceType.value },
+] });
 
 const rootCounts = () => runtime.hostState.resourceRootCounts();
 const initialRoots = rootCounts().active;

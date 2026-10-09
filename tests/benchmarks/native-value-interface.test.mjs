@@ -6,7 +6,8 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compileNativeValueInterface } from "../../benchmarks/harness/native-value-interface-prototype.mjs";
+import { compileNativeValueCodec } from "../../web/src/runtime/native-value-codecs.js";
+const compileNativeValueInterface = (runtime, native, value) => compileNativeValueCodec(runtime, { native, value });
 
 const nat = { type: { tag: "nat" } }, bigint = { tag: "bigint" };
 const objectType = (declaration, constructors) => ({
