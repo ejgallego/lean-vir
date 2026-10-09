@@ -7,7 +7,8 @@ Author: Emilio J. Gallego Arias
 module
 
 meta import Vir.Attributes
-public import Vir.Js.Json
+public import Lean.Data.Json
+public import Vir.Js
 public import Vir.Examples.Tamagotchi
 
 public section
@@ -63,12 +64,13 @@ private def decodeAction (text : String) : Except String Tamagotchi.Action :=
   | none => .error s!"unknown action {text}"
 
 @[vir_export]
-def fromJsonText (text : String) : IO (JSL Tamagotchi.PetState) :=
-  LeanRef.fromJsonText decodeState text
+def fromJsonText (text : String) : IO (JSL Tamagotchi.PetState) := do
+  let state ← orThrow (Json.parse text >>= decodeState)
+  RuntimeM.run (LeanRef.toJSL state)
 
 @[vir_export]
-def toJsonText (value : JSL Tamagotchi.PetState) : IO String :=
-  LeanRef.toJsonText encodeState value
+def toJsonText (value : JSL Tamagotchi.PetState) : IO String := RuntimeM.run do
+  return (encodeState (← LeanRef.fromJSL value)).compress
 
 @[vir_export]
 def create (name artwork : String) : RuntimeM (JSL Tamagotchi.PetState) :=

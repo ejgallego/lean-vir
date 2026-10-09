@@ -7,7 +7,8 @@ Author: Emilio J. Gallego Arias
 module
 
 meta import Vir.Attributes
-public import Vir.Js.Json
+public import Lean.Data.Json
+public import Vir.Js
 
 public section
 
@@ -67,12 +68,13 @@ private def orThrow (result : Except String α) : IO α :=
   | .error message => throw (IO.userError message)
 
 @[vir_export]
-def fromJsonText (text : String) : IO (JSL Model) :=
-  LeanRef.fromJsonText decodeModel text
+def fromJsonText (text : String) : IO (JSL Model) := do
+  let model ← orThrow (Json.parse text >>= decodeModel)
+  RuntimeM.run (LeanRef.toJSL model)
 
 @[vir_export]
-def toJsonText (value : JSL Model) : IO String :=
-  LeanRef.toJsonText encodeModel value
+def toJsonText (value : JSL Model) : IO String := RuntimeM.run do
+  return (encodeModel (← LeanRef.fromJSL value)).compress
 
 @[vir_export]
 def advance (value : JSL Model) (delta : Nat) : RuntimeM (JSL Model) := do
@@ -136,12 +138,13 @@ def standardDecodeNat (text : String) : IO Nat :=
   orThrow (Json.parse text >>= fromJson? (α := Nat))
 
 @[vir_export]
-def standardFromJsonText (text : String) : IO (JSL Nat) :=
-  LeanRef.fromJsonText (fromJson? (α := Nat)) text
+def standardFromJsonText (text : String) : IO (JSL Nat) := do
+  let value ← orThrow (Json.parse text >>= fromJson? (α := Nat))
+  RuntimeM.run (LeanRef.toJSL value)
 
 @[vir_export]
-def standardToJsonText (value : JSL Nat) : IO String :=
-  LeanRef.toJsonText toJson value
+def standardToJsonText (value : JSL Nat) : IO String := RuntimeM.run do
+  return (toJson (← LeanRef.fromJSL value)).compress
 
 @[vir_export]
 def standardValue (value : JSL Nat) : RuntimeM Nat :=

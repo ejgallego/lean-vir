@@ -57,7 +57,3 @@ Generated JSON converters, explicitly invoked by applications in both directions
 are a planned 0.1.1 deliverable. They are not yet a qualified release feature.
 Existing automatic value conversion is not that API; basic calls and Js/JSL
 reference interop do not require JSON.
-
-Applications can already supply their own JSON converters through the optional
-[`Vir.Js.Json` helpers](guides/EXPLICIT_JSON_CODECS.md). Those helpers use existing
-calls and opaque references; they do not generate or choose an encoding.

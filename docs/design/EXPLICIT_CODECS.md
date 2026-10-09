@@ -1,9 +1,7 @@
 # Lossless explicit codecs
 
-This is a design proposal for the [planned generated JSON converters](../SUPPORT.md#planned-for-011)
-and their lossless representations. Applications can use the implemented
-[explicit JSON helpers](../guides/EXPLICIT_JSON_CODECS.md) with their own codecs;
-the candidate encodings below do not change current automatic conversion.
+This is a design proposal for the [planned generated JSON converters](../SUPPORT.md#planned-for-011),
+not an implemented API or a change to current automatic conversion.
 
 ## Why a separate contract is needed
 
@@ -73,6 +71,13 @@ support must explicitly address nonfinite values and negative zero; unsupported
 domains, cycles, indexed types and functions need clear limitations.
 
 ## Qualification and migration
+
+The [custom-codec regression](../../fixtures/runtime/JsonCodecs.lean) exercises
+tagged options, unit presence and exact integer encodings through existing calls
+and opaque references. The [Tamagotchi regression](../../fixtures/runtime/TamagotchiCodecs.lean)
+saves and restores the existing application model across runtime disposal, then
+continues its normal transitions. Their converters stay in the fixtures; these
+cases qualify the chosen representations and lifetimes, not a general codec API.
 
 Use compiler-produced types, public calls and independent Lean-side observations
 of constructors and fields. Include nested options, Option Unit, options inside

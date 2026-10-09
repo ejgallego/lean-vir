@@ -37,9 +37,8 @@ Automatic array conversion is supported when the element representation is
 supported, for example `Array Nat`. Automatic conversion of records and custom
 inductives remains experimental; see the
 [implemented call representations](JS_API.md#calls-and-manifest).
-For explicitly requested JSON text, supply an encoder/decoder through the optional
-[JSON helpers](EXPLICIT_JSON_CODECS.md). Generated codecs remain separate
-[planned 0.1.1 work](../SUPPORT.md#planned-for-011).
+Explicit host-value conversions and opaque carriers do not encode JSON. The
+[planned 0.1.1 JSON converters](../SUPPORT.md#planned-for-011) are a separate API.
 
 Passing a DOM or React value through `Js` uses core reference interop; the DOM or
 React operation itself remains experimental. Choose focused imports below when
@@ -52,7 +51,6 @@ useful; the umbrella import is a convenience, not a support classification.
 | `Vir` | Convenience umbrella for core interop, package markers and experimental browser/React/ProofWidgets helpers. |
 | `Vir.Runtime` | `RuntimeM` and Lean-owned mutable `RuntimeRef` cells. |
 | `Vir.Js` | Exact JavaScript values, collections, functions, Promises and explicit conversions. |
-| `Vir.Js.Json` | Explicit JSON text ↔ opaque Lean values using application-supplied codecs. |
 | `Vir.Browser` | Experimental DOM receivers, events, timers, animation and canvas. |
 | `Vir.React.Core` | Experimental native React nodes, roots, components and hooks. |
 | `Vir.React` | Convenience import for experimental native React bindings. |
