@@ -54,6 +54,28 @@ assert.match(run(["lake", "env", "lean", visibility], "codec-private-json", 1),
 writeFileSync(visibility, "module\npublic meta import Vir.Compiler.Interface.Encode\n" +
   "public meta import Vir.Package.Json\n#check Vir.GeneratePackage.jsonString\n");
 run(["lake", "env", "lean", visibility], "codec-explicit-json");
+// Check the public surface independently: expected failures must not mask it.
+const classifierVisibility = join(client, "ClassifierVisibility.lean");
+const classifierImport = "module\npublic meta import Vir.Compiler.Interface.Classify.Signature\n";
+writeFileSync(classifierVisibility, classifierImport +
+  "#check Vir.Interface.interfaceType\n#check Vir.Interface.analyzeExportInterface\n" +
+  "#check Vir.Interface.classifyExportSignature\n#check Vir.Interface.classifyHostImportSignature\n");
+run(["lake", "env", "lean", classifierVisibility], "classifier-public-api");
+const privateTraversalHelpers = ["RecursiveSeen", "recursiveVisit", "functionType", "inductiveType",
+  "structureType", "taggedUnionType", "classifyType"];
+const nonReexportedReductionHelpers = ["reduceTypeAliases", "effectResult?"];
+const hiddenFromSignature = [...privateTraversalHelpers, ...nonReexportedReductionHelpers];
+writeFileSync(classifierVisibility, classifierImport + hiddenFromSignature.map(
+  (name) => `#check Vir.Interface.${name}\n`).join(""));
+const classifierVisibilityOutput = run(["lake", "env", "lean", classifierVisibility], "classifier-hidden-helpers", 1);
+for (const name of hiddenFromSignature) {
+  assert.ok(classifierVisibilityOutput.includes(`Unknown identifier \`Vir.Interface.${name}\``),
+    `classifier helper ${name} must not be exposed by Signature`);
+}
+// Reduction is a low-level module, not private declarations in Core.
+writeFileSync(classifierVisibility, "module\npublic meta import Vir.Compiler.Interface.Classify.Reduce\n" +
+  nonReexportedReductionHelpers.map((name) => `#check Vir.Interface.${name}\n`).join(""));
+run(["lake", "env", "lean", classifierVisibility], "classifier-direct-reduction-import");
 const modules = ["Vir", ...readdirSync(join(producer, "Vir"), { recursive: true })
   .filter((path) => path.endsWith(".lean"))
   .map((path) => "Vir." + path.slice(0, -5).replaceAll("/", ".").replaceAll("\\", "."))];

@@ -159,15 +159,37 @@ to an earlier VIR revision can continue using that revision's imports.
 `Expr.consumeMData` directly. Likewise, classifier callers can use
 `e.consumeMData.constName?` instead of the removed `Vir.Interface.constName?`.
 
-Low-level classifier helpers no longer accept separate argument/field ordinal
-counters: fallback names follow the accumulated argument or field order.
-`functionType` now takes an optional recursion context before its accumulated
-arguments. Classification retains the enclosing recursion context and rejects
-callbacks that refer back to that enclosing owner: closure invocation cannot
-carry it. A complete recursive result descriptor establishes its own owner and
-remains supported. Exhaustive error matches should handle the new
-`InterfaceClassifierError.recursiveCallback owner` case. Use `interfaceType`
-for ordinary complete type classification.
+Use `interfaceType` to classify a complete type, `analyzeExportInterface` for a
+complete export declaration, or `classifyHostImportSignature` for a host import.
+`classifyExportSignature` accepts a signature already checked by marker preflight.
+Classification returns typed errors with argument, field and container context;
+JSON encoding remains a separate pure operation.
+
+Recursion stacks and intermediate classifiers are private. `interfaceType` always
+starts a fresh context; internal recursive calls must pass their branch-local
+context explicitly. The retired `RecursiveSeen`, `recursiveVisit`, `functionType`,
+`inductiveType`, `structureType` and `taggedUnionType` helpers are not public APIs.
+
+Classifier recursion keys are fully applied Lean expressions compared with
+`ExprStructEq`. Outer metadata is stripped; binder names and annotations, nested
+metadata and universe levels participate in structural equality. No alpha or
+definitional equality is added. Constructors and projections substitute the
+applied type's declaration universe parameters before classifying their fields.
+Different applications of an already visited recursive type remain nonuniform,
+and earlier stack matches remain mutual-recursion errors.
+
+Callbacks referring back to their enclosing aggregate owner remain unsupported:
+closure invocation cannot carry that owner. A complete recursive result descriptor
+establishes its own owner and remains supported. Exhaustive error matches should
+handle `InterfaceClassifierError.recursiveCallback owner`.
+
+The classifier's bounded head-reduction policy lives in `Classify.Reduce` and is
+a low-level implementation module. Its helpers are not re-exported by `Core` or
+`Signature`, but are callable through an explicit `Classify.Reduce` import; this
+is separate from the private traversal declarations. It preserves recognized
+interface heads and does not perform general definitional reduction. Ordinary
+callers do not need reduction helpers or recursion contexts; encoded descriptors
+are unchanged.
 
 ## Regression example
 
