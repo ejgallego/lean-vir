@@ -248,14 +248,14 @@ try {
       const remounted = await createProgram(options); values.push(remounted.call(score)); remounted.dispose();
       globalThis.openResourceProgram = (extra = {}) => createProgram({...options, ...extra});
       return {correctValues: values.map(value => value === 6093n), unknown, disposed,
-        loaderName: createProgram.name};
+        loaderCallable: typeof createProgram === 'function'};
     })()`,
     );
     assert.deepEqual(result, {
       correctValues: [true, true, true, true],
       unknown: true,
       disposed: true,
-      loaderName: "createProgram",
+      loaderCallable: true,
     });
     outcomes.push(
       `${prefix}: JavaScript MIME alias, full-name call, independent instance, disposal, remount PASS`,
@@ -264,7 +264,7 @@ try {
   assert.equal(requests.some((path) => noticePaths.some((notice) =>
     path === `/${notice}` || path === `/talk/nested/${notice}`)), false);
   override = null;
-  outcomes.push("minimized runtime: diagnostic name retained, no notice startup requests PASS");
+  outcomes.push("minimized runtime: callable export retained, no notice startup requests PASS");
   const browserVersion = await cdp.send("Browser.getVersion");
   await measureResourceRetention(cdp, async (observations) => {
     await writeFile(join(output, "retention.json"), JSON.stringify({

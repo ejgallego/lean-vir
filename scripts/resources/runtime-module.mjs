@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import * as esbuild from "esbuild";
 
 // One release bundle operation for the packer and its real browser regression.
-// Preserve diagnostic names and legal comments; never mangle public properties.
+// Preserve legal comments and public properties; internal names may be minimized.
 export async function buildRuntimeModule(root) {
   const compiled = await esbuild.build({
     absWorkingDir: root,
@@ -17,7 +17,6 @@ export async function buildRuntimeModule(root) {
     platform: "browser",
     target: "es2022",
     minify: true,
-    keepNames: true,
     write: false,
     metafile: true,
     legalComments: "inline",

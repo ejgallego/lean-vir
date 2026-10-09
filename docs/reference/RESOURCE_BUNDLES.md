@@ -347,8 +347,8 @@ pack without overwriting it; maintainers select a verified public asset in
 durable consumer source, and a new producer commit does not silently change
 the runtime selected by applications.
 
-It minimizes the JS import closure while preserving diagnostic names and legal
-comments, bundles Wasm and notices, verifies the compiler/profile
+It minimizes the JS import closure while preserving legal comments and public
+properties, bundles Wasm and notices, verifies the compiler/profile
 metadata and emits a native-validated pack plus provenance. Qualification of the
 supplied Wasm remains the maintainer's responsibility. This command is never
 called by an application's build or renderer.
