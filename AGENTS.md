@@ -50,7 +50,6 @@ larger harness machinery out unless the maintainer requests them.
 - Use ordinary `git` commands in this checkout.
 - Prefer one linked worktree per implementation task under `.worktrees/<slug>`.
 - Keep the root checkout as the stable base for multi-step work when possible.
-- Do not push branches unless the user explicitly asks.
 - Branch names should usually be `feat/<slug>`, `fix/<slug>`,
   `docs/<slug>`, `chore/<slug>`, or local-only `wip/<slug>`.
 - Commit subjects should be concise and behavior-oriented, preferably
@@ -148,6 +147,12 @@ larger harness machinery out unless the maintainer requests them.
 
 ## Pull Requests
 
+- Publish branches only when the maintainer requests a PR, publication or landing.
+- Land repository changes through a PR, including documentation-only changes
+  and maintenance fixes. Direct pushes to `main` or a maintenance branch require
+  an explicit maintainer exception. Follow
+  [landing and completion](CONTRIBUTING.md#landing-and-completion) for authorization,
+  checks and completion evidence.
 - Use `scripts/pr-message.sh` before opening or editing a PR description.
 - Keep PR titles and bodies suitable as the final squash commit message.
 - Start public PR bodies with `This PR ...`.
