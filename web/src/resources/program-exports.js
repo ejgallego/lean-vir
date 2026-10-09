@@ -28,8 +28,8 @@ export function snapshotExpectedExports(value) {
   return expected;
 }
 
-// Only the root member supplies callable entries; convenience aliases such as
-// The full Lean entry is the sole public call key; nameKey preserves native identity.
+// Only the root member supplies callable entries, keyed by full Lean name.
+// nameKey preserves native identity.
 export function resolveProgramExports(rootExports, expected = new Map()) {
   const declarations = new Map();
   for (const entry of rootExports) {
