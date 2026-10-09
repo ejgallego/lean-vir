@@ -35,6 +35,12 @@ not choose a nullable representation based on the surrounding type or payload.
 
 ## Proposed first boundary
 
+Keep ordinary interop on the existing value/object codecs and exact `Js`/opaque
+`JSL` reference paths. Restrict JSON conversion to an application requirement for
+JSON text, such as an external protocol or an existing persisted format. It adds
+JSON construction/parsing and string allocation; the correctness cases below do
+not measure that cost or recommend JSON as the normal call transport.
+
 Use explicitly invoked, concrete Lean converters between JSON text and a typed
 opaque `JSL` value. Applications can transform that value in Lean and invoke
 the encoder when they want JSON. Thin opted-in wrappers or generated entrypoints
@@ -71,6 +77,13 @@ support must explicitly address nonfinite values and negative zero; unsupported
 domains, cycles, indexed types and functions need clear limitations.
 
 ## Qualification and migration
+
+The [custom-codec regression](../../fixtures/runtime/JsonCodecs.lean) exercises
+tagged options, unit presence and exact integer encodings through existing calls
+and opaque references. The [Tamagotchi regression](../../fixtures/runtime/TamagotchiCodecs.lean)
+saves and restores the existing application model across runtime disposal, then
+continues its normal transitions. Their converters stay in the fixtures; these
+cases qualify the chosen representations and lifetimes, not a general codec API.
 
 Use compiler-produced types, public calls and independent Lean-side observations
 of constructors and fields. Include nested options, Option Unit, options inside
