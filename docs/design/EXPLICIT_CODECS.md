@@ -1,7 +1,9 @@
 # Lossless explicit codecs
 
-This is a design proposal for the [planned generated JSON converters](../SUPPORT.md#planned-for-011),
-not an implemented API or a change to current automatic conversion.
+This is a design proposal for the [planned generated JSON converters](../SUPPORT.md#planned-for-011)
+and their lossless representations. Applications can use the implemented
+[explicit JSON helpers](../guides/EXPLICIT_JSON_CODECS.md) with their own codecs;
+the candidate encodings below do not change current automatic conversion.
 
 ## Why a separate contract is needed
 
