@@ -31,6 +31,7 @@ if (!source)
     "usage: node tests/resources/client.mjs EXACT_RUNTIME_PACK | --published",
   );
 const published = source === "--published";
+mkdirSync(join(sourceRoot, "build"), { recursive: true });
 const evidence = mkdtempSync(join(sourceRoot, "build/resource-client-"));
 console.log(`resource client evidence: ${evidence}`);
 let root = sourceRoot;
@@ -138,23 +139,15 @@ if (published) {
   assert.ok(!existsSync(join(evidence, "absent-cache.virres")));
   assert.ok(!existsSync(join(evidence, "absent-stage.virres")));
 }
-const programStage = join(client, "resources/.vir-generated/ClientResources.virres");
-const carrierInput = join(client, "resources/.vir-generated/inputs/Client/Resources.path");
+const programStage = join(client, "build with spaces/lib/lean/vir-assets/Client/Program.virres");
 const programFirst = readFileSync(programStage);
-assert.equal(readFileSync(carrierInput, "utf8"), programStage);
 const clientConfig = join(client, "lakefile.lean");
 const originalConfig = readFileSync(clientConfig, "utf8");
 for (const [label, change, diagnostic] of [
-  ["missing-selection", text => replaceFixture(text, "`+Client.Program, ", ""),
-    /exactly one program module key/],
-  ["duplicate-selection", text => replaceFixture(text, "`+Client.Program, ",
-    "`+Client.Program, `+Client.Alternative, "),
-    /exactly one program module key/],
-  ["foreign-module", text => replaceFixture(text, "`+Client.Program, ", "`+Vir.Attributes, "),
-    /not Lake-registered in/],
-  ["foreign-package", text => replaceFixture(text, "`+Client.Program, ", "`@lean_vir/+Vir.Attributes, "),
-    /must belong to/],
-  ["carrier-as-root", text => replaceFixture(text, "`+Client.Program, ", "`+Client.Resources, "),
+  ["unknown-module", text => replaceFixture(text, "`+Client.Program:virResourcePack",
+    "`+Client.Absent:virResourcePack"), /module 'Client.Absent' not found/],
+  ["carrier-as-root", text => replaceFixture(text, "`+Client.Program:virResourcePack",
+    "`+Client.Resources:virResourcePack"),
     /VIR resource cycle/],
 ]) {
   writeFileSync(clientConfig, change(originalConfig));
@@ -163,13 +156,13 @@ for (const [label, change, diagnostic] of [
 }
 writeFileSync(clientConfig, originalConfig);
 writeFileSync(clientConfig, replaceFixture(originalConfig,
-  "`+Client.Program, ", "`@client_fixture/+Client.Program, "));
+  "`+Client.Program:virResourcePack", "`@client_fixture/+Client.Program:virResourcePack"));
 build("qualified-selection");
 assert.deepEqual(readFileSync(programStage), programFirst);
 writeFileSync(clientConfig, originalConfig);
-const first = [snapshot(programStage), snapshot(runtimeStage), snapshot(carrierInput)];
+const first = [snapshot(programStage), snapshot(runtimeStage)];
 build("warm");
-assert.deepEqual([snapshot(programStage), snapshot(runtimeStage), snapshot(carrierInput)], first);
+assert.deepEqual([snapshot(programStage), snapshot(runtimeStage)], first);
 assert.doesNotMatch(
   readFileSync(join(evidence, "warm.log"), "utf8"),
   /Built.*(?:Client|Main|Runtime)/,
@@ -180,10 +173,34 @@ assert.deepEqual(readFileSync(programStage), programFirst);
 writeFileSync(programStage, "corrupt staged pack");
 build("repair-corrupt-stage");
 assert.deepEqual(readFileSync(programStage), programFirst);
-unlinkSync(carrierInput);
-build("repair-context-input");
-assert.equal(readFileSync(carrierInput, "utf8"), programStage);
+// The include consumes precisely its literal module list, not a carrier-name
+// map or a second pass over configuration. A missing prepared root is explicit.
+const carrierSource = join(client, "resources/Client/Resources.lean");
+const originalCarrier = readFileSync(carrierSource, "utf8");
+writeFileSync(carrierSource, replaceFixture(originalCarrier, "#[Client.Program]",
+  "#[Client.Alternative]"));
+run(leaf, "unprepared-include", "lake", ["build", "generate-site"],
+  /VIR_RESOURCE_NOT_PREPARED.*Client.Alternative/s);
 assert.deepEqual(readFileSync(programStage), programFirst);
+writeFileSync(carrierSource, originalCarrier);
+build("include-restored");
+
+// Multiple roots are an ordered literal list, not an ambiguous carrier mapping.
+writeFileSync(clientConfig, replaceFixture(originalConfig,
+  "`+Client.Program:virResourcePack",
+  "`+Client.Alternative:virResourcePack, `+Client.Program:virResourcePack"));
+writeFileSync(carrierSource, replaceFixture(originalCarrier, "#[Client.Program]",
+  "#[Client.Alternative, Client.Program]"));
+run(leaf, "two-roots", "lake", ["exe", "generate-site", join(evidence, "two-root-site")]);
+assert.equal(readdirSync(join(evidence, "two-root-site")).length, 3);
+writeFileSync(join(client, "Order.lean"), `import Client.Resources
+#eval IO.println (reprStr (Client.Resources.resources.programs.map (·.descriptor.logicalId)))
+`);
+assert.match(run(client, "literal-order", "lake", ["env", "lean", "Order.lean"]),
+  /Client.Alternative.*Client.Program/s);
+writeFileSync(clientConfig, originalConfig);
+writeFileSync(carrierSource, originalCarrier);
+build("two-roots-restored");
 
 const programSource = join(client, "program/Client/Program.lean");
 const initialSource = readFileSync(programSource, "utf8");
@@ -217,7 +234,7 @@ writeFileSync(programSource, initialSource);
 build("restored");
 
 // Native publication now needs only compiled/link prerequisites, not raw packs.
-renameSync(programStage, join(client, "resources/.vir-generated/retained.virres"));
+renameSync(programStage, `${programStage}.retained`);
 const destination = join(evidence, "relocated-site");
 run(
   "/tmp",

@@ -40,7 +40,7 @@ lean_lib ClientProgram where
 
 lean_lib ClientResources where
   roots := #[`Client.Resources]
-  needs := #[`+Client.Program, `@greeting_app/ClientResources:virResourcePack]
+  needs := #[`+Client.Program:virResourcePack]
 ```
 
 Replace `VIR_REVISION` with the selected source revision. Existing application
@@ -48,10 +48,9 @@ and asset libraries can own these modules; no wrapper library is required.
 Keep their ownership disjoint: a later broad `Client` library root would also
 claim both modules. The program must not import its own resource carrier.
 
-The bare `+Client.Program` key is the one program selection. In stock Lake it
-returns the registered Module, not a compilation facet; `virResourcePack` checks
-the graph and prepares the program before the resource library compiles.
-There is no registration table, JSON recipe or extra helper import.
+The `+Client.Program:virResourcePack` prerequisite checks the graph and prepares
+the program before the asset library compiles. There is no registration table,
+JSON recipe or carrier-library key.
 
 ## 2. Embed it in the library
 
@@ -59,34 +58,32 @@ In `Client/Resources.lean` (or the existing asset module):
 
 ```lean
 module
-public import Vir.Resources.Embed
+public import Vir.Resources.Assets
 
-public def Client.Resources.bundle : Vir.Resources.Bundle :=
-  include_vir_program
+public def Client.Resources.resources : Vir.Resources.ResourceSet :=
+  include_vir_assets (modules := #[Client.Program])
 ```
 
-Inclusion takes no library-name or path argument. It reads the input prepared
-for this module, using the same decoder as explicit bundle inclusion. It does
-not download resources or launch a build. Custom source/build directories and
-quoted module names do not require a different recipe.
+The list contains exact, fully qualified Lean module names, as in imports.
+Lake declares what must be built; the include declares what is used.
+`Vir.Resources.Assets` supplies the macro and the library-owned runtime.
+Inclusion reads prepared bytes through the shared decoder; it never downloads
+or builds. Custom source/build directories and quoted module names require no
+generated-path changes.
 
 Keep the preparation prerequisite configured. Inclusion reads prepared input;
 it does not inspect Lake configuration or detect later removal of that prerequisite.
 
 ## 3. Publish through the existing asset writer
 
-The native application imports the carrier and the precompiled runtime carrier:
+The native application imports the library's resource set:
 
 ```lean
 import Client.Resources
 import Vir.Resources
-import Vir.Resources.Runtime
 
 def writeVirAssets (directory : System.FilePath) : IO Vir.Resources.SiteFiles := do
-  let resources : Vir.Resources.ResourceSet := {
-    runtime := Vir.Resources.Runtime.bundle
-    programs := #[Client.Resources.bundle] }
-  let site ← IO.ofExcept <| (resources.forSite "lib/vir").mapError reprStr
+  let site ← IO.ofExcept <| (Client.Resources.resources.forSite "lib/vir").mapError reprStr
   for file in site.files do
     let path := directory / file.path
     IO.FS.createDirAll (path.parent.getD directory)

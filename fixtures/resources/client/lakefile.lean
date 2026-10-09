@@ -16,7 +16,7 @@ lean_lib ClientResources where
   srcDir := "resources"
   roots := #[]
   globs := #[.one `Client.Resources]
-  needs := #[`+Client.Program, `@client_fixture/ClientResources:virResourcePack]
+  needs := #[`+Client.Program:virResourcePack]
 
 lean_lib Client where
   roots := #[]

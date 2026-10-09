@@ -311,31 +311,28 @@ lean_lib ClientResources where
   srcDir := "resources"
   roots := #[]
   globs := #[.one `Client.Resources]
-  needs := #[`+Client.Program, `@client_fixture/ClientResources:virResourcePack]
+  needs := #[`+Client.Program:virResourcePack]
 ```
 
-The one bare Module key in `needs` is the selection connection. Stock Lake returns
-its typed registered Module without starting a compilation facet; the resource
-facet checks the graph before fetching the canonical compiled program.
-One registered root per owning library; no registration target, helper import,
+The ordinary module facet in `needs` is the preparation prerequisite. It checks
+the source import graph before fetching the canonical compiled program.
+No registration target, helper import,
 handwritten recipe, alias, logical ID,
 interface ID or export list. Logical identity is the selected module's name.
 The canonical root `vir_export ∪ vir_startup` inventory supplies callable names;
 imported markers do not become root entrypoints. Startup hooks are callable but
 not automatically executed.
 
-The facet stages `.vir-generated/ClientResources.virres` under the owning
-library's `srcDir` (here `resources`). `resources/Client/Resources.lean` embeds it
-with `include_vir_program`, using the module-specific private locator prepared by
-the facet. Lake's source-only library module collection supplies those contexts;
-this works for local imported carrier modules, not only library roots. The include
-strips the complete canonical module suffix from the actual
-source filename to derive that same source root; mismatches reject without an
-ancestor search, working-directory guess or alternate-path fallback.
+The facet materializes its actual Lake-returned artifact as a private input under
+the producer's configured `leanLibDir`. `resources/Client/Resources.lean` imports
+`Vir.Resources.Assets` and uses `include_vir_assets (modules := #[Client.Program])`.
+The include finds complete semantic module paths on Lean's ordinary search path;
+no carrier key, source-root inference, printed-name splitting or caller-cwd lookup.
 The library's ordinary prerequisite owns preparation and tracing. Explicit
 source-relative `include_vir_bundle` remains a low-level prepared-input tool,
-not another application setup workflow. An umbrella
-client module constructs a `ResourceSet` from that bundle and `Runtime.bundle`.
+not another application setup workflow. The high-level include returns the existing
+`ResourceSet` with `Runtime.bundle` and programs in literal-list order; an umbrella
+client module exposes it to the application.
 The leaf depends only on the client and runs its normal native generator.
 
 Keep carrier and program ownership disjoint: broad overlapping library globs
