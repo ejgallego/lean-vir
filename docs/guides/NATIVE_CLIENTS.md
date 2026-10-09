@@ -184,9 +184,12 @@ establishes its own owner and remains supported. Exhaustive error matches should
 handle `InterfaceClassifierError.recursiveCallback owner`.
 
 The classifier's bounded head-reduction policy lives in `Classify.Reduce` and is
-an implementation detail. It preserves recognized interface heads and does not
-perform general definitional reduction. Ordinary callers do not need reduction
-helpers or recursion contexts; encoded descriptors are unchanged.
+a low-level implementation module. Its helpers are not re-exported by `Core` or
+`Signature`, but are callable through an explicit `Classify.Reduce` import; this
+is separate from the private traversal declarations. It preserves recognized
+interface heads and does not perform general definitional reduction. Ordinary
+callers do not need reduction helpers or recursion contexts; encoded descriptors
+are unchanged.
 
 ## Regression example
 

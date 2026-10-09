@@ -25,26 +25,25 @@ outer metadata. Lean's structural equality includes binder names/annotations,
 nested metadata and universe levels; no alpha or definitional reduction is used. -/
 private abbrev RecursiveSeen := Array ExprStructEq
 
-private inductive RecursiveVisit where
+private inductive RecursiveStep where
   | selfReference
   | descend (nextSeen : RecursiveSeen)
-  | error (error : InterfaceClassifierError)
 
 private def recursiveVisit
     (seen : RecursiveSeen) (kind : InterfaceAggregateKind) (type : Lean.Expr)
     (isRec : Bool) :
-    RecursiveVisit :=
+    Except InterfaceClassifierError RecursiveStep :=
   let key : ExprStructEq := ⟨type.consumeMData⟩
   let name := key.val.getAppFn.constName
   if seen.contains key then
     if seen.back? == some key then
-      .selfReference
+      .ok .selfReference
     else
       .error (.mutuallyRecursive kind name)
   else if isRec && seen.any (fun key => key.val.getAppFn.constName == name) then
     .error (.nonUniformRecursive kind name)
   else
-    .descend (seen.push key)
+    .ok (.descend (seen.push key))
 
 private abbrev ClassifyM := ExceptT InterfaceClassifierError CoreM
 
@@ -74,9 +73,10 @@ private partial def enclosingRecursiveOwner? : InterfaceType → Option Name
       args.findSome? (fun arg => enclosingRecursiveOwner? arg.type) <|> enclosingRecursiveOwner? result
   | _ => none
 
-private partial def constructorFieldTypes? (type : Lean.Expr) : Option (Array (String × Lean.Expr)) :=
+private def constructorFieldTypes? (type : Lean.Expr) : Option (Array (String × Lean.Expr)) :=
   let rec go (type : Lean.Expr) (fields : Array (String × Lean.Expr)) : Option (Array (String × Lean.Expr)) :=
-    match type.consumeMData with
+    match type with
+    | .mdata _ body => go body fields
     | .forallE name domain body binderInfo =>
         if binderInfo != .default then
           none
@@ -141,11 +141,9 @@ private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
   let env ← getEnv
   let some (.inductInfo indInfo) := env.find? name
     | throwThe InterfaceClassifierError (.unsupportedType e)
-  match recursiveVisit seenTypes .inductive e indInfo.isRec with
+  match ← liftM (recursiveVisit seenTypes .inductive e indInfo.isRec) with
   | .selfReference =>
       return (.recursiveSelf name (exprTypeLabel e))
-  | .error error =>
-      throwThe InterfaceClassifierError error
   | .descend nextSeen =>
     if indInfo.numIndices != 0 then
       throwThe InterfaceClassifierError (.indexedInductive name)
@@ -195,11 +193,9 @@ private partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
     | throwThe InterfaceClassifierError (.unsupportedType e)
   let some structInfo := getStructureInfo? env name
     | throwThe InterfaceClassifierError (.unsupportedType e)
-  match recursiveVisit seenTypes .structure e indInfo.isRec with
+  match ← liftM (recursiveVisit seenTypes .structure e indInfo.isRec) with
   | .selfReference =>
       return (.recursiveSelf name (exprTypeLabel e))
-  | .error error =>
-      throwThe InterfaceClassifierError error
   | .descend nextSeen =>
     if indInfo.numIndices != 0 then
       throwThe InterfaceClassifierError (.indexedStructure name)
