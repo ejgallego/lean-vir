@@ -42,6 +42,7 @@ The cold native-client regression checks one owner for every Vir module. -/
 lean_lib Vir where
   roots := #[]
   globs := #[.one `Vir, .one `Vir.Runtime, .andSubmodules `Vir.Js,
+    .andSubmodules `Vir.JsonValue,
     .andSubmodules `Vir.Browser, .andSubmodules `Vir.React,
     .andSubmodules `Vir.ProofWidgets, .submodules `Vir.Examples]
 
@@ -116,7 +117,7 @@ lean_lib VirRuntimeFixtures where
   srcDir := "fixtures/runtime"
   roots := #[`ShellLifetime, `InfoviewRpcPromise, `JsNatNumber,
     `CollectionTypeFidelity, `ObjectTypeFidelity, `PromiseTypeFidelity, `BindingApi, `OptionalProps,
-    `HostErrorPropagation]
+    `HostErrorPropagation, `JsonRpcFoo, `JsonValueCodec]
 
 /-- Standalone descriptor-forcing fixture, not a shipped binding authority. -/
 lean_lib VirTypeAnchorFixtures where

@@ -38,7 +38,8 @@ function replaceOnce(source, before, after) {
 async function main() {
   // No copied Lean program or simulated package: the server imports these exact
   // existing fixtures and the real shell invokes buildIRPackage without polling.
-  run(["build", "VirInfoview", "+ShellLifetime", "+tutorials.RpcReferenceWidget"]);
+  run(["build", "VirInfoview", "+ShellLifetime", "+tutorials.RpcReferenceWidget",
+    "+JsonRpcFoo", "+Vir.Infoview.JsonRpc.Server"]);
   for (const fixture of [
     "fixtures/infoview/RpcBrowserServer",
   ]) {

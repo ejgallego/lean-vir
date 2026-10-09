@@ -20,6 +20,12 @@ const textEncoder = new TextEncoder();
 // out-of-band cell. JavaScript reachability controls its lifetime; calling
 // metadata does not introduce a separate owner.
 const leanObjectHandleStates = new WeakMap();
+
+// Read-only brand query for explicit value codecs; no lease or liveness change.
+export function isLeanObjectHandle(value) {
+  return leanObjectHandleStates.has(value);
+}
+
 const leanObjectHandleFinalizer =
   typeof FinalizationRegistry === "function"
     ? new FinalizationRegistry((weakCell) => {

@@ -6,11 +6,13 @@ Author: Emilio J. Gallego Arias
 
 import { createJsValueHostBindings } from "./vir-js-value-bindings.js";
 import { createJsCollectionHostBindings } from "./vir-js-collection-bindings.js";
+import { createJsonValueHostBindings } from "./vir-json-value-bindings.js";
 
 export function createCommonHostBindings() {
   return {
     ...createJsValueHostBindings(),
     ...createJsCollectionHostBindings(),
+    ...createJsonValueHostBindings(),
   };
 }
 
