@@ -9,6 +9,21 @@ This is the shared review baseline for VIR and its integrations. Consumer-specif
 policies belong to the consumer; changing a shared contract requires an explicit
 handoff and agreement before either project implements against it.
 
+## Scope of shipped work
+
+Ship behavior the maintainer has approved or a concrete user has requested,
+along with the code, tests and documentation needed to support it. Internal
+helpers do not need separate feature approval, but new public surfaces and
+requirements need a real use case. Hypothetical consumers are not a reason to
+add options, aliases, fallback workflows or frameworks.
+
+Tracked documentation explains how to use, contribute to and maintain the
+software: current contracts, limitations and useful design rationale. Agent
+handoffs, status matrices, command transcripts, dated test inventories and
+experimental reports belong in coordination/evidence storage, not the shipped
+documentation. Keep public execution records in CI and release metadata rather
+than a parallel, manually maintained acceptance ledger.
+
 ## Matching build revisions
 
 **Users are responsible for refreshing their build setup when updating VIR.**

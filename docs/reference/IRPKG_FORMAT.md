@@ -161,8 +161,9 @@ for unsupported `Lean.IR.IRType.struct` and `Lean.IR.IRType.union` cases.
 After editing the Lean constants or enum mapping, run `npm run generate:ir-codec-tags`, then
 `npm run check:ir-codec-tags`.
 
-See [IRPKG_PAYLOAD_ANALYSIS.md](../design/IRPKG_PAYLOAD_ANALYSIS.md) for a measured section
-snapshot and declaration-codec maintenance analysis.
+Shared tags do not eliminate field-order or object-layout coupling: the Lean
+encoder and native decoder must agree on both. The decoder's constructors and
+reference-counting behavior must also match the pinned upstream IR layouts.
 
 ## Embedded manifest
 
