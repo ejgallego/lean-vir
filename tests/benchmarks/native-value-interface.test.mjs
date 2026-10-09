@@ -8,13 +8,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { compileNativeValueInterface } from "../../benchmarks/harness/native-value-interface-prototype.mjs";
 
-const nat = { tag: "nat" }, bigint = { tag: "bigint" };
+const nat = { type: { tag: "nat" } }, bigint = { tag: "bigint" };
+const objectType = (declaration, constructors) => ({
+  type: { tag: "leanObject" }, metadata: { declaration, constructors },
+});
 const object = (name, fields) => ({ name, representation: "object",
   storage: { objectFieldCount: fields.length, usizeFieldCount: 0, scalarByteSize: 0 }, fields });
 const field = (name, type, index) => ({ name, type, location: { tag: "object", index } });
-const pair = { tag: "constructors", name: "Pair", constructors: [object("Pair.mk", [
+const pair = objectType("Pair", [object("Pair.mk", [
   field("first", nat, 1), field("second", nat, 0),
-])] };
+])]);
 const record = { tag: "record", fields: [
   { key: "__proto__", path: [1], value: bigint }, { key: "x", path: [0], value: bigint },
 ] };
@@ -112,13 +115,13 @@ test("failed lifting releases the acquired child and preserves the caller's root
 });
 
 test("one native Option preserves all distinctions under different views", () => {
-  const unit = { tag: "constructors", name: "Unit", constructors: [
+  const unit = objectType("Unit", [
     { name: "Unit.unit", representation: "immediate", fields: [] },
-  ] };
-  const option = child => ({ tag: "constructors", name: "Option", constructors: [
+  ]);
+  const option = child => objectType("Option", [
     { name: "Option.none", representation: "immediate", fields: [] },
     object("Option.some", [field("val", child, 0)]),
-  ] });
+  ]);
   const view = (inner, no, yes) => ({ tag: "variant", cases: [
     { kind: no, payload: "none" }, { kind: yes, payload: "value", value: inner },
   ] });
@@ -147,10 +150,10 @@ test("safe integer is an explicit view with range checks in both directions", ()
 });
 
 test("chain traversal uses chosen ordinals and physical slots without declaration-name dispatch", () => {
-  const h = heap(), native = { tag: "constructors", name: "UnrelatedChain", constructors: [
-    object("UnrelatedChain.link", [field("rest", { tag: "recursive", depth: 0 }, 1), field("item", nat, 0)]),
+  const h = heap(), native = objectType("UnrelatedChain", [
+    object("UnrelatedChain.link", [field("rest", { ref: 0 }, 1), field("item", nat, 0)]),
     { name: "UnrelatedChain.stop", representation: "immediate", fields: [] },
-  ] };
+  ]);
   const view = { tag: "sequence", element: bigint, chain: { nil: 1, cons: 0, head: 1, tail: 0 } };
   const codec = compileNativeValueInterface(h.runtime, native, view);
   const obj = codec.lower([42n, 43n], "input", h.scratch);
@@ -162,10 +165,10 @@ test("chain traversal uses chosen ordinals and physical slots without declaratio
 });
 
 test("immediate constructor plans reject unknown ordinals and heap objects", () => {
-  const h = heap(), native = { tag: "constructors", name: "Mode", constructors: [
+  const h = heap(), native = objectType("Mode", [
     { name: "Mode.off", representation: "immediate", fields: [] },
     { name: "Mode.on", representation: "immediate", fields: [] },
-  ] };
+  ]);
   const codec = compileNativeValueInterface(h.runtime, native, { tag: "enum", cases: ["disabled", "enabled"] });
   for (const value of ["disabled", "enabled"])
     assert.equal(codec.lift(codec.lower(value, "input"), "output"), value);

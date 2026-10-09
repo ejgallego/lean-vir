@@ -28,16 +28,30 @@ description of its storage.
 
 ```ts
 interface BoundaryInterface {
-  native: NativeDescriptor;
+  native: DescriptorRef;
   value: ValueInterface;
+}
+
+interface NativeDescriptor {
+  type: NativeType; // Primitive | LeanObject | Resource
+  metadata?: CompilerMetadata;
 }
 ```
 
-`NativeDescriptor` contains compiler-owned facts: constructor order, field types,
-physical field locations, allocation sizes, and recursive references.
+`NativeType` identifies the core runtime operation and ownership boundary.
+Optional compiler metadata supplies constructor order, field types, physical
+field locations, allocation sizes, recursive references, and callable signatures.
 `ValueInterface` selects JavaScript representations and the mappings needed to
 interpret them. A compiled codec binds the two, checks their compatibility once,
 and caches its lowering/lifting plan.
+
+Opaque Lean-object passage requires no layout metadata. Structural conversion
+requires a constructor table; array conversion requires a compiler-confirmed
+native-array element descriptor; calling an object requires a compiler-owned
+signature. These facts enable chosen
+operations without creating separate core kinds for records, closures, or Expr.
+The metadata is optional information on the same descriptor, not a second type
+registry or an automatic conversion requirement.
 
 The pair is used at a callable boundary. Its two members do not both describe
 field types or physical layouts. A value interface refers to logical field
@@ -45,8 +59,9 @@ positions in the native descriptor; it never repeats object slot indices, scalar
 offsets, or allocation counts. An application can reuse one admitted native
 descriptor with several explicitly selected value interfaces.
 
-Use one `tag` discriminant in each union. The draft uses readable string tags;
-there is no simultaneous numeric `interfaceTag` and textual `kind` describing
+Use one `tag` discriminant in each runtime-type or value-interface union. The
+draft uses readable string tags; there is no simultaneous numeric `interfaceTag`
+and textual `kind` describing
 the same category. Numeric wire discriminants, if selected later, would replace
 the strings rather than accompany them.
 
@@ -56,7 +71,7 @@ descriptor and interface identities, never by a declaration name or display
 label. Compiler recursion classification still uses the complete applied Lean
 type, including parameters and universes.
 
-## Native tags
+## Core native tags
 
 | Tag | Required facts / native operation |
 | --- | --- |
@@ -64,19 +79,30 @@ type, including parameters and universes.
 | `string`, `byteArray` | Existing distinct native string and byte-array operations. |
 | `unsigned` | Width: 8, 16, 32, 64, or target `usize`. |
 | `float` | Width: 32 or 64. |
-| `array` | Element descriptor; existing native array storage. |
-| `constructors` | Declaration identity and ordered constructor descriptors. |
-| `recursive` | Lexical depth into enclosing constructor descriptors. |
-| `jsResource` | Existing exact JavaScript resource boundary. |
-| `leanObject` | Existing opaque Lean-object boundary. |
-| `function` | Native argument/result descriptors and execution effect. |
-| `expr` | Existing specialized Lean.Expr ABI. |
+| `leanObject` | Lean-owned values, including constructors, arrays, closures, and Expr; common retain/release operations. |
+| `resource` | JavaScript rooting and release at the exact resource boundary. |
 
-There are no native `List`, `Option`, `Prod`, record, enum, or tagged-union tags.
-Unit and Bool also become constructor descriptors. Their JavaScript meanings
-belong to the value interface. Remaining primitive tags identify native ABI
-operations which the constructor table alone does not supply; this is not a
-proposal to reconstruct String, Nat, or native arrays through stdlib internals.
+There are no native List, Option, Prod, Array, record, enum, or tagged-union tags.
+Unit and Bool are Lean objects with constructor metadata. Their JavaScript
+meanings belong to the value interface. Native arrays, function signatures and
+Expr conversion also leave the core tag set: they describe optional operations
+on Lean objects.
+Resource has a distinct rooting policy and can be regarded as a boundary
+primitive. Remaining primitive tags identify native ABI operations which a
+constructor table alone does not supply; this is not a proposal to reconstruct
+String or Nat through stdlib internals. The sequence codec still uses efficient
+native array allocation/indexing helpers, just as an expression codec uses
+expression helpers. Those operations do not require separate core type tags.
+
+`metadata.arrayElement` is emitted only for compiler-confirmed Lean Array storage.
+It supplies the element descriptor for a selected sequence codec. It is not an
+element hint authorizing array operations on arbitrary constructors. A List's
+sequence codec instead binds its constructor table and explicit chain traversal.
+
+Recursive metadata uses `{ ref: depth }`, referring to an enclosing constructor
+description. It is a schema reference, not another kind of runtime value.
+The runtime's core object passage does not need to interpret it. Optional
+structural codecs resolve it when binding their cached plans.
 
 Each constructor has one representation:
 
@@ -141,47 +167,51 @@ not inferred by this interface.
 `sequence.chain` selects nil/cons constructor ordinals and logical head/tail
 field positions. The compiled plan obtains their physical locations from the
 descriptor and uses an iterative traversal. It does not dispatch on `name ===
-"List"`. Without `chain`, a sequence must bind to a native array descriptor.
+"List"`. Without `chain`, a sequence must bind to a Lean-object descriptor with
+native-array metadata.
 The first version supports the ordinary two-constructor head/tail chain, not an
 arbitrary graph traversal language.
 
-Reference and callback interfaces preserve existing carrier and boundary
-semantics. They do not make an opaque parameter structurally inspectable or
-expand which callbacks can cross an import. Validation still needs the actual
-boundary role, in addition to the pair's shape compatibility.
+Reference and callback interfaces preserve ownership and boundary semantics.
+A `function` view requires signature metadata, including the execution effect;
+its binding checks the actual boundary role as well as shape compatibility.
+An `expr` view selects the specialized expression codec after admission confirms
+the compiler-owned type identity is `Lean.Expr`. Neither operation needs a core
+function or expression tag. The prototype does not implement these views yet.
 
 In particular, `JSL α` remains `Js (LeanRef.Handle α)`: its boundary is a
-`jsResource` descriptor with a `jsReference` view, and its payload type is opaque.
+`resource` descriptor with a `jsReference` view, and its payload type is opaque.
 The `leanReference` view applies to the existing native `leanObject` boundary.
 Selecting a view does not manufacture a JSL carrier for an arbitrary output type.
 
 ## Replacement of existing tags
 
-| Existing descriptor category | Native descriptor | Default value interface |
+| Existing descriptor category | Core type / optional compiler facts | Default value interface |
 | --- | --- | --- |
 | Nat / Int (0 / 1) | `nat` / `int` | `bigint` |
-| Bool (2) | `constructors` | `boolean` |
+| Bool (2) | `leanObject`, constructors | `boolean` |
 | String (3) | `string` | `string` |
 | UInt8 / UInt16 / UInt32 (4 / 5 / 6) | `unsigned`, corresponding width | `number`, checked against the native range |
 | UInt64 (7) | `unsigned`, width 64 | `bigint` |
 | USize (8) | `unsigned`, target usize | `number` for the current wasm32 boundary |
 | ByteArray (9) | `byteArray` | `bytes` |
 | Float / Float32 (10 / 11) | `float`, width 64 / 32 | `number` |
-| Simple enum (14) | `constructors` | `enum` |
-| Lean.Expr (15) | `expr` | `expr` |
-| Array (16) | `array` | `sequence` |
-| Structure (20) | `constructors` | `record` |
-| Tagged union (21) | `constructors` | `variant` |
-| Unit (22) | `constructors` | `unit` |
-| Resource (23) | `jsResource` | `jsReference` |
-| Function (24) | `function` | `function` |
-| Custom inductive (25) | `constructors` | `variant`, or an explicit alternate view |
-| Recursive reference (26) | `recursive` | `recursive` |
+| Simple enum (14) | `leanObject`, constructors | `enum` |
+| Lean.Expr (15) | `leanObject`, declaration identity | `expr` |
+| Array (16) | `leanObject`, native-array element descriptor | `sequence` |
+| Structure (20) | `leanObject`, constructors | `record` |
+| Tagged union (21) | `leanObject`, constructors | `variant` |
+| Unit (22) | `leanObject`, constructors | `unit` |
+| Resource (23) | `resource` | `jsReference` |
+| Function (24) | `leanObject`, signature | `function` |
+| Custom inductive (25) | `leanObject`, constructors | `variant`, or an explicit alternate view |
+| Recursive reference (26) | Metadata reference `{ ref: depth }`; no core type | `recursive` |
 | Lean object (27) | `leanObject` | `leanReference` |
 
 Previously retired List/Option/Prod categories (17/18/19) stay retired. Their
-native form is `constructors`; default views are respectively `sequence`,
-`variant`, and `record`. These are migration choices, not compatibility modes.
+native form is `leanObject` with constructor metadata; default views are
+respectively `sequence`, `variant`, and `record`. These are migration choices,
+not compatibility modes.
 
 ## Examples
 
@@ -231,7 +261,7 @@ view. Unit uses one immediate constructor with a unit view.
 
 ## Recursion and ownership
 
-Every `constructors` descriptor binds one native recursive scope, regardless of
+Every constructor table binds one metadata recursive scope, regardless of
 the chosen JS shape. Arrays and function signatures do not invent aggregate
 owners. Thus `Tree -> Option Tree -> Tree` refers to depth 1, whereas a List's
 tail refers to depth 0. Sum/Except no longer have a separate transparent category;
@@ -255,8 +285,9 @@ walker on every call. Plans remain cached over immutable admitted metadata.
 
 ## What is validated where
 
-Native admission checks compiler descriptor structure, layouts, ordinals by
-position, and recursive scope bounds. Binding a value interface checks its
+Core admission checks the native boundary. When compiler metadata is provided,
+admission checks its structure, layouts, ordinals by position, and recursive
+scope bounds. Binding a value interface checks its
 compatibility with the admitted native descriptor once: distinct spellings,
 constructor and field coverage, primitive compatibility, and sequence shape.
 Dynamic conversion checks input values and returned object discriminants. It
@@ -290,10 +321,11 @@ consumer integration.
 
 ## First implementation slice
 
-Replace the overlapping aggregate descriptor forms with the unified constructor
-form and generate explicit default value interfaces. Keep primitive ABI kernels,
-layout-plan caching, and existing ownership operations. Compile the pair once;
-select linked traversal through the value interface rather than declaration-name
+Reduce the core type set to primitives, Lean objects, and resources. Move
+constructor layouts, signatures, and recursion references into optional
+compiler metadata and generate explicit default value interfaces. Keep primitive
+ABI kernels, layout-plan caching, and existing ownership operations. Compile
+the pair once; select linked traversal through the value interface rather than declaration-name
 dispatch. Remove the simultaneous kind/interfaceTag category fields.
 
 Before adopting that slice, qualify enums/Bool/Unit, trivial and inherited
@@ -308,3 +340,7 @@ implementation. Compare the same value interface and full call boundary before
 and after, then separately compare alternate interfaces. Retain the current
 regression measurements; a smaller schema alone is not evidence of faster
 conversion. The existing List specialization remains a useful algorithm to reuse.
+
+The retained timing screens predate this core-tag revision. The executable
+prototype now uses the revised grammar with the same allocation and traversal
+algorithms; this revision makes no new speed claim and adds no timing campaign.

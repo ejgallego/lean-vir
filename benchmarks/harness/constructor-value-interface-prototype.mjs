@@ -8,10 +8,11 @@ Author: Emilio J. Gallego Arias
 // constructor shape only; native layouts and child codecs stay with the caller.
 // Descriptors are admitted before binding. No metadata is checked per value.
 export function compileConstructorValueInterface(native, view) {
-  if (native.tag !== "constructors" || view.tag !== "variant") {
-    throw new Error("constructor interface requires constructors and variant");
+  const constructors = native.metadata?.constructors;
+  if (native.type.tag !== "leanObject" || constructors === undefined || view.tag !== "variant") {
+    throw new Error("constructor interface requires object metadata and variant");
   }
-  if (view.cases.length !== native.constructors.length) {
+  if (view.cases.length !== constructors.length) {
     throw new Error("variant must cover every native constructor");
   }
   const byName = new Map();
@@ -20,7 +21,7 @@ export function compileConstructorValueInterface(native, view) {
     if (typeof kind !== "string" || kind.length === 0 || byName.has(kind)) {
       throw new Error("variant constructor spellings must be nonempty and unique");
     }
-    const fields = native.constructors[index].fields;
+    const fields = constructors[index].fields;
     const expected = JSON.stringify(kind);
     let keys, read, build, wrap;
     if (entry.payload === "none") {
