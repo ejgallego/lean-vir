@@ -148,6 +148,17 @@ larger harness machinery out unless the maintainer requests them.
 
 ## Pull Requests
 
+- Land repository changes through a PR, including documentation-only changes
+  and maintenance fixes. Follow [the landing workflow](CONTRIBUTING.md#landing-and-completion).
+  Requests to "wrap up", "land" or "merge" use that workflow; direct pushes to
+  `main` or a maintenance branch require an explicit maintainer request to bypass it.
+- Within an authorized landing, publish the task branch and open its PR when
+  needed without another permission loop. A request to prepare a PR authorizes
+  publication for review, not its merge.
+- Before reporting source changes as landed, verify the merged PR and record
+  its URL, validated head and merge commit. Local review establishes readiness.
+  For an explicitly requested direct push, record the maintainer instruction,
+  target branch and verified landed commit instead.
 - Use `scripts/pr-message.sh` before opening or editing a PR description.
 - Keep PR titles and bodies suitable as the final squash commit message.
 - Start public PR bodies with `This PR ...`.

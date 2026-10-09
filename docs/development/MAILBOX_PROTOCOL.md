@@ -233,6 +233,14 @@ acceptance checks and any ownership handoff. Recorded metadata describes a
 checkpoint, not current Git or process state. A completion identifies the result
 and its durable commit, PR, design document or explicit disposable disposition.
 It does not authorize publication or deletion of a worktree or branch.
+
+For source work reported as landed, include the PR URL, validated head and merge
+commit after verifying the merged state, as described in
+[landing and completion](../../CONTRIBUTING.md#landing-and-completion).
+An explicit direct-push exception uses the maintainer instruction, target branch
+and verified landed commit instead. Keep local review checkpoints ready for
+review until adoption; no new envelope fields are required.
+
 An implementation claim identifies the sole writer; transfer names the new
 owner and checkpoint. Worktree retirement separately requires maintainer
 approval and checks of cleanliness, commit reachability and remote/PR state.

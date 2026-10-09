@@ -80,6 +80,28 @@ Development targets `main`. Selected fixes may also target the single
 maintenance line; see [backports](docs/HARNESS.md#backports) for the current
 target, provenance, PR links and validation workflow.
 
+### Landing and completion
+
+Land repository changes through a PR, including documentation-only changes and
+maintenance fixes. A maintainer's request to "wrap up", "land" or "merge" uses
+this workflow. Direct pushes to `main` or a maintenance branch require an
+explicit maintainer request to bypass the PR workflow for that change.
+
+Within an authorized landing, publish the task branch and open its PR if needed
+without another permission loop. A request to prepare a PR authorizes branch
+publication and PR creation for review; it does not authorize merging it.
+Before an authorized merge, complete the selected review and verify that the
+applicable PR checks pass on the actual head being merged.
+
+Before reporting source changes as landed, verify GitHub's merged PR state and
+record the PR URL, validated head and merge commit in the task's completion
+evidence. A local review checkpoint or green CI establishes readiness while the
+PR is still open. For an explicitly requested direct push, record the maintainer
+instruction, target branch and landed commit instead, and verify the remote ref.
+Investigation and local preparation tasks can finish without claiming a landing.
+
+### PR metadata
+
 Before opening or editing a PR, run:
 
 ```bash
@@ -103,6 +125,17 @@ Guidelines:
   something CI cannot show or when skipped checks change review risk.
 - Put questions and extra coordination in PR comments rather than the PR
   description.
+
+### Repository protection
+
+To enforce the PR workflow on GitHub, protect `main` and any active maintenance
+branch: require pull requests and apply the restrictions to administrators and
+the account used by agents. Review bypass permissions explicitly rather than
+assuming the agent account is covered. See
+[GitHub's branch protection settings](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches).
+These repository settings are configured separately from the tracked guidance;
+adding this policy to a PR does not enable them. Settings changes require their
+own explicit maintainer selection.
 
 ## Documentation
 
