@@ -100,6 +100,9 @@ PR is still open. For an explicitly requested direct push, record the maintainer
 instruction, target branch and landed commit instead, and verify the remote ref.
 Investigation and local preparation tasks can finish without claiming a landing.
 
+Maintainers configure [repository protection](docs/HARNESS.md#repository-protection)
+separately to enforce this workflow on GitHub.
+
 ### PR metadata
 
 Before opening or editing a PR, run:
@@ -125,17 +128,6 @@ Guidelines:
   something CI cannot show or when skipped checks change review risk.
 - Put questions and extra coordination in PR comments rather than the PR
   description.
-
-### Repository protection
-
-To enforce the PR workflow on GitHub, protect `main` and any active maintenance
-branch: require pull requests and apply the restrictions to administrators and
-the account used by agents. Review bypass permissions explicitly rather than
-assuming the agent account is covered. See
-[GitHub's branch protection settings](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches).
-These repository settings are configured separately from the tracked guidance;
-adding this policy to a PR does not enable them. Settings changes require their
-own explicit maintainer selection.
 
 ## Documentation
 

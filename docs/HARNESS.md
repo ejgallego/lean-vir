@@ -412,6 +412,18 @@ The [workflow files](../.github/workflows) own job definitions. Pages runs
 `npm run build:site`; [surface analysis](development/SURFACE_ANALYSIS.md) explains its
 deployed surface/size explorers.
 
+### Repository Protection
+
+To enforce the [PR landing workflow](../CONTRIBUTING.md#landing-and-completion)
+on GitHub, protect `main` and any active maintenance branch: require pull requests
+and apply the restrictions to administrators and the account used by agents.
+Review bypass permissions explicitly rather than assuming the agent account is
+covered. See
+[GitHub's branch protection settings](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches).
+These repository settings are configured separately from the tracked guidance;
+adding this policy to a PR does not enable them. Settings changes require their
+own explicit maintainer selection.
+
 ## Runtime Releases
 
 Tags named `v<package.json version>` trigger

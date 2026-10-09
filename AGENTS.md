@@ -50,7 +50,7 @@ larger harness machinery out unless the maintainer requests them.
 - Use ordinary `git` commands in this checkout.
 - Prefer one linked worktree per implementation task under `.worktrees/<slug>`.
 - Keep the root checkout as the stable base for multi-step work when possible.
-- Do not push branches unless the user explicitly asks.
+- Publish branches only when the maintainer requests a PR, publication or landing.
 - Branch names should usually be `feat/<slug>`, `fix/<slug>`,
   `docs/<slug>`, `chore/<slug>`, or local-only `wip/<slug>`.
 - Commit subjects should be concise and behavior-oriented, preferably
@@ -149,16 +149,10 @@ larger harness machinery out unless the maintainer requests them.
 ## Pull Requests
 
 - Land repository changes through a PR, including documentation-only changes
-  and maintenance fixes. Follow [the landing workflow](CONTRIBUTING.md#landing-and-completion).
-  Requests to "wrap up", "land" or "merge" use that workflow; direct pushes to
-  `main` or a maintenance branch require an explicit maintainer request to bypass it.
-- Within an authorized landing, publish the task branch and open its PR when
-  needed without another permission loop. A request to prepare a PR authorizes
-  publication for review, not its merge.
-- Before reporting source changes as landed, verify the merged PR and record
-  its URL, validated head and merge commit. Local review establishes readiness.
-  For an explicitly requested direct push, record the maintainer instruction,
-  target branch and verified landed commit instead.
+  and maintenance fixes. Direct pushes to `main` or a maintenance branch require
+  an explicit maintainer exception. Follow
+  [landing and completion](CONTRIBUTING.md#landing-and-completion) for authorization,
+  checks and completion evidence.
 - Use `scripts/pr-message.sh` before opening or editing a PR description.
 - Keep PR titles and bodies suitable as the final squash commit message.
 - Start public PR bodies with `This PR ...`.
