@@ -16,8 +16,9 @@ interop:
 
 Supported means documented, maintained and tested for the stated workflow and
 pinned Lean/VIR versions. It does not promise arbitrary Lean programs, every host
-environment, or compatibility across revisions. The first release remains under
-review; see [current qualification](development/RESOURCE_ACCEPTANCE.md).
+environment, or compatibility across revisions. Runtime selection is recorded in
+the committed [runtime lock](../vir-resources/runtime.json); changing it does not
+expand this support scope.
 
 VIR maintains the current contracts without legacy APIs or backward compatibility
 layers. Retired interfaces are removed when the contract changes. Applications

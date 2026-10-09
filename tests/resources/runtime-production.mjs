@@ -17,7 +17,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { build } from "esbuild";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const evidence = mkdtempSync(join(root, "build/runtime-production-"));
@@ -37,7 +38,7 @@ function run(command, args, label, env = process.env) {
   return result;
 }
 
-test("runtime packaging creates parents but never reuses an existing destination", () => {
+test("runtime packaging creates parents but never reuses an existing destination", async () => {
   const wasm = join(evidence, "synthetic.wasm");
   const identity = join(evidence, "synthetic-identity.json");
   const output = join(evidence, "missing parent", "runtime");
@@ -59,6 +60,29 @@ test("runtime packaging creates parents but never reuses an existing destination
   const provenance = JSON.parse(readFileSync(join(output, "provenance.json")));
   const pack = join(output, `${provenance.contentId}.virres`);
   const before = readFileSync(pack);
+  const moduleBytes = readFileSync(join(output, "payloads/runtime.js"));
+  const unminified = await build({
+    absWorkingDir: root,
+    entryPoints: ["web/src/resource-program.js"],
+    bundle: true,
+    format: "esm",
+    platform: "browser",
+    target: "es2022",
+    write: false,
+    legalComments: "inline",
+    outfile: "runtime.js",
+  });
+  assert.ok(moduleBytes.length < unminified.outputFiles[0].contents.length,
+    "release module is minimized");
+  const module = await import(pathToFileURL(join(output, "payloads/runtime.js")));
+  assert.deepEqual(Object.keys(module), ["createProgram"]);
+  assert.equal(typeof module.createProgram, "function", "public loader export remains callable");
+  for (const [name, source] of [
+    ["LICENSE", join(root, "LICENSE")], ["NOTICE", join(root, "NOTICE")],
+    ["lean-LICENSE", join(root, "third_party/lean4-src/LICENSE")],
+    ["lean-LICENSES", join(root, "third_party/lean4-src/LICENSES")],
+  ])
+    assert.deepEqual(readFileSync(join(output, "payloads", name)), readFileSync(source));
   const repeat = run(process.execPath, args, "pack-existing-destination");
   assert.notEqual(repeat.status, 0);
   assert.match(repeat.stderr, /EEXIST/);

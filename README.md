@@ -74,8 +74,7 @@ The [application setup guide](docs/guides/EMBEDDED_RESOURCES.md) explains these
 three changes and how to publish and call the program.
 Use the Lean toolchain selected by your VIR dependency; HTTPS runtime acquisition
 needs `curl`.
-Qualification and remaining limits are recorded in
-[the acceptance checklist](docs/development/RESOURCE_ACCEPTANCE.md).
+See [support scope](docs/SUPPORT.md) for supported behavior and limitations.
 
 ## Experimental
 

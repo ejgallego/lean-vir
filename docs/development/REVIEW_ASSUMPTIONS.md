@@ -9,6 +9,21 @@ This is the shared review baseline for VIR and its integrations. Consumer-specif
 policies belong to the consumer; changing a shared contract requires an explicit
 handoff and agreement before either project implements against it.
 
+## Scope of shipped work
+
+Ship behavior the maintainer has approved or a concrete user has requested,
+along with the code, tests and documentation needed to support it. Internal
+helpers do not need separate feature approval, but new public surfaces and
+requirements need a real use case. Hypothetical consumers are not a reason to
+add options, aliases, fallback workflows or frameworks.
+
+Tracked documentation explains how to use, contribute to and maintain the
+software: current contracts, limitations and useful design rationale. Agent
+handoffs, status matrices, command transcripts, dated test inventories and
+experimental reports belong in coordination/evidence storage, not the shipped
+documentation. Keep public execution records in CI and release metadata rather
+than a parallel, manually maintained acceptance ledger.
+
 ## Matching build revisions
 
 **Users are responsible for refreshing their build setup when updating VIR.**
@@ -31,8 +46,10 @@ See [matching runtime assets](../guides/JS_API.md#matching-runtime-assets).
 
 ## Supported runtime construction
 
-Applications create runtimes through `createVirRuntime`,
-`createVirRuntimeFactory` or the public `VirRuntimeFactory`. These paths always
+Resource applications use `createProgram` through the
+[application workflow](../guides/EMBEDDED_RESOURCES.md). Lower-level hosts create
+runtimes through `createVirRuntime`, `createVirRuntimeFactory` or the public
+`VirRuntimeFactory`. These paths always
 attach a `VirHostState`, including in Node and with null/empty binding maps.
 No application bindings does not mean no internal host state.
 
@@ -44,13 +61,8 @@ fixtures do not establish a supported managed runtime lifecycle for every such
 combination. Low-level `createVirImports` without host state supports linking;
 it does not supply the factory's instance ownership and disposal contract.
 
-In particular, roots retained after disposing a directly constructed
-`new VirRuntime(exports)` with no host state are a known internal consistency
-limitation, not a demonstrated supported-application defect or a merge blocker.
-Revisit if a documented public creation path reproduces it, or the maintainer
-explicitly selects broader constructor support. Raw loader exports likewise
-require their documented caller preconditions; private resource IDs are not a
-public reusable-handle API.
+Raw loader exports require their documented caller preconditions; private
+resource IDs are not a public reusable-handle API.
 
 ## What must work
 
@@ -91,9 +103,10 @@ result to repeatedly parsing, hashing and checking the same result.
 A digest identifies bytes and detects accidental corruption; it does not prove
 publisher authenticity, compiler provenance, callable types or program behavior.
 An internally consistent bundle can still be the wrong selected program or have
-a different callable contract. Consumer expectations must therefore be independent
-of the artifact being loaded. Semantic/native/browser oracle tests establish
-behavior for their tested cases, not a general proof.
+a different callable contract. When a consumer supplies callable expectations,
+they must be independent of the artifact being loaded; an independent reference
+is not required for ordinary program creation. Semantic/native/browser tests
+establish behavior for their tested cases, not a general proof.
 
 Reserve **Lean soundness** for logical/kernel guarantees. State artifact
 consistency, ABI agreement, memory/ownership correctness and execution admission
@@ -123,9 +136,9 @@ application work budgets belong at the application boundary.
 4. Preserve interfaces and byte identities during internal refactoring. A digest,
    format, callable contract or lifetime change needs explicit migration review;
    no aliases or fallback versions simply to make an integration pass.
-5. Record exact source/runtime identities and distinguish inspected code, locally
-   executed tests, CI and consumer-reported acceptance. Do not reuse old-head
-   evidence as qualification of changed behavior.
+5. Record exact source/runtime identities in coordination, CI or release records,
+   distinguishing inspected code, locally executed tests and consumer-reported
+   results. Do not reuse old-head evidence as qualification of changed behavior.
 
 Use Lean/Lake's existing non-cryptographic hashes for internal build traces. The
 current published formats specify SHA-256, shared across native and browser
