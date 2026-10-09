@@ -151,7 +151,7 @@ The release WASM is selected by default. To load the optimized, unstripped
 companion artifact while debugging, serve `vir-upstream.dev.wasm` next to
 `vir-upstream.wasm` and set `debugWasm: true` in the same options object.
 
-You can also call generated methods by JavaScript name:
+Call an export by its full Lean entry name:
 
 ```js
 console.log(vir.call("MyApp.total", [2, 3, 5, 8]));

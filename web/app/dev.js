@@ -131,10 +131,12 @@ function selectEntryFromQuery() {
   const match = interfaceEntries.find(
     (entry) => entry.entry === entryId,
   );
-  if (match) {
-    entrySelect.value = match.entry;
-  }
   requestedEntry = null;
+  if (!match) {
+    requestedAutoRun = false;
+    throw new Error(`interface entry not found: ${entryId}; use the full Lean entry name`);
+  }
+  entrySelect.value = match.entry;
 }
 
 function renderPackagePresets() {

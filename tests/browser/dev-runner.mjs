@@ -392,10 +392,7 @@ export async function packageInfoFor(packageFile) {
 export async function runnerCaseFromManifest(packageFile, entryName, expected) {
   const info = await packageInfoFor(packageFile);
   const entry = info.manifest.exports.find(
-    (candidate) =>
-      candidate.entry === entryName ||
-      candidate.id === entryName ||
-      candidate.jsName === entryName,
+    (candidate) => candidate.entry === entryName,
   );
   assert.ok(entry, `${packageFile} manifest does not export ${entryName}`);
   return {
