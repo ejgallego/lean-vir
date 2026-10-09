@@ -120,7 +120,7 @@
     "test:resources:browser": "lake build vir_resource_pack vir_irpkg VirResourceBrowserFixture && node tests/resources/browser.mjs",
     "test:generator:memory": "node tests/packages/generator-memory.mjs",
     "test:generator:imports": "lake build +ModuleSetFixture.InputSelection +fixtures.HostInterop Vir.GeneratePackage.Inputs && lake env lean --run tests/packages/ImportCache.lean module && lake env lean --run tests/packages/ImportCache.lean host && node tests/packages/import-cache-resolved.mjs",
-    "test:interface": "lake build Vir.Attributes Vir.Compiler.HostValidation Vir.Js Vir.Browser.Types Vir.React.Types && mkdir -p build/interface-tests && lake env lean --root=tests/packages -o build/interface-tests/InterfaceReduction.olean tests/packages/InterfaceReduction.lean && LEAN_PATH=build/interface-tests lake env lean tests/packages/InterfaceReductionImported.lean",
+    "test:interface": "lake build Vir.Attributes Vir.Compiler.HostValidation Vir.Compiler.Interface.Encode Vir.Js Vir.Browser.Types Vir.React.Types && mkdir -p build/interface-tests && lake env lean --root=tests/packages -o build/interface-tests/InterfaceReduction.olean tests/packages/InterfaceReduction.lean && LEAN_PATH=build/interface-tests lake env lean tests/packages/InterfaceReductionImported.lean",
     "test:resource-roots": "bash tests/native/resource-roots.sh",
     "test:constructor-providers": "bash tests/native/constructor-providers.sh",
     "test:native:unit": "node --test tests/native/*.test.mjs",

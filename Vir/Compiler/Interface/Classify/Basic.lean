@@ -37,25 +37,28 @@ def InterfaceEffect.ofStartupEffect : Vir.InterfaceValidation.StartupEffect → 
 def effectHead? (name : Name) : Option InterfaceEffect :=
   Vir.InterfaceValidation.effectKind? name |>.map InterfaceEffect.ofEffectKind
 
+private def primitiveInterfaceType? : Name → Option InterfaceType
+  | `Unit => some .unit
+  | `Nat => some .nat
+  | `Int => some .int
+  | `Bool => some .bool
+  | `String => some .string
+  | `Float => some .float
+  | `Float32 => some .float32
+  | `UInt8 => some .uint8
+  | `UInt16 => some .uint16
+  | `UInt32 => some .uint32
+  | `UInt64 => some .uint64
+  | `USize => some .usize
+  | `ByteArray => some .byteArray
+  | `Lean.Expr => some .expr
+  | _ => none
+
 def preserveInterfaceHead (name : Name) : Bool :=
-  if (effectHead? name).isSome then
+  if (effectHead? name).isSome || (primitiveInterfaceType? name).isSome then
     true
   else
     match name with
-    | `Unit
-    | `Nat
-    | `Int
-    | `Bool
-    | `String
-    | `Float
-    | `Float32
-    | `UInt8
-    | `UInt16
-    | `UInt32
-    | `UInt64
-    | `USize
-    | `ByteArray
-    | `Lean.Expr
     | `Array
     | `List
     | `Option
@@ -79,7 +82,7 @@ the attempt rather than accepting a partially reduced type.
 private def reduceScopedHead (fuel : Nat) (recordReceiver : Bool) (e : Lean.Expr) :
     CoreM (Option (Lean.Expr × Nat)) := do
   let fuel + 1 := fuel | return none
-  let e := stripMData e
+  let e := e.consumeMData
   if preserveInterfaceHead e.getAppFn.constName then return some (e, fuel)
   let beta := e.headBeta
   if beta != e then return ← reduceScopedHead fuel recordReceiver beta
@@ -101,7 +104,7 @@ private def reduceScopedHead (fuel : Nat) (recordReceiver : Bool) (e : Lean.Expr
       match env.find? name with
       | some (.defnInfo info) =>
           if getReducibilityStatusCore env name == .irreducible ||
-              !(info.hints == .abbrev || recordReceiver) then return some (e, fuel)
+              !(info.hints.isAbbrev || recordReceiver) then return some (e, fuel)
           let value := (ConstantInfo.defnInfo info).instantiateValueLevelParams! levels
           reduceScopedHead fuel recordReceiver (value.beta e.getAppArgs)
       | _ => return some (e, fuel)
@@ -116,38 +119,18 @@ def reduceTypeAliases (e : Lean.Expr) : CoreM Lean.Expr := do
   -- family, but may not turn a dependent field into the generic bvar ABI lane.
   return if isClosedTypeExpr reduced then reduced else aliased
 
-def constName? (e : Lean.Expr) : Option Name :=
-  match stripMData e with
-  | .const n _ => some n
-  | _ => none
-
 def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
-  match constName? e with
-  | some `Unit => some .unit
-  | some `Nat => some .nat
-  | some `Int => some .int
-  | some `Bool => some .bool
-  | some `String => some .string
-  | some `Float => some .float
-  | some `Float32 => some .float32
-  | some `UInt8 => some .uint8
-  | some `UInt16 => some .uint16
-  | some `UInt32 => some .uint32
-  | some `UInt64 => some .uint64
-  | some `USize => some .usize
-  | some `ByteArray => some .byteArray
-  | some `Lean.Expr => some .expr
-  | _ => none
+  e.consumeMData.constName?.bind primitiveInterfaceType?
 
 def optParamType? (e : Lean.Expr) : Option Lean.Expr := do
-  let (fn, args) := (stripMData e).getAppFnArgs
+  let (fn, args) := e.consumeMData.getAppFnArgs
   if fn == `optParam then
     args[0]?
   else
     none
 
 def jsResourceMarker? (e : Lean.Expr) : Option (Name × String) := do
-  let name ← constName? e
+  let name ← e.consumeMData.constName?
   match name with
   | `Lean.Vir.Browser.CSSStyleDeclaration => some (name, "CSSStyleDeclaration")
   | `Lean.Vir.Browser.Element => some (name, "Element")
@@ -168,7 +151,7 @@ def jsResourceMarker? (e : Lean.Expr) : Option (Name × String) := do
   | _ => none
 
 def resourceInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
-  let (fn, args) := (stripMData e).getAppFnArgs
+  let (fn, args) := e.consumeMData.getAppFnArgs
   match fn with
   | `Lean.Vir.Js =>
       match args[0]? >>= jsResourceMarker? with
@@ -177,7 +160,7 @@ def resourceInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   | _ => none
 
 def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType := do
-  let name <- constName? e
+  let name <- e.consumeMData.constName?
   let .inductInfo info <- env.find? name | none
   if info.numParams != 0 || info.numIndices != 0 || info.isRec || info.ctors.isEmpty then
     none
@@ -193,7 +176,7 @@ partial def exprTypeLabel (e : Lean.Expr) : String :=
   match simpleInterfaceType? e with
   | some ty => ty.label
   | none =>
-      let e := stripMData e
+      let e := e.consumeMData
       let (fn, args) := e.getAppFnArgs
       match fn, Array.toList args with
       | `Array, [arg] => s!"Array {typeArgLabel arg}"
@@ -215,25 +198,21 @@ where
     else
       label
 
-partial def instantiateForallPrefix? (type : Lean.Expr) (args : Array Lean.Expr) : Option Lean.Expr :=
-  let rec go (idx : Nat) (type : Lean.Expr) : Option Lean.Expr :=
-    if h : idx < args.size then
-      match stripMData type with
-      | .forallE _ _ body _ => go (idx + 1) (body.instantiate1 args[idx])
-      | _ => none
-    else
-      some type
-  go 0 type
+/-- Instantiate only syntactically present binders; do not reduce to expose more. -/
+def instantiateForallPrefix? (type : Lean.Expr) (args : Array Lean.Expr) : Option Lean.Expr :=
+  args.foldlM (init := type) fun type arg => do
+    let .forallE _ _ body _ := type.consumeMData | none
+    some (body.instantiate1 arg)
 
 def projectionFieldType? (numParams : Nat) (params : Array Lean.Expr) (projType : Lean.Expr) : Option Lean.Expr := do
   if params.size != numParams then
     none
   let instantiated ← instantiateForallPrefix? projType params
-  match stripMData instantiated with
+  match instantiated.consumeMData with
   | .forallE _ _ body _ => some body
   | _ => none
 
-def structureFieldLayout? : Lean.Compiler.LCNF.CtorFieldInfo → Option StructureFieldLayout
+def fieldLayout? : Lean.Compiler.LCNF.CtorFieldInfo → Option FieldLayout
   | .object index _ => some (.object index)
   | .usize index => some (.usize index)
   | .scalar size offset _ => some (.scalar size offset)
@@ -277,7 +256,7 @@ def binderArgName (fallback : Nat) (name : Name) : String :=
     candidate
 
 def effectResultRaw? (e : Lean.Expr) : Option (InterfaceEffect × Lean.Expr) :=
-  let e := stripMData e
+  let e := e.consumeMData
   let (fn, args) := e.getAppFnArgs
   match effectHead? fn, Array.toList args with
   | some effect, [result] => some (effect, result)
@@ -287,7 +266,7 @@ def effectResult? (e : Lean.Expr) : CoreM (Option (InterfaceEffect × Lean.Expr)
   match effectResultRaw? e with
   | some result => return some result
   | none =>
-      let e := stripMData e
+      let e := e.consumeMData
       let reduced ← reduceTypeAliases e
       if reduced == e then
         return none
@@ -295,8 +274,6 @@ def effectResult? (e : Lean.Expr) : CoreM (Option (InterfaceEffect × Lean.Expr)
         return effectResultRaw? reduced
 
 def isRuntimeErasedTypeBinder (domain : Lean.Expr) : Bool :=
-  match stripMData domain with
-  | .sort _ => true
-  | _ => false
+  domain.consumeMData.isSort
 
 end Vir.Interface

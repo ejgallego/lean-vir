@@ -95,6 +95,37 @@ This is not a native guarantee for the `Vir` umbrella, browser or React modules:
 those still contain JavaScript-only externs. Program generation stays independent
 of runtime acquisition and Wasm production.
 
+## Aggregate descriptors
+
+`InterfaceType` uses named records for aggregate metadata. Constructor storage
+counts live in `ConstructorStorage`; per-field locations remain separate
+`FieldLayout` values. Counts describe compiled object/usize slots and
+scalar bytes, not the number of source binders.
+
+| Interface case | Named metadata |
+| --- | --- |
+| `taggedUnion` | `TaggedUnionVariant` with constructor name, payload type/layout and constructor storage |
+| `customInductive` | `InductiveConstructor` with constructor storage and named `InductiveField` values |
+| `structure` | `StructureDescriptor` with constructor storage, optional trivial field and `StructureField` values |
+
+Clients inspecting custom constructors use `constructor.fields.map (·.type)`
+instead of tuple projections. A structure matches as
+`.structure name label descriptor`; its fields, trivial-field index and storage
+counts are `descriptor.fields`, `descriptor.trivialField?` and
+`descriptor.storage`. Construct metadata with named record literals.
+These records replace positional aggregate tuples and storage-count arguments;
+`StructureFieldLayout` is now `FieldLayout`.
+Constructor JSON names are derived from the constructor's Lean Name relative to
+its owning type, using the same rule for enums, tagged unions and custom inductives.
+The records store the canonical constructor Name rather than a second label.
+Callbacks and export signatures share `InterfaceArg` values: inspect arguments
+with `arg.name` and `arg.type`. The same named-argument encoder handles both;
+independent expected signatures still encode only the ordered argument types.
+These are deliberate changes to the experimental Lean constructor API; there
+are no tuple compatibility aliases. `ClassifiedSignature` and its expectation
+encoder are unchanged. JSON fields, order, layout values and wire versions are
+also unchanged.
+
 ## Import migration
 
 Authoring imports `Vir.Attributes`, `Vir.Host` and `Vir.ExternFallback` remain.
@@ -123,6 +154,20 @@ declaration names, attribute names and wire-format values. Generator diagnostics
 now use the single `PackageDiagnostic` record; `DeclIndexDiagnostic` and its
 conversion helper have been removed. Existing clients pinned
 to an earlier VIR revision can continue using that revision's imports.
+
+`Vir.Compiler.InterfaceValidation.stripMData` is removed; use Lean's
+`Expr.consumeMData` directly. Likewise, classifier callers can use
+`e.consumeMData.constName?` instead of the removed `Vir.Interface.constName?`.
+
+Low-level classifier helpers no longer accept separate argument/field ordinal
+counters: fallback names follow the accumulated argument or field order.
+`functionType` now takes an optional recursion context before its accumulated
+arguments. Classification retains the enclosing recursion context and rejects
+callbacks that refer back to that enclosing owner: closure invocation cannot
+carry it. A complete recursive result descriptor establishes its own owner and
+remains supported. Exhaustive error matches should handle the new
+`InterfaceClassifierError.recursiveCallback owner` case. Use `interfaceType`
+for ordinary complete type classification.
 
 ## Regression example
 

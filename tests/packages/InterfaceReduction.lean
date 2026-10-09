@@ -11,6 +11,7 @@ public import Vir.Browser.Types
 public import Vir.React.Types
 public meta import Vir.Attributes
 public meta import Vir.Compiler.HostValidation
+public meta import Vir.Compiler.Interface.Encode
 
 public section
 
@@ -34,6 +35,43 @@ inductive FamilyValue (β : Nat → Type) where
 
 @[vir_export] def constantFamily (x : FamilyValue (fun _ => String)) :
     FamilyValue (fun _ => String) := x
+
+def valueCallback (_f : (value : Nat) → String) : Unit := ()
+def hostCallback (_f : (value : Lean.Vir.Js String) → Lean.Vir.RuntimeM Unit) :
+    Lean.Vir.RuntimeM Unit := pure ()
+
+def erasedHost {α : Type} (_proof : True) (_left _right : Lean.Vir.Js String) :
+    Lean.Vir.RuntimeM Unit := pure ()
+
+inductive «Constructor.names» where
+  | «left.value» (value : Nat)
+  | right (value : String)
+
+inductive Status where
+  | ready
+  | done
+
+inductive CallbackNode where
+  | done
+  | next (resume : Unit → CallbackNode)
+
+inductive CallbackParam (α : Type) where
+  | done
+  | next (resume : Unit → CallbackParam α)
+
+mutual
+inductive CallbackLeft where
+  | next (resume : Unit → CallbackRight)
+inductive CallbackRight where
+  | next (resume : Unit → CallbackLeft)
+end
+
+inductive OrdinaryTree where
+  | leaf
+  | next (child : Option OrdinaryTree)
+
+-- A complete callback result descriptor owns its own recursion.
+def treeCallback (_f : Unit → OrdinaryTree) : Unit := ()
 
 @[expose] def plainType : Type := String
 opaque hiddenType : Type := String
@@ -77,15 +115,47 @@ private def rejected (label : String) (e : Expr) : CoreM Unit := do
   | .error _ => pure ()
   | .ok actual => throwError "interface reduction: {label} unexpectedly accepted {repr actual}"
 
+private def errorCause : InterfaceClassifierError → InterfaceClassifierError
+  | .inContext _ cause => errorCause cause
+  | error => error
+
 private def argumentType (name : Name) : CoreM Expr := do
   let .forallE _ arg .. := (← getConstInfo name).type
     | throwError "expected unary declaration {name}"
   return arg
 
+private def expectConstructorNames (type : Expr) (expected : Array (Name × String)) : CoreM Unit := do
+  let .ok descriptor ← interfaceType type
+    | throwError "constructor-name classification failed"
+  let .ok encoded := Json.parse descriptor.toJson
+    | throwError "constructor-name JSON failed"
+  let .ok constructors := (encoded.getObjVal? "constructors").bind Json.getArr?
+    | throwError "constructor-name array missing"
+  expect "constructor count" (constructors.size == expected.size)
+  for h : index in *...expected.size do
+    let some constructor := constructors[index]?
+      | throwError "constructor missing"
+    let .ok name := constructor.getObjValAs? String "name"
+      | throwError "constructor Name missing"
+    let .ok label := constructor.getObjValAs? String "jsName"
+      | throwError "constructor label missing"
+    let .ok tag := constructor.getObjValAs? Nat "tag"
+      | throwError "constructor tag missing"
+    expect "canonical constructor Name" (name == expected[index].1.toString)
+    expect "relative constructor label" (label == expected[index].2)
+    expect "constructor order" (tag == index)
+
 run_elab do
   for name in #[``direct, ``projected, ``parameterized] do
     expectType name.toString (← argumentType name) .string
   let string := mkConst ``String
+  expectType "nested metadata" (.mdata {} (.mdata {} string)) .string
+  for (typeName, ctorName, expected) in #[
+      (`Owner, `Owner.mk, "mk"),
+      (`Owner, `Other.mk, "Other.mk"),
+      (`Owner, `Owner, "Owner"),
+      (Name.num `Owner 7, Name.str (Name.num `Owner 7) "mk", "mk")] do
+    expect "structural constructor label" (constructorLabel typeName ctorName == expected)
   let record := mkApp (mkConst ``Carrier.mk) string
   let project := fun receiver => Expr.proj ``Carrier 0 receiver
   expectType "literal record" (project record) .string
@@ -105,9 +175,82 @@ run_elab do
   -- The specialized dependent constructor must retain the concrete value ABI.
   match ← interfaceType (← argumentType ``constantFamily) with
   | .ok (.customInductive _ _ variants) =>
-      let some (_, _, _, _, _, fields) := variants[0]? | throwError "missing constructor"
-      expect "constant family field types" (fields.map (·.2.1) == #[.nat, .string])
+      let some constructor := variants[0]? | throwError "missing constructor"
+      expect "constant family field types" (constructor.fields.map (·.type) == #[.nat, .string])
   | result => throwError "constant family descriptor: {repr result}"
+
+  -- Compare actual classified constructor metadata with independent wire labels.
+  let .forallE _ familyType .. := (← getConstInfo ``constantFamily).type
+    | throwError "family argument missing"
+  expectConstructorNames familyType #[( ``FamilyValue.mk, "mk")]
+  let nat := mkConst ``Nat
+  expectConstructorNames (mkApp2 (mkConst ``Sum [.zero, .zero]) nat string)
+    #[( `Sum.inl, "inl"), (`Sum.inr, "inr")]
+  expectConstructorNames (mkApp2 (mkConst ``Except [.zero, .zero]) string nat)
+    #[( `Except.error, "error"), (`Except.ok, "ok")]
+  expectConstructorNames (mkConst ``«Constructor.names»)
+    #[( ``«Constructor.names».«left.value», "«left.value»"), (``«Constructor.names».right, "right")]
+  expectConstructorNames (mkConst ``Status) #[( ``Status.ready, "ready"), (``Status.done, "done")]
+
+  -- Callback invocation has no enclosing aggregate owner: fail finitely.
+  let node := mkConst ``CallbackNode
+  let .error nodeError ← interfaceType node
+    | throwError "recursive callback aggregate must be rejected"
+  expect "recursive callback result reason"
+    (errorCause nodeError == .recursiveCallback ``CallbackNode)
+  let context : RecursiveSeen := #[(``CallbackNode, toString node)]
+  for type in #[
+      .forallE `_arg node (mkConst ``Unit) .default,
+      mkApp (mkConst ``IO) node,
+      .forallE `_arg (mkConst ``Unit) (mkApp (mkConst ``Option [.zero]) node) .default,
+      .forallE `_arg (mkConst ``Unit)
+        (mkApp2 (mkConst ``Sum [.zero, .zero]) node string) .default] do
+    let .error error ← interfaceType type context
+      | throwError "recursive callback boundary must be rejected"
+    expect "callback argument/effect/container owner diagnostic"
+      (errorCause error == .recursiveCallback ``CallbackNode)
+  let .ok (.function _ (.customInductive name _ _) .pure) ←
+      interfaceType (← argumentType ``treeCallback)
+    | throwError "callback returning complete recursive descriptor must stay supported"
+  expect "complete callback result owner" (name == ``OrdinaryTree)
+  let .error mutualError ← interfaceType (mkConst ``CallbackLeft)
+    | throwError "mutual recursion through callbacks must be rejected"
+  expect "mutual callback recursion reason"
+    (errorCause mutualError == .mutuallyRecursive .inductive ``CallbackLeft)
+  let natInstance := mkApp (mkConst ``CallbackParam [.zero]) (mkConst ``Nat)
+  let stringInstance := mkApp (mkConst ``CallbackParam [.zero]) string
+  let .error nonuniformError ← interfaceType
+      (.forallE `_arg (mkConst ``Unit) stringInstance .default)
+      #[(``CallbackParam, toString natInstance)]
+    | throwError "nonuniform recursive callback context must be rejected"
+  expect "nonuniform callback recursion reason"
+    (errorCause nonuniformError == .nonUniformRecursive .inductive ``CallbackParam)
+
+  let .ok erasedSignature ← classifyHostImportSignature (← getConstInfo ``erasedHost).type
+    | throwError "erased-prefix host signature classification failed"
+  expect "host erased prefix retains argument numbering"
+    (erasedSignature.erasedPrefixArgs == 2 &&
+      erasedSignature.args.map (·.name) == #["arg1", "arg2"])
+
+  -- Classify real callback binders and retain their independent wire contract.
+  let .ok callback ← interfaceType (← argumentType ``valueCallback)
+    | throwError "value callback classification failed"
+  match callback with
+  | .function args .string .pure =>
+      expect "named callback argument" (args == #[{ name := "value", type := .nat }])
+  | result => throwError "value callback descriptor: {repr result}"
+  expect "callback encoding" (callback.toJson ==
+    "{\"type\":\"Function\",\"interfaceTag\":24,\"kind\":\"function\",\"effect\":\"pure\",\"args\":[{\"name\":\"value\",\"type\":{\"type\":\"Nat\",\"interfaceTag\":0}}],\"result\":{\"type\":\"String\",\"interfaceTag\":3}}")
+  let .ok valueSignature ← analyzeExportInterface (← getConstInfo ``valueCallback).type
+    | throwError "value callback signature failed"
+  match Vir.HostValidation.validateHostImportBoundary .hostImport "test.valueCallback" valueSignature with
+  | .error _ => pure ()
+  | .ok _ => throwError "raw Lean callback values must not become JS host values"
+  let .ok hostSignature ← analyzeExportInterface (← getConstInfo ``hostCallback).type
+    | throwError "host callback signature failed"
+  match Vir.HostValidation.validateHostImportBoundary .hostImport "test.hostCallback" hostSignature with
+  | .ok _ => pure ()
+  | .error error => throwError "JS callback boundary rejected: {repr error}"
 
   for name in #[``hiddenCarrier, ``sealedCarrier] do
     rejected name.toString (project (mkConst name))

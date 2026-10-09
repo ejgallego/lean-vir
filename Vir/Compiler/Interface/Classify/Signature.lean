@@ -68,16 +68,15 @@ public def analyzeExportInterface (type : Lean.Expr) :
 private partial def classifyHostImportSignatureLoop
     (type : Lean.Expr)
     (proofBinders : Array Bool)
-    (argIndex : Nat)
     (args : Array InterfaceArg)
     (erasedPrefixArgs : Nat) :
     CoreM (Except InterfaceClassifierError ClassifiedSignature) := do
-  let type := stripMData type
+  let type := type.consumeMData
   match type with
   | .forallE name domain body binderInfo =>
       if isRuntimeErasedTypeBinder domain || proofBinders[erasedPrefixArgs + args.size]?.getD false then
         if args.isEmpty then
-          classifyHostImportSignatureLoop body proofBinders argIndex args (erasedPrefixArgs + 1)
+          classifyHostImportSignatureLoop body proofBinders args (erasedPrefixArgs + 1)
         else
           return .error (.runtimeErasedParameterAfterArguments name)
       else if binderInfo != .default then
@@ -86,8 +85,8 @@ private partial def classifyHostImportSignatureLoop
         match ← interfaceType domain with
         | .error error => return .error (.inContext (.signatureArgument domain) error)
         | .ok argType =>
-            let arg := { name := binderArgName argIndex name, type := argType }
-            classifyHostImportSignatureLoop body proofBinders (argIndex + 1) (args.push arg) erasedPrefixArgs
+            let arg := { name := binderArgName (args.size + 1) name, type := argType }
+            classifyHostImportSignatureLoop body proofBinders (args.push arg) erasedPrefixArgs
   | result =>
       match ← classifyResult result with
       | .error error => return .error error
@@ -100,6 +99,6 @@ def classifyHostImportSignature (type : Lean.Expr) :
     CoreM (Except InterfaceClassifierError ClassifiedSignature) := do
   let proofs ← Meta.MetaM.run' <| Meta.forallTelescope type fun binders _ =>
     binders.mapM Meta.isProof
-  classifyHostImportSignatureLoop type proofs 1 #[] 0
+  classifyHostImportSignatureLoop type proofs #[] 0
 
 end Vir.Interface

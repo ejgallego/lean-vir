@@ -67,6 +67,7 @@ public inductive InterfaceClassifierError where
   | inContext (context : InterfaceClassifierContext) (cause : InterfaceClassifierError)
   | polymorphicCallbackParameter (name : Lean.Name)
   | implicitCallbackArgument (name : Lean.Name)
+  | recursiveCallback (owner : Lean.Name)
   | mutuallyRecursive (kind : InterfaceAggregateKind) (name : Lean.Name)
   | nonUniformRecursive (kind : InterfaceAggregateKind) (name : Lean.Name)
   | indexedInductive (name : Lean.Name)
@@ -127,6 +128,8 @@ public def InterfaceClassifierError.toMessageData : InterfaceClassifierError →
       m!"unsupported polymorphic callback type parameter `{name}`"
   | .implicitCallbackArgument name =>
       m!"unsupported implicit/instance callback argument `{name}`"
+  | .recursiveCallback owner =>
+      m!"callbacks referring to enclosing recursive type `{owner}` are not supported"
   | .mutuallyRecursive kind name =>
       m!"mutually recursive {kind.label} `{name}` is not supported"
   | .nonUniformRecursive kind name =>

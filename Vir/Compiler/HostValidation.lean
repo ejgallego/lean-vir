@@ -110,7 +110,7 @@ private def isJsBoundaryValueType : InterfaceType → Bool
 
 private def isJsBoundaryArgType : InterfaceType → Bool
   | .function args result _ =>
-      args.all (fun (_, type) => isJsBoundaryValueType type) && isJsBoundaryValueType result
+      args.all (fun arg => isJsBoundaryValueType arg.type) && isJsBoundaryValueType result
   | type => isJsBoundaryValueType type
 
 private def isJsValueConversionSignature (signature : ClassifiedSignature) : Bool :=
