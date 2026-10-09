@@ -113,10 +113,16 @@ initializer mappings, host imports and export summaries on failure or clear.
 Binary fields are read into named locals before constructor calls, so decoding
 does not depend on C++ argument evaluation order.
 
-[ULC-0001](../design/IR_DECLARATION_LOOKUP.md)
-records why a real compiler-environment prototype was disproportionate for
-declaration-only execution and motivates an upstream provider API. That proposal
-does not change the current package format or interpreter lifetime.
+The package provider indexes full declaration names and boxed base names with
+package-owned `lean::name_hash_map` tables. Names retain Lean's normal hashes;
+the indices refer to stable declaration slots rather than owning a second set of
+declarations. Clearing a package releases the indices before their declarations.
+
+VIR does not substitute the upstream environment-backed lookup directly:
+`Lean.IR.declMapExt` requires a valid compiler environment, module ownership and
+environment-extension initialization. A map of decoded declarations alone does
+not provide those facilities or the separate initializer/native-symbol policy.
+The local provider keeps that compiler closure out of declaration-only execution.
 
 ## Package instance lifecycle
 

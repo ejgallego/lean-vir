@@ -34,7 +34,7 @@ The key is the full Lean declaration name from the
 For compound types, retain the existing complete interface representation from
 separately reviewed compiler output alongside the client's typed adapter. Do not
 construct expectations from the program being loaded. ABI agreement does not
-prove semantics; native/browser oracle tests remain necessary.
+prove semantics; applications check behavior separately.
 
 ## Pending-creation cancellation
 
@@ -59,7 +59,7 @@ current candidate or disposes a stale one, and `reportCleanup` is the host's
 diagnostic handler. Property presence matters: cleanup can throw
 `undefined` or `null`. This handling does not replace explicit program disposal.
 
-See the [browser lifecycle contract](../development/RESOURCE_BUNDLES.md#browser-lifecycle)
+See the [browser lifecycle contract](../reference/RESOURCE_BUNDLES.md#browser-lifecycle)
 for `program.status`, failure and disposal. A failed instance still needs disposal;
 do not automatically replay its last call on a replacement.
 
