@@ -4,11 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import {
-  normalizeUint32,
-  requireStructureFields,
-  requireTypeField,
-} from "./vir-codec.js";
+import { normalizeUint32 } from "./vir-codec.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
 import { enumValue, normalizeEnum } from "./vir-value-normalizers.js";
 import {
@@ -23,53 +19,24 @@ const MAX_UINT64 = 0xffffffffffffffffn;
 const objectLayoutPlanCache = new WeakMap();
 
 export function objectArgumentSupported(type, selfType = null) {
-  const tag = type?.interfaceTag;
-  switch (tag) {
-    case INTERFACE_TAG.RECURSIVE_SELF:
-      return selfType !== null;
-    case INTERFACE_TAG.UNIT:
-    case INTERFACE_TAG.RESOURCE:
-    case INTERFACE_TAG.BOOL:
-    case INTERFACE_TAG.NAT:
-    case INTERFACE_TAG.INT:
-    case INTERFACE_TAG.STRING:
-    case INTERFACE_TAG.UINT8:
-    case INTERFACE_TAG.UINT16:
-    case INTERFACE_TAG.UINT32:
-    case INTERFACE_TAG.UINT64:
-    case INTERFACE_TAG.USIZE:
-    case INTERFACE_TAG.BYTE_ARRAY:
-    case INTERFACE_TAG.FLOAT:
-    case INTERFACE_TAG.FLOAT32:
-    case INTERFACE_TAG.EXPR:
-    case INTERFACE_TAG.SIMPLE_ENUM:
-      return true;
-    case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
-      return objectArgumentSupported(requireTypeField(type, "element", "object argument"), selfType);
-    case INTERFACE_TAG.PROD:
-      return objectArgumentSupported(requireTypeField(type, "fst", "object argument"), selfType) &&
-        objectArgumentSupported(requireTypeField(type, "snd", "object argument"), selfType);
-    case INTERFACE_TAG.STRUCTURE:
-      return objectStructureSupported(type, objectArgumentSupported);
-    case INTERFACE_TAG.TAGGED_UNION:
-      return objectTaggedUnionSupported(type, objectArgumentSupported, selfType);
-    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      return objectCustomInductiveSupported(type, objectArgumentSupported);
-    default:
-      return false;
-  }
+  return objectTypeSupported(type, false, selfType);
 }
 
 export function objectResultSupported(type, selfType = null) {
-  const tag = type?.interfaceTag;
-  switch (tag) {
+  return objectTypeSupported(type, true, selfType);
+}
+
+// One descriptor traversal; automatic functions are results only. These helpers
+// consume admitted descriptors, not another independently validated type grammar.
+function objectTypeSupported(type, isResult, selfType) {
+  const fieldSupported = isResult ? objectResultSupported : objectArgumentSupported;
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType !== null;
+    case INTERFACE_TAG.FUNCTION:
+      return isResult;
     case INTERFACE_TAG.UNIT:
     case INTERFACE_TAG.RESOURCE:
-    case INTERFACE_TAG.FUNCTION:
     case INTERFACE_TAG.BOOL:
     case INTERFACE_TAG.NAT:
     case INTERFACE_TAG.INT:
@@ -88,33 +55,33 @@ export function objectResultSupported(type, selfType = null) {
     case INTERFACE_TAG.ARRAY:
     case INTERFACE_TAG.LIST:
     case INTERFACE_TAG.OPTION:
-      return objectResultSupported(requireTypeField(type, "element", "object result"), selfType);
+      return fieldSupported(type.element, selfType);
     case INTERFACE_TAG.PROD:
-      return objectResultSupported(requireTypeField(type, "fst", "object result"), selfType) &&
-        objectResultSupported(requireTypeField(type, "snd", "object result"), selfType);
+      return fieldSupported(type.fst, selfType) && fieldSupported(type.snd, selfType);
     case INTERFACE_TAG.STRUCTURE:
-      return objectStructureSupported(type, objectResultSupported);
+      return objectStructureSupported(type, fieldSupported);
     case INTERFACE_TAG.TAGGED_UNION:
-      return objectTaggedUnionSupported(type, objectResultSupported, selfType);
+      return objectTaggedUnionSupported(type, fieldSupported, selfType);
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      return objectCustomInductiveSupported(type, objectResultSupported);
+      return objectCustomInductiveSupported(type, fieldSupported);
     default:
       return false;
   }
 }
 
 function objectStructureSupported(type, fieldSupported) {
-  const fields = requireStructureFields(type, "object structure");
+  const fields = type.fields;
   const trivial = trivialStructureField(type, fields);
   if (trivial !== null) {
     return fieldSupported(trivial.type, type);
   }
-  return objectLayoutSupported(type, fields, fieldSupported, type);
+  return objectLayoutSupported(type, fieldSupported, type);
 }
 
 function objectTaggedUnionSupported(type, fieldSupported, selfType) {
+  // The constructor owns storage, but its payload retains the enclosing recursive type.
   return type.constructors.every((ctor) =>
-    objectLayoutSupported(ctor, [taggedUnionField(ctor)], fieldSupported, selfType));
+    objectLayoutSupported(ctor, fieldSupported, selfType));
 }
 
 function objectCustomInductiveSupported(type, fieldSupported) {
@@ -123,14 +90,14 @@ function objectCustomInductiveSupported(type, fieldSupported) {
       const counts = objectRuntimeCounts(ctor, "object custom inductive");
       return counts.objectFieldCount === 0 && counts.usizeFieldCount === 0 && counts.scalarByteSize === 0;
     }
-    return objectLayoutSupported(ctor, ctor.fields, fieldSupported, type);
+    return objectLayoutSupported(ctor, fieldSupported, type);
   });
 }
 
-function objectLayoutSupported(owner, fields, fieldSupported, selfType) {
+function objectLayoutSupported(owner, fieldSupported, selfType) {
   let plan;
   try {
-    plan = objectLayoutPlan(owner, fields, "object layout");
+    plan = objectLayoutPlan(owner, "object layout");
   } catch {
     return false;
   }
@@ -151,15 +118,8 @@ function objectFieldPlanSupported(fieldPlan, fieldSupported, selfType) {
   }
 }
 
-export function taggedUnionField(ctor) {
-  return {
-    name: ctor.jsName,
-    type: ctor.type,
-    layout: ctor.layout,
-  };
-}
-
 export function objectLayoutSlotsFromPlan(plan) {
+  // Slots own per-call Lean references. Cache metadata, never these mutable buffers.
   return {
     objectFields: Array(plan.objectFieldCount).fill(0),
     usizeFields: Array(plan.usizeFieldCount).fill(0n),
@@ -167,21 +127,16 @@ export function objectLayoutSlotsFromPlan(plan) {
   };
 }
 
-export function objectLayoutPlan(owner, fields, label) {
-  const cacheable = owner !== null && (typeof owner === "object" || typeof owner === "function");
-  let cachedPlans;
-  if (cacheable) {
-    cachedPlans = objectLayoutPlanCache.get(owner);
-    if (cachedPlans !== undefined) {
-      for (const plan of cachedPlans) {
-        if (objectLayoutPlanMatches(plan, fields)) {
-          return plan;
-        }
-      }
-    }
-  }
+export function objectLayoutPlan(owner, label) {
+  // A structure/custom constructor owns fields; a Sum/Except constructor owns
+  // one payload. Derive that layout only on a cache miss from the admitted owner.
+  const cached = objectLayoutPlanCache.get(owner);
+  if (cached !== undefined) return cached;
 
   const counts = objectRuntimeCounts(owner, label);
+  const fields = owner.fields ?? [{
+    name: owner.jsName, type: owner.type, layout: owner.layout,
+  }];
   const fieldPlans = [];
   const seenObjects = new Set();
   const seenUSize = new Set();
@@ -190,7 +145,7 @@ export function objectLayoutPlan(owner, fields, label) {
     const fieldLabel = `${label}.${field.name ?? "field"}`;
     switch (field.layout.kind) {
       case "object": {
-        const index = objectLayoutIndex(owner, field.layout, fieldLabel);
+        const index = objectLayoutIndex(counts, field.layout);
         if (index === null) {
           throw new Error(`${fieldLabel} has unsupported object ABI layout`);
         }
@@ -202,7 +157,7 @@ export function objectLayoutPlan(owner, fields, label) {
         break;
       }
       case "usize": {
-        const index = usizeLayoutIndex(owner, field.layout, fieldLabel);
+        const index = usizeLayoutIndex(counts, field.layout);
         if (index === null) {
           throw new Error(`${fieldLabel} has unsupported object ABI layout`);
         }
@@ -234,44 +189,8 @@ export function objectLayoutPlan(owner, fields, label) {
     scalarByteSize: counts.scalarByteSize,
     fields: fieldPlans,
   };
-  if (!cacheable) {
-    return plan;
-  }
-  if (cachedPlans === undefined) {
-    objectLayoutPlanCache.set(owner, [plan]);
-  } else {
-    cachedPlans.push(plan);
-  }
+  objectLayoutPlanCache.set(owner, plan);
   return plan;
-}
-
-function objectLayoutPlanMatches(plan, fields) {
-  if (plan.fields.length !== fields.length) {
-    return false;
-  }
-  for (let index = 0; index < fields.length; index++) {
-    if (!sameLayoutField(plan.fields[index].field, fields[index])) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function sameLayoutField(lhs, rhs) {
-  return lhs === rhs || (
-    lhs?.name === rhs?.name &&
-    lhs?.type === rhs?.type &&
-    sameLayout(lhs?.layout, rhs?.layout)
-  );
-}
-
-function sameLayout(lhs, rhs) {
-  return lhs === rhs || (
-    lhs?.kind === rhs?.kind &&
-    lhs?.index === rhs?.index &&
-    lhs?.offset === rhs?.offset &&
-    lhs?.size === rhs?.size
-  );
 }
 
 function objectRuntimeCounts(owner, label) {
@@ -288,21 +207,20 @@ function objectRuntimeCounts(owner, label) {
   return { objectFieldCount, usizeFieldCount, scalarByteSize };
 }
 
-function objectLayoutIndex(owner, layout, label) {
-  if (layout?.kind !== "object" || !Number.isInteger(layout.index)) {
+function objectLayoutIndex(counts, layout) {
+  if (!Number.isInteger(layout.index)) {
     return null;
   }
-  const { objectFieldCount } = objectRuntimeCounts(owner, label);
-  return layout.index >= 0 && layout.index < objectFieldCount ? layout.index : null;
+  return layout.index >= 0 && layout.index < counts.objectFieldCount ? layout.index : null;
 }
 
-function usizeLayoutIndex(owner, layout, label) {
-  if (layout?.kind !== "usize" || !Number.isInteger(layout.index)) {
+function usizeLayoutIndex(counts, layout) {
+  if (!Number.isInteger(layout.index)) {
     return null;
   }
-  const { objectFieldCount, usizeFieldCount } = objectRuntimeCounts(owner, label);
-  const index = layout.index - objectFieldCount;
-  return index >= 0 && index < usizeFieldCount ? index : null;
+  // Native indices include the object-field prefix; the USize buffer does not.
+  const index = layout.index - counts.objectFieldCount;
+  return index >= 0 && index < counts.usizeFieldCount ? index : null;
 }
 
 function scalarLayoutOffset(layout, scalarByteSize, label) {

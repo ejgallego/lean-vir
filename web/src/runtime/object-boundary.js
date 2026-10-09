@@ -4,7 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { requireStructureFields } from "./vir-codec.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
 
 export function objectTypeNeedsBoxedBoundary(type) {
@@ -14,7 +13,7 @@ export function objectTypeNeedsBoxedBoundary(type) {
     case INTERFACE_TAG.UINT64:
       return true;
     case INTERFACE_TAG.STRUCTURE: {
-      const fields = requireStructureFields(type, "object boundary");
+      const fields = type.fields;
       const trivial = trivialStructureField(type, fields);
       return trivial !== null && objectTypeNeedsBoxedBoundary(trivial.type);
     }
@@ -24,14 +23,5 @@ export function objectTypeNeedsBoxedBoundary(type) {
 }
 
 export function trivialStructureField(type, fields) {
-  const index = type?.trivialFieldIndex;
-  if (!Number.isInteger(index)) {
-    return null;
-  }
-  if (index < 0 || index >= fields.length) {
-    throw new Error(
-      `${type?.type ?? "structure"} has invalid trivial field index`,
-    );
-  }
-  return fields[index];
+  return type.trivialFieldIndex === undefined ? null : fields[type.trivialFieldIndex];
 }

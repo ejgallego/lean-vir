@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+import { validateInterfaceType } from "../../web/src/runtime/interface-manifest.js";
 import { normalizeCustomInductive } from "../../web/src/runtime/vir-value-normalizers.js";
 
 const scalarType = { type: "Unit", interfaceTag: INTERFACE_TAG.UNIT };
@@ -15,6 +16,7 @@ function objectField(name, index) {
 }
 const nilCtor = {
   name: "Example.nil",
+  tag: 0,
   jsName: "nil",
   objectFieldCount: 0,
   usizeFieldCount: 0,
@@ -23,6 +25,7 @@ const nilCtor = {
 };
 const unaryCtor = {
   name: "Example.unary",
+  tag: 1,
   jsName: "unary",
   objectFieldCount: 1,
   usizeFieldCount: 0,
@@ -31,6 +34,7 @@ const unaryCtor = {
 };
 const pairCtor = {
   name: "Example.pair",
+  tag: 2,
   jsName: "pair",
   objectFieldCount: 2,
   usizeFieldCount: 0,
@@ -40,7 +44,11 @@ const pairCtor = {
     objectField("right", 1),
   ],
 };
-const type = Object.freeze({ constructors: Object.freeze([nilCtor, unaryCtor, pairCtor]) });
+const type = Object.freeze(validateInterfaceType({
+  type: "Example", kind: "customInductive", name: "Example",
+  interfaceTag: INTERFACE_TAG.CUSTOM_INDUCTIVE,
+  constructors: Object.freeze([nilCtor, unaryCtor, pairCtor]),
+}));
 const expectedShapes =
   '{ kind: "nil" } | { kind: "unary", value } | { kind: "pair", fields: { left, right } }';
 
@@ -59,7 +67,7 @@ assert.deepEqual(
   { index: 2, ctor: pairCtor, fields: { left: 1, right: 2 } },
 );
 
-// Exercise repeated normalization with the same immutable descriptor.
+// Exercise repeated normalization against the same admitted descriptor.
 assert.deepEqual(normalizeCustomInductive({ kind: "unary", value: 3 }, type, "repeat"), {
   index: 1,
   ctor: unaryCtor,
@@ -101,13 +109,20 @@ assert.throws(
 
 // Independently admitted descriptors have independent normalization plans.
 const replacementCtor = { ...nilCtor, name: "Example.empty", jsName: "empty" };
-const replacementType = Object.freeze({ constructors: Object.freeze([replacementCtor]) });
+const replacementType = Object.freeze(validateInterfaceType({
+  ...type, constructors: Object.freeze([replacementCtor]),
+}));
 assert.equal(normalizeCustomInductive({ kind: "empty" }, replacementType, "replacement").ctor, replacementCtor);
 assert.throws(
   () => normalizeCustomInductive({ kind: "nil" }, replacementType, "replacement"),
   /replacement has unknown custom inductive constructor nil; expected \{ kind: "empty" \}/,
 );
 assert.equal(normalizeCustomInductive({ kind: "nil" }, type, "original").ctor, nilCtor);
+
+// Malformed metadata is rejected at admission, before any value conversion.
+const malformed = structuredClone(type);
+malformed.constructors[2].fields[0].layout.index = 5;
+assert.throws(() => validateInterfaceType(malformed), /outside objectFieldCount/);
 
 console.log("custom inductive normalization smoke ok");
 

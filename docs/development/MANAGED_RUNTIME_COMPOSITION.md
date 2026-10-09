@@ -35,6 +35,22 @@ including a fresh default builder when required. Public browser and Node entries
 continue selecting their usual providers. Imports remain declarative: there is
 no mutable codec registry or runtime feature flag.
 
+Conversion consumes the installed, validated and deeply frozen manifest directly.
+`interface-manifest.js` owns descriptor-shape validation; the converters do not
+repeat it for each field, element or callback. Argument and result support share
+one traversal, with automatic functions permitted only in the result direction.
+Layout plans and constructor-name lookups are derived once per immutable owner;
+layout fields come from that owner rather than a separate caller-supplied list.
+Only metadata is cached: each conversion allocates fresh slots for its owned Lean
+references. Changing an internal descriptor after admission is unsupported.
+
+This distinction applies to metadata, not application values. Each call still
+checks JavaScript value shapes and numeric bounds, returned constructor tags,
+supported scalar layouts and retained-value liveness/instance ownership. Argument
+conversion can execute application code, so callback liveness is checked again
+before native transfer. Package admission keeps its independent native contract
+check; it is not replaced by these conversion caches.
+
 The compiled [ManagedCore fixture](../../fixtures/runtime/ManagedCore.lean)
 exercises a thin Lean boundary:
 
