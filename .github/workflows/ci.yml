@@ -62,6 +62,7 @@ jobs:
       - run: npm run test:env-lookup:wasm-pair
       - run: npm run test:pages
       - run: npm run test:pages:browser
+      - run: npm run test:quickstart:browser
       - run: npm run test:infoview:browser
       - run: npm run test:resources:browser
       - name: Retain resource browser diagnostics
@@ -69,7 +70,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: resource-browser-diagnostics
-          path: build/resources-browser/
+          path: |
+            build/resources-browser/
+            build/quickstart-*/*.log
           if-no-files-found: ignore
       - run: npm run test:upstream:no-build
       - run: npm run package:runtime
@@ -142,6 +145,7 @@ jobs:
       - run: npm run test:resources:packing
       - run: npm run test:resources:program
       - run: npm run test:resources:published
+      - run: npm run test:quickstart
       - run: npm run test:resources:cache
       - name: Preserve failed resource cache campaign
         if: failure()
@@ -171,6 +175,7 @@ jobs:
             build/resource-acquisition-*/transport/args.json
             build/resource-packing-*/
             build/resource-client-*/*.log
+            build/quickstart-*/*.log
           if-no-files-found: ignore
       - run: npm run test:interface
       - run: npm run test:generator:memory

@@ -1,5 +1,27 @@
 # Embedded resources: review and acceptance
 
+## Current workflow
+
+[PR229](https://github.com/ejgallego/lean-vir/pull/229) landed module-owned
+`+Module:virResourcePack` and literal `include_vir_assets`, replacing carrier keys
+and recipe-based application setup. Reviewed head `957854b9` passed all four
+jobs in CI run `37925315137`, including native resources, published-client and
+cache checks. The landed source is `aa465b87` on Lean 4.35.0-rc4. Follow the
+[runnable application](../../examples/tutorials/quickstart/README.md), not old
+recipe commands in dated acceptance records.
+
+Slides separately qualified its main-4.35 successor at `daa96fee` (executed
+`99ec093`) with VIR `3e7dbcf0`, runtime `6cdd` and regenerated program `00c4`.
+Its own root/leaf builds, native checks and 30 focused Chromium/Firefox results are
+[retained downstream evidence](https://github.com/ejgallego/verso-slides/tree/6f3653037663f529fb8ffb64ebe2cb227d0fe886/docs/evidence/main435-adoption),
+not tests rerun by this document update or complete product qualification.
+
+The historical matrix below includes superseded recipe/v2/bounds contracts.
+Its partial rows are evidence limits, not requirements to restore retired APIs,
+add application budgets or expand the current pre-merge gate.
+
+## Historical checkpoints
+
 The Lean-name 4.34 checkpoint introduced by PR217 uses descriptor schema2 and
 resource compatibility3. Its [public e415 runtime](https://github.com/ejgallego/lean-vir/releases/tag/resource-e415e41a43eccf298b710056efccf6c3d436d5fceb4e130fb06cb09d12d027dd)
 is 1,120,065 bytes, SHA256
@@ -96,7 +118,7 @@ See [the contract and compiling recipe](RESOURCE_BUNDLES.md). This is based on
 main, independently of the Lean 4.35 support PR. Runtime packs must match the
 selected compiler exactly; a 4.35 pack cannot be reused under 4.34.
 
-## Acceptance scope
+## Historical acceptance scope
 
 “Covered” means the focused behavior has passing local evidence, not that the
 complete product or every supported platform is qualified. CI runs core,
@@ -178,7 +200,7 @@ reject. This changes neither the underlying runtime's ownership policy nor its
 ABI. Collection is observed after explicit GC, not promised to occur immediately
 on disposal, and linear memory capacity need not shrink while an instance lives.
 
-## Before promoting the workflow
+## Historical promotion checklist
 
 Finish the partial/pending build-graph and Wasm-bound cases above; measure resource
 size, compile memory and retained browser memory; qualify the published runtime

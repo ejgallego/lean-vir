@@ -236,7 +236,7 @@ assertLink(indexHtml, "benchmarks/");
 assertLink(demoHtml, "index.html");
 assertLink(demoHtml, "surface/");
 assertLink(demoHtml, "size/");
-assertLink(demoHtml, "dev.html?package=local-quickstart.irpkg&amp;entry=Quickstart.total");
+assertLink(demoHtml, "dev.html?package=local-quickstart.irpkg&amp;entry=QuickstartApp.Program.total");
 assertLink(demoHtml, `dev.html?package=${defaultPackageFile}&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump`);
 assertLink(demoHtml, `dev.html?package=${hostPackageFile}&amp;entry=HostInterop_titleHandshake`);
 assertLink(demoHtml, `dev.html?package=${leanPackageFile}&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore`);

@@ -115,6 +115,8 @@
     "test:resources:program": "lake build vir_irpkg vir_resource_program vir_resource_pack +tests.resources.BrowserProgram:vir && node tests/resources/native-generation.mjs && node tests/resources/program-packing.mjs && node tests/resources/carrier-names.mjs",
     "test:resources:client": "lake build vir_resource_program vir_resource_pack && node tests/resources/client.mjs",
     "test:resources:published": "node tests/resources/client.mjs --published",
+    "test:quickstart": "node tests/resources/quickstart.mjs",
+    "test:quickstart:browser": "node tests/resources/quickstart.mjs --browser",
     "test:resources:cache": "node tests/resources/cache.mjs",
     "test:resources:descriptor": "node --test tests/resources/*.test.mjs",
     "test:resources:browser": "lake build vir_resource_pack vir_irpkg VirResourceBrowserFixture && node tests/resources/browser.mjs",
