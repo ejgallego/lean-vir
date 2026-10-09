@@ -15,7 +15,7 @@ namespace ReactCounter
 open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 def label (value : Nat) : String :=
   "react:" ++ toString value
@@ -32,9 +32,9 @@ def initialProbe (eager : Js String) (initializer : Js.Function0 (Js String))
     let value ← Js.Tuple2.first lazyState
     let click ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) =>
       Js.Function.callVoid stored value
-    return ← <button id="react-initial-probe" onClick={click}>
+    jsx%{<button id="react-initial-probe" onClick={click}>
       {← Js.Tuple2.first eagerState}{value}
-    </button>
+    </button>}
 
 /-- Exercises the closed generic callback shapes without wrapping their native values. -/
 def callbackShapeProbe
@@ -54,8 +54,8 @@ def callbackShapeProbe
     let binaryResult ← Js.Function.call2 selectedBinary (← js#"two") (← js#"three")
     let ternaryResult ← Js.Function.call3 selectedTernary
       (← js#"four") (← js#"five") (← js#"six")
-    return ← <div id="react-callback-shapes">{nullaryResult}{unaryResult}
-      {binaryResult}{ternaryResult}</div>
+    jsx%{<div id="react-callback-shapes">{nullaryResult}{unaryResult}
+      {binaryResult}{ternaryResult}</div>}
 
 def reducerInitializerProbe (reducer : Js (Reducer String String)) (initial : Js.Any)
     (init : Js.Function1 Js.Any (Js String)) (action : Js String) :
@@ -64,7 +64,7 @@ def reducerInitializerProbe (reducer : Js (Reducer String String)) (initial : Js
     js#let (value, dispatch) ← Hooks.useReducerWithInit reducer initial init
     let click ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) =>
       Js.Function.callVoid dispatch action
-    return ← <button onClick={click}>{value}</button>
+    jsx%{<button onClick={click}>{value}</button>}
 
 def eventProbe (record : Js.Function1 (Js SyntheticEvent) Unit) :
     RuntimeM (FunctionComponent Props) :=
@@ -75,7 +75,7 @@ def eventProbe (record : Js.Function1 (Js SyntheticEvent) Unit) :
       SyntheticEvent.preventDefault event
       SyntheticEvent.stopPropagation event
       Js.Function.callVoid record event
-    return ← <button onClick={click}><span>event target</span></button>
+    jsx%{<button onClick={click}><span>event target</span></button>}
 
 def counter : RuntimeM (FunctionComponent Props) := do
   let initial ← JsValue.ofNat 0
@@ -85,13 +85,13 @@ def counter : RuntimeM (FunctionComponent Props) := do
     js#let (countValue, countSetter) ← Hooks.useState (α := Nat) initial
     let increment ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) =>
       Js.Function.callVoid countSetter (SetStateAction.ofUpdater update)
-    return ← <button type="button" id="react-counter-button" onClick={increment}>react:{countValue}</button>
+    jsx%{<button type="button" id="react-counter-button" onClick={increment}>react:{countValue}</button>}
 
 partial def renderInto (root : Lean.Vir.Js Root) (value : Nat) : DomM Unit := do
   let node ← ReactM.run do
     let text ← Node.text (← Lean.Vir.JsValue.ofString (label value))
     let increment ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) => DomM.toRuntime (renderInto root (value + 1))
-    return ← <button type="button" id="react-counter-button" onClick={increment}>{pure text}</button>
+    jsx%{<button type="button" id="react-counter-button" onClick={increment}>{pure text}</button>}
   Root.render root node
 
 def mount (selector : String) : DomM Bool := do
@@ -113,7 +113,7 @@ def mountDefault : DomM Bool :=
 
 def staticTree : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text (← Lean.Vir.JsValue.ofString "react:static")
-  return ← <span id="react-static-label">{pure text}</span>
+  jsx%{<span id="react-static-label">{pure text}</span>}
 
 def renderStatic (selector : String) : DomM Bool := do
   let container ← Lean.Vir.Browser.Document.querySelector
@@ -149,7 +149,7 @@ def effectProbe : RuntimeM (FunctionComponent Props) :=
       Js.UndefinedOr.undefined
     Hooks.useEffect effectWithDeps (Js.UndefinedOr.ofJs (← js#[Js.erase dep]))
     let text ← Node.text (← Lean.Vir.JsValue.ofString "react:effect")
-    return ← <span id="react-effect-label">{pure text}</span>
+    jsx%{<span id="react-effect-label">{pure text}</span>}
 
 def mountEffect (selector : String) : DomM Bool := do
   let component ← effectProbe
@@ -174,7 +174,7 @@ def memoProbe : RuntimeM (FunctionComponent Props) :=
     let value ← Hooks.useMemo calculation (← js#[Js.erase dep])
     let memoValue ← JsValue.toNat value
     let text ← Node.text (← Lean.Vir.JsValue.ofString s!"react:memo:{memoValue}")
-    return ← <span id="react-memo-label">{pure text}</span>
+    jsx%{<span id="react-memo-label">{pure text}</span>}
 
 def mountMemo (selector : String) : DomM Bool := do
   let component ← memoProbe
@@ -206,7 +206,7 @@ def memoStableProbe : RuntimeM (FunctionComponent Props) :=
         let value ← JsValue.toNat previous
         JsValue.ofNat (value + 1)
       Js.Function.callVoid countSetter (SetStateAction.ofUpdater update)
-    return ← <button type="button" id="react-memo-stable-button" onClick={increment}>{pure text}</button>
+    jsx%{<button type="button" id="react-memo-stable-button" onClick={increment}>{pure text}</button>}
 
 def mountMemoStable (selector : String) : DomM Bool := do
   let component ← memoStableProbe
@@ -240,9 +240,9 @@ def refFragmentProbe : RuntimeM (FunctionComponent Props) :=
         Ref.set lastClick next
         pure next
       Js.Function.callVoid countSetter (SetStateAction.ofUpdater update)
-    let button ← <button type="button" id="react-ref-button" onClick={increment}>{pure labelText}</button>
+    let button ← jsx%{<button type="button" id="react-ref-button" onClick={increment}>{pure labelText}</button>}
     let markerText ← Node.text (← Lean.Vir.JsValue.ofString "fragment child")
-    let marker ← <span id="react-fragment-marker">{pure markerText}</span>
+    let marker ← jsx%{<span id="react-fragment-marker">{pure markerText}</span>}
     Node.fragment (← Js.Object.empty) (← js#[button, marker])
 
 def mountRefFragment (selector : String) : DomM Bool := do
@@ -261,7 +261,7 @@ def mountRefFragment (selector : String) : DomM Bool := do
 
 def benchTextSpan (index : Nat) : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text (← Lean.Vir.JsValue.ofString ("item:" ++ toString index))
-  return ← <span className="react-bench-text" data-index={← JsValue.ofString (toString index)}>{pure text}</span>
+  jsx%{<span className="react-bench-text" data-index={← JsValue.ofString (toString index)}>{pure text}</span>}
 
 partial def benchTextChildrenAux
     (index remaining : Nat)
@@ -304,8 +304,8 @@ def benchCallbackButton (root : Lean.Vir.Js Root) (index : Nat) : ReactM (Lean.V
   let text ← Node.text (← Lean.Vir.JsValue.ofString ("callback:" ++ toString index))
   let click ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) => DomM.toRuntime do
     Root.render root (← ReactM.run (benchTextTree 1))
-  return ← <button type="button" className="react-bench-callback"
-    data-index={← JsValue.ofString (toString index)} onClick={click}>{pure text}</button>
+  jsx%{<button type="button" className="react-bench-callback"
+    data-index={← JsValue.ofString (toString index)} onClick={click}>{pure text}</button>}
 
 partial def benchCallbackChildrenAux
     (root : Lean.Vir.Js Root)
@@ -382,7 +382,7 @@ def nestedDivs (depth : Nat) : ReactM (Lean.Vir.Js Node) := do
   | 0 => Node.text (← Lean.Vir.JsValue.ofString "deep")
   | n + 1 => do
       let child ← nestedDivs n
-      return ← <div>{pure child}</div>
+      jsx%{<div>{pure child}</div>}
 
 def renderTooDeep (selector : String) : DomM Bool := do
   let container ← Lean.Vir.Browser.Document.querySelector

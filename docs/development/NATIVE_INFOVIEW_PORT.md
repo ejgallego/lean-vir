@@ -31,7 +31,7 @@ React, browser primitives and server/transport services remain dependencies.
 def View : RuntimeM (FunctionComponent PanelWidgetProps) := do
   let Upstream ← interactiveCode
   GoalPanel.withCode fun fmt => do
-    <Upstream fmt={fmt}/>
+    jsx%{<Upstream fmt={fmt}/>}
 ```
 
 The generated getter returns the exact public component from
@@ -124,7 +124,7 @@ presentation state, and ordinary React component/effect lifecycles**.
 - Native JSX plus `js%{}` handles element props and styles without a builder
   catalogue. `Html.text` makes Lean-string conversion explicit but compact.
 - The native renderer's `CodeProps` is a compile-time schema with one
-  `fmt : Js CodeWithInfos` field. `<Code fmt={value}/>` constructs native props;
+  `fmt : Js CodeWithInfos` field. `jsx%{<Code fmt={value}/>}` constructs native props;
   `js_field% props "fmt"` projects the exact value without a Lean record or
   `WithData` box. External-component props remain the separate boundary above.
 - `Props.WithData` and `LeanRef` keep internal records and functional state

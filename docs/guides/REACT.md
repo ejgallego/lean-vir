@@ -43,16 +43,17 @@ array, including an optional key in the props object.
 
 ### Lean HTML and JSX
 
-Import `Vir.ProofWidgets.Jsx` and open its scope for native construction:
+Importing `Vir.ProofWidgets.Jsx` makes the `jsx%{...}` literal available for
+native construction; `js%{...}` and `js#...` need `open scoped Lean.Vir.Js`:
 
 ```lean
 import Vir.ProofWidgets.Jsx
 open Lean.Vir Lean.Vir.React
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 def greeting (name : Js String) : ReactM (Js Node) := do
   let style ← js%{ "color" := js#"red" }
-  return ← <section className="greeting" style={style}>Hello, {name}</section>
+  jsx%{<section className="greeting" style={style}>Hello, {name}</section>}
 ```
 
 Attributes accept exact JS values; literal strings are converted once. Use
@@ -68,7 +69,7 @@ actions than with per-field construction. See the
 
 In native object fields, native arrays and JSX attributes, `js#"text"` inserts
 its conversion at that position: `js%{ "title" := js#"Hello" }`,
-`js#[js#"Hello"]` and `<span title={js#"Hello"}/>` need no extra arrow.
+`js#[js#"Hello"]` and `jsx%{<span title={js#"Hello"}/>}` need no extra arrow.
 Parentheses do not change this rule. Elsewhere it remains a `RuntimeM (Js String)`
 action. Named property/array actions still require explicit `←`; only literal
 syntax receives this treatment.
@@ -85,14 +86,15 @@ an intermediate Lean property record or array. Values require explicit
 conversion; these notations do not inspect or encode arbitrary Lean data.
 
 Uppercase JSX takes a native function component. Supply an already-typed
-props object with `<Component @props={props}/>`; this must be the sole attribute.
+props object with `jsx%{<Component @props={props}/>}`; this must be the sole attribute.
 `@props` is VIR's exact-object argument, not a field named `props` or JavaScript
 object spread. It performs no copying or merging before calling React. React
 still applies its normal props construction. Both attribute `{...props}` and
 child `{...items}` spreads are rejected; insert native child arrays with `{items}`.
 With an untyped `FunctionComponent Props`, attributes construct ordinary native
 props. For a typed component, declare a flat structure whose fields are native
-`Js` values and use it only as the props shape:
+`Js` values and use it only as the props shape. The same import makes
+`js_field%` available for reading declared fields:
 
 ```lean
 structure LabelProps where
@@ -103,7 +105,7 @@ def Label : RuntimeM (FunctionComponent LabelProps) :=
     Node.text (← js_field% props "title")
 ```
 
-Given `let Label ← Label`, `<Label title="Hello"/>` checks field names, required
+Given `let Label ← Label`, `jsx%{<Label title="Hello"/>}` checks field names, required
 fields and value types at compile time. No `LabelProps` record is allocated:
 JSX still writes a fresh native object. Fields must be supplied unless their
 projection is tagged `attribute [js_optional] LabelProps.title`. Such a field
@@ -113,7 +115,7 @@ A field declared `Js.UndefinedOr String` without the tag remains required;
 explicit `undefined` and omission are distinct. Generic,
 dependent and inherited schemas are outside this bounded surface. The special
 `key` and `children` fields and `__proto__` are not supported schema fields.
-Supply `key` separately, for example `<Label key={id} title="Hello"/>`: it accepts
+Supply `key` separately, for example `jsx%{<Label key={id} title="Hello"/>}`: it accepts
 native string/number/bigint keys, optionally null or undefined. React consumes it
 as element metadata; it is not readable through the component's props schema.
 `js_field% props "title"` uses that declaration for one native property read;
@@ -168,8 +170,8 @@ Use native mapping directly:
 def labels (values : Js.Array String) : ReactM (Js Node) := do
   let render ← Js.Function.ofLean3 fun (label : Js String) (_ : Js Float)
       (_ : Js.Array String) =>
-    <span key={label}>{label}</span>
-  return ← <div>{values.map render}</div>
+    jsx%{<span key={label}>{label}</span>}
+  jsx%{<div>{values.map render}</div>}
 ```
 
 `Js.Array.map` calls native `array.map(callback)` with an explicitly created
@@ -183,10 +185,15 @@ is not exposed. No Lean array is constructed.
 The mapping expression runs once at its child position. Keys and component
 identity follow React's ordinary rules. For a fixed native array, use
 `js#[first, second]`; execute construction actions explicitly inside it, such
-as `js#[← <span key="first">First</span>, ← <span key="second">Second</span>]`.
+as `js#[← jsx%{<span key="first">First</span>}, ← jsx%{<span key="second">Second</span>}]`.
 
-`Html.text` explicitly converts Lean text. In a `do` block, use
-`return ← <...>` for a final JSX expression to avoid Lean parsing `<` as comparison.
+`Html.text` explicitly converts Lean text.
+
+Each `jsx%{...}` literal has one root element; nested tags need no extra
+delimiter. It can be the final action in a `do` block without `return ←`.
+This notation adopts part of [PR197](https://github.com/ejgallego/lean-vir/pull/197).
+VIR retains its parser on Lean 4.35; adopting Lean 4.36's upstream HTML parser
+is separate work.
 
 The [HTML fixture](../../fixtures/ProofWidgetsHtml.lean) and
 [JSX fixture](../../fixtures/ProofWidgetsJsxSubset.lean) exercise tags, string and
