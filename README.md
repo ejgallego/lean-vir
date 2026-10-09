@@ -19,17 +19,11 @@ No local Lean or Wasm build is needed to try the hosted site.
 
 ## Use VIR in an application
 
-Write your browser program in a Lean module and mark its public entry points:
+Write your browser program in a Lean module and mark its public entry points
+with `@[vir_export]`. The [Quickstart's greeting](examples/tutorials/quickstart/QuickstartApp/Program.lean)
+is the first example.
 
-```lean
-module
-meta import Vir.Attributes
-
-@[vir_export]
-public def Client.Program.greet (name : String) : String := "Hello, " ++ name
-```
-
-The application's client library declares that program and prepares its browser
+The application's asset library declares that program and prepares its browser
 files through Lake. It also acquires the matching prebuilt **runtime**: the
 JavaScript loader and Wasm interpreter that execute the program.
 
@@ -38,12 +32,21 @@ writes the prepared files, and the browser calls the program's exported function
 Applications do not locate VIR build directories, invoke packaging scripts, or
 build Wasm. Program compilation and runtime acquisition remain independent.
 
-Follow [the application setup guide](docs/guides/EMBEDDED_RESOURCES.md) for a
-complete greeting project, its Lake command, publication and JavaScript call.
+Start with the [runnable Quickstart application](examples/tutorials/quickstart/README.md):
+
+```bash
+cd examples/tutorials/quickstart
+lake exe publish _site
+python3 -m http.server --directory _site 8000
+```
+
+Open <http://localhost:8000/> to see Lean's greeting.
+The [application setup guide](docs/guides/EMBEDDED_RESOURCES.md) explains the
+same project's build, asset value, publication and JavaScript call.
 Use the Lean toolchain selected by your VIR dependency; HTTPS runtime acquisition
 needs `curl`.
-The integration is under review for the first release; current qualification
-and limits are recorded in [the acceptance checklist](docs/development/RESOURCE_ACCEPTANCE.md).
+Qualification and remaining limits are recorded in
+[the acceptance checklist](docs/development/RESOURCE_ACCEPTANCE.md).
 
 ## Experimental
 
@@ -69,6 +72,9 @@ run this setup sequence.
 
 [Build internals](docs/guides/BUILD_WORKFLOWS.md) documents the compiler, runtime
 distribution and repository tooling behind the application workflow.
+For custom JavaScript hosts and explicit object/host-binding APIs, see the
+[runtime API reference](docs/guides/JS_API.md) and
+[matching runtime/SDK assets](docs/guides/CALL_LEAN_FROM_JS.md).
 
 [Documentation](docs/README.md) links the API guides, implementation references,
 examples, and validation instructions.

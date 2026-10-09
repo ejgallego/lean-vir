@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 export const browserRunnerCaseSpecs = [
   {
     packageFile: "local-quickstart.irpkg",
-    entryName: "Quickstart.total",
+    entryName: "QuickstartApp.Program.total",
     expected: {
       entryCount: 6,
       input: "[]",

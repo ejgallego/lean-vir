@@ -107,7 +107,7 @@ export async function smokeRuntimeDemo(cdp, origin) {
   );
   assert.equal(state.mood, "happy");
   assert.deepEqual(state.packageItems.map((item) => item.href), [
-    "dev.html?package=local-quickstart.irpkg&entry=Quickstart.total",
+    "dev.html?package=local-quickstart.irpkg&entry=QuickstartApp.Program.total",
     `dev.html?package=${defaultPackageFile}&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump`,
     `dev.html?package=${hostPackageFile}&entry=HostInterop_titleHandshake`,
     "react.html",
@@ -115,7 +115,7 @@ export async function smokeRuntimeDemo(cdp, origin) {
     `dev.html?package=${leanPackageFile}&entry=Vir_Fixtures_ExprPrinter_exprKindScore`,
     `dev.html?package=${boundaryPackageFile}&entry=Vir_Fixtures_Boundary_floatScaleScore`,
   ]);
-  assert.ok(state.packageItems[0].text.includes("Four small exports from one Lean file"));
+  assert.ok(state.packageItems[0].text.includes("Explicit-root developer package from the shared tutorial source"));
   assert.ok(state.packageItems[1].text.includes("Basic, list/option, interface shapes"));
   assert.ok(state.packageItems[2].text.includes("Browser host calls, React, and Tamagotchi demos"));
   assert.ok(state.packageItems[3].text.includes("Lean-authored React Tamagotchi"));

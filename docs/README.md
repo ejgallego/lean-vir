@@ -1,14 +1,16 @@
 # Documentation
 
-Start with [the application workflow](guides/EMBEDDED_RESOURCES.md), or the
+Start with [the runnable Quickstart](../examples/tutorials/quickstart/README.md) and
+[its application workflow](guides/EMBEDDED_RESOURCES.md), or the
 [developer guide](DEVELOPER_GUIDE.md) to work on VIR itself.
 Read [support scope](SUPPORT.md) for the officially supported boundary and
 experimental conveniences; shipped coverage is not a support commitment.
 
 ## Guides: use VIR
 
-- [Application setup](guides/EMBEDDED_RESOURCES.md): a complete plain greeting
-  project, its Lake build, site publication and JavaScript call.
+- [Quickstart](../examples/tutorials/quickstart/README.md): the complete plain
+  greeting project. [Application setup](guides/EMBEDDED_RESOURCES.md) explains
+  its ordinary Lake build, publication and JavaScript call.
 - [Lean library](guides/LEAN_VIR_LIBRARY.md#choose-a-boundary-representation): choose
   value representations for core interop,
   alongside explicitly identified experimental helpers.
