@@ -1,35 +1,33 @@
-# The application workflow
+# Use VIR in an application
 
-Start with the [runnable Quickstart](../../examples/tutorials/quickstart/README.md).
-It is the maintained source for the program, Lake setup, asset value, native
-publisher and one-shot browser entry described here—not an excerpt to transcribe.
+After adding `lean_vir` to your project, integration has three parts: mark the
+functions to export, include their assets in a resource library, and tell Lake
+to prepare those assets. The [Quickstart](../../examples/tutorials/quickstart/README.md)
+is the complete runnable project used below.
 
-```bash
-cd examples/tutorials/quickstart
-lake exe publish _site
-python3 -m http.server --directory _site 8000
-```
+## 1. Mark the functions JavaScript may call
 
-Open <http://localhost:8000/>. The project can be copied out of the repository;
-its [configuration](../../examples/tutorials/quickstart/lakefile.lean) pins an
-immutable compatible VIR revision and [toolchain](../../examples/tutorials/quickstart/lean-toolchain).
-Lean/Elan, Git and `curl` are build prerequisites. Python is only the example
-HTTP server. No npm, WASI SDK, supplied pack or repository website build is needed.
-
-## Declare preparation, then include the value
-
-The [program](../../examples/tutorials/quickstart/QuickstartApp/Program.lean)
-marks its public greeting with `@[vir_export]`. Its owner is separate from the
-resource module's owner. The asset library declares the preparation dependency:
+In the [program module](../../examples/tutorials/quickstart/QuickstartApp/Program.lean),
+use `@[vir_export]` on public entry points:
 
 ```lean
-lean_lib QuickstartResources where
-  roots := #[`QuickstartApp.Resources]
-  needs := #[`+QuickstartApp.Program:virResourcePack]
+module
+meta import Vir.Attributes
+
+@[vir_export]
+public def QuickstartApp.Program.greet (name : String) : String :=
+  "Hello, " ++ name
 ```
 
-The [resource module](../../examples/tutorials/quickstart/QuickstartApp/Resources.lean)
-uses those prepared bytes:
+One program can export several functions. The program module selects what Lake
+builds; the full declaration name selects what JavaScript calls.
+
+## 2. Include the assets in a resource library
+
+Use an existing asset library or create one. Keep it separate from the library
+containing your program, so building the program does not depend on its own
+generated assets. Its [resource module](../../examples/tutorials/quickstart/QuickstartApp/Resources.lean)
+contains:
 
 ```lean
 module
@@ -39,18 +37,50 @@ public def QuickstartApp.Resources.resources : Vir.Resources.ResourceSet :=
   include_vir_assets (modules := #[QuickstartApp.Program])
 ```
 
-The program module selects what is prepared; the full declaration name
-`QuickstartApp.Program.greet` selects what JavaScript calls. Library names are
-owners, not another program-selection key. In an existing application, reuse
-suitable disjoint program and asset owners rather than inventing wrapper libraries.
-The program must not import its own resource carrier.
+This is an ordinary Lean value containing the selected program and its matching
+precompiled interpreter. The include expression reads prepared assets; it does
+not run a build or download them.
 
-Preparation and use are explicit, different relationships. Keep the `needs`
-entry configured; inclusion does not inspect configuration or repair its removal.
+## 3. Add the Lake prerequisite
+
+In [lakefile.lean](../../examples/tutorials/quickstart/lakefile.lean), register the
+program and resource modules and add `needs` to the resource library:
+
+```lean
+lean_lib QuickstartProgram where
+  roots := #[`QuickstartApp.Program]
+
+lean_lib QuickstartResources where
+  roots := #[`QuickstartApp.Resources]
+  needs := #[`+QuickstartApp.Program:virResourcePack]
+```
+
+If the libraries already exist, add the prerequisite to the resource library's
+configuration. Lake prepares the program before that library compiles. Keep the
+`needs` entry: it requests the build, while the include expression uses its result.
+The program must not import the resource module that embeds it.
+
 For a dependency-owned program, qualify only the Lake key, such as
 `@producer/+Program.Module:virResourcePack`. The literal include uses the full
 semantic module name without that package qualifier. Custom source/build roots
 and quoted module names need no authored generated paths.
+
+## Run the complete example
+
+The Quickstart includes the dependency, publisher and browser page. From the
+repository root:
+
+```bash
+cd examples/tutorials/quickstart
+lake exe publish _site
+python3 -m http.server --directory _site 8000
+```
+
+Open <http://localhost:8000/> to see **Hello, world**. You can copy the project
+out of the repository; its configuration pins a compatible VIR revision and
+[toolchain](../../examples/tutorials/quickstart/lean-toolchain). Lean/Elan, Git
+and `curl` are build prerequisites. Python is only the example HTTP server.
+No npm, WASI SDK, supplied pack or repository website build is needed.
 
 ## Publish with the application's writer
 

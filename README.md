@@ -19,20 +19,49 @@ No local Lean or Wasm build is needed to try the hosted site.
 
 ## Use VIR in an application
 
-Write your browser program in a Lean module and mark its public entry points
-with `@[vir_export]`. The [Quickstart's greeting](examples/tutorials/quickstart/QuickstartApp/Program.lean)
-is the first example.
+After adding the `lean_vir` dependency to your Lake project, make three changes:
 
-The application's asset library declares that program and prepares its browser
-files through Lake. It also acquires the matching prebuilt **runtime**: the
-JavaScript loader and Wasm interpreter that execute the program.
+1. Mark the Lean functions JavaScript may call with `@[vir_export]`.
 
-Build the application with its ordinary Lake command. Its native site generator
-writes the prepared files, and the browser calls the program's exported functions.
-Applications do not locate VIR build directories, invoke packaging scripts, or
-build Wasm. Program compilation and runtime acquisition remain independent.
+   ```lean
+   module
+   meta import Vir.Attributes
 
-Start with the [runnable Quickstart application](examples/tutorials/quickstart/README.md):
+   @[vir_export]
+   public def QuickstartApp.Program.greet (name : String) : String :=
+     "Hello, " ++ name
+   ```
+
+2. Create or reuse a resource library, separate from the program's library.
+   In its resource module, include the program's assets:
+
+   ```lean
+   module
+   public import Vir.Resources.Assets
+
+   public def QuickstartApp.Resources.resources : Vir.Resources.ResourceSet :=
+     include_vir_assets (modules := #[QuickstartApp.Program])
+   ```
+
+3. In `lakefile.lean`, register the modules and add `needs` to the resource library:
+
+   ```lean
+   lean_lib QuickstartProgram where
+     roots := #[`QuickstartApp.Program]
+
+   lean_lib QuickstartResources where
+     roots := #[`QuickstartApp.Resources]
+     needs := #[`+QuickstartApp.Program:virResourcePack]
+   ```
+
+Lake prepares the program before compiling the resource module and downloads
+the matching prebuilt interpreter. Your application writes `resources.forSite`'s
+files with its normal asset writer; JavaScript calls
+`program.call("QuickstartApp.Program.greet", "world")`.
+No producer paths, packaging scripts or Wasm build are needed.
+
+The [runnable Quickstart](examples/tutorials/quickstart/README.md) supplies the
+complete dependency setup, publisher and browser page:
 
 ```bash
 cd examples/tutorials/quickstart
@@ -41,8 +70,8 @@ python3 -m http.server --directory _site 8000
 ```
 
 Open <http://localhost:8000/> to see Lean's greeting.
-The [application setup guide](docs/guides/EMBEDDED_RESOURCES.md) explains the
-same project's build, asset value, publication and JavaScript call.
+The [application setup guide](docs/guides/EMBEDDED_RESOURCES.md) explains these
+three changes and how to publish and call the program.
 Use the Lean toolchain selected by your VIR dependency; HTTPS runtime acquisition
 needs `curl`.
 Qualification and remaining limits are recorded in

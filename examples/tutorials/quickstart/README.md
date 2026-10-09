@@ -1,8 +1,18 @@
 # Call Lean from JavaScript
 
-This is the getting-started application. It builds a Lean greeting, publishes
-the matching precompiled interpreter and program files, and calls Lean once
-from a plain browser page.
+This application calls a Lean greeting from a plain browser page. Its integration
+has three parts:
+
+1. [Program.lean](QuickstartApp/Program.lean) marks the greeting with `@[vir_export]`.
+2. [Resources.lean](QuickstartApp/Resources.lean) includes that program's assets
+   in a resource library with `include_vir_assets`.
+3. [lakefile.lean](lakefile.lean) registers those libraries and adds `needs` so
+   Lake prepares the program before compiling the resource module.
+
+The [application guide](../../../docs/guides/EMBEDDED_RESOURCES.md) shows these
+three changes in detail. This directory supplies all the files to run them.
+
+## Run it
 
 With Lean/Elan, Git and `curl` installed, run from this directory:
 
@@ -21,33 +31,22 @@ needed. The ordinary Lake build acquires the runtime selected by the pinned VIR
 dependency. Missing acquisition is an error, not an implicit Wasm source build.
 You can copy this whole directory out of the repository and use the same command.
 
-## The files
+## Publish and call
 
-- [lakefile.lean](lakefile.lean) pins an immutable compatible VIR revision,
-  registers disjoint program/resource owners, and requests the module resource
-  facet. The executable's ordinary web-source dependency tracks `include_str` inputs.
-- [Program.lean](QuickstartApp/Program.lean) contains the public marked greeting.
-  Its other five declarations are secondary examples reused by VIR's loose-package
-  developer tests; only the greeting is marked for this application.
-- [Resources.lean](QuickstartApp/Resources.lean) includes that prepared program
-  and the library-owned interpreter as an ordinary `ResourceSet` value.
-- [Main.lean](Main.lean) calls `forSite`, writes its inventory and derives every
-  browser URL from the returned paths. It also writes the page and browser entry
-  embedded through Lean's standard `include_str`.
-- [main.js](web/main.js) initializes once, calls the fully qualified Lean
-  declaration, displays its result or the original failure, and disposes the
-  finite program. There is no retry, recreation or alternate backend.
+[Main.lean](Main.lean) calls `forSite`, writes its files and derives every browser
+URL from the returned paths. It also writes the page and JavaScript embedded
+through Lean's standard `include_str`; Lake's web-source dependency tracks edits.
+[main.js](web/main.js) initializes once, calls `QuickstartApp.Program.greet`,
+displays the result or original failure, and disposes the finite program.
+There is no retry, recreation or alternate backend.
 
 Edit the Lean greeting or the page/JavaScript, rerun `lake exe publish _site`,
 and reload the page. The whole output can move or be hosted under a nested URL;
 it does not need the Lean checkout or build directory. The simple writer retains
 stale files and is not a transactional website publisher.
 
-The program module `QuickstartApp.Program` selects what Lake prepares; the
-declaration `QuickstartApp.Program.greet` selects what JavaScript calls. The
-project's namespace is distinct from the pinned dependency's older examples.
-Larger applications can use existing disjoint program and asset libraries.
-
+The other five declarations in Program.lean are secondary examples reused by
+VIR's loose-package developer tests; only the greeting is marked for this application.
 The repository smoke test copies this same authored project and substitutes the
 candidate checkout for its immutable dependency pin. That tests current changes;
 the copy-out configuration above does not silently follow a development branch.
