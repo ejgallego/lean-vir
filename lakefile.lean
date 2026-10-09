@@ -4,10 +4,10 @@ open Lake DSL
 package lean_vir where
   releaseRepo := "https://github.com/ejgallego/lean-vir"
 
-def npmCmd : String :=
+private def npmCmd : String :=
   if System.Platform.isWindows then "npm.cmd" else "npm"
 
-def runNpmScript (cwd : System.FilePath) (scriptName : String) : LogIO Unit :=
+private def runNpmScript (cwd : System.FilePath) (scriptName : String) : LogIO Unit :=
   proc {
     cmd := npmCmd
     args := #["run", "--silent", scriptName]
@@ -31,6 +31,8 @@ target infoviewBundle (pkg) : System.FilePath := do
     let lockTrace ← computeTrace (root / "package-lock.json")
     return mixTrace entryTrace (mixTrace errorsTrace (mixTrace scriptTrace (mixTrace packageTrace lockTrace)))) fun _ =>
     runNpmScript root "build:infoview"
+
+-- Library ownership
 
 /- Lake roots claim all descendants, even when globs build only the root.
 Use explicit owners so native imports never load the browser library by accident.
@@ -116,6 +118,8 @@ lean_lib VirTypeAnchorFixtures where
   srcDir := "fixtures/type-anchors"
   roots := #[`TypeAnchorFixture]
 
+-- Native tools
+
 lean_exe vir_irpkg where
   root := `tools.GeneratePackage
   supportInterpreter := true
@@ -153,10 +157,10 @@ lean_exe vir_js_inventory where
   root := `tools.ExportVirJsInventory
   supportInterpreter := true
 
+-- Compiled program facets and their cache dependencies
+
 private def virModuleOutput (mod : Module) (kind ext : String) : System.FilePath :=
   mod.filePath (mod.pkg.buildDir / "vir" / kind) ext
-
-private def virSdkVersion : String := "0.1.0"
 
 /- Keep this small preflight in the Lake configuration: importing the unbuilt
 native tool here would create a bootstrap dependency. Lake may remove the output
@@ -328,6 +332,10 @@ dependency members and the root member owns the public interface manifest.
 -/
 module_facet vir (mod : Module) : System.FilePath :=
   buildVirPackageSetFacet mod
+
+-- Browser SDK acquisition
+
+private def virSdkVersion : String := "0.1.0"
 
 /--
 Install and verify the matching VIR browser SDK under the package build

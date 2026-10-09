@@ -378,6 +378,22 @@ assert.equal(
   }),
   14n,
 );
+// A getter can reenter conversion for the same descriptor while the outer
+// constructor owns partially lowered fields. Only the metadata may be shared.
+{
+  const tags = ["outer"];
+  let nestedScore;
+  Object.defineProperty(tags, 0, { get() {
+    nestedScore = runtime.call("Vir.Fixtures.InterfaceShapes.profileScore", {
+      nickname: "inner", points: 10, tags: ["xy"],
+    });
+    return "tag";
+  } });
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileScore", {
+    nickname: "outer", points: 1, tags,
+  }), 9n);
+  assert.equal(nestedScore, 17n);
+}
 assert.deepEqual(
   runtime.call("Vir.Fixtures.InterfaceShapes.profileSummary", {
     nickname: "lean",

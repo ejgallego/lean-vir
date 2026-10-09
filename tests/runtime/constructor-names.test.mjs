@@ -8,16 +8,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  customInductiveConstructorAt,
   enumValue,
   normalizeCustomInductive,
   normalizeEnum,
   normalizeTaggedUnion,
+  taggedUnionConstructorAt,
 } from "../../web/src/runtime/vir-value-normalizers.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
-import {
-  customInductiveConstructorAt,
-  taggedUnionConstructorAt,
-} from "../../web/src/runtime/vir-codec.js";
 import {
   constructorTemplate,
   defaultValueForType,

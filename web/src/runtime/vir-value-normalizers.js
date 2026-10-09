@@ -4,7 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { requireStructureFields } from "./vir-codec.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
 
 const customInductiveNormalizationPlanCache = new WeakMap();
@@ -43,7 +42,7 @@ export function normalizeStructure(value, fields, label) {
     } else if (field.subobject === true) {
       normalized[field.name] = normalizeStructure(
         value,
-        requireStructureFields(field.type, `${label}.${field.name}`),
+        field.type.fields,
         `${label}.${field.name}`,
       );
     } else if (field.type?.interfaceTag === INTERFACE_TAG.OPTION) {
@@ -56,7 +55,7 @@ export function normalizeStructure(value, fields, label) {
 }
 
 export function flattenStructureSubobjects(type, value) {
-  const fields = requireStructureFields(type, "result");
+  const fields = type.fields;
   const flattened = {};
   for (const field of fields) {
     if (field.subobject === true) {
@@ -215,6 +214,24 @@ export function normalizeEnum(value, type, label) {
   return index;
 }
 
+// Descriptors reaching conversion have been validated and frozen at admission.
+// Constructor indices come from live Lean values and still need a bounds check.
+export function taggedUnionConstructorAt(type, index, label) {
+  return constructorAt(type, index, label, "tagged-union");
+}
+
+export function customInductiveConstructorAt(type, index, label) {
+  return constructorAt(type, index, label, "custom inductive");
+}
+
+function constructorAt(type, index, label, kindLabel) {
+  const constructors = type.constructors;
+  if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
+    throw new Error(`${label} ${kindLabel} constructor index is out of range`);
+  }
+  return constructors[index];
+}
+
 export function enumValue(type, index) {
   const constructors = type.constructors;
   if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
@@ -224,7 +241,7 @@ export function enumValue(type, index) {
 }
 
 function flattenedSubobjectFieldsPresent(value, type) {
-  for (const field of requireStructureFields(type, "subobject")) {
+  for (const field of type.fields) {
     if (field.subobject === true) {
       if (flattenedSubobjectFieldsPresent(value, field.type)) return true;
     } else if (hasOwn(value, field.name)) {

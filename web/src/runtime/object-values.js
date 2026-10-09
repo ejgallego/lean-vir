@@ -4,14 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import {
-  customInductiveConstructorAt,
-  requireFunctionArgs,
-  requireFunctionResult,
-  requireStructureFields,
-  requireTypeField,
-  taggedUnionConstructorAt,
-} from "./vir-codec.js";
 import { interfaceEffectRuntimeTag } from "./interface-effects.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
 import {
@@ -20,11 +12,11 @@ import {
   objectLayoutPlan,
   objectLayoutSlotsFromPlan,
   readObjectScalarField as readObjectScalarFieldValue,
-  taggedUnionField,
   writeObjectScalarField,
 } from "./object-abi.js";
 import {
   constructorValue,
+  customInductiveConstructorAt,
   enumValue,
   flattenStructureSubobjects,
   normalizeArray,
@@ -34,6 +26,7 @@ import {
   normalizePair,
   normalizeStructure,
   normalizeTaggedUnion,
+  taggedUnionConstructorAt,
 } from "./vir-value-normalizers.js";
 import {
   normalizeBoundedUnsignedDecimal,
@@ -65,7 +58,7 @@ export function withObjectValues(Base) {
       this.requireLiveLeanObjectCell(cell, "callback");
       this.requireFunction("vir_closure_apply_objects");
       const type = cell.callType;
-      const fnArgs = requireFunctionArgs(type, "callback");
+      const fnArgs = type.args;
       const argObjs = [];
       try {
         let argvPtr = 0;
@@ -103,7 +96,7 @@ export function withObjectValues(Base) {
             throw new Error(this.lastClosureCallError() || "closure call failed");
           }
           return this.liftObjectValue(
-            requireFunctionResult(type, "callback"), resultObj, "callback result",
+            type.result, resultObj, "callback result",
           );
         } finally {
           if (argvPtr !== 0) this.freeBytes(argvPtr);
@@ -263,7 +256,7 @@ export function withObjectValues(Base) {
         throw new Error(`${label} has too many elements`);
       }
 
-      const elementType = requireTypeField(sequenceType, "element", label);
+      const elementType = sequenceType.element;
       const elementObjs = [];
       try {
         for (let index = 0; index < values.length; index++) {
@@ -291,7 +284,7 @@ export function withObjectValues(Base) {
       }
       const fields = [
         this.makeObjectValue(
-          requireTypeField(type, "element", label),
+          type.element,
           option.value,
           `${label}.value`,
           selfType,
@@ -310,7 +303,7 @@ export function withObjectValues(Base) {
       try {
         fields.push(
           this.makeObjectValue(
-            requireTypeField(type, "fst", label),
+            type.fst,
             pair.fst,
             `${label}.fst`,
             selfType,
@@ -318,7 +311,7 @@ export function withObjectValues(Base) {
         );
         fields.push(
           this.makeObjectValue(
-            requireTypeField(type, "snd", label),
+            type.snd,
             pair.snd,
             `${label}.snd`,
             selfType,
@@ -331,7 +324,7 @@ export function withObjectValues(Base) {
     }
 
     makeObjectStructureValue(type, value, label) {
-      const fields = requireStructureFields(type, label);
+      const fields = type.fields;
       const record = normalizeStructure(value, fields, label);
       const trivial = trivialStructureField(type, fields);
       if (trivial !== null) {
@@ -345,7 +338,6 @@ export function withObjectValues(Base) {
       return this.makeObjectCtorFromLayout(
         0,
         type,
-        fields,
         record,
         label,
         type,
@@ -355,12 +347,10 @@ export function withObjectValues(Base) {
     makeObjectTaggedUnionValue(type, value, label, selfType = null) {
       // Sum/Except carry the enclosing recursive owner through their payload.
       const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
-      const field = taggedUnionField(ctor);
       return this.makeObjectCtorFromLayout(
         index,
         ctor,
-        [field],
-        { [field.name]: payload },
+        { [ctor.jsName]: payload },
         label,
         selfType,
       );
@@ -378,15 +368,14 @@ export function withObjectValues(Base) {
       return this.makeObjectCtorFromLayout(
         index,
         ctor,
-        ctor.fields,
         fields,
         label,
         type,
       );
     }
 
-    makeObjectCtorFromLayout(tag, owner, fields, values, label, selfType) {
-      const plan = objectLayoutPlan(owner, fields, label);
+    makeObjectCtorFromLayout(tag, owner, values, label, selfType) {
+      const plan = objectLayoutPlan(owner, label);
       const layout = objectLayoutSlotsFromPlan(plan);
       try {
         for (const fieldPlan of plan.fields) {
@@ -1183,14 +1172,12 @@ export function withObjectValues(Base) {
     }
 
     liftObjectFunction(type, obj, label) {
-      requireFunctionArgs(type, label);
-      requireFunctionResult(type, label);
       return this.makeLeanObjectHandleTarget(obj, label, type, makeLeanCallback);
     }
 
     liftObjectArrayValue(type, obj, label, selfType) {
       const len = this.exports.vir_obj_array_size(obj);
-      const elementType = requireTypeField(type, "element", label);
+      const elementType = type.element;
       const values = [];
       for (let index = 0; index < len; index++) {
         const element = this.exports.vir_obj_array_get(obj, index);
@@ -1224,7 +1211,7 @@ export function withObjectValues(Base) {
     }
 
     liftObjectListValue(type, obj, label, selfType) {
-      const elementType = requireTypeField(type, "element", label);
+      const elementType = type.element;
       return this.liftObjectConstructorList(obj, label, (head, index) =>
         this.liftObjectValue(elementType, head, `${label}[${index}]`, selfType),
       );
@@ -1297,7 +1284,7 @@ export function withObjectValues(Base) {
       const field = this.ownedObjectField(obj, 0, label);
       try {
         return this.liftObjectValue(
-          requireTypeField(type, "element", label),
+          type.element,
           field,
           `${label}.value`,
           selfType,
@@ -1314,13 +1301,13 @@ export function withObjectValues(Base) {
         try {
           return {
             fst: this.liftObjectValue(
-              requireTypeField(type, "fst", label),
+              type.fst,
               fst,
               `${label}.fst`,
               selfType,
             ),
             snd: this.liftObjectValue(
-              requireTypeField(type, "snd", label),
+              type.snd,
               snd,
               `${label}.snd`,
               selfType,
@@ -1335,7 +1322,7 @@ export function withObjectValues(Base) {
     }
 
     liftObjectStructureValue(type, obj, label) {
-      const fields = requireStructureFields(type, label);
+      const fields = type.fields;
       const trivial = trivialStructureField(type, fields);
       if (trivial !== null) {
         return {
@@ -1347,7 +1334,7 @@ export function withObjectValues(Base) {
           ),
         };
       }
-      const plan = objectLayoutPlan(type, fields, label);
+      const plan = objectLayoutPlan(type, label);
       const values = {};
       for (const fieldPlan of plan.fields) {
         const field = fieldPlan.field;
@@ -1365,8 +1352,7 @@ export function withObjectValues(Base) {
     liftObjectTaggedUnionValue(type, obj, label, selfType = null) {
       const tag = this.exports.vir_obj_tag(obj);
       const ctor = taggedUnionConstructorAt(type, tag, label);
-      const field = taggedUnionField(ctor);
-      const plan = objectLayoutPlan(ctor, [field], label);
+      const plan = objectLayoutPlan(ctor, label);
       return constructorValue(
         type,
         ctor,
@@ -1388,7 +1374,6 @@ export function withObjectValues(Base) {
       }
       const plan = objectLayoutPlan(
         ctor,
-        ctor.fields,
         `${label}.${ctor.jsName}`,
       );
       const values = {};
