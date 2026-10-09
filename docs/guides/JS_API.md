@@ -520,7 +520,25 @@ Constructor `name` identifies the Lean declaration and `tag` records its numeric
 ordinal; neither is a JavaScript value alias. See the
 [descriptor format](../reference/IRPKG_FORMAT.md#interface-descriptors).
 
-Options use `null` for `none` and the bare inner value for `some`. Products use
+Options use `{ kind: "none" }` and `{ kind: "some", value }` in both directions,
+for every element type. `some` requires its own `value` field, including when the
+payload is `undefined`. For example, `some none : Option (Option Nat)` lifts to
+`{ kind: "some", value: { kind: "none" } }`, and `some () : Option Unit` lifts to
+`{ kind: "some", value: undefined }`. The payload follows its normal type's
+representation; the outer tag preserves its presence. Bare values, `null`, and
+`undefined` are not Option inputs. Structure fields are required, including
+Option fields; supply `{ kind: "none" }` explicitly to select absence.
+`Js.Nullable` and `Js.UndefinedOr` retain their exact JavaScript values.
+See the [Option representation decision](../design/OPTION_VALUES.md).
+
+The optional converter compiles admitted compiler layouts into cached JavaScript
+codecs. Option uses the ordinary zero/one-field constructor codec and Prod uses
+the ordinary record codec. List has an iterative adapter over its generic nil/cons
+layout; these types have no dedicated interface descriptor tags. Recursive
+references identify their lexical constructor scope, including through nested
+container owners. The managed foundation still owns calls and references.
+
+Products use
 `{ fst, snd }` in both directions. Arrays and lists use JavaScript arrays,
 `ByteArray` uses `Uint8Array`, floats use JavaScript numbers, and `Sum`/`Except`
 values use `{ kind, value }`.
@@ -558,7 +576,10 @@ object keys. A direct recursive structure such as
 `{ label : String, next : Option Chain }` uses a normal nested record:
 
 ```js
-{ label: "root", next: { label: "leaf", next: null } }
+{
+  label: "root",
+  next: { kind: "some", value: { label: "leaf", next: { kind: "none" } } },
+}
 ```
 
 Direct `Bool`, `UInt*`, `USize`, and enum fields, including single-field

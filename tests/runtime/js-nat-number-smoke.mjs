@@ -49,7 +49,9 @@ try {
     ["js.float", "js.nat", "js.nat.value"]);
   for (const value of [0n, 1n, 9007199254740991n]) {
     const callsBefore = numberInputs.length;
-    const result = runtime.call(entries[0], value.toString());
+    const option = runtime.call(entries[0], value.toString());
+    assert.equal(option.kind, "some");
+    const result = option.value;
     assert.equal(typeof result, "number");
     assert.ok(Number.isSafeInteger(result));
     assert.equal(BigInt(result), value);
@@ -58,8 +60,7 @@ try {
   }
   for (const value of [9007199254740992n, 9007199254740993n, 2n ** 256n - 1n]) {
     const callsBefore = numberInputs.length;
-    // Structural Option results lift as the inner value or null.
-    assert.equal(runtime.call(entries[0], value.toString()), null);
+    assert.deepEqual(runtime.call(entries[0], value.toString()), { kind: "none" });
     assert.equal(numberInputs.length, callsBefore, "overflow must not call js.float");
   }
   for (const value of [0n, 9007199254740993n, 2n ** 256n - 1n]) {

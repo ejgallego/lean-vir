@@ -32,13 +32,10 @@ def InterfaceType.interfaceTag : InterfaceType → Nat
   | .usize => 8
   | .byteArray => 9
   | .array .. => 16
-  | .list .. => 17
-  | .option .. => 18
-  | .prod .. => 19
   | .simpleEnum .. => 14
   | .taggedUnion .. => 21
   | .customInductive .. => 25
-  | .recursiveSelf .. => 26
+  | .recursiveRef .. => 26
   | .structure .. => 20
   | .resource .. => 23
   | .function .. => 24
@@ -83,22 +80,6 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
         ("kind", jsonString "array"),
         ("element", element.toJson)
       ]
-  | .list element =>
-      encode #[
-        ("kind", jsonString "list"),
-        ("element", element.toJson)
-      ]
-  | .option element =>
-      encode #[
-        ("kind", jsonString "option"),
-        ("element", element.toJson)
-      ]
-  | .prod fst snd =>
-      encode #[
-        ("kind", jsonString "prod"),
-        ("fst", fst.toJson),
-        ("snd", snd.toJson)
-      ]
   | .simpleEnum name constructors =>
       let ctorJson := constructors.mapIdx fun idx ctor =>
         jsonObject #[
@@ -124,10 +105,11 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
         ("name", jsonName name),
         ("constructors", jsonArray ctorJson)
       ]
-  | .recursiveSelf name _ =>
+  | .recursiveRef name _ depth =>
       encode #[
-        ("kind", jsonString "recursiveSelf"),
-        ("name", jsonName name)
+        ("kind", jsonString "recursiveRef"),
+        ("name", jsonName name),
+        ("depth", jsonNat depth)
       ]
   | .customInductive name _ constructors =>
       let ctorJson := constructors.mapIdx fun idx constructor =>

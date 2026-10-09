@@ -271,13 +271,12 @@ def chainRootScore (chain : Chain) : Nat := ...
 ```js
 vir.call("MyApp.chainRootScore", {
   label: "root",
-  next: { label: "leaf", next: null },
+  next: { kind: "some", value: { label: "leaf", next: { kind: "none" } } },
 });
 ```
 
-`Option Chain` uses the normal option shape: `null` for `none`, or the nested
-`Chain` object for `some`. Recursive structures are direct records; they do not
-wrap the recursive field in a custom-inductive `{ kind, ... }` object.
+`Option Chain` uses `{ kind: "none" }` or `{ kind: "some", value: chain }`, just
+like every other Option. The recursive `Chain` itself is a direct record.
 
 ## 4. Serve The Artifacts In Your App
 
@@ -312,8 +311,9 @@ Common Lean values map to JavaScript values like this:
 - `Bool`, `String`, `Float`, `Float32`, `UInt8`, `UInt16`, and `UInt32` use the
   corresponding JavaScript boolean, string, or number values.
 - `Array alpha` and `List alpha` use JavaScript arrays.
-- `Option alpha` accepts `null` for `none` and a bare value for `some`. Results are
-  `null` or the inner value.
+- `Option alpha` uses `{ kind: "none" }` or `{ kind: "some", value }` in both
+  directions. The payload uses its normal type's representation, including
+  `undefined` for Unit. Null and bare-value Option inputs are rejected.
 - Products use `{ fst, snd }`.
 - `Sum` and `Except` use `{ kind, value }` tagged objects.
 - Structures use JavaScript objects keyed by Lean field name.

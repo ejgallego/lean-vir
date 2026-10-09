@@ -115,8 +115,39 @@ for (const [declaration, type, tag] of [
 const nat = { type: "Nat", interfaceTag: 0 };
 const string = { type: "String", interfaceTag: 3 };
 const unit = { type: "Unit", interfaceTag: 22 };
-const nested = { type: "Array Option Nat", interfaceTag: 16, kind: "array",
-  element: { type: "Option Nat", interfaceTag: 18, kind: "option", element: nat } };
+const nested = {
+  type: "Array Option Nat",
+  interfaceTag: 16,
+  kind: "array",
+  element: {
+    type: "Option Nat",
+    interfaceTag: 25,
+    kind: "customInductive",
+    name: "Option",
+    constructors: [
+      {
+        name: "Option.none",
+        jsName: "none",
+        tag: 0,
+        objectFieldCount: 0,
+        usizeFieldCount: 0,
+        scalarByteSize: 0,
+        fields: [],
+      },
+      {
+        name: "Option.some",
+        jsName: "some",
+        tag: 1,
+        objectFieldCount: 1,
+        usizeFieldCount: 0,
+        scalarByteSize: 0,
+        fields: [
+          { name: "val", type: nat, layout: { kind: "object", index: 0 } },
+        ],
+      },
+    ],
+  },
+};
 for (const [declaration, args, result, effect] of [
   ["NativeClient.nullary", [], unit, "pure"],
   ["NativeClient.multiple", [string, nat], nat, "pure"],

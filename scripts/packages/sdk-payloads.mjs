@@ -29,6 +29,8 @@ export const SDK_PAYLOADS = [
   ["js/runtime/js-value-support.js", "web/src/runtime/js-value-support.js"],
   ["js/runtime/package-contract.js", "web/src/runtime/package-contract.js"],
   ["js/runtime/object-values.js", "web/src/runtime/object-values.js"],
+  ["js/runtime/native-value-codecs.js", "web/src/runtime/native-value-codecs.js"],
+  ["js/runtime/constructor-scratch.js", "web/src/runtime/constructor-scratch.js"],
   ["js/runtime/vir-codec.js", "web/src/runtime/vir-codec.js"],
   ["js/runtime/host-state.js", "web/src/runtime/host-state.js"],
   ["js/runtime/object-abi.js", "web/src/runtime/object-abi.js"],

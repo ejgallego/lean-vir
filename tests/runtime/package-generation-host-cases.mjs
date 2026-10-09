@@ -236,7 +236,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(hostRuntime.call("freshRuntimeInReact"), 11n);
   assert.deepEqual(hostRuntime.call("freshElementRoundtrip", "element"), {
     fst: "element",
-    snd: "element!",
+    snd: { kind: "some", value: "element!" },
   });
 
   const jsObjectSource = join(freshDir, "FreshJsObject.lean");
