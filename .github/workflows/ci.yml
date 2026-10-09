@@ -153,10 +153,10 @@ jobs:
             /tmp/vir-resource-cache-*/producer/vir-resources/*.json
             /tmp/vir-resource-cache-*/client/lakefile.lean
             /tmp/vir-resource-cache-*/client/build with spaces/vir/resources/programs/*
-            /tmp/vir-resource-cache-*/client/resources/.vir-generated/*
+            /tmp/vir-resource-cache-*/client/build with spaces/lib/lean/vir-assets/**/*.virres
             /tmp/vir-resource-cache-*/peer/lakefile.lean
             /tmp/vir-resource-cache-*/peer/build with spaces/vir/resources/programs/*
-            /tmp/vir-resource-cache-*/peer/resources/.vir-generated/*
+            /tmp/vir-resource-cache-*/peer/build with spaces/lib/lean/vir-assets/**/*.virres
           if-no-files-found: ignore
       - run: npm run test:resources:descriptor
       - name: Retain resource diagnostics
