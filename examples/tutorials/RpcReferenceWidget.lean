@@ -24,7 +24,7 @@ namespace RpcReferenceWidget
 open Lean.Vir
 
 open Lean.Vir.React Lean.Vir.Browser
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 /-- Response shape: a message and a nested server-owned RPC reference. -/
 opaque Reply : Type
@@ -60,9 +60,9 @@ private def ResponseView : RuntimeM (FunctionComponent (Props.WithData (Js Reply
     let label ← message reply
     let increment ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) =>
       Js.Function.callVoid setCount (SetStateAction.ofUpdater update)
-    return ← <button id="rpc-reference-view" onClick={increment}>
+    jsx%{<button id="rpc-reference-view" onClick={increment}>
       {label} / local {count}
-    </button>
+    </button>}
 
 /-- Keep the session and query identities stable until the request should change. -/
 structure Input where
@@ -135,13 +135,13 @@ private def renderView (child : FunctionComponent (Props.WithData (Js Reply))) (
     | some reply => do
         let props ← Props.WithData.make (← LeanRef.toJSL reply)
         Js.Nullable.ofJs (← Node.functionComponent child props (← Js.Array.empty))
-  return ← <section aria-busy={← JsValue.ofBool (state.status == "loading")}>
+  jsx%{<section aria-busy={← JsValue.ofBool (state.status == "loading")}>
     <p role={← JsValue.ofString (if state.status == "error" then "alert" else "status")}
         data-rpc-status={← JsValue.ofString state.status}>
       {ProofWidgets.Html.text status}
     </p>
     {responseChild}
-  </section>
+  </section>}
 
 /-- Construct once: native React function identity preserves parent and child state. -/
 def View : RuntimeM (FunctionComponent (Props.WithData Input)) := do

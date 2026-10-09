@@ -15,7 +15,7 @@ namespace ProofWidgetsHtml
 open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.ProofWidgets
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 structure StatProps where
   label : String
@@ -25,10 +25,10 @@ def Stat : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.With
   Lean.Vir.React.FunctionComponent.ofLean fun nativeProps => do
     let data ← Lean.Vir.React.Props.WithData.data nativeProps
     let props ← Lean.Vir.LeanRef.fromJSL data
-    return ← <li className="pw-html-stat" data-label={(← Lean.Vir.JsValue.ofString props.label)}>
+    jsx%{<li className="pw-html-stat" data-label={(← Lean.Vir.JsValue.ofString props.label)}>
       <span className="pw-html-stat-label">{Lean.Vir.React.Node.text (← Lean.Vir.JsValue.ofString props.label)}</span>
       <strong className="pw-html-stat-value">{Lean.Vir.React.Node.text (← Lean.Vir.JsValue.ofString props.value)}</strong>
-    </li>
+    </li>}
 
 def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := do
   let StatComponent ← Stat
@@ -37,7 +37,7 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := d
       (← Lean.Vir.LeanRef.toJSL { label := "Elements", value := "5" })
     let componentsProps ← Lean.Vir.React.Props.WithData.make
       (← Lean.Vir.LeanRef.toJSL { label := "Components", value := "1" })
-    return ← <section id="proofwidgets-html-demo" role="region" aria-label="ProofWidgets HTML facade demo"
+    jsx%{<section id="proofwidgets-html-demo" role="region" aria-label="ProofWidgets HTML facade demo"
         className="pw-html-demo is-live" data-testid="proofwidgets-html">
       <h3 className="pw-html-title">ProofWidgets-style Html</h3>
       <p className="pw-html-summary">This tree is written through native JSX and rendered as native React nodes.</p>
@@ -50,7 +50,7 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := d
         </li>
       </ul>
       <code className="pw-html-code">Native JSX section props children</code>
-    </section>
+    </section>}
 
 def mount (selector : String) : DomM Bool := do
   let component ← View

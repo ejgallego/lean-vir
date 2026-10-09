@@ -16,7 +16,7 @@ public section
 namespace VirNativeInfoview.InteractiveCode
 
 open Lean.Vir Lean.Vir.React Lean.Vir.Infoview Lean.Vir.ProofWidgets
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 private def optionalString (value : Js.Any) : RuntimeM String := do
   match ← Js.UndefinedOr.toOption (Js.UndefinedOr.ofJs value) with
@@ -62,8 +62,8 @@ private structure PopupState where
   status : String := "Loading…"
 
 private def separator (key : Js String) : Html := do
-  <hr key={key} style={(← js%{ "margin" := (← js#"4px 0"), "border" := (← js#"0"),
-    "borderTop" := (← js#"1px solid var(--vscode-editorHoverWidget-border, #888)") })}/>
+  jsx%{<hr key={key} style={(← js%{ "margin" := (← js#"4px 0"), "border" := (← js#"0"),
+    "borderTop" := (← js#"1px solid var(--vscode-editorHoverWidget-border, #888)") })}/>}
 
 private def keyed (key : Js String) (child : Html) : Html := do
   let props ← Js.Object.empty
@@ -155,24 +155,24 @@ private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
             (props.render (Hover.asParent hover) type))
         let code := contents
         let wrapped ←
-          <div key="code" className="font-code tl pre-wrap" style={(← js%{
+          jsx%{<div key="code" className="font-code tl pre-wrap" style={(← js%{
             "whiteSpace" := (← js#"pre-wrap"),
-            "fontFamily" := (← js#"var(--vscode-editor-font-family, monospace)") })}>{code}</div>
+            "fontFamily" := (← js#"var(--vscode-editor-font-family, monospace)") })}>{code}</div>}
         contents ← Js.Array.empty
         let _ ← Js.Array.push contents wrapped
         if let some value ← popupField (Js.UndefinedOr.ofJs (← Js.Object.get reply (← js#"doc"))) then
           let doc ← Js.String.fromAny value
           if (← JsValue.toFloat (← Js.String.length doc)) != 0 then
             let _ ← Js.Array.push contents (← separator (← js#"doc-separator"))
-            let _ ← Js.Array.push contents (← <span key="doc" className="vir-native-infoview-doc" style={(← js%{
-                "display" := (← js#"block"), "whiteSpace" := (← js#"pre-wrap") })}>{Node.text doc}</span>)
+            let _ ← Js.Array.push contents (← jsx%{<span key="doc" className="vir-native-infoview-doc" style={(← js%{
+                "display" := (← js#"block"), "whiteSpace" := (← js#"pre-wrap") })}>{Node.text doc}</span>})
         if !props.diff.isEmpty then
           let _ ← Js.Array.push contents (← separator (← js#"diff-separator"))
-          let _ ← Js.Array.push contents (← <div key="diff" className="vir-native-infoview-diff-description">{Html.text (diffDescription props.diff)}</div>)
+          let _ ← Js.Array.push contents (← jsx%{<div key="diff" className="vir-native-infoview-diff-description">{Html.text (diffDescription props.diff)}</div>})
       else
         let _ ← Js.Array.push contents (← Html.text state.status)
       popup := do
-        let node ← <div id={popupId} role="tooltip" className="vir-native-infoview-type-popup tooltip"
+        let node ← jsx%{<div id={popupId} role="tooltip" className="vir-native-infoview-type-popup tooltip"
             onPointerEnter={popupEnter} onPointerLeave={popupLeave}
             onPointerOver={popupOver} onPointerOut={popupOver} onKeyDown={popupKeyboard}
             data-pinned={(← JsValue.ofBool current.pinned)}
@@ -208,16 +208,16 @@ private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
               "border" := (← js#"0"), "background" := (← js#"transparent"),
               "color" := (← js#"inherit"), "font" := (← js#"inherit"),
               "lineHeight" := (← js#"1"), "cursor" := (← js#"pointer") })}>×</button>
-          </div>
+          </div>}
         HoverDom.portal node
-    return ← <span id={anchorId} className={(← JsValue.ofString ("vir-native-infoview-code-tag " ++
+    jsx%{<span id={anchorId} className={(← JsValue.ofString ("vir-native-infoview-code-tag " ++
         diffClass props.diff ++ (if current.highlighted then " highlight" else "")))}
         role="button" tabIndex={(← JsValue.ofFloat 0)} aria-expanded={(← JsValue.ofBool current.visible)}
         aria-pressed={(← JsValue.ofBool current.pinned)}
         aria-controls={popupId} onPointerOver={over} onPointerOut={leave} onClick={toggle}
         onFocus={focus} onBlur={leave} onKeyDown={keyboard}>
       {props.render props.parent props.fmt}{popup}
-    </span>
+    </span>}
 
 private partial def renderTaggedText (TagComponent : FunctionComponent (Props.WithData TagProps))
     (session : Js RpcSession) (parent : Hover.Parent) (fmt : Js CodeWithInfos) : Html := do
@@ -237,12 +237,12 @@ private partial def renderTaggedText (TagComponent : FunctionComponent (Props.Wi
     let info ← Js.Object.get data (← js#"info")
     if ← JsValue.toBool (← Js.UndefinedOr.isUndefined (Js.UndefinedOr.ofJs info)) then
       if (← JsValue.toString (← Js.String.fromAny data)) == "highlighted" then
-        return ← <span className="highlighted-text">{renderTaggedText TagComponent session parent body}</span>
+        return ← jsx%{<span className="highlighted-text">{renderTaggedText TagComponent session parent body}</span>}
       else return ← malformed
     let diff ← optionalString (← Js.Object.get data (← js#"diffStatus"))
     let props ← Props.WithData.make (← LeanRef.toJSL ({
       info, fmt := body, diff, session, parent, render := renderTaggedText TagComponent session } : TagProps))
-    return ← <TagComponent @props={props}/>
+    return ← jsx%{<TagComponent @props={props}/>}
   malformed
 
 /-- Compile-time schema only: JSX carries the exact native tagged text, not a Lean record. -/
@@ -255,6 +255,6 @@ def View : RuntimeM (FunctionComponent CodeProps) := do
   FunctionComponent.ofLean fun props => do
     let fmt ← js_field% props "fmt"
     let session ← useRpcSession
-    return ← <span className="font-code">{renderTaggedText tag session {} fmt}</span>
+    jsx%{<span className="font-code">{renderTaggedText tag session {} fmt}</span>}
 
 end VirNativeInfoview.InteractiveCode

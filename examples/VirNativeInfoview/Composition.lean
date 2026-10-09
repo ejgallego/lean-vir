@@ -13,13 +13,13 @@ public section
 namespace VirNativeInfoview.Composition
 
 open Lean.Vir Lean.Vir.React Lean.Vir.Infoview Lean.Vir.ProofWidgets
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 /-- Interoperability checkpoint, not the completed port: React renders the exact
 upstream component with the exact native tagged text. No traversal or RPC here. -/
 def View : RuntimeM (FunctionComponent PanelWidgetProps) := do
   let Upstream ← interactiveCode
   GoalPanel.withCode fun fmt => do
-    <Upstream fmt={fmt}/>
+    jsx%{<Upstream fmt={fmt}/>}
 
 end VirNativeInfoview.Composition
