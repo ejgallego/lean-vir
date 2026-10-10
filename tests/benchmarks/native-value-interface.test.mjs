@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 import { compileNativeValueCodec } from "../../web/src/runtime/native-value-codecs.js";
+import { validateBoundaryInterface } from "../../web/src/runtime/value-interfaces.js";
 const compileNativeValueInterface = (runtime, native, value) => compileNativeValueCodec(runtime, { native, value });
 
 const nat = { type: { tag: "nat" } }, bigint = { tag: "bigint" };
@@ -155,12 +156,14 @@ test("safe integer is an explicit view with range checks in both directions", ()
 test("an identity constructor uses its own ordinal when its payload has another tag", () => {
   const h = heap(), native = objectType("Wrapper", [
     { name: "Wrapper.mk", representation: "identity", fields: [
-      { name: "value", type: nat, location: { tag: "identity" } },
+      { name: "value", type: nat },
     ] },
   ]);
-  const codec = compileNativeValueInterface(h.runtime, native, { tag: "variant", cases: [
+  const view = { tag: "variant", cases: [
     { kind: "wrapped", payload: "value", value: bigint },
-  ] });
+  ] };
+  validateBoundaryInterface({ native, value: view });
+  const codec = compileNativeValueInterface(h.runtime, native, view);
   for (const value of [42n, 9007199254740993n]) {
     const input = { kind: "wrapped", value };
     const obj = codec.lower(input, "input", h.scratch);
