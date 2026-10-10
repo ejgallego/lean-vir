@@ -17,7 +17,8 @@ const wasmBytes =
     : await readFile(process.argv[2]);
 const huge = (1n << 256n) + 3n;
 const cases = [
-  [primitiveBoundary("nat", "bigint"), [0n, 1n, (1n << 53n) - 1n, (1n << 53n) + 1n, huge]],
+  [primitiveBoundary("nat", "bigint"), [0n, 1n, (1n << 31n) - 1n, 1n << 31n,
+    (1n << 32n) - 1n, (1n << 53n) - 1n, (1n << 53n) + 1n, 1n << 63n, huge]],
   [primitiveBoundary("int", "bigint"), [0n, -1n, -(1n << 53n) - 1n, -huge, huge]],
   [primitiveBoundary("unsigned", "bigint", { width: 64 }), [0n, 1n, 1n << 63n, (1n << 64n) - 1n]],
   [primitiveBoundary("unsigned", "number", { width: "usize" }), [0n, 1n, 1n << 31n, (1n << 32n) - 1n]],
@@ -48,7 +49,11 @@ for (const create of [
         }
       }
     }
-    assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", huge), huge + 1n);
+    for (const value of cases[0][1])
+      assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", value), value + 1n);
+    for (const invalid of [-1n, -1, Number.MAX_SAFE_INTEGER + 1, 1.5, NaN, Infinity])
+      assert.throws(() => runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", invalid),
+        /non-negative|safe integer|decimal/);
     assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseIntNegate", -huge), huge);
     assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", 0), 1n);
     assert.equal(runtime.failure, null);

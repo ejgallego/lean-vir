@@ -17,6 +17,7 @@ import { ObjectRuntime } from "./object-core.js";
 
 const MAX_UINT64 = 0xffffffffffffffffn;
 const MAX_WASM32_USIZE = 0xffffffffn;
+const MAX_WASM32_SCALAR_NAT = 0x7fffffffn;
 
 const primitiveViews = new Set(["bigint", "safeInteger", "number", "string", "bytes", "unit", "boolean", "jsReference", "leanReference"]);
 
@@ -37,6 +38,8 @@ export class PrimitiveObjectRuntime extends ObjectRuntime {
   liftObjectValue(pair, obj, label) { return this.nativeValueCodec(pair).lift(obj, label); }
 
   readObjectNat(obj) {
+    if (this.targetPointerBytes() === 4 && this.exports.vir_obj_is_scalar(obj) !== 0)
+      return BigInt(this.exports.vir_obj_scalar_value(obj) >>> 0);
     return BigInt(this.readObjectDecimal(obj, "vir_obj_nat_decimal"));
   }
 
@@ -155,6 +158,12 @@ export function compilePrimitiveValueCodec(runtime, native, view) {
       const safe = view.tag === "safeInteger", signed = type.tag === "int";
       codec.lower = (value, label) => {
         if (safe && !Number.isSafeInteger(value)) throw new Error(`${label} must be a safe integer`);
+        // Use the native scalar operation for exactly representable wasm32 Nats.
+        // Heap naturals and textual inputs keep arbitrary-precision conversion.
+        if (!signed && runtime.targetPointerBytes() === 4 && (
+          (typeof value === "bigint" && value >= 0n && value <= MAX_WASM32_SCALAR_NAT) ||
+          (Number.isInteger(value) && value >= 0 && value <= Number(MAX_WASM32_SCALAR_NAT))))
+          return runtime.makeObjectScalar(Number(value), label);
         return runtime.makeObjectDecimal(signed ? "vir_obj_int" : "vir_obj_nat",
           normalizeDecimal(value, label, { signed }), label);
       };
