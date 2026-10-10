@@ -169,4 +169,3 @@ test("recursive templates resolve lexical references and stop at a finite depth"
     fields: { left: { kind: "leaf" }, right: { kind: "leaf" } },
   });
 });
-
