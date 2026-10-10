@@ -127,6 +127,8 @@ test("explicit scalar conversions do not traverse callback roots", t => {
     vir_obj_uint64_value: () => 1n,
     vir_obj_usize_value: () => 1,
     vir_upstream_target_pointer_bytes: () => 4,
+    vir_obj_is_scalar: () => 1,
+    vir_obj_scalar_value: () => 1,
     vir_obj_float_value: () => 1,
     vir_obj_float32_value: () => 1,
   });

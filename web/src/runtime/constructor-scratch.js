@@ -21,13 +21,26 @@ export class ConstructorScratch {
       if (region.ptr !== 0) this.runtime.freeBytes(region.ptr);
       region.ptr = ptr;
       region.capacity = capacity;
+      region.view = undefined;
     }
     return region.ptr;
   }
 
+  writeObjects(ptr, fields) {
+    if (fields.length === 0) return;
+    const region = this.regions[0];
+    const buffer = this.runtime.exports.memory.buffer;
+    // Allocation or memory.grow invalidates a previous view. It is retained
+    // only inside this lowering operation, alongside its owned scratch region.
+    if (region.view === undefined || region.view.buffer !== buffer)
+      region.view = new DataView(buffer, ptr, region.capacity);
+    for (let i = 0; i < fields.length; i++)
+      region.view.setUint32(i * 4, fields[i], true);
+  }
+
   createObjects(tag, fields, label) {
     const ptr = this.reserve(0, fields.length * 4);
-    this.runtime.writePointerArray(ptr, fields);
+    this.writeObjects(ptr, fields);
     const result = this.runtime.exports.vir_obj_ctor(tag, ptr, fields.length);
     if (result === 0)
       throw new Error(
@@ -43,7 +56,7 @@ export class ConstructorScratch {
     if (layout.usizeFields.length === 0 && layout.scalarBytes.byteLength === 0)
       return this.createObjects(tag, fields, label);
     const objectsPtr = this.reserve(0, fields.length * 4);
-    runtime.writePointerArray(objectsPtr, fields);
+    this.writeObjects(objectsPtr, fields);
     const pointerBytes = runtime.targetPointerBytes();
     const usizePtr = this.reserve(1, layout.usizeFields.length * pointerBytes);
     const scalarPtr = this.reserve(2, layout.scalarBytes.byteLength);
