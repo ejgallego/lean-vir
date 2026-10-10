@@ -107,6 +107,22 @@ try {
         assert.equal(runtime.failure, null);
         assert.deepEqual(call("identity", value), value);
         const allocate = runtime.allocByteLength;
+        let midConstructionGrowth = false;
+        calls = 0;
+        runtime.exports.vir_obj_ctor = (...args) => {
+          const object = ctor(...args);
+          if (++calls === 3) {
+            runtime.exports.memory.grow(1);
+            midConstructionGrowth = true;
+          }
+          return object;
+        };
+        try {
+          assert.deepEqual(call("identity", value), value);
+        } finally {
+          runtime.exports.vir_obj_ctor = ctor;
+        }
+        assert.ok(midConstructionGrowth);
         let grown = false;
         runtime.allocByteLength = function (size, label) {
           const ptr = allocate.call(this, size, label);

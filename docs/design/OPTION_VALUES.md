@@ -49,11 +49,12 @@ references preserve ownership through these complete container descriptors.
 ## Implementation and limits
 
 Lean's compiled Option layout, constructor ordinals and ownership stay the
-same. The manifest now describes Option as an ordinary custom inductive and
-Prod as a structure. None uses its scalar tag; some owns one lowered field.
-Lexical references carry their enclosing type across complete container scopes;
-Array and Sum/Except retain the current scope. No synthetic constructor
-descriptor or metadata validation layer is needed.
+same. The manifest describes both through a `leanObject` native descriptor:
+Option has constructor metadata and a variant view; Prod has field metadata
+and a record view. None uses its immediate ordinal; some owns one lowered field.
+Lexical references account for each enclosing constructor scope, including
+Sum/Except. Native-array traversal carries the enclosing scope through its
+element. No synthetic constructor descriptor is needed.
 
 Lifting allocates a JS wrapper object for each Option. It adds no Lean constructor
 allocation or bridge call compared with the previous conversion. There is no

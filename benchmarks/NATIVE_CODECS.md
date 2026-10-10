@@ -115,7 +115,7 @@ JS value checks -> lower fields -> allocate Lean objects -> execute Lean
 | Value checks | Constructor choice, own payloads, keys and ranges vary per call. | Repeated interpretation of admitted descriptor structure. |
 | Native allocation | Materializing a constructor graph allocates its nontrivial nodes. | Storage selection and field-location branches for common small layouts. |
 | Bridge calls and pointer buffers | Construction, inspection and reference release cross JS/Wasm. | Repeated scratch allocation within a lowering operation; it does not remove all crossings. |
-| Nat/Int transport | Current helpers format/parse decimal text through UTF-8 and JS bigint. | No change to this transport in the pair prototype. |
+| Nat/Int transport | Heap Nat, Int and textual inputs use decimal UTF-8 conversion. | Numeric wasm32 Nat values through 2³¹−1 use existing native scalar construction/inspection. |
 | Strings and bytes | Strings cross UTF-16/UTF-8; byte results copy into JS-owned storage. | No zero-copy or binary-integer claim. |
 | Output materialization | Structural output creates JS objects/arrays and releases acquired children. | Per-field property-descriptor allocation, using bound own-property templates. |
 | Binding/startup | Admission, freezing, slot resolution and codec compilation precede warmed calls. | Planning is cached; warmed measurements exclude these costs. |
@@ -132,30 +132,58 @@ UTF handling in these callers; they are not evidence of JSON data conversion.
 Numeric Wasm frames were not assigned names speculatively. Sampling shares are
 attribution hints, not predicted application savings.
 
-The latest retained release screen used Node24.21.0, an AMD Ryzen AI9 HX370,
-the same Wasm/native program sections, sizes0/16/128/1024, small/large integers,
-and12 alternating AB/BA pairs. At1024, these are median paired roundtrip changes
-for the **draft-pair prototype relative to the older specialized codec**:
+The emitted-pair migration was compared with the preceding generic production
+codec using Node 24.21.0, an AMD Ryzen AI 9 HX 370, identical Wasm/native program
+sections, sizes 16/1024, small/large integers, and eight alternating AB/BA pairs.
+At 1,024, the median paired roundtrip changes **before the new optimizations** were:
 
 | Family | Small integers | Large integers |
 | --- | ---: | ---: |
-| Records | -8.6% | -6.3% |
-| Recursive Tree | -32.2% | -13.3% |
-| Nested List/Option/Prod | +3.2% | -0.3% |
-| Enum array | -44.6% | -43.4% |
-| String control | +4.1% | +0.6% |
-| Byte-array control | +2.9% | +2.9% |
+| Records | -6.8% | -1.8% |
+| Recursive Tree | -15.0% | -5.6% |
+| Nested List/Option/Prod | -12.8% | -4.9% |
+| Enum array | -43.3% | -43.0% |
+| String control | -0.7% | -7.0% |
+| Byte-array control | -2.4% | -2.3% |
 
-Negative means faster. Small nested roundtrip and large nested output were mixed
-across pairs; small nested output remained10.7% slower (10/12 pairs). Even the
-unchanged text/byte paths have small deltas, so these figures should guide source
-inspection, not serve as precise forecasts. They describe the prototype, not a
-speedup already present in the production generic-container codec.
+Negative means faster. These are mechanism measurements, not application
+forecasts. The manifest grew from 46,095 to 55,270 bytes, about 20%; separating
+native facts from value mappings does not make inline JSON smaller. Fresh-runtime
+creation medians were 7.7ms and 8.3ms across eight observations each. Imports and
+first calls remain separately recorded; this small screen does not establish a
+cold-browser startup result.
 
-These timings precede the draft's core-tag reduction. The migrated format
-uses primitives, Lean objects, and resources; constructor, native-array and
-callable facts are optional codec metadata. The earlier figures remain historical
-prototype evidence, not measurements of the emitted format.
+A sampled nested-small-integer workload then identified decimal UTF conversion:
+`encode` alone accounted for about 9% of sampled time. Using existing native
+scalar operations for numeric Nat values through 2³¹−1 removed that text path.
+A separate matched comparison against the corrected migrated codec measured:
+
+| Family at 1,024 | Small integers | Large integers |
+| --- | ---: | ---: |
+| Records | -13.6% | -1.2% |
+| Nested List/Option/Prod | -35.7% | -1.6% |
+| Recursive Tree | -37.4% | -0.4% |
+
+The small nested/tree roundtrips improved in all eight pairs. Large-integer
+results remain close to baseline; their decimal path remains. Large-tree output
+was 3% slower in this screen, while unchanged controls also moved, so this is not
+proof of zero overhead. Boundary regression tests cover the largest scalar,
+heap values, exact larger integers, textual inputs, and invalid inputs.
+
+The follow-up profile put pointer-buffer writes first. Reusing the DataView
+inside an existing per-lowering scratch region gave another 14.2% improvement
+for small nested roundtrips and 10.5% for small trees in a focused eight-pair
+comparison; both improved in every pair. Large nested/tree improvements were
+4.1%/3.9%. This preserves explicit little-endian writes and refreshes the view
+when allocation or memory growth changes its backing buffer. A real Wasm test
+forces growth after the view has already been used. Unchanged enum controls
+varied between screens; their deltas are not attributed to this change.
+
+Those stages use different immediate baselines. Do not multiply their median
+ratios into a claimed combined speedup. The final profile still shows native
+constructor creation, field acquisition/release, shape checks and output
+materialization. Larger integers and real strings still use UTF conversion.
+No JSON data serialization, new native ABI, or borrowed-pointer API was added.
 
 The representative next comparison is an actual caller's complete encode/call/
 decode workflow, including the materialization it chooses. A JSL boundary can

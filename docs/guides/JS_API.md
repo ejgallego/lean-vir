@@ -357,7 +357,9 @@ application ownership: VIR does not dispose supplied maps when runtimes shut dow
 - Export `id`, export `jsName`, and `exportsByName` were removed in manifest11 /
   resource compatibility5. Replace generated methods and alias calls with
   `call` using the full `entry`; regenerate programs with the matching SDK.
-  Constructor `jsName` labels, provider IDs and structural `nameKey` are unchanged.
+  Provider IDs and structural `nameKey` keep their separate responsibilities.
+  In manifest12 / resource compatibility6, constructor JavaScript spellings
+  live in the selected value interface; constructor metadata has no `jsName`.
 - `vir.runStartupEntries()` invokes zero-argument exports whose manifest entry
   has `startup: true`, in manifest order, once per runtime. After success,
   repeated calls do nothing. Failure stops the sequence and throws the error;
