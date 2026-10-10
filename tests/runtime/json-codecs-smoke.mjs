@@ -110,14 +110,21 @@ try {
       try {
         // Admission contains only primitive and opaque boundaries. The model itself
         // is never interpreted by the optional automatic object converter.
+        const supportedBoundaryPairs = new Set([
+          "nat:bigint",
+          "leanObject:boolean",
+          "string:string",
+          "resource:jsReference",
+        ]);
         for (const entry of runtime.interfaceManifest.exports) {
           for (const type of [
             ...entry.args.map((arg) => arg.type),
             entry.result,
           ]) {
+            const pair = `${type.native.type.tag}:${type.value.tag}`;
             assert.ok(
-              ["Nat", "Bool", "String", "Js"].includes(type.type),
-              `unexpected structural boundary ${type.type}`,
+              supportedBoundaryPairs.has(pair),
+              `unexpected structural boundary ${pair}`,
             );
           }
         }

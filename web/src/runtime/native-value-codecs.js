@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import { compileConstructorValueInterface } from "./constructor-value-interface.js";
 import { compilePrimitiveValueCodec } from "./primitive-values.js";
 import {
-  normalizeInteger,
+  normalizeBoundedUnsignedBigInt,
 } from "./primitive-value-normalizers.js";
 
 // Bind immutable admitted compiler facts to the selected JS representation.
@@ -74,6 +74,7 @@ function compileValueCodec(runtime, native, view, bindings = []) {
         Object.assign(codec, compileChain(runtime, constructors, view, scope, compile));
       } else if (view.tag === "variant") {
         const shape = compileConstructorValueInterface(native, view);
+        const identity = constructors.length === 1 && constructors[0].representation === "identity";
         const plans = constructors.map((ctor, index) => {
           const entry = view.cases[index];
           const mappings = entry.payload === "none" ? [] : entry.payload === "value"
@@ -88,7 +89,7 @@ function compileValueCodec(runtime, native, view, bindings = []) {
           return plans[index].lower(index, payload, label, scratch);
         };
         codec.lift = (obj, label) => {
-          const index = runtime.exports.vir_obj_tag(obj);
+          const index = identity ? 0 : runtime.exports.vir_obj_tag(obj);
           if (!Number.isInteger(index) || index < 0 || index >= plans.length)
             throw new Error(`${label} constructor is out of range`);
           return plans[index].lift(obj, label);
@@ -239,7 +240,7 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
           const at = entry.field.location, child = entry.read(value);
           const fieldLabel = `${label}.${entry.field.name}`;
           if (at.tag === "object") objects[at.index] = entry.codec.lower(child, fieldLabel, scratch);
-          else if (at.tag === "usize") usize[at.index] = BigInt(normalizeInteger(child, fieldLabel, 0, 0xffffffff));
+          else if (at.tag === "usize") usize[at.index] = normalizeBoundedUnsignedBigInt(child, fieldLabel, 0xffffffffn, "USize");
           else entry.codec.scalar.write(scalars, at.offset, at.size, child, fieldLabel);
         }
         return objectOnly ? scratch.createObjects(index, objects, label)
