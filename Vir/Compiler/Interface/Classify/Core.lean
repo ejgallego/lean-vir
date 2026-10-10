@@ -79,8 +79,6 @@ private partial def enclosingRecursiveOwner? (bound : Nat := 0) : InterfaceType 
         constructor.fields.findSome? fun field => enclosingRecursiveOwner? (bound + 1) field.type
   | .structure _ _ descriptor =>
       descriptor.fields.findSome? fun field => enclosingRecursiveOwner? (bound + 1) field.type
-  | .taggedUnion _ _ constructors =>
-      constructors.findSome? fun constructor => enclosingRecursiveOwner? (bound + 1) constructor.payloadType
   | .function args result _ =>
       args.findSome? (fun arg => enclosingRecursiveOwner? bound arg.type) <|> enclosingRecursiveOwner? bound result
   | _ => none
@@ -126,52 +124,6 @@ private partial def functionType (type : Lean.Expr) (seenTypes : RecursiveSeen)
           throwThe InterfaceClassifierError (.recursiveCallback owner)
         return resultType
       return (.function args resultType effect)
-
-private partial def taggedUnionType (seenTypes : RecursiveSeen) (name : Name) (label : String)
-    (type : Lean.Expr) (constructors : Array (Name × Lean.Expr)) :
-    ClassifyM InterfaceType := do
-  let env ← getEnv
-  let some (.inductInfo indInfo) := env.find? name
-    | throwThe InterfaceClassifierError (.unsupportedType type)
-  match ← liftM (recursiveVisit seenTypes .inductive type indInfo.isRec indInfo.all) with
-  | .reference depth =>
-      return (.recursiveRef name label depth)
-  | .descend nextSeen =>
-    let (_, args) := type.getAppFnArgs
-    if indInfo.numIndices != 0 then
-      throwThe InterfaceClassifierError (.indexedInductive name)
-    else if args.size != indInfo.numParams then
-      throwThe InterfaceClassifierError (.parameterCountMismatch .inductive name indInfo.numParams args.size)
-    else
-      let mut variants : Array TaggedUnionVariant := #[]
-      for (ctorName, fieldExpr) in constructors do
-        let some (.ctorInfo ctorInfo) := env.find? ctorName
-          | throwThe InterfaceClassifierError (.constructorMissingDeclaration ctorName)
-        if ctorInfo.induct != name then
-          throwThe InterfaceClassifierError (.constructorOwnerMismatch ctorName name ctorInfo.induct)
-        let ctorType := ctorInfo.toConstantVal.instantiateTypeLevelParams type.getAppFn.constLevels!
-        let some instantiated := instantiateForallPrefix? ctorType args
-          | throwThe InterfaceClassifierError (.constructorInvalidType ctorName ctorInfo.type)
-        let some fieldExprs := constructorFieldTypes? instantiated
-          | throwThe InterfaceClassifierError (.constructorImplicitFields ctorName)
-        if fieldExprs.size != 1 then
-          throwThe InterfaceClassifierError (.constructorRuntimeFieldCount ctorName fieldExprs.size)
-        let some (fieldName, _) := fieldExprs[0]?
-          | throwThe InterfaceClassifierError (.constructorInvalidType ctorName ctorInfo.type)
-        let layout ← constructorLayout ctorName (.constructorLayoutUnavailable ctorName)
-        if layout.fieldInfo.size != 1 then
-          throwThe InterfaceClassifierError (.constructorRuntimeFieldCount ctorName layout.fieldInfo.size)
-        let some fieldLayout := fieldLayout? layout.fieldInfo[0]!
-          | throwThe InterfaceClassifierError (.constructorErasedRuntimeLayout ctorName)
-        let fieldType ← withContext (.constructorPayload ctorName fieldExpr)
-          (classifyType fieldExpr nextSeen)
-        variants := variants.push {
-          constructorName := ctorName
-          fieldName := fieldName
-          payloadType := fieldType
-          payloadLayout := fieldLayout
-          storage := constructorStorage layout }
-      return (.taggedUnion name label variants)
 
 private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
     ClassifyM InterfaceType := do
@@ -301,16 +253,6 @@ private partial def classifyType (e : Lean.Expr) (seenTypes : RecursiveSeen) :
               match fn, Array.toList args with
               | `Array, [arg] =>
                   return .array (← withContext .arrayElement (classifyType arg seenTypes))
-              | `Sum, [lhs, rhs] =>
-                  taggedUnionType seenTypes `Sum (exprTypeLabel e) e #[
-                    (`Sum.inl, lhs),
-                    (`Sum.inr, rhs)
-                  ]
-              | `Except, [err, ok] =>
-                  taggedUnionType seenTypes `Except (exprTypeLabel e) e #[
-                    (`Except.error, err),
-                    (`Except.ok, ok)
-                  ]
               | _, _ =>
                   match simpleEnumType? env e with
                   | some ty => return ty

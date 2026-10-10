@@ -546,9 +546,10 @@ container owners. The managed foundation still owns calls and references.
 Products use
 `{ fst, snd }` in both directions. Arrays and lists use JavaScript arrays,
 `ByteArray` uses `Uint8Array`, floats use JavaScript numbers, and `Sum`/`Except`
-values use `{ kind, value }`.
-Lowering accepts the same canonical shapes that lifting returns; text parsing
-and other UI conveniences belong in application code. Non-indexed custom inductives use
+values use `{ kind, value }`. Sum and Except are classified and converted through
+the same constructor descriptors as other inductives.
+Constructor spellings and payload forms match in both directions; numeric input
+coercions follow the rules above. Non-indexed custom inductives use
 canonical constructor objects only: nullary constructors accept and return
 `{ kind }`, single-field constructors accept and return `{ kind, value }`,
 and multi-field constructors accept and return `{ kind, fields }`.
@@ -573,6 +574,20 @@ constructor, use `{ kind: "null" }` and `{ kind: "array", value: [...] }`.
 Tagged unions use their canonical `{ kind, value }` representation in both
 directions; alternate tag fields and single-constructor-key objects are not
 accepted.
+
+Array/List results are fresh dense arrays. Inputs are read by numeric index;
+holes, inherited numeric properties and getters participate. Each element must
+be accepted by its codec: a hole can supply undefined to Unit but fails for Nat.
+Array lowering visits indices forward; List lowering visits them backward to
+construct its owned tail. Both lift forward. Use ordinary data arrays when read
+order should not affect a value. Conversion does not preserve sparse slots or
+accessor/prototype behavior.
+
+Structure fields and constructor payloads must be own properties. The `kind`
+property itself may be inherited. Unknown enumerable string keys reject; symbols
+and non-enumerable extras are outside that check. Results use writable own data
+properties. Recursive structural conversion expects finite trees and does not
+promise cycle handling, graph-sharing preservation or arbitrary-depth stack safety.
 
 Non-indexed structures, including parameterized instances like `Box Nat` and
 `Tagged (Array String)`, are accepted and returned as objects keyed by their
@@ -600,7 +615,10 @@ boundary, `Lean.Expr` values use structural objects such as
 the same shape with `kind` values `zero`, `succ`, `max`, `imax`, `param`, and
 `mvar`. Resolved calls lower these values through the object ABI into real Lean
 expression objects. Metadata expression inputs are accepted by lowering their
-inner expression; metadata results preserve a structural `mdata` wrapper.
+inner expression; metadata results preserve a structural `mdata` wrapper but omit
+the metadata payload. This specialized adapter does not preserve every Lean.Expr
+distinction through a round trip. Use opaque references when retaining the exact
+expression is required.
 
 Bound-variable indices must be in `0..1048574`: the pinned kernel stores
 `index + 1` in a 20-bit range. Larger indices reject before Wasm execution.
@@ -627,6 +645,10 @@ Package loading validates the embedded interface manifest before any generated
 entry is exposed. Malformed native/value pairs, incompatible value mappings,
 invalid recursive references, incomplete field or constructor mappings, and
 duplicate export names are reported as package-load errors.
+Native/value pairs and their layout/mapping records reject unknown keys. Outer
+manifest, provenance and callable records currently permit additional keys;
+those keys have no conversion meaning and do not define custom codecs. See the
+[format reference](../reference/IRPKG_FORMAT.md#interface-descriptors).
 
 ## Lean To JavaScript Host Imports
 

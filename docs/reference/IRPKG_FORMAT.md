@@ -269,7 +269,7 @@ binds admitted pairs into cached codecs; ordinary calls and opaque reference
 passage do not require structural conversion.
 
 ```text
-BoundaryInterface = { native: DescriptorRef, value: ValueInterface }
+BoundaryInterface = { native: NativeDescriptor, value: ValueInterface }
 DescriptorRef     = NativeDescriptor | { ref: depth }
 NativeDescriptor  = { type: NativeType, metadata?: CompilerMetadata }
 ```
@@ -298,8 +298,11 @@ Compiler metadata is optional. `declaration` identifies or labels the Lean
 type; `constructors` describes object layouts; `arrayElement` identifies a
 compiler-confirmed native Lean array element; and `signature` describes a
 callable. A signature contains native `args`, native `result` and `effect`.
-Native fields and signature positions hold `DescriptorRef` values, not
-JavaScript mappings.
+Constructor, array and signature facts are mutually exclusive and require
+`leanObject`; declaration identity may also accompany primitives/resources.
+Native fields and array elements hold `DescriptorRef` values. Callable
+argument/result positions start closed NativeDescriptor roots, with no reference
+to an enclosing aggregate. None of these facts contain JavaScript mappings.
 
 ### Constructor and field layouts
 
@@ -364,7 +367,11 @@ contains a JavaScript `kind` plus one payload form: `none`, `value`, or named
 There is no second numeric `tag` field in either table: the array position is
 the native ordinal, while `kind` or the enum string is the selected JS spelling.
 
-`sequence` maps a dense JavaScript array. For a native Array, `metadata.arrayElement`
+`sequence` lifts to a dense JavaScript array and lowers indexed Array inputs.
+Input holes are read as undefined unless an inherited numeric property supplies
+a value; the selected element codec must accept the value. See the
+[JS input rules](../guides/JS_API.md#calls-and-manifest).
+For a native Array, `metadata.arrayElement`
 supplies its element descriptor. A linked traversal instead selects `nil`,
 `cons`, `head` and `tail` positions through its `chain`; the codec reads their
 physical layout from native metadata. The native type remains `leanObject` in

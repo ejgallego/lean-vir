@@ -71,7 +71,7 @@ writeFileSync(classifierVisibility, classifierImport +
   "#check Vir.Interface.classifyExportSignature\n#check Vir.Interface.classifyHostImportSignature\n");
 run(["lake", "env", "lean", classifierVisibility], "classifier-public-api");
 const privateTraversalHelpers = ["RecursiveSeen", "recursiveVisit", "functionType", "inductiveType",
-  "structureType", "taggedUnionType", "classifyType"];
+  "structureType", "classifyType"];
 const nonReexportedReductionHelpers = ["reduceTypeAliases", "effectResult?"];
 const hiddenFromSignature = [...privateTraversalHelpers, ...nonReexportedReductionHelpers];
 writeFileSync(classifierVisibility, classifierImport + hiddenFromSignature.map(

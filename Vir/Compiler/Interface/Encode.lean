@@ -98,9 +98,6 @@ private partial def nativeMetadataFields (type : InterfaceType) : Array (String 
   | .simpleEnum name constructors =>
       let encoded := constructors.map immediateConstructorJson
       #[("declaration", jsonName name), ("constructors", jsonArray encoded)]
-  | .taggedUnion name _ constructors =>
-      let encoded := constructors.map (taggedUnionConstructorJson ·)
-      #[("declaration", jsonName name), ("constructors", jsonArray encoded)]
   | .customInductive name _ constructors =>
       let encoded := constructors.map inductiveConstructorJson
       #[("declaration", jsonName name), ("constructors", jsonArray encoded)]
@@ -165,16 +162,6 @@ private partial def structureConstructorJson (descriptor : StructureDescriptor) 
         ("fields", jsonArray fields)
       ]
 
-private partial def taggedUnionConstructorJson (constructor : TaggedUnionVariant) : String :=
-  let field := storedFieldJson constructor.storage constructor.fieldName
-    constructor.payloadType constructor.payloadLayout
-  jsonObject #[
-    ("name", jsonName constructor.constructorName),
-    ("representation", jsonString "object"),
-    ("storage", constructor.storage.toJson),
-    ("fields", jsonArray #[field])
-  ]
-
 private partial def recordFieldJson
     (key : String) (path : Array Nat) (type : InterfaceType) : String :=
   jsonObject #[
@@ -206,16 +193,6 @@ private partial def variantCaseJson
         ("payload", jsonString "fields"),
         ("fields", jsonArray encodedFields)
       ]
-
-private partial def taggedUnionValueJson
-    (name : Name) (constructors : Array TaggedUnionVariant) : String :=
-  let cases := constructors.map fun constructor =>
-    variantCaseJson (constructorLabel name constructor.constructorName)
-      #[(constructor.fieldName, constructor.payloadType)]
-  jsonObject #[
-    ("tag", jsonString "variant"),
-    ("cases", jsonArray cases)
-  ]
 
 private partial def inductiveVariantValueJson
     (name : Name) (constructors : Array InductiveConstructor) : String :=
@@ -303,7 +280,6 @@ private partial def valueInterfaceJson (type : InterfaceType) : String :=
   | .simpleEnum name constructors =>
       let cases := constructors.map fun constructor => jsonString (constructorLabel name constructor)
       jsonObject #[("tag", jsonString "enum"), ("cases", jsonArray cases)]
-  | .taggedUnion name _ constructors => taggedUnionValueJson name constructors
   | .recursiveRef .. => jsonObject #[("tag", jsonString "recursive")]
   | .customInductive name _ constructors => customInductiveValueJson name constructors
   | .structure _ _ descriptor => jsonObject #[

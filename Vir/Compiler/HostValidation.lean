@@ -41,7 +41,6 @@ private def hostBoundaryKind : InterfaceType → String
   | .byteArray
   | .expr => "raw Lean type"
   | .simpleEnum .. => "enum"
-  | .taggedUnion .. => "tagged union"
   | .customInductive .. => "inductive"
   | .structure .. => "structure"
   | .recursiveRef .. => "recursive type"

@@ -257,17 +257,14 @@ function immediateView(constructors, view) {
   const count = constructors.length;
   let encode, decode;
   if (view.tag === "unit") {
-    if (count !== 1) throw new Error("unit requires one constructor");
     encode = (value, label) => { if (value !== undefined && value !== null) throw new Error(`${label} must be Unit`); return 0; };
     decode = () => undefined;
   } else if (view.tag === "boolean") {
     const no = view.false, yes = view.true;
-    if (count !== 2 || ![0, 1].includes(no) || yes !== 1 - no) throw new Error("invalid boolean mapping");
     encode = (value, label) => { if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`); return value ? yes : no; };
     decode = value => value === yes;
   } else {
     const names = [...view.cases], ordinals = new Map(names.map((name, index) => [name, index]));
-    if (names.length !== count || ordinals.size !== count || names.some(name => typeof name !== "string" || !name)) throw new Error("invalid enum mapping");
     encode = (value, label) => { const index = ordinals.get(value); if (index === undefined) throw new Error(`${label} has unknown enum value`); return index; };
     decode = value => names[value];
   }
@@ -282,8 +279,7 @@ function unsignedScalar(width) {
   return {
     write(bytes, offset, _size, value, label) {
       if (width === 64) {
-        const n = BigInt(normalizeDecimal(value, label, { signed: false }));
-        if (n > max) throw new Error(`${label} exceeds UInt64 range`);
+        const n = normalizeBoundedUnsignedBigInt(value, label, max, "UInt64");
         bytes.setBigUint64(offset, n, true);
       } else bytes[`setUint${width}`](offset, normalizeInteger(value, label, 0, max), true);
     },

@@ -25,7 +25,7 @@ description of its storage.
 
 ```ts
 interface BoundaryInterface {
-  native: DescriptorRef;
+  native: NativeDescriptor;
   value: ValueInterface;
 }
 
@@ -150,6 +150,13 @@ is `bigint`; a wire codec can explicitly select a safe-integer subdomain. That
 adapter must reject large integers, not round them. Selecting it does not imply
 that every value of an unbounded Lean type can be materialized through it.
 
+These tags specify canonical output and conversion policy, not strict input
+JavaScript types. The default `bigint` view also accepts safe integer Numbers and
+decimal strings for Nat/Int/UInt64; USize's `number` view accepts those integer
+inputs too. The `unit` view lowers either null or undefined and lifts undefined.
+The explicit `safeInteger` adapter requires safe integer Numbers in both
+directions. Range checks remain those of the paired native type.
+
 `variant.cases` follows native constructor order. It supplies the JS spelling and
 payload shape, without repeating tags, field types, or layouts. A zero-field
 payload is `none`, a one-field payload can be `value`, and named payloads use
@@ -169,12 +176,27 @@ native-array metadata.
 The first version supports the ordinary two-constructor head/tail chain, not an
 arbitrary graph traversal language.
 
+Sequence output is a fresh dense array. Input must be a JavaScript Array and is
+read by numeric index: holes yield undefined unless an inherited numeric
+property supplies a value, and getters participate. An element codec determines
+whether that value is accepted; Unit accepts undefined, while Nat rejects it.
+Native arrays lower from the first index forward; linked sequences lower from
+the last index backward to construct an owned tail. Both lift forward. This
+codec materializes indexed values; it does not preserve sparse slots, prototypes
+or getter effects. Use ordinary data arrays when read order should be irrelevant.
+
 Reference and callback interfaces preserve ownership and boundary semantics.
 A `function` view requires signature metadata, including the execution effect;
 its binding checks the actual boundary role as well as shape compatibility.
 An `expr` view selects the specialized expression codec after admission confirms
 the compiler-owned type identity is `Lean.Expr`. Neither operation needs a core
 function or expression tag. These codecs retain the existing callable and expression operations.
+
+The specialized Expr adapter has a restricted domain and is not lossless for
+all Lean.Expr values: lowering mdata uses its child, and lifting omits the
+metadata payload. Its Name grammar is also restricted. See the
+[JS API](../guides/JS_API.md#calls-and-manifest); selecting `expr` does not extend
+the lossless constructor/field guarantee of generic structural conversion.
 
 In particular, `JSL α` remains `Js (LeanRef.Handle α)`: its boundary is a
 `resource` descriptor with a `jsReference` view, and its payload type is opaque.
@@ -270,6 +292,13 @@ reference determines the owner, and the bound codec for that owner determines th
 representation. In a sequence plan, the chain tail is handled iteratively while
 element references still resolve in the native scope.
 
+A metadata reference currently admits only a `recursive` view, reusing the
+enclosing whole codec. It cannot select an opaque `leanReference` just at that
+recursive child. Callable argument/result descriptors start independent closed
+roots; an enclosing aggregate's reference cannot escape into a callback.
+General recursive conversion requires finite trees and does not promise cycle
+handling, preservation of graph sharing, or stack safety for arbitrary depth.
+
 Constructor creation preserves existing transfer-on-success ownership. A failed
 conversion releases its partial owned values; inspection retains fields for its
 documented scope. Public JS values contain no raw pointers. Compiling a different
@@ -282,16 +311,35 @@ walker on every call. Plans remain cached over immutable admitted metadata.
 
 ## What is validated where
 
-Core admission checks the native boundary. When compiler metadata is provided,
-admission checks its structure, layouts, ordinals by position, and recursive
-scope bounds. Binding a value interface checks its
-compatibility with the admitted native descriptor once: distinct spellings,
-constructor and field coverage, primitive compatibility, and sequence shape.
-Dynamic conversion checks input values and returned object discriminants. It
-does not revalidate the descriptor at each node.
+Pair admission checks the native boundary, optional metadata structure, layouts,
+ordinals by position, recursive scope, and native/view compatibility. It checks
+distinct spellings, constructor and field coverage, primitive compatibility, and
+sequence shape. Binding builds cached plans from those immutable admitted facts.
+Dynamic conversion checks caller values, returned discriminants and ownership.
+It does not revalidate the descriptor at each node.
+
+Constructor, array and signature metadata forms are mutually exclusive and
+belong only to `leanObject`; primitive/resource descriptors may carry declaration
+identity. The typed contract models that association and closed callable roots.
+Numeric ranges, slot coverage, path overlap and lexical scope remain admission
+checks that TypeScript does not express.
+
+Native/value, metadata, layout and mapping records reject unknown keys. The outer
+manifest, provenance, callable entries, named arguments and targets currently
+permit additional keys, except explicitly retired export aliases. Those extra
+keys have no runtime meaning; they are not extension points for new codecs.
+Diagnostics are producer report data and only their containing array is checked.
+This policy does not make every manifest record an exact-key schema.
+
+Record fields and variant payload properties must be own properties. The variant
+kind is read as a property and may be inherited. Unknown enumerable string keys
+are rejected; symbols and non-enumerable extras are outside that check. Lifting
+produces ordinary writable own data properties, not the input prototype or its
+accessors.
 
 A supported structural codec preserves constructor and field information through
-Lean -> JS -> Lean. Explicit restricted adapters state their accepted domain and
+Lean -> JS -> Lean within its stated domain. Expr's specialized limitations above
+are separate. Explicit restricted adapters state their accepted domain and
 reject values outside it. Field output must use own data properties so that keys
 such as `__proto__` do not acquire assignment semantics. These requirements are
 independent of JSON serialization.
