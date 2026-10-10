@@ -29,6 +29,11 @@ function assertCompiled(result) {
   return result;
 }
 
+function assertBoundaryPair(boundary, nativeTag, valueTag) {
+  assert.equal(boundary?.native?.type?.tag, nativeTag);
+  assert.equal(boundary?.value?.tag, valueTag);
+}
+
 function readFixture(name) {
   return readFile(
     new URL(`../../fixtures/runtime/${name}.lean`, import.meta.url),
@@ -793,17 +798,16 @@ try {
 
   const runtimeExport = manifestEntry(manifest, "runtimeValue");
   assert.equal(runtimeExport.effect, "runtime");
-  assert.equal(runtimeExport.result.type, "Nat");
+  assertBoundaryPair(runtimeExport.result, "nat", "bigint");
 
   const runtimeImport = manifest.hostImports.find(
     (entry) => entry.target === "test.runtime.value",
   );
   assert.ok(runtimeImport, "runtime host import missing");
   assert.equal(runtimeImport.effect, "runtime");
-  assert.equal(runtimeImport.boundary, "hostResource");
   assert.equal(runtimeImport.arity, 1);
   assert.equal(runtimeImport.erasedPrefixArgs, 0);
-  assert.equal(runtimeImport.result.type, "Js");
+  assertBoundaryPair(runtimeImport.result, "resource", "jsReference");
 
   const report = await readFile(runtimeReport, "utf8");
   assert.match(report, /runtimeValue/);
@@ -876,7 +880,7 @@ try {
     (entry) => entry.slot === 127,
   );
   assert.equal(lastHostSlot?.symbol, "vir_js_import_127_1");
-  assert.equal(lastHostSlot?.boundary, "hostResource");
+  assertBoundaryPair(lastHostSlot?.result, "resource", "jsReference");
   assert.equal(lastHostSlot?.arity, 1);
 } finally {
   await rm(freshDir, { recursive: true, force: true });
