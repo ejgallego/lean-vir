@@ -25,7 +25,7 @@ export interface ConstructorStorage {
 export type FieldLocation =
   | { readonly tag: "object"; readonly index: number }
   | { readonly tag: "usize"; readonly index: number }
-  | { readonly tag: "scalar"; readonly size: number; readonly offset: number };
+  | { readonly tag: "scalar"; readonly size: 1 | 2 | 4 | 8; readonly offset: number };
 
 export interface NativeField {
   readonly name: string;
@@ -81,8 +81,9 @@ export interface RecursiveDescriptorRef {
 export type DescriptorRef = NativeDescriptor | RecursiveDescriptorRef;
 
 export interface NativeSignature {
-  readonly args: readonly DescriptorRef[];
-  readonly result: DescriptorRef;
+  // Callable positions start closed roots; refs occur only inside their metadata.
+  readonly args: readonly NativeDescriptor[];
+  readonly result: NativeDescriptor;
   readonly effect: Effect;
 }
 
@@ -90,24 +91,51 @@ export interface NativeSignature {
 // opaque object passage needs none of these fields. A structural codec requires
 // constructors, an array codec requires arrayElement, a callable requires signature.
 // Admission checks facts against the producer's type and the selected operation.
-export interface CompilerMetadata {
+interface DeclarationMetadata {
   readonly declaration?: DeclarationName;
-  readonly constructors?: readonly ConstructorDescriptor[];
-  // Present only for compiler-confirmed native Lean Array storage.
-  readonly arrayElement?: DescriptorRef;
-  readonly signature?: NativeSignature;
 }
 
-export interface NativeDescriptor {
-  readonly type: NativeType;
-  readonly metadata?: CompilerMetadata;
-}
+// Storage forms are mutually exclusive. Primitives/resources may carry identity
+// only; layout, array and callable facts belong exclusively to Lean objects.
+type IdentityMetadata = DeclarationMetadata & {
+  readonly constructors?: never;
+  readonly arrayElement?: never;
+  readonly signature?: never;
+};
+export type CompilerMetadata = DeclarationMetadata & (
+  | IdentityMetadata
+  | {
+      readonly constructors: readonly [ConstructorDescriptor, ...ConstructorDescriptor[]];
+      readonly arrayElement?: never;
+      readonly signature?: never;
+    }
+  | {
+      readonly constructors?: never;
+      readonly arrayElement: DescriptorRef;
+      readonly signature?: never;
+    }
+  | {
+      readonly constructors?: never;
+      readonly arrayElement?: never;
+      readonly signature: NativeSignature;
+    }
+);
+
+export type NativeDescriptor =
+  | {
+      readonly type: PrimitiveType | { readonly tag: "resource" };
+      readonly metadata?: IdentityMetadata;
+    }
+  | {
+      readonly type: { readonly tag: "leanObject" };
+      readonly metadata?: CompilerMetadata;
+    };
 
 // Field positions are declaration/projection order, never physical slot indices.
 // A path crosses native fields, e.g. [0, 1] for an inherited parent's field.
 export interface RecordFieldInterface {
   readonly key: string;
-  readonly path: readonly number[];
+  readonly path: readonly [number, ...number[]];
   readonly value: ValueInterface;
 }
 
@@ -139,11 +167,11 @@ export type ValueInterface =
   | { readonly tag: "bytes" }
   | { readonly tag: "unit" }
   | { readonly tag: "boolean"; readonly false: number; readonly true: number }
-  | { readonly tag: "enum"; readonly cases: readonly string[] }
+  | { readonly tag: "enum"; readonly cases: readonly [string, ...string[]] }
   | { readonly tag: "record"; readonly fields: readonly RecordFieldInterface[] }
   | {
       readonly tag: "variant";
-      readonly cases: readonly ConstructorInterface[];
+      readonly cases: readonly [ConstructorInterface, ...ConstructorInterface[]];
     }
   | {
       readonly tag: "sequence";
@@ -163,11 +191,12 @@ export type ValueInterface =
 export type ValueTag = ValueInterface["tag"];
 
 export interface BoundaryInterface {
-  readonly native: DescriptorRef;
+  readonly native: NativeDescriptor;
   readonly value: ValueInterface;
 }
 
-export interface ExportInterface {
+// The callable signature, not the manifest entry with named arguments/provenance.
+export interface CallableInterface {
   readonly args: readonly BoundaryInterface[];
   readonly result: BoundaryInterface;
   readonly effect: Effect;

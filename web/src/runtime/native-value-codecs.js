@@ -73,7 +73,7 @@ function compileValueCodec(runtime, native, view, bindings = []) {
       if (view.tag === "sequence") {
         Object.assign(codec, compileChain(runtime, constructors, view, scope, compile));
       } else if (view.tag === "variant") {
-        const shape = compileConstructorValueInterface(native, view);
+        const shape = compileConstructorValueInterface(view);
         const identity = constructors.length === 1 && constructors[0].representation === "identity";
         const plans = constructors.map((ctor, index) => {
           const entry = view.cases[index];

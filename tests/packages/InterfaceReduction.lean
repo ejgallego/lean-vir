@@ -292,12 +292,11 @@ run_elab do
     expect "binder identity reason" (errorCause binderError == .nonUniformRecursive .inductive ``FamilyTree)
 
   -- Declaration resolution precedes layout lookup in the selected producer path.
-  let missingUnion := mkConst `MissingUnion
-  let .error missingUnionError ← (taggedUnionType #[] `MissingUnion "MissingUnion"
-      missingUnion #[(`MissingUnion.missing, nat)]).run
-    | throwError "an absent union declaration must fail before layout lookup"
-  expect "missing union declaration reason"
-    (errorCause missingUnionError == .unsupportedType missingUnion)
+  let missingInductive := mkConst `MissingInductive
+  let .error missingInductiveError ← (inductiveType #[] missingInductive).run
+    | throwError "an absent inductive declaration must fail before layout lookup"
+  expect "missing inductive declaration reason"
+    (errorCause missingInductiveError == .unsupportedType missingInductive)
   let compilerErrorEscaped ← try
     let _ ← (withContext .arrayElement
       (liftM (throwError "compiler-exception-control" : CoreM InterfaceType) : ClassifyM InterfaceType)).run

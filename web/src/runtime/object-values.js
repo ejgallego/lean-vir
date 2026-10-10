@@ -9,7 +9,6 @@ import {
   objectArgumentSupported,
   objectResultSupported,
 } from "./object-abi.js";
-import { normalizeArray } from "./vir-value-normalizers.js";
 import { ConstructorScratch } from "./constructor-scratch.js";
 import { compileNativeValueCodec } from "./native-value-codecs.js";
 import {
@@ -368,10 +367,10 @@ export function withObjectValues(Base) {
     }
 
     makeObjectLevelList(levels, label) {
-      const values = normalizeArray(levels, label);
+      if (!Array.isArray(levels)) throw new Error(`${label} must be an array`);
       const levelObjs = [];
       try {
-        values.forEach((level, index) => {
+        levels.forEach((level, index) => {
           levelObjs.push(this.makeObjectLevel(level, `${label}[${index}]`));
         });
         return this.makeObjectListFromOwnedElements(levelObjs, label);

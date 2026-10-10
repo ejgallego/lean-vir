@@ -78,8 +78,6 @@ inductive InterfaceType where
   | byteArray
   | array (element : InterfaceType)
   | simpleEnum (name : Name) (constructors : Array Name)
-  | taggedUnion (name : Name) (label : String)
-      (constructors : Array TaggedUnionVariant)
   | recursiveRef (name : Name) (label : String) (depth : Nat)
   | customInductive (name : Name) (label : String)
       (constructors : Array InductiveConstructor)
@@ -88,14 +86,6 @@ inductive InterfaceType where
   | function (args : Array InterfaceArg) (result : InterfaceType) (effect : InterfaceEffect)
   | expr
   | leanObject
-  deriving BEq, Repr
-
-structure TaggedUnionVariant where
-  constructorName : Name
-  fieldName : String
-  payloadType : InterfaceType
-  payloadLayout : FieldLayout
-  storage : ConstructorStorage
   deriving BEq, Repr
 
 structure InductiveField where
@@ -151,7 +141,6 @@ def InterfaceType.label : InterfaceType → String
   | .byteArray => "ByteArray"
   | .array element => s!"Array {element.label}"
   | .simpleEnum name _ => name.toString
-  | .taggedUnion _ label _ => label
   | .recursiveRef _ label _ => label
   | .customInductive _ label _ => label
   | .structure _ label .. => label

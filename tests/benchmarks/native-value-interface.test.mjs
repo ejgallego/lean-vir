@@ -8,7 +8,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { compileNativeValueCodec } from "../../web/src/runtime/native-value-codecs.js";
 import { validateBoundaryInterface } from "../../web/src/runtime/value-interfaces.js";
-const compileNativeValueInterface = (runtime, native, value) => compileNativeValueCodec(runtime, { native, value });
+const compileNativeValueInterface = (runtime, native, value) =>
+  compileNativeValueCodec(runtime, validateBoundaryInterface({ native, value }));
 
 const nat = { type: { tag: "nat" } }, bigint = { tag: "bigint" };
 const objectType = (declaration, constructors) => ({
@@ -142,6 +143,10 @@ test("one native Option preserves all distinctions under different views", () =>
     h.dec(other); h.dec(obj); assert.equal(h.objects.size, 0);
   }
   assert.throws(() => standard.lower({ kind: "some" }, "input", h.scratch), /missing value/);
+  assert.throws(() => standard.lower({ kind: "none", value: null }, "input", h.scratch), /not supported/);
+  assert.throws(() => standard.lower({ kind: "present", value: undefined }, "input", h.scratch), /unknown/);
+  assert.throws(() => alternate.lower({ kind: "some", value: undefined }, "input", h.scratch), /unknown/);
+  assert.equal(h.objects.size, 0);
 });
 
 test("safe integer is an explicit view with range checks in both directions", () => {
@@ -200,4 +205,46 @@ test("immediate constructor plans reject unknown ordinals and heap objects", () 
   const object = h.runtime.makeObjectDecimal("vir_obj_nat", "42");
   assert.throws(() => codec.lift(object, "output"), /out of range/);
   h.dec(object); assert.equal(h.objects.size, 0);
+});
+
+test("variant field mappings traverse inherited paths and retain own output keys", () => {
+  const h = heap(), native = objectType("Outer", [
+    object("Outer.mk", [field("parent", pair, 0)]),
+  ]);
+  const view = { tag: "variant", cases: [{
+    kind: "wrapped", payload: "fields", fields: [
+      { key: "__proto__", path: [0, 1], value: bigint },
+      { key: "first", path: [0, 0], value: bigint },
+    ],
+  }] };
+  const codec = compileNativeValueInterface(h.runtime, native, view);
+  const fields = Object.fromEntries([["__proto__", 43n], ["first", 42n]]);
+  const value = { kind: "wrapped", fields };
+  const obj = codec.lower(value, "input", h.scratch);
+  const result = codec.lift(obj, "output");
+  assert.deepEqual(result, value);
+  assert.equal(Object.getPrototypeOf(result.fields), Object.prototype);
+  assert.equal(Object.hasOwn(result.fields, "__proto__"), true);
+  assert.equal(Object.getOwnPropertyDescriptor(result.fields, "__proto__").writable, true);
+  h.dec(obj);
+  assert.throws(() => codec.lower({ kind: "wrapped" }, "input", h.scratch), /missing fields/);
+  assert.throws(() => codec.lower({ kind: "wrapped", fields: { first: 42n } }, "input", h.scratch), /missing __proto__/);
+  assert.throws(() => codec.lower({ kind: "wrapped", fields: { ...fields, extra: 0n } }, "input", h.scratch), /not supported/);
+  assert.throws(() => codec.lower({ kind: "wrapped", fields: { ...fields, first: -1n } }, "input", h.scratch), /non-negative/);
+  assert.equal(h.objects.size, 0);
+});
+
+test("packed UInt64 accepts exact integer inputs and rejects overflow before writing", () => {
+  const codec = compileNativeValueInterface({}, { type: { tag: "unsigned", width: 64 } }, bigint);
+  const bytes = new DataView(new ArrayBuffer(8));
+  const max = 0xffffffffffffffffn;
+  for (const [value, expected] of [[0n, 0n], [42, 42n], ["18446744073709551615", max], [max, max]]) {
+    codec.scalar.write(bytes, 0, 8, value, "input");
+    assert.equal(codec.scalar.read(bytes, 0), expected);
+  }
+  for (const value of [-1n, max + 1n, "18446744073709551616", Number.MAX_SAFE_INTEGER + 1]) {
+    bytes.setBigUint64(0, 42n, true);
+    assert.throws(() => codec.scalar.write(bytes, 0, 8, value, "input"));
+    assert.equal(bytes.getBigUint64(0, true), 42n);
+  }
 });

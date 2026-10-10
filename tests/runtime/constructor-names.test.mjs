@@ -6,10 +6,8 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  enumValue,
-  normalizeEnum,
-} from "../../web/src/runtime/vir-value-normalizers.js";
+import { compileNativeValueCodec } from "../../web/src/runtime/native-value-codecs.js";
+import { validateBoundaryInterface } from "../../web/src/runtime/value-interfaces.js";
 import {
   constructorTemplate,
   defaultValueForType,
@@ -23,21 +21,25 @@ import {
   objectConstructor,
 } from "../support/interface-fixtures.mjs";
 
-const color = enumBoundary("Example.Color", ["red", "constructor"]);
+const color = validateBoundaryInterface(enumBoundary("Example.Color", ["red", "constructor"]));
+// This substitute models immediate constructor identity; conversion uses the
+// same admitted bound codec as ordinary runtime calls.
+const colorCodec = compileNativeValueCodec({ makeObjectScalar: index => index }, color);
 
 test("enum values use the chosen JavaScript spelling in both directions", () => {
   for (const [index, value] of ["red", "constructor"].entries()) {
-    assert.equal(normalizeEnum(value, color, "value"), index);
-    assert.equal(enumValue(color, index), value);
+    const object = colorCodec.lower(value, "value");
+    assert.equal(object, index);
+    assert.equal(colorCodec.lift(object, "result"), value);
   }
   for (const value of ["Example.Color.red", "Example.Color.constructor", "0", "1"]) {
-    assert.throws(() => normalizeEnum(value, color, "value"), /unknown enum constructor/);
+    assert.throws(() => colorCodec.lower(value, "value"), /unknown enum/);
   }
 });
 
 test("enum lifting requires an ordinal in the admitted constructor table", () => {
   for (const index of [-1, 2, 0.5, NaN, "0", "constructor", "map"]) {
-    assert.throws(() => enumValue(color, index), /enum.*out of range/);
+    assert.throws(() => colorCodec.lift(index, "result"), /constructor.*out of range/);
   }
 });
 
@@ -56,7 +58,7 @@ test("runner defaults follow the chosen constructor spelling and payload", () =>
   assert.equal(interfaceInputTag(color), "SELECT");
   const enumDefault = defaultValueForType(color);
   assert.equal(enumDefault, "red");
-  assert.equal(normalizeEnum(enumDefault, color, "input"), 0);
+  assert.equal(colorCodec.lower(enumDefault, "input"), 0);
 
   assert.equal(interfaceInputTag(taggedChoice), "TEXTAREA");
   assert.deepEqual(constructorTemplate(taggedChoice, 0), {
