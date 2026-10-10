@@ -6,139 +6,97 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import test from "node:test";
-
-import {
-  customInductiveConstructorAt,
-  enumValue,
-  normalizeCustomInductive,
-  normalizeEnum,
-  normalizeTaggedUnion,
-  taggedUnionConstructorAt,
-} from "../../web/src/runtime/vir-value-normalizers.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+import { compileNativeValueCodec } from "../../web/src/runtime/native-value-codecs.js";
+import { validateBoundaryInterface } from "../../web/src/runtime/value-interfaces.js";
 import {
   constructorTemplate,
   defaultValueForType,
   interfaceInputTag,
 } from "../../web/app/pages/interface-inputs.js";
+import {
+  enumBoundary,
+  nativeDescriptor,
+  nativeField,
+  objectBoundary,
+  objectConstructor,
+} from "../support/interface-fixtures.mjs";
 
-const type = {
-  type: "Example.Color",
-  interfaceTag: INTERFACE_TAG.SIMPLE_ENUM,
-  kind: "simpleEnum",
-  constructors: [
-    { name: "Example.Color.red", jsName: "red", tag: 0 },
-    { name: "Example.Color.constructor", jsName: "constructor", tag: 1 },
-  ],
-};
+const color = validateBoundaryInterface(enumBoundary("Example.Color", ["red", "constructor"]));
+// This substitute models immediate constructor identity; conversion uses the
+// same admitted bound codec as ordinary runtime calls.
+const colorCodec = compileNativeValueCodec({ makeObjectScalar: index => index }, color);
 
-const stringType = { type: "String", interfaceTag: INTERFACE_TAG.STRING };
-const taggedType = {
-  type: "Example.Choice",
-  name: "Example.Choice",
-  interfaceTag: INTERFACE_TAG.TAGGED_UNION,
-  kind: "taggedUnion",
-  constructors: [{
-    name: "Example.Choice.left", jsName: "left", tag: 0,
-    type: stringType,
-    objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0,
-    layout: { kind: "object", index: 0 },
-  }],
-};
-
-test("enum values use the JS spelling in both directions", () => {
+test("enum values use the chosen JavaScript spelling in both directions", () => {
   for (const [index, value] of ["red", "constructor"].entries()) {
-    assert.equal(normalizeEnum(value, type, "value"), index);
-    assert.equal(enumValue(type, index), value);
+    const object = colorCodec.lower(value, "value");
+    assert.equal(object, index);
+    assert.equal(colorCodec.lift(object, "result"), value);
   }
   for (const value of ["Example.Color.red", "Example.Color.constructor", "0", "1"]) {
-    assert.throws(() => normalizeEnum(value, type, "value"), /unknown enum constructor/);
+    assert.throws(() => colorCodec.lower(value, "value"), /unknown enum/);
   }
 });
 
-test("enum lifting requires a numeric constructor ordinal in range", () => {
+test("enum lifting requires an ordinal in the admitted constructor table", () => {
   for (const index of [-1, 2, 0.5, NaN, "0", "constructor", "map"]) {
-    assert.throws(() => enumValue(type, index), /enum.*index.*out of range/);
+    assert.throws(() => colorCodec.lift(index, "result"), /constructor.*out of range/);
   }
 });
 
-test("tagged-union kinds use JS spelling without Lean-name aliases", () => {
-  const value = { kind: "left", value: "payload" };
-  assert.deepEqual(normalizeTaggedUnion(value, taggedType, "value"), {
-    index: 0, ctor: taggedType.constructors[0], payload: "payload",
-  });
-  assert.throws(
-    () => normalizeTaggedUnion({ ...value, kind: "Example.Choice.left" }, taggedType, "value"),
-    /unknown tagged-union constructor/,
-  );
-});
+const string = nativeDescriptor("string");
+const taggedChoice = objectBoundary(
+  "Example.Choice",
+  [objectConstructor("Example.Choice.left", {
+    objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0,
+  }, [nativeField("payload", string, { tag: "object", index: 0 })])],
+  { tag: "variant", cases: [
+    { kind: "left", payload: "value", value: { tag: "string" } },
+  ] },
+);
 
-test("constructor result ordinals remain numeric and within the admitted table", () => {
-  const customType = {
-    type: "Example.Empty", name: "Example.Empty", kind: "customInductive",
-    interfaceTag: INTERFACE_TAG.CUSTOM_INDUCTIVE,
-    constructors: [{ name: "Example.Empty.empty", jsName: "empty", tag: 0,
-      objectFieldCount: 0, usizeFieldCount: 0, scalarByteSize: 0, fields: [] }],
-  };
-  for (const [lookup, descriptor] of [
-    [taggedUnionConstructorAt, taggedType],
-    [customInductiveConstructorAt, customType],
-  ]) {
-    assert.equal(lookup(descriptor, 0, "result"), descriptor.constructors[0]);
-    for (const ordinal of [-1, 1, 0.5, NaN, "0"]) {
-      assert.throws(() => lookup(descriptor, ordinal, "result"), /constructor index is out of range/);
-    }
-  }
-});
-
-test("browser input defaults use the same constructor names as normalization", () => {
-  assert.equal(interfaceInputTag(type), "SELECT");
-  const enumDefault = defaultValueForType(type);
+test("runner defaults follow the chosen constructor spelling and payload", () => {
+  assert.equal(interfaceInputTag(color), "SELECT");
+  const enumDefault = defaultValueForType(color);
   assert.equal(enumDefault, "red");
-  assert.equal(normalizeEnum(enumDefault, type, "input"), 0);
+  assert.equal(colorCodec.lower(enumDefault, "input"), 0);
 
-  const taggedDefault = defaultValueForType(taggedType);
-  assert.deepEqual(taggedDefault, { kind: "left", value: "" });
-  assert.equal(normalizeTaggedUnion(taggedDefault, taggedType, "input").index, 0);
-
-  const customType = {
-    type: "Example.Tree", name: "Example.Tree",
-    interfaceTag: INTERFACE_TAG.CUSTOM_INDUCTIVE, kind: "customInductive",
-    constructors: [{
-      name: "Example.Tree.empty", jsName: "empty", tag: 0,
-      objectFieldCount: 0, usizeFieldCount: 0, scalarByteSize: 0, fields: [],
-    }],
-  };
-  const customDefault = defaultValueForType(customType);
-  assert.deepEqual(customDefault, { kind: "empty" });
-  assert.equal(normalizeCustomInductive(customDefault, customType, "input").index, 0);
+  assert.equal(interfaceInputTag(taggedChoice), "TEXTAREA");
+  assert.deepEqual(constructorTemplate(taggedChoice, 0), {
+    kind: "left", value: "",
+  });
+  assert.equal(defaultValueForType(taggedChoice).kind, "left");
 });
 
-test("selected custom constructors produce canonical editable templates", () => {
-  const field = (name, index) => ({
-    name, type: stringType, layout: { kind: "object", index },
-  });
+test("runner templates use constructor order and explicit record mappings", () => {
   const ctors = [
-    { name: "Example.Tree.empty", jsName: "empty", tag: 0, fields: [] },
-    { name: "Example.Tree.leaf", jsName: "leaf", tag: 1, fields: [field("payload", 0)] },
-    { name: "Example.Tree.branch", jsName: "branch", tag: 2, fields: [field("left", 0), field("right", 1)] },
-  ].map((ctor) => ({ ...ctor,
-    objectFieldCount: ctor.fields.length, usizeFieldCount: 0, scalarByteSize: 0,
-  }));
-  const custom = {
-    type: "Example.Tree", name: "Example.Tree",
-    interfaceTag: INTERFACE_TAG.CUSTOM_INDUCTIVE, kind: "customInductive",
-    constructors: ctors,
-  };
-  const before = structuredClone(custom);
-  const expected = [
-    { kind: "empty" }, { kind: "leaf", value: "" },
-    { kind: "branch", fields: { left: "", right: "" } },
+    { name: "Example.Tree.empty", representation: "immediate", fields: [] },
+    { name: "Example.Tree.leaf", representation: "object",
+      storage: { objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0 },
+      fields: [nativeField("payload", string, { tag: "object", index: 0 })] },
+    { name: "Example.Tree.branch", representation: "object",
+      storage: { objectFieldCount: 2, usizeFieldCount: 0, scalarByteSize: 0 },
+      fields: [
+        nativeField("left", string, { tag: "object", index: 0 }),
+        nativeField("right", string, { tag: "object", index: 1 }),
+      ] },
   ];
-  for (const [index, ctor] of ctors.entries()) {
-    const value = constructorTemplate(custom, ctor);
-    assert.deepEqual(value, expected[index]);
-    assert.equal(normalizeCustomInductive(value, custom, "input").index, index);
-  }
-  assert.deepEqual(custom, before);
+  const tree = objectBoundary("Example.Tree", ctors, {
+    tag: "variant",
+    cases: [
+      { kind: "empty", payload: "none" },
+      { kind: "leaf", payload: "value", value: { tag: "string" } },
+      { kind: "branch", payload: "fields", fields: [
+        { key: "left", path: [0], value: { tag: "string" } },
+        { key: "right", path: [1], value: { tag: "string" } },
+      ] },
+    ],
+  });
+  const before = structuredClone(tree);
+  assert.deepEqual(defaultValueForType(tree), { kind: "empty" });
+  assert.deepEqual(constructorTemplate(tree, 0), { kind: "empty" });
+  assert.deepEqual(constructorTemplate(tree, 1), { kind: "leaf", value: "" });
+  assert.deepEqual(constructorTemplate(tree, 2), {
+    kind: "branch", fields: { left: "", right: "" },
+  });
+  assert.deepEqual(tree, before);
 });

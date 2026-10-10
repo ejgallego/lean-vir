@@ -21,6 +21,11 @@ import {
   spawnSync,
 } from "./shared.mjs";
 
+function assertBoundaryPair(boundary, nativeTag, valueTag) {
+  assert.equal(boundary?.native?.type?.tag, nativeTag);
+  assert.equal(boundary?.value?.tag, valueTag);
+}
+
 const tempDir = await mkdtemp(join(tmpdir(), "lean-vir-slides-canvas-"));
 const previousDocument = globalThis.document;
 const previousCanvas = globalThis.HTMLCanvasElement;
@@ -171,28 +176,35 @@ try {
     ]) {
       const entry = hostImport(target);
       assert.ok(entry, `missing reachable conversion: ${target}`);
-      assert.equal(entry.boundary, "explicitConversion", target);
     }
-    assert.equal(
-      hostImport("browser.element.getClassList")?.result?.type,
-      "DOMTokenList",
+    assertBoundaryPair(hostImport("js.float")?.args[0]?.type, "float", "number");
+    assertBoundaryPair(hostImport("js.float")?.result, "resource", "jsReference");
+    assertBoundaryPair(hostImport("js.float.value")?.args[0]?.type, "resource", "jsReference");
+    assertBoundaryPair(hostImport("js.float.value")?.result, "float", "number");
+    assertBoundaryPair(
+      hostImport("js.value.browser.canvasStyle.string")?.args[0]?.type,
+      "string",
+      "string",
     );
-    assert.equal(
-      hostImport("browser.domTokenList.add")?.args[0]?.type?.type,
-      "DOMTokenList",
-    );
-    assert.equal(
-      hostImport("browser.htmlCanvasElement.setWidth")?.args[0]?.type?.type,
-      "HTMLCanvasElement",
-    );
-    assert.equal(
-      hostImport("browser.canvas2d.measureText")?.args[0]?.type?.type,
-      "CanvasRenderingContext2D",
-    );
-    assert.equal(
-      hostImport("browser.canvas2d.measureText")?.result?.type,
-      "TextMetrics",
-    );
+    const canvasStyleResult = hostImport("js.value.browser.canvasStyle.string")?.result;
+    assertBoundaryPair(canvasStyleResult, "resource", "jsReference");
+    assert.equal(canvasStyleResult?.native?.metadata?.declaration, "Lean.Vir.Browser.CanvasStyle");
+
+    const classListResult = hostImport("browser.element.getClassList")?.result;
+    assertBoundaryPair(classListResult, "resource", "jsReference");
+    assert.equal(classListResult?.native?.metadata?.declaration, "Lean.Vir.Browser.DOMTokenList");
+    const classListArgument = hostImport("browser.domTokenList.add")?.args[0]?.type;
+    assertBoundaryPair(classListArgument, "resource", "jsReference");
+    assert.equal(classListArgument?.native?.metadata?.declaration, "Lean.Vir.Browser.DOMTokenList");
+    const canvasArgument = hostImport("browser.htmlCanvasElement.setWidth")?.args[0]?.type;
+    assertBoundaryPair(canvasArgument, "resource", "jsReference");
+    assert.equal(canvasArgument?.native?.metadata?.declaration, "Lean.Vir.Browser.HTMLCanvasElement");
+    const contextArgument = hostImport("browser.canvas2d.measureText")?.args[0]?.type;
+    assertBoundaryPair(contextArgument, "resource", "jsReference");
+    assert.equal(contextArgument?.native?.metadata?.declaration, "Lean.Vir.Browser.CanvasRenderingContext2D");
+    const textMetricsResult = hostImport("browser.canvas2d.measureText")?.result;
+    assertBoundaryPair(textMetricsResult, "resource", "jsReference");
+    assert.equal(textMetricsResult?.native?.metadata?.declaration, "Lean.Vir.Browser.TextMetrics");
     assert.equal(runtime.runStartupEntries(), undefined);
     assert.equal(runtime.runStartupEntries(), undefined);
     assert.equal(slideRoot.children.length, 2);

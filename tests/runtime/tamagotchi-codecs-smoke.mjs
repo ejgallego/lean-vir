@@ -130,12 +130,21 @@ try {
             .sort(),
           ["js.leanRef", "js.leanRef.value"],
         );
+        const supportedBoundaryPairs = new Set([
+          "nat:bigint",
+          "string:string",
+          "resource:jsReference",
+        ]);
         for (const entry of first.interfaceManifest.exports) {
           for (const type of [
             ...entry.args.map((arg) => arg.type),
             entry.result,
           ]) {
-            assert.ok(["Nat", "String", "Js"].includes(type.type));
+            const pair = `${type.native.type.tag}:${type.value.tag}`;
+            assert.ok(
+              supportedBoundaryPairs.has(pair),
+              `unexpected Tamagotchi boundary ${pair}`,
+            );
           }
         }
         const original = keep(call(first, "create", "", "octopus"));

@@ -4,6 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 import { countLiveCallbacks } from "../support/lean-ownership.js";
+import {
+  objectBoundary,
+  objectConstructor,
+  nativeField,
+  primitiveBoundary,
+} from "../support/interface-fixtures.mjs";
 
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
@@ -55,7 +61,7 @@ try {
   const nodeRuntime = modules["vir-runtime-node.js"];
   const hostBindings = modules["vir-host-bindings.js"];
   const interfaceManifest = modules["runtime/interface-manifest.js"];
-  const interfaceTags = modules["runtime/interface-tags.js"];
+  const valueInterfaces = modules["runtime/interface-manifest.js"];
   const packageTargets = modules["runtime/package-targets.js"];
 
   assert.equal(typeof runtime.createVirRuntime, "function");
@@ -110,11 +116,10 @@ try {
     }),
     "Example.lean [unknown selection] roots: Example.value",
   );
-  assert.equal(interfaceTags.INTERFACE_TAG.NAT, 0);
-  assert.equal(
-    interfaceTags.SUPPORTED_INTERFACE_TAGS.has(interfaceTags.INTERFACE_TAG.NAT),
-    true,
-  );
+  assert.equal(typeof valueInterfaces.validateInterfaceType, "function");
+  assert.equal(typeof valueInterfaces.formatInterfaceType, "function");
+  assert.equal(typeof valueInterfaces.interfaceSignatureKey, "function");
+  assert.equal(SDK_JS_MODULES.includes("js/runtime/interface-tags.js"), false);
   const packagedRuntime = await nodeRuntime.createVirRuntime({
     wasmBytes: await readFile(join(jsDir, "..", "wasm", "vir-upstream.wasm")),
   });
@@ -126,14 +131,13 @@ try {
     ]) {
       assert.equal(Object.hasOwn(packagedRuntime.exports, name), false, `${name} must not ship in the SDK`);
     }
-    for (const [interfaceTag, value, expected] of [
-      [interfaceTags.INTERFACE_TAG.UINT64, "18446744073709551615", 18446744073709551615n],
-      [interfaceTags.INTERFACE_TAG.USIZE, "4294967295", 4294967295],
-      [interfaceTags.INTERFACE_TAG.NAT, "0", 0n],
-      [interfaceTags.INTERFACE_TAG.NAT, (1n << 256n).toString(), 1n << 256n],
-      [interfaceTags.INTERFACE_TAG.INT, (-1n << 256n).toString(), -1n << 256n],
+    for (const [type, value, expected] of [
+      [primitiveBoundary("unsigned", "bigint", { width: 64 }), "18446744073709551615", 18446744073709551615n],
+      [primitiveBoundary("unsigned", "number", { width: "usize" }), "4294967295", 4294967295],
+      [primitiveBoundary("nat", "bigint"), "0", 0n],
+      [primitiveBoundary("nat", "bigint"), (1n << 256n).toString(), 1n << 256n],
+      [primitiveBoundary("int", "bigint"), (-1n << 256n).toString(), -1n << 256n],
     ]) {
-      const type = { interfaceTag };
       const object = packagedRuntime.makeObjectValue(type, value, "SDK scalar");
       try {
         assert.equal(packagedRuntime.liftObjectValue(type, object, "SDK scalar"), expected);
@@ -141,16 +145,19 @@ try {
         packagedRuntime.exports.vir_obj_dec(object);
       }
     }
-    const type = {
-      interfaceTag: interfaceTags.INTERFACE_TAG.STRUCTURE,
-      typeName: "Sdk.USizeFields",
+    const usize = primitiveBoundary("unsigned", "number", { width: "usize" });
+    const word = primitiveBoundary("unsigned", "number", { width: 32 });
+    const type = objectBoundary("Sdk.USizeFields", [objectConstructor("Sdk.USizeFields.mk", {
       objectFieldCount: 0, usizeFieldCount: 2, scalarByteSize: 4,
-      fields: [
-        { name: "first", type: { interfaceTag: interfaceTags.INTERFACE_TAG.USIZE }, layout: { kind: "usize", index: 0 } },
-        { name: "second", type: { interfaceTag: interfaceTags.INTERFACE_TAG.USIZE }, layout: { kind: "usize", index: 1 } },
-        { name: "word", type: { interfaceTag: interfaceTags.INTERFACE_TAG.UINT32 }, layout: { kind: "scalar", offset: 0, size: 4 } },
-      ],
-    };
+    }, [
+      nativeField("first", usize.native, { tag: "usize", index: 0 }),
+      nativeField("second", usize.native, { tag: "usize", index: 1 }),
+      nativeField("word", word.native, { tag: "scalar", offset: 0, size: 4 }),
+    ])], { tag: "record", fields: [
+      { key: "first", path: [0], value: usize.value },
+      { key: "second", path: [1], value: usize.value },
+      { key: "word", path: [2], value: word.value },
+    ] });
     const value = { first: "4294967295", second: "0", word: 0xfffffffe };
     const object = packagedRuntime.makeObjectValue(type, value, "SDK fields");
     try {

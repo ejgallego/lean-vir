@@ -10,8 +10,10 @@ import { relative, resolve } from "node:path";
 import { readIrPackageFile } from "../packages/irpkg-format.mjs";
 import { repositoryRoot as root } from "../repository-paths.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
-import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
-import { INTERFACE_TAG as WIRE } from "../../web/src/runtime/interface-tags.js";
+import {
+  validateInterfaceManifest,
+  validateInterfaceType,
+} from "../../web/src/runtime/interface-manifest.js";
 import { typeScriptAnchorId, validateTypeScriptAnchors } from "./type-anchor-format.mjs";
 
 const statusRank = {
@@ -213,6 +215,12 @@ function validateShippedInventory(value) {
             descriptor.result === null || typeof descriptor.result !== "object"))) {
       throw new Error(`invalid shipped public interface descriptor for ${entry.declaration ?? "?"}`);
     }
+    if (descriptor !== null) {
+      for (const arg of descriptor.args) {
+        validateInterfaceType(arg.type, `shipped ${entry.declaration} argument ${arg.name}`);
+      }
+      validateInterfaceType(descriptor.result, `shipped ${entry.declaration} result`);
+    }
   }
   return value;
 }
@@ -245,7 +253,7 @@ function collectLeanDescriptors(manifest) {
     const descriptor = {
       kind: "export",
       lean: entry.entry,
-      label: entry.jsName ?? entry.entry,
+      label: entry.entry,
       source: entry.source,
       shape: {
         kind: "function",
@@ -255,8 +263,6 @@ function collectLeanDescriptors(manifest) {
       },
     };
     addLeanDescriptor(descriptors, entry.entry, descriptor);
-    addLeanDescriptor(descriptors, entry.id, descriptor);
-    addLeanDescriptor(descriptors, entry.jsName, descriptor);
     exportsByEntry.set(entry.entry, { entry, descriptor });
     collectLeanTypes(descriptors, entry.result);
     for (const arg of entry.args ?? []) collectLeanTypes(descriptors, arg.type);
@@ -325,143 +331,238 @@ function leanAliasShape(alias, entry, viaDescriptor) {
   return { kind: "opaque", name: alias.type ?? alias.lean };
 }
 
-function collectLeanTypes(descriptors, type) {
-  if (!type || typeof type !== "object") return;
-  const named = leanNamedDescriptor(type);
-  if (named !== null) {
-    addLeanDescriptor(descriptors, named.lean, named);
-    if (type.type) addLeanDescriptor(descriptors, type.type, named);
+function collectLeanTypes(descriptors, pair, bindings = [], ancestors = new Set()) {
+  if (!pair || typeof pair !== "object") return;
+  if (pair.native?.ref !== undefined || pair.value?.tag === "recursive") {
+    const target = resolvePairReference(pair, bindings);
+    if (target !== null) collectLeanTypes(descriptors, target, bindings.slice(1), ancestors);
+    return;
   }
-  for (const child of leanChildren(type)) collectLeanTypes(descriptors, child);
-}
-
-function leanNamedDescriptor(type) {
-  switch (leanInterfaceTag(type)) {
-    case WIRE.SIMPLE_ENUM:
-    case WIRE.STRUCTURE:
-    case WIRE.CUSTOM_INDUCTIVE:
-    case WIRE.RESOURCE:
-      return {
-        kind: "type",
-        lean: type.name ?? type.type,
-        label: type.type ?? type.name,
-        shape: leanShape(type),
-      };
-    default:
-      return null;
+  const native = pair.native;
+  if (!native || typeof native !== "object" || ancestors.has(native)) return;
+  const named = leanNamedDescriptor(pair, bindings);
+  if (named !== null) addLeanDescriptor(descriptors, named.lean, named);
+  const nested = new Set(ancestors);
+  nested.add(native);
+  for (const child of leanChildren(pair, [pair, ...bindings])) {
+    collectLeanTypes(descriptors, child.pair, child.bindings, nested);
   }
 }
 
-function leanChildren(type) {
-  switch (leanInterfaceTag(type)) {
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
-      return [type.element];
-    case WIRE.PROD:
-      return [type.fst, type.snd];
-    case WIRE.STRUCTURE:
-      return (type.fields ?? []).map((field) => field.type);
-    case WIRE.TAGGED_UNION:
-      return (type.constructors ?? []).map((ctor) => ctor.type);
-    case WIRE.CUSTOM_INDUCTIVE:
-      return (type.constructors ?? []).flatMap((ctor) => (ctor.fields ?? []).map((field) => field.type));
-    case WIRE.FUNCTION:
-      return [...(type.args ?? []).map((arg) => arg.type), type.result];
-    default:
+function leanNamedDescriptor(pair, bindings) {
+  const native = pair.native;
+  const declaration = native?.metadata?.declaration;
+  const view = pair.value;
+  if (typeof declaration !== "string" || declaration.length === 0) return null;
+  if (!["enum", "record", "variant", "expr"].includes(view?.tag) &&
+      native?.type?.tag !== "resource") return null;
+  return {
+    kind: "type",
+    lean: declaration,
+    label: declaration,
+    shape: leanShape(pair, bindings),
+  };
+}
+
+function leanChildren(pair, bindings) {
+  const view = pair.value;
+  const native = pair.native;
+  if (view?.tag === "record") {
+    return (view.fields ?? []).map((field) => pairAtPath(
+      native,
+      field.path,
+      0,
+      field.value,
+      bindings,
+    ));
+  }
+  if (view?.tag === "variant") {
+    return view.cases.flatMap((caseView, index) => {
+      if (caseView.payload === "value") {
+        return [pairAtPath(native, [0], index, caseView.value, bindings)];
+      }
+      if (caseView.payload === "fields") {
+        return caseView.fields.map((field) => pairAtPath(
+          native,
+          field.path,
+          index,
+          field.value,
+          bindings,
+        ));
+      }
       return [];
+    });
   }
+  if (view?.tag === "sequence") {
+    const child = view.chain === undefined
+      ? { native: native.metadata?.arrayElement, bindings }
+      : nativeFieldAtPath(native, [view.chain.head], view.chain.cons, bindings);
+    return child?.native === undefined || child?.native === null
+      ? []
+      : [{ pair: { native: child.native, value: view.element }, bindings: child.bindings }];
+  }
+  if (view?.tag === "function") {
+    const signature = native.metadata?.signature;
+    if (signature === undefined) return [];
+    const args = view.args.map((value, index) => ({
+      pair: { native: signature.args[index], value },
+      bindings,
+    }));
+    return [...args, { pair: { native: signature.result, value: view.result }, bindings }];
+  }
+  return [];
 }
 
 function addLeanDescriptor(descriptors, key, descriptor) {
-  if (typeof key !== "string" || key.length === 0) return;
-  if (!descriptors.has(key)) descriptors.set(key, descriptor);
-}
-
-function leanShape(type) {
-  switch (leanInterfaceTag(type)) {
-    case WIRE.UNIT:
-      return { kind: "primitive", name: "Unit" };
-    case WIRE.NAT:
-      return { kind: "primitive", name: "Nat" };
-    case WIRE.INT:
-      return { kind: "primitive", name: "Int" };
-    case WIRE.BOOL:
-      return { kind: "primitive", name: "Bool" };
-    case WIRE.STRING:
-      return { kind: "primitive", name: "String" };
-    case WIRE.FLOAT:
-      return { kind: "primitive", name: "Float" };
-    case WIRE.FLOAT32:
-      return { kind: "primitive", name: "Float32" };
-    case WIRE.UINT8:
-      return { kind: "primitive", name: "UInt8" };
-    case WIRE.UINT16:
-      return { kind: "primitive", name: "UInt16" };
-    case WIRE.UINT32:
-      return { kind: "primitive", name: "UInt32" };
-    case WIRE.UINT64:
-      return { kind: "primitive", name: "UInt64" };
-    case WIRE.USIZE:
-      return { kind: "primitive", name: "USize" };
-    case WIRE.BYTE_ARRAY:
-      return { kind: "primitive", name: "ByteArray" };
-    case WIRE.EXPR:
-      return { kind: "opaque", name: "Lean.Expr" };
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-      return { kind: "array", element: leanShape(type.element) };
-    case WIRE.OPTION:
-      return { kind: "option", element: leanShape(type.element) };
-    case WIRE.PROD:
-      return { kind: "tuple", elements: [leanShape(type.fst), leanShape(type.snd)] };
-    case WIRE.SIMPLE_ENUM:
-      return {
-        kind: "enum",
-        cases: (type.constructors ?? []).map((ctor) => ctor.jsName),
-      };
-    case WIRE.STRUCTURE:
-      return {
-        kind: "record",
-        name: type.name ?? type.type,
-        fields: Object.fromEntries((type.fields ?? []).map((field) => [field.name, leanShape(field.type)])),
-      };
-    case WIRE.TAGGED_UNION:
-      return {
-        kind: "variant",
-        name: type.name ?? type.type,
-        constructors: Object.fromEntries((type.constructors ?? []).map((ctor) => [
-          ctor.jsName,
-          { fields: { value: leanShape(ctor.type) } },
-        ])),
-      };
-    case WIRE.CUSTOM_INDUCTIVE:
-      return {
-        kind: "variant",
-        name: type.name ?? type.type,
-        constructors: Object.fromEntries((type.constructors ?? []).map((ctor) => [
-          ctor.jsName,
-          { fields: Object.fromEntries((ctor.fields ?? []).map((field) => [field.name, leanShape(field.type)])) },
-        ])),
-      };
-    case WIRE.RECURSIVE_SELF:
-      return { kind: "ref", id: type.name ?? type.type };
-    case WIRE.RESOURCE:
-      return { kind: "resource", name: type.name ?? type.type };
-    case WIRE.FUNCTION:
-      return {
-        kind: "function",
-        effect: type.effect,
-        args: (type.args ?? []).map((arg) => ({ name: arg.name, type: leanShape(arg.type) })),
-        result: leanShape(type.result),
-      };
-    default:
-      return { kind: "opaque", name: type?.type ?? `interfaceTag ${leanInterfaceTag(type) ?? "?"}` };
+  if (typeof key === "string" && key.length > 0 && !descriptors.has(key)) {
+    descriptors.set(key, descriptor);
   }
 }
 
-function leanInterfaceTag(type) {
-  return type?.interfaceTag;
+function leanShape(pair, bindings = []) {
+  if (pair?.native?.ref !== undefined || pair?.value?.tag === "recursive") {
+    const target = resolvePairReference(pair, bindings);
+    const declaration = target?.native?.metadata?.declaration;
+    const owner = bindings[0]?.native?.metadata?.declaration;
+    return { kind: "ref", id: declaration ?? owner ?? `recursive${pair.native?.ref ?? 0}` };
+  }
+  const native = pair?.native;
+  const view = pair?.value;
+  const nativeType = native?.type;
+  const declaration = native?.metadata?.declaration;
+  switch (view?.tag) {
+    case "bigint":
+    case "number":
+    case "safeInteger":
+      return { kind: "primitive", name: nativePrimitiveName(nativeType) };
+    case "string":
+      return { kind: "primitive", name: "String" };
+    case "bytes":
+      return { kind: "primitive", name: "ByteArray" };
+    case "unit":
+      return { kind: "primitive", name: "Unit" };
+    case "boolean":
+      return { kind: "primitive", name: "Bool" };
+    case "enum":
+      return { kind: "enum", cases: view.cases };
+    case "record":
+      return {
+        kind: "record",
+        name: declaration,
+        fields: Object.fromEntries(view.fields.map((field) => [
+          field.key,
+          (() => {
+            const child = pairAtPath(native, field.path, 0, field.value, [pair, ...bindings]);
+            return leanShape(child.pair, child.bindings);
+          })(),
+        ])),
+      };
+    case "variant":
+      return {
+        kind: "variant",
+        name: declaration,
+        constructors: Object.fromEntries(view.cases.map((caseView, index) => [
+          caseView.kind,
+          { fields: variantFields(pair, caseView, index, bindings) },
+        ])),
+      };
+    case "sequence": {
+      const child = view.chain === undefined
+        ? { native: native?.metadata?.arrayElement, bindings: [pair, ...bindings] }
+        : nativeFieldAtPath(native, [view.chain.head], view.chain.cons, [pair, ...bindings]);
+      return {
+        kind: "array",
+        element: child?.native === undefined || child?.native === null
+          ? { kind: "opaque", name: "sequence element" }
+          : leanShape({ native: child.native, value: view.element }, child.bindings),
+      };
+    }
+    case "function": {
+      const signature = native?.metadata?.signature;
+      if (signature === undefined) return { kind: "opaque", name: declaration ?? "function" };
+      return {
+        kind: "function",
+        effect: signature.effect,
+        args: view.args.map((value, index) => ({
+          name: `arg${index + 1}`,
+          type: leanShape({ native: signature.args[index], value }, [pair, ...bindings]),
+        })),
+        result: leanShape({ native: signature.result, value: view.result }, [pair, ...bindings]),
+      };
+    }
+    case "expr":
+      return { kind: "opaque", name: declaration ?? "Lean.Expr" };
+    case "jsReference":
+      return { kind: "resource", name: declaration ?? "JavaScript resource" };
+    case "leanReference":
+      return { kind: "opaque", name: declaration ?? "LeanObject" };
+    default:
+      return { kind: "opaque", name: declaration ?? nativeType?.tag ?? "unknown" };
+  }
+}
+
+function variantFields(pair, caseView, caseIndex, bindings) {
+  const nested = [pair, ...bindings];
+  if (caseView.payload === "none") return {};
+  if (caseView.payload === "value") {
+    const child = pairAtPath(pair.native, [0], caseIndex, caseView.value, nested);
+    return {
+      value: leanShape(child.pair, child.bindings),
+    };
+  }
+  return Object.fromEntries(caseView.fields.map((field) => [
+    field.key,
+    (() => {
+      const child = pairAtPath(pair.native, field.path, caseIndex, field.value, nested);
+      return leanShape(child.pair, child.bindings);
+    })(),
+  ]));
+}
+
+function resolvePairReference(pair, bindings) {
+  const ref = pair?.native?.ref;
+  if (ref !== undefined) return bindings[ref] ?? null;
+  return bindings[0] ?? null;
+}
+
+function nativeFieldAtPath(native, path, firstConstructor, bindings) {
+  let current = resolveNative(native, bindings);
+  let owners = bindings;
+  for (const [position, fieldIndex] of path.entries()) {
+    const constructorIndex = position === 0 ? firstConstructor : 0;
+    const field = current?.metadata?.constructors?.[constructorIndex]?.fields?.[fieldIndex];
+    if (field === undefined) return null;
+    if (position === path.length - 1) return { native: field.type, bindings: owners };
+    current = resolveNative(field.type, owners);
+    if (current === null) return null;
+    owners = [current, ...owners];
+  }
+  return path.length === 0 ? { native: current, bindings: owners } : null;
+}
+
+function pairAtPath(native, path, constructorIndex, value, bindings) {
+  const field = nativeFieldAtPath(native, path, constructorIndex, bindings);
+  return {
+    pair: { native: field?.native ?? null, value },
+    bindings: field?.bindings ?? bindings,
+  };
+}
+
+function resolveNative(native, bindings) {
+  return native?.ref === undefined ? native : bindings[native.ref]?.native ?? null;
+}
+
+function nativePrimitiveName(type) {
+  switch (type?.tag) {
+    case "nat": return "Nat";
+    case "int": return "Int";
+    case "string": return "String";
+    case "byteArray": return "ByteArray";
+    case "unsigned":
+      return ({ 8: "UInt8", 16: "UInt16", 32: "UInt32", 64: "UInt64", usize: "USize" })[type.width] ?? "UInt";
+    case "float": return type.width === 32 ? "Float32" : "Float";
+    default: return type?.tag ?? "unknown";
+  }
 }
 
 function compareAnchor(anchor, lean, tsSymbols) {
@@ -589,27 +690,6 @@ function compareShapes(lean, tsShape, tsSymbols, seen) {
   switch (lean.kind) {
     case "array":
       return compareShapes(lean.element, ts.element, tsSymbols, seen);
-    case "option": {
-      const element = compareShapes(lean.element, ts.element, tsSymbols, seen);
-      const absence = ts.absence;
-      if (absence === undefined) {
-        return comparison("weak", [
-          diagnostic(
-            "typescript_absence_provenance_missing",
-            "TypeScript option is missing null-versus-undefined absence provenance",
-          ),
-          ...element.diagnostics,
-        ]);
-      }
-      if (absence === "null") return element;
-      return comparison("weak", [
-        diagnostic(
-          "typescript_undefined_not_represented",
-          `Lean Option does not preserve TypeScript ${absence} absence semantics`,
-        ),
-        ...element.diagnostics,
-      ]);
-    }
     case "tuple":
       return compareSequence(lean.elements, ts.elements, tsSymbols, seen, "tuple element");
     case "record":

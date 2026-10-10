@@ -261,21 +261,21 @@ export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
   assert.equal(state.packageName, packageFile);
   assert.deepEqual(
     state.options.map((option) => option.value),
-    info.manifest.exports.map((entry) => entry.id),
+    info.manifest.exports.map((entry) => entry.entry),
   );
   for (const [index, entry] of info.manifest.exports.entries()) {
     assert.ok(
-      state.options[index].text.includes(entry.jsName),
-      `missing ${entry.jsName} in option label`,
+      state.options[index].text.includes(entry.entry),
+      `missing ${entry.entry} in option label`,
     );
   }
 
   const expectedControls = info.manifest.exports.map((entry) => ({
-    id: entry.id,
+    id: entry.entry,
     inputTags: entry.args.map((arg) => interfaceInputTag(arg.type)),
     enumOptions: entry.args.map((arg) =>
-      interfaceInputTag(arg.type) === "SELECT"
-        ? arg.type.constructors.map((ctor) => ({ value: ctor.jsName, text: ctor.jsName }))
+      arg.type.value?.tag === "enum"
+        ? arg.type.value.cases.map((name) => ({ value: name, text: name }))
         : null,
     ),
   }));
@@ -303,6 +303,11 @@ export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
 export async function smokeConstructorTemplates(cdp, origin) {
   for (const spec of [
     {
+      entry: "Vir.Fixtures.InterfaceShapes.optionNatScore", kind: "some",
+      template: { kind: "some", value: 0 },
+      edited: { kind: "none" }, result: "7",
+    },
+    {
       entry: "Vir.Fixtures.ListOption.sumScore", kind: "inr",
       template: { kind: "inr", value: 0 },
       edited: { kind: "inr", value: 7 }, result: "70",
@@ -324,7 +329,8 @@ export async function smokeConstructorTemplates(cdp, origin) {
     await waitForReady(cdp);
     const template = await evaluate(cdp, `(() => {
       const select = document.querySelector('[data-constructor-index="0"]');
-      select.value = ${JSON.stringify(spec.kind)};
+      select.value = Array.from(select.options).find((option) =>
+        option.textContent === ${JSON.stringify(spec.kind)}).value;
       select.dispatchEvent(new Event("change", { bubbles: true }));
       return JSON.parse(document.querySelector('[data-input-index="0"]').value);
     })()`);
@@ -333,7 +339,8 @@ export async function smokeConstructorTemplates(cdp, origin) {
       const field = document.querySelector('[data-input-index="0"]');
       field.value = ${JSON.stringify(JSON.stringify(spec.edited))};
       field.dispatchEvent(new Event("input", { bubbles: true }));
-      return document.querySelector('[data-constructor-index="0"]').value;
+      return document.querySelector('[data-constructor-index="0"]')
+        .selectedOptions[0]?.textContent ?? "";
     })()`);
     assert.equal(selected, spec.edited.kind);
     assert.equal(await runSelectedEntry(cdp), spec.result);
@@ -387,17 +394,14 @@ export async function packageInfoFor(packageFile) {
 export async function runnerCaseFromManifest(packageFile, entryName, expected) {
   const info = await packageInfoFor(packageFile);
   const entry = info.manifest.exports.find(
-    (candidate) =>
-      candidate.entry === entryName ||
-      candidate.id === entryName ||
-      candidate.jsName === entryName,
+    (candidate) => candidate.entry === entryName,
   );
   assert.ok(entry, `${packageFile} manifest does not export ${entryName}`);
   return {
-    url: `dev.html?package=${encodeURIComponent(packageFile)}&entry=${encodeURIComponent(entry.id)}`,
+    url: `dev.html?package=${encodeURIComponent(packageFile)}&entry=${encodeURIComponent(entry.entry)}`,
     expected: {
       packageName: packageFile,
-      entry: entry.id,
+      entry: entry.entry,
       entryCount: info.manifest.exports.length,
       ...expected,
     },

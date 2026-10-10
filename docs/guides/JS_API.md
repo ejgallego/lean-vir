@@ -205,8 +205,8 @@ const prettyVir = await createForMember("pretty-printer.irpkg");
 const leanVir = await createForMember("fixtures-lean.irpkg");
 
 console.log(vir.call("fib", 12));
-console.log(vir.exportsByName.SortDemo_demo());
-console.log(vir.exportsByName.SortDemo_demoFromArray([4, 1, 3, 2]));
+console.log(vir.call("SortDemo.demo"));
+console.log(vir.call("SortDemo.demoFromArray", [4, 1, 3, 2]));
 console.log(vir.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"));
 console.log(vir.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]));
 console.log(hostVir.call("HostInterop.titleHandshake", "browser handshake"));
@@ -349,14 +349,17 @@ application ownership: VIR does not dispose supplied maps when runtimes shut dow
 - `vir.packageMetadata` is `vir.interfaceManifest.metadata`, including the
   package format version, Lean toolchain, source targets, and resolved roots.
   Wall-clock generation time is intentionally confined to diagnostic reports.
-- `vir.call(name, ...args)` accepts a manifest `entry`, `id`, or `jsName`.
-  These share one alias namespace: multiple
-  spellings may identify the same export, but a spelling cannot identify two
-  different exports. Ambiguous manifests are rejected before initialization.
-- `vir.callTimed(name, ...args)` performs the same call and returns
+- `vir.call(entry, ...args)` accepts the full Lean declaration name from the
+  manifest's `entry` field, for example `vir.call("SortDemo.demo")`.
+  `Duplicate.entry` and `Duplicate_entry` are distinct callable declarations.
+- `vir.callTimed(entry, ...args)` performs the same call and returns
   `{ value, timings }` for opt-in phase attribution.
-- `vir.exportsByName.<jsName>(...args)` exposes valid generated JS names as
-  methods.
+- Export `id`, export `jsName`, and `exportsByName` were removed in manifest11 /
+  resource compatibility5. Replace generated methods and alias calls with
+  `call` using the full `entry`; regenerate programs with the matching SDK.
+  Provider IDs and structural `nameKey` keep their separate responsibilities.
+  In manifest12 / resource compatibility6, constructor JavaScript spellings
+  live in the selected value interface; constructor metadata has no `jsName`.
 - `vir.runStartupEntries()` invokes zero-argument exports whose manifest entry
   has `startup: true`, in manifest order, once per runtime. After success,
   repeated calls do nothing. Failure stops the sequence and throws the error;
@@ -411,8 +414,7 @@ other fields. Across repeated samples, each phase median is also computed
 independently, so phase medians need not sum to the median `totalMs`.
 
 The method throws the same errors as `call`; failed calls do not return a
-partial timing report. Ordinary `call` and generated `exportsByName` methods do
-not read the clock. Application projection, JSON conversion, DOM/render work,
+partial timing report. Ordinary `call` does not read the clock. Application projection, JSON conversion, DOM/render work,
 and reporting UI remain consumer-owned and should be timed outside this API.
 This is a JavaScript runtime API addition; it requires no Wasm ABI, `.irpkg`
 package-format, or Lean toolchain version change.
@@ -512,20 +514,42 @@ use generated Lean `_boxed` declarations automatically.
 JavaScript number and preserve NaN, infinities, and signed zero across the
 opaque `Lean.Vir.Js Float` resource boundary.
 
-Nullary inductive enums use their generated JavaScript constructor name in both
-directions. For example, the Lean constructor `Example.Color.red` has the
-JavaScript value `"red"`. The manifest's required `jsName` field determines that
-spelling, also used for tagged-union and custom-inductive `kind` values.
-Constructor `name` identifies the Lean declaration and `tag` records its numeric
-ordinal; neither is a JavaScript value alias. See the
+Nullary inductive enums use the selected string spelling in both directions.
+For example, the Lean constructor `Example.Color.red` can have the JavaScript
+value `"red"`. The manifest's `value` interface lists enum spellings in native
+constructor order; tagged-union and custom-inductive `kind` strings are selected
+there as well. Constructor `name` identifies the Lean declaration, while its
+position in the native constructor table is the ordinal. Neither is a JavaScript
+value alias. See the
 [descriptor format](../reference/IRPKG_FORMAT.md#interface-descriptors).
 
-Options use `null` for `none` and the bare inner value for `some`. Products use
+Options use `{ kind: "none" }` and `{ kind: "some", value }` in both directions,
+for every element type. `some` requires its own `value` field, including when the
+payload is `undefined`. For example, `some none : Option (Option Nat)` lifts to
+`{ kind: "some", value: { kind: "none" } }`, and `some () : Option Unit` lifts to
+`{ kind: "some", value: undefined }`. The payload follows its normal type's
+representation; the outer tag preserves its presence. Bare values, `null`, and
+`undefined` are not Option inputs. Structure fields are required, including
+Option fields; supply `{ kind: "none" }` explicitly to select absence.
+`Js.Nullable` and `Js.UndefinedOr` retain their exact JavaScript values.
+See the [Option representation decision](../design/OPTION_VALUES.md).
+
+The optional converter compiles admitted compiler layouts into cached JavaScript
+codecs. Option uses the ordinary zero/one-field constructor codec and Prod uses
+the ordinary record codec. List has an iterative adapter over its generic nil/cons
+layout. These types use the same native `leanObject` tag as other Lean-owned
+objects; their constructor layouts and selected `variant`, `record`, or
+`sequence` views provide the structural conversion facts. Recursive descriptor
+references identify their lexical constructor scope, including through nested
+container owners. The managed foundation still owns calls and references.
+
+Products use
 `{ fst, snd }` in both directions. Arrays and lists use JavaScript arrays,
 `ByteArray` uses `Uint8Array`, floats use JavaScript numbers, and `Sum`/`Except`
-values use `{ kind, value }`.
-Lowering accepts the same canonical shapes that lifting returns; text parsing
-and other UI conveniences belong in application code. Non-indexed custom inductives use
+values use `{ kind, value }`. Sum and Except are classified and converted through
+the same constructor descriptors as other inductives.
+Constructor spellings and payload forms match in both directions; numeric input
+coercions follow the rules above. Non-indexed custom inductives use
 canonical constructor objects only: nullary constructors accept and return
 `{ kind }`, single-field constructors accept and return `{ kind, value }`,
 and multi-field constructors accept and return `{ kind, fields }`.
@@ -551,6 +575,20 @@ Tagged unions use their canonical `{ kind, value }` representation in both
 directions; alternate tag fields and single-constructor-key objects are not
 accepted.
 
+Array/List results are fresh dense arrays. Inputs are read by numeric index;
+holes, inherited numeric properties and getters participate. Each element must
+be accepted by its codec: a hole can supply undefined to Unit but fails for Nat.
+Array lowering visits indices forward; List lowering visits them backward to
+construct its owned tail. Both lift forward. Use ordinary data arrays when read
+order should not affect a value. Conversion does not preserve sparse slots or
+accessor/prototype behavior.
+
+Structure fields and constructor payloads must be own properties. The `kind`
+property itself may be inherited. Unknown enumerable string keys reject; symbols
+and non-enumerable extras are outside that check. Results use writable own data
+properties. Recursive structural conversion expects finite trees and does not
+promise cycle handling, graph-sharing preservation or arbitrary-depth stack safety.
+
 Non-indexed structures, including parameterized instances like `Box Nat` and
 `Tagged (Array String)`, are accepted and returned as objects keyed by their
 Lean field names; inherited parent fields are accepted and returned as flattened
@@ -558,7 +596,10 @@ object keys. A direct recursive structure such as
 `{ label : String, next : Option Chain }` uses a normal nested record:
 
 ```js
-{ label: "root", next: { label: "leaf", next: null } }
+{
+  label: "root",
+  next: { kind: "some", value: { label: "leaf", next: { kind: "none" } } },
+}
 ```
 
 Direct `Bool`, `UInt*`, `USize`, and enum fields, including single-field
@@ -574,7 +615,10 @@ boundary, `Lean.Expr` values use structural objects such as
 the same shape with `kind` values `zero`, `succ`, `max`, `imax`, `param`, and
 `mvar`. Resolved calls lower these values through the object ABI into real Lean
 expression objects. Metadata expression inputs are accepted by lowering their
-inner expression; metadata results preserve a structural `mdata` wrapper.
+inner expression; metadata results preserve a structural `mdata` wrapper but omit
+the metadata payload. This specialized adapter does not preserve every Lean.Expr
+distinction through a round trip. Use opaque references when retaining the exact
+expression is required.
 
 Bound-variable indices must be in `0..1048574`: the pinned kernel stores
 `index + 1` in a 20-bit range. Larger indices reject before Wasm execution.
@@ -598,9 +642,13 @@ identity contract; this restriction applies only to the specialized Expr and
 Level adapter.
 
 Package loading validates the embedded interface manifest before any generated
-entry is exposed. Malformed type trees, invalid structure layouts, unsupported
-interface descriptor tags, duplicate export names, and bad enum constructor
-metadata are reported as package-load errors.
+entry is exposed. Malformed native/value pairs, incompatible value mappings,
+invalid recursive references, incomplete field or constructor mappings, and
+duplicate export names are reported as package-load errors.
+Native/value pairs and their layout/mapping records reject unknown keys. Outer
+manifest, provenance and callable records currently permit additional keys;
+those keys have no conversion meaning and do not define custom codecs. See the
+[format reference](../reference/IRPKG_FORMAT.md#interface-descriptors).
 
 ## Lean To JavaScript Host Imports
 

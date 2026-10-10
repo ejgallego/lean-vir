@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { VirHostState } from "../../web/src/runtime/host-state.js";
+import { functionBoundary, primitiveBoundary, unitBoundary } from "../support/interface-fixtures.mjs";
 
 for (const kind of ["named", "closure"]) {
   test(`${kind} transfers arguments before a trap and never reenters Wasm for cleanup`, () => {
@@ -35,7 +36,7 @@ for (const kind of ["named", "closure"]) {
     assert.throws(() => kind === "named"
       ? runtime.callResolvedObjects({ entry: "test" }, {}, args, () => {})
       : runtime.callClosure({ runtime, object: 1, live: true,
-        callType: { args: ["a", "b"].map(name => ({ name, type: { interfaceTag: 1 } })), effect: "pure" } }, args), error => error === failure);
+        callType: functionBoundary([primitiveBoundary("int", "bigint"), primitiveBoundary("int", "bigint")], unitBoundary()) }, args), error => error === failure);
     assert.deepEqual(args, kind === "named" ? [] : [100, 200], "callbacks own their lowered array, not the caller inputs");
     assert.equal(runtime.failure, failure);
     assert.equal(hostState.callError, null);

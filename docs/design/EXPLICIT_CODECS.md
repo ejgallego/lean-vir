@@ -5,14 +5,19 @@ not an implemented API or a change to current automatic conversion.
 
 ## Why a separate contract is needed
 
-The automatic JavaScript representation maps `Option.none` to `null` and
-`Option.some` to its bare payload. That loses distinctions under composition:
+The native JavaScript Option representation preserves presence through explicit
+constructor objects. See the [Option decision](OPTION_VALUES.md):
 
-| Lean value | Current lifted JavaScript value | Lowered back |
-| --- | --- | --- |
-| `none : Option (Option Nat)` | `null` | `none` |
-| `some none : Option (Option Nat)` | `null` | `none` |
-| `some () : Option Unit` | `undefined` | `none` |
+| Lean value | Native JavaScript value |
+| --- | --- |
+| `none : Option (Option Nat)` | `{ kind: "none" }` |
+| `some none : Option (Option Nat)` | `{ kind: "some", value: { kind: "none" } }` |
+| `some () : Option Unit` | `{ kind: "some", value: undefined }` |
+
+This does not define a JSON format. JavaScript payloads can include bigint,
+undefined and opaque references. Plain JSON serialization does not preserve
+those values, and Lean's standard nullable Option JSON encoding still maps both
+`none` and `some none` to null. Explicit JSON codecs need their own wire contract.
 
 A constructor helper can unify how values are built, but it cannot recover
 information discarded by a representation. Recursive context is another concern:
@@ -71,8 +76,8 @@ Standard derivation must be checked against these laws rather than assumed
 lossless: an existing nullable Option encoder cannot supply this distinction.
 
 JSON text and JavaScript-value conversion are separate contracts. Plain
-`JSON.stringify` rejects bigint and drops undefined object fields. A future
-JavaScript-value codec need not use the JSON integer or unit spelling. Float
+`JSON.stringify` rejects bigint and drops undefined object fields. Native
+JavaScript-value conversion uses bigint for Nat/Int and undefined for Unit. Float
 support must explicitly address nonfinite values and negative zero; unsupported
 domains, cycles, indexed types and functions need clear limitations.
 
@@ -91,11 +96,10 @@ products/lists/records, recursive mixed containers, zero/one/many-field
 constructors, large integers and the selected byte/float rules. Check lowering,
 direct Lean-produced results, ordinary conversion failure and subsequent reuse.
 
-First agree on the initial domain, converter surface and canonical encodings with
-a concrete caller. Then qualify the generated implementation and its normal
-matching-asset distribution. Any replacement of the automatic nullable mapping
-is a separate API change that removes the retired representation under the
-[API change policy](../../CONTRIBUTING.md#api-changes).
+First agree on the initial domain, converter surface and canonical JSON encodings
+with a concrete caller. Then qualify the generated implementation and its normal
+matching-asset distribution. The native Option representation does not select
+those JSON encodings or deliver the planned generated API.
 
 This proposal follows the constructor/codec review of PR221 and the recursive
 context repair in PR224. The current [JavaScript API](../guides/JS_API.md#calls-and-manifest)

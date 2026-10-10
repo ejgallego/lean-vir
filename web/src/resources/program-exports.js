@@ -28,8 +28,8 @@ export function snapshotExpectedExports(value) {
   return expected;
 }
 
-// Only the root member supplies callable entries; convenience aliases such as
-// id and jsName are never used to select a Lean declaration.
+// Only the root member supplies callable entries, keyed by full Lean name.
+// nameKey preserves native identity.
 export function resolveProgramExports(rootExports, expected = new Map()) {
   const declarations = new Map();
   for (const entry of rootExports) {

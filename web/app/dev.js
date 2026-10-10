@@ -9,7 +9,7 @@ import {
   constructorTemplate,
   inputDefault,
   interfaceInputTag,
-  isJsonInputTag,
+  isJsonInput,
   parseBoolText,
 } from "./pages/interface-inputs.js";
 import { formatInterfaceEffectPrefix } from "../src/runtime/interface-effects.js";
@@ -39,7 +39,6 @@ import {
 } from "./pages/page-utils.js";
 import { createLatestLoadGate } from "./pages/latest-load.js";
 import { fetchBytes } from "../src/vir-runtime.js";
-import { INTERFACE_TAG } from "../src/runtime/interface-tags.js";
 import { formatPackageTarget } from "../src/runtime/package-targets.js";
 
 const statusEl = document.querySelector("#status");
@@ -121,23 +120,20 @@ function finishPackageLoad(token) {
 
 function selectedInterfaceEntry() {
   return (
-    interfaceEntries.find((entry) => entry.id === entrySelect.value) ?? null
+    interfaceEntries.find((entry) => entry.entry === entrySelect.value) ?? null
   );
 }
 
-function selectEntryFromQuery() {
-  const entryId = requestedEntry;
-  if (!entryId) return;
-  const match = interfaceEntries.find(
-    (entry) =>
-      entry.id === entryId ||
-      entry.jsName === entryId ||
-      entry.entry === entryId,
-  );
-  if (match) {
-    entrySelect.value = match.id;
-  }
+function consumeRequestedEntry(entries) {
+  const entryName = requestedEntry;
   requestedEntry = null;
+  if (!entryName) return null;
+  const match = entries.find((entry) => entry.entry === entryName);
+  if (!match) {
+    requestedAutoRun = false;
+    throw new Error(`interface entry not found: ${entryName}; use the full Lean entry name`);
+  }
+  return match.entry;
 }
 
 function renderPackagePresets() {
@@ -186,32 +182,29 @@ function renderInputFields(entry) {
     );
     field.id = inputFieldId(input, index);
     field.dataset.inputIndex = String(index);
-    if (input.type?.interfaceTag === INTERFACE_TAG.SIMPLE_ENUM) {
-      for (const ctor of input.type?.constructors ?? []) {
+    const nativeType = input.type?.native?.type;
+    const valueTag = input.type?.value?.tag;
+    if (valueTag === "enum") {
+      for (const spelling of input.type.value.cases) {
         const option = document.createElement("option");
-        option.value = ctor.jsName;
-        option.textContent = ctor.jsName;
+        option.value = spelling;
+        option.textContent = spelling;
         field.append(option);
       }
       field.value = inputDefault(input);
     } else if (
-      input.type?.interfaceTag === INTERFACE_TAG.NAT ||
-      input.type?.interfaceTag === INTERFACE_TAG.UINT8 ||
-      input.type?.interfaceTag === INTERFACE_TAG.UINT16 ||
-      input.type?.interfaceTag === INTERFACE_TAG.UINT32
+      nativeType?.tag === "nat" ||
+      (nativeType?.tag === "unsigned" && [8, 16, 32].includes(nativeType.width))
     ) {
       field.type = "number";
       field.inputMode = "numeric";
       field.min = "0";
-    } else if (
-      input.type?.interfaceTag === INTERFACE_TAG.FLOAT ||
-      input.type?.interfaceTag === INTERFACE_TAG.FLOAT32
-    ) {
+    } else if (nativeType?.tag === "float") {
       field.type = "text";
       field.inputMode = "decimal";
-    } else if (isJsonInputTag(input.type?.interfaceTag)) {
+    } else if (isJsonInput(input.type)) {
       field.spellcheck = false;
-    } else if (input.type?.interfaceTag === INTERFACE_TAG.BOOL) {
+    } else if (valueTag === "boolean") {
       label.classList.add("dev-checkbox-field");
       field.type = "checkbox";
       field.checked = parseBoolText(
@@ -222,13 +215,13 @@ function renderInputFields(entry) {
       field.inputMode = "text";
     }
     if (
-      input.type?.interfaceTag !== INTERFACE_TAG.SIMPLE_ENUM &&
-      input.type?.interfaceTag !== INTERFACE_TAG.BOOL
+      valueTag !== "enum" &&
+      valueTag !== "boolean"
     ) {
       field.value = inputOverride(entry, input, index) ?? inputDefault(input);
     }
     label.append(caption, field);
-    if (isJsonInputTag(input.type?.interfaceTag)) {
+    if (isJsonInput(input.type)) {
       const hint = document.createElement("small");
       hint.id = `dev-entry-input-${index}-hint`;
       hint.className = "dev-field-hint";
@@ -236,8 +229,7 @@ function renderInputFields(entry) {
       field.setAttribute("aria-describedby", hint.id);
       label.append(hint);
     }
-    if (input.type.interfaceTag === INTERFACE_TAG.TAGGED_UNION ||
-        input.type.interfaceTag === INTERFACE_TAG.CUSTOM_INDUCTIVE) {
+    if (field.tagName === "TEXTAREA" && valueTag === "variant") {
       const group = document.createElement("div");
       group.className = "dev-constructor-input";
       group.append(constructorControl(input, index, field), label);
@@ -250,6 +242,7 @@ function renderInputFields(entry) {
 
 function constructorControl(input, index, field) {
   const type = input.type;
+  const cases = type.value.cases;
   const label = document.createElement("label");
   label.className = "dev-field";
   const caption = document.createElement("span");
@@ -262,26 +255,26 @@ function constructorControl(input, index, field) {
   placeholder.textContent = "Choose a constructor";
   placeholder.disabled = true;
   select.append(placeholder);
-  for (const ctor of type.constructors) {
+  for (const [caseIndex, view] of cases.entries()) {
     const option = document.createElement("option");
-    option.value = ctor.jsName;
-    option.textContent = ctor.jsName;
+    option.value = String(caseIndex);
+    option.textContent = view.kind;
     select.append(option);
   }
   const syncSelection = () => {
     try {
       const value = JSON.parse(field.value);
-      select.value = type.constructors.some((ctor) => ctor.jsName === value?.kind)
-        ? value.kind : "";
+      const caseIndex = cases.findIndex((view) => view.kind === value?.kind);
+      select.value = caseIndex < 0 ? "" : String(caseIndex);
     } catch {
       select.value = "";
     }
   };
   field.addEventListener("input", syncSelection);
   select.addEventListener("change", () => {
-    const ctor = type.constructors.find((ctor) => ctor.jsName === select.value);
-    if (ctor === undefined) return;
-    field.value = JSON.stringify(constructorTemplate(type, ctor), null, 2);
+    const caseIndex = Number(select.value);
+    if (!Number.isInteger(caseIndex) || cases[caseIndex] === undefined) return;
+    field.value = JSON.stringify(constructorTemplate(type, caseIndex), null, 2);
     syncSelection();
   });
   syncSelection();
@@ -327,18 +320,18 @@ function validatedManifestEntries(manifest) {
   return validated.exports;
 }
 
-function renderManifestEntries(entries) {
+function renderManifestEntries(entries, requestedEntryName) {
   interfaceEntries = entries;
   entrySelect.replaceChildren();
   for (const entry of interfaceEntries) {
     const option = document.createElement("option");
-    option.value = entry.id;
+    option.value = entry.entry;
     const effect = formatInterfaceEffectPrefix(entry.effect);
     const signature = `${entry.args.map((arg) => formatInterfaceType(arg.type)).join(", ") || "()"} -> ${effect}${formatInterfaceType(entry.result)}`;
-    option.textContent = `${entry.jsName} / ${signature}`;
+    option.textContent = `${entry.entry} / ${signature}`;
     entrySelect.append(option);
   }
-  selectEntryFromQuery();
+  if (requestedEntryName !== null) entrySelect.value = requestedEntryName;
   renderInputFields(selectedInterfaceEntry());
   if (interfaceEntries.length === 0) {
     resultOutput.textContent =
@@ -352,7 +345,7 @@ function entryUrl(entry) {
   if (currentPackageSource?.packageQuery != null) {
     url.searchParams.set("package", currentPackageSource.packageQuery);
   }
-  url.searchParams.set("entry", entry.id);
+  url.searchParams.set("entry", entry.entry);
   return url;
 }
 
@@ -387,44 +380,40 @@ function renderPackageMetadata(metadata, packageInfo) {
 
 function parseInputValue(input, field) {
   const text = field?.value ?? inputDefault(input);
-  switch (input.type?.interfaceTag) {
-    case INTERFACE_TAG.NAT:
-    case INTERFACE_TAG.UINT64:
-    case INTERFACE_TAG.USIZE:
-      return parseNatText(text);
-    case INTERFACE_TAG.INT:
-      return parseIntText(text);
-    case INTERFACE_TAG.BOOL:
+  const nativeType = input.type?.native?.type;
+  switch (input.type?.value?.tag) {
+    case "bigint":
+      return nativeType?.tag === "int" ? parseIntText(text) : parseNatText(text);
+    case "number":
+      return nativeType?.tag === "float"
+        ? parseFloatText(text)
+        : Number(parseNatText(text));
+    case "safeInteger": {
+      const integer = nativeType?.tag === "int" ? parseIntText(text) : parseNatText(text);
+      const value = Number(integer);
+      if (!Number.isSafeInteger(value)) throw new Error(`unsafe integer literal: ${text}`);
+      return value;
+    }
+    case "boolean":
       if (field?.type === "checkbox") return Boolean(field.checked);
       if (String(text).trim() === "true") return true;
       if (String(text).trim() === "false") return false;
       throw new Error(`invalid Bool literal: ${text}`);
-    case INTERFACE_TAG.STRING:
+    case "string":
       return text;
-    case INTERFACE_TAG.UINT8:
-    case INTERFACE_TAG.UINT16:
-    case INTERFACE_TAG.UINT32: {
-      const value = Number(parseNatText(text));
-      return value;
-    }
-    case INTERFACE_TAG.BYTE_ARRAY:
+    case "bytes":
       return parseByteArrayInput(text);
-    case INTERFACE_TAG.FLOAT:
-    case INTERFACE_TAG.FLOAT32:
-      return parseFloatText(text);
-    case INTERFACE_TAG.SIMPLE_ENUM:
+    case "enum":
       return text.trim();
-    case INTERFACE_TAG.EXPR:
-    case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
-    case INTERFACE_TAG.PROD:
-    case INTERFACE_TAG.STRUCTURE:
-    case INTERFACE_TAG.TAGGED_UNION:
-    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
+    case "expr":
+    case "record":
+    case "sequence":
+    case "variant":
       return JSON.parse(text);
+    case "unit":
+      return undefined;
     default:
-      throw new Error(`unsupported input type: ${input.type?.type ?? "?"}`);
+      throw new Error(`unsupported input value interface: ${input.type?.value?.tag ?? "?"}`);
   }
 }
 
@@ -445,8 +434,10 @@ async function loadPackageSet(
   if (packageLoadGate.discardStale(token, () => candidate.dispose())) return;
 
   let entries;
+  let requestedEntryName;
   try {
     entries = validatedManifestEntries(candidate.interfaceManifest);
+    requestedEntryName = consumeRequestedEntry(entries);
   } catch (error) {
     candidate.dispose();
     throw error;
@@ -463,7 +454,7 @@ async function loadPackageSet(
     packageSize.textContent = formatBytes(candidate.packageInfo.byteLength);
     declCount.textContent = String(candidate.packageInfo.count);
     ptrWidth.textContent = `${candidate.targetPointerBytes()} bytes`;
-    renderManifestEntries(entries);
+    renderManifestEntries(entries, requestedEntryName);
     if (restoreState !== null) restoreRunnerState(restoreState);
     renderPackageMetadata(candidate.packageMetadata, candidate.packageInfo);
     updateRuntimeControls();
@@ -498,7 +489,7 @@ function captureRunnerState() {
 }
 
 function restoreRunnerState(state) {
-  if (!interfaceEntries.some((entry) => entry.id === state.entryId)) return;
+  if (!interfaceEntries.some((entry) => entry.entry === state.entryId)) return;
   entrySelect.value = state.entryId;
   renderInputFields(selectedInterfaceEntry());
   for (const [index, saved] of state.inputs.entries()) {
@@ -579,7 +570,7 @@ function evaluateEntry(runtime, entry) {
   const values = inputs.map((input, index) => {
     const field = inputFields.querySelector(`[data-input-index='${index}']`);
     const value = parseInputValue(input, field);
-    if (field && input.type?.interfaceTag === INTERFACE_TAG.BYTE_ARRAY) {
+    if (field && input.type?.native?.type?.tag === "byteArray") {
       field.value = value.join(", ");
     }
     return value;

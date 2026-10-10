@@ -26,7 +26,7 @@ try {
   assert.equal(generated.status, 0, `${generated.stderr}\n${generated.stdout}`);
   const bytes = await readFile(path);
   const info = readIrPackageInfo(bytes);
-  assert.equal(info.manifest.version, 9);
+  assert.equal(info.manifest.version, 12);
   const factory = createVirRuntimeFactory({ wasmBytes: await readFile(new URL("../../web/public/vir-upstream.wasm", import.meta.url)) });
   const key = parts => parts.map(part => typeof part === "string"
     ? `s${Buffer.from(part, "utf8").toString("hex")}/` : `n${part.num}/`).join("");
@@ -42,7 +42,7 @@ try {
     ["#meta.part.with.dot", ["#meta", "part.with.dot"], 5],
     ["Hygienic.part.with.dot._hyg", ["Hygienic", "part.with.dot", "_hyg"], 2],
   ];
-  await test("structural keys preserve exotic exported names independently of display aliases", async () => {
+  await test("structural keys preserve exotic exported entry names", async () => {
     const runtime = await factory.createRuntime({ irPackageSet: [bytes] });
     try {
       for (const [entry, parts, increment] of cases) {
@@ -50,15 +50,6 @@ try {
         assert.equal(runtime.call(entry, 10), BigInt(10 + increment));
       }
     } finally { runtime.dispose(); }
-    const renamed = structuredClone(info.manifest);
-    renamed.exports.find(value => value.entry === "café").entry = "a client-selected alias";
-    renamed.exports.find(value => value.entry === "boxedIdentity").entry = "boxed alias";
-    const aliased = await factory.createRuntime({ irPackageSet: [replaceIrPackageManifest(bytes, renamed)] });
-    try {
-      assert.equal(aliased.call("a client-selected alias", 10), 13n);
-      assert.equal(aliased.call("boxed alias", "18446744073709551615"), 18446744073709551615n);
-    }
-    finally { aliased.dispose(); }
   });
   await test("checksum-consistent structural identity mismatch rejects before finish and permits retry", async () => {
     const renamed = structuredClone(info.manifest);
@@ -75,49 +66,43 @@ try {
       assert.equal(runtime.call("café", 10), 13n);
     } finally { runtime.dispose(); }
   });
-  await test("cross-field aliases reject before initialization and same-export aliases agree", async () => {
-    const aliases = structuredClone(info.manifest);
-    Object.assign(aliases.exports.find(entry => entry.entry === "café"), {
-      entry: "sharedName", id: "sharedName", jsName: "sharedName",
-    });
-    Object.assign(aliases.exports.find(entry => entry.entry === "αβ₁"), {
-      entry: "otherName_", id: "otherName_", jsName: "otherName_",
-    });
-    const validPackage = replaceIrPackageManifest(bytes, aliases);
-    aliases.exports.find(entry => entry.entry === "otherName_").jsName = "sharedName";
-    // Bypass writer validation so the runtime receives checksum-valid bytes.
-    const ambiguousPackage = rewriteSameLengthManifest(validPackage, aliases);
-    const runtime = await factory.createRuntime();
-    const original = runtime.exports;
-    let begins = 0;
-    let finishes = 0;
-    runtime.exports = { ...original,
-      vir_begin_ir_package_set() { begins++; return original.vir_begin_ir_package_set(); },
-      vir_finish_ir_package_set() { finishes++; return original.vir_finish_ir_package_set(); },
-    };
-    try {
-      assert.throws(() => runtime.loadIrPackageSetBytes([ambiguousPackage]), /duplicates another interface export alias "sharedName"/);
-      assert.equal(begins, 0);
-      assert.equal(finishes, 0);
-      assert.equal(runtime.packageDeclCount(), 0);
-      assert.equal(runtime.interfaceManifest, null);
-      assert.equal(runtime.failure, null);
-      runtime.loadIrPackageSetBytes([validPackage]);
-      assert.equal(begins, 1);
-      assert.equal(finishes, 1);
-      assert.equal(runtime.call("sharedName", 10), 13n);
-      assert.equal(runtime.exportsByName.sharedName(10), 13n);
-      assert.equal(runtime.call("otherName_", 10), 14n);
-      assert.equal(runtime.exportsByName.otherName_(10), 14n);
-    } finally { runtime.dispose(); }
+  await test("retired export keys reject before initialization and allow retry", async () => {
+    const reserved = structuredClone(info.manifest);
+    reserved.metadata.testPadding = "x".repeat(256);
+    const padded = replaceIrPackageManifest(bytes, reserved);
+    for (const field of ["id", "jsName"]) {
+      const legacy = structuredClone(reserved);
+      delete legacy.metadata.testPadding;
+      legacy.exports[0][field] = "legacy";
+      const malformed = rewriteSameLengthManifest(padded, legacy);
+      const runtime = await factory.createRuntime();
+      const original = runtime.exports;
+      let begins = 0;
+      let finishes = 0;
+      runtime.exports = { ...original,
+        vir_begin_ir_package_set() { begins++; return original.vir_begin_ir_package_set(); },
+        vir_finish_ir_package_set() { finishes++; return original.vir_finish_ir_package_set(); },
+      };
+      try {
+        assert.throws(() => runtime.loadIrPackageSetBytes([malformed]), /is retired; use the full Lean entry name/);
+        assert.equal(begins, 0);
+        assert.equal(finishes, 0);
+        assert.equal(runtime.packageDeclCount(), 0);
+        assert.equal(runtime.interfaceManifest, null);
+        assert.equal(runtime.failure, null);
+        runtime.loadIrPackageSetBytes([bytes]);
+        assert.equal(runtime.call("café", 10), 13n);
+        assert.equal("exportsByName" in runtime, false);
+      } finally { runtime.dispose(); }
+    }
   });
   await test("old manifests reject before initialization and permit a current-package retry", async () => {
     const canonical = replaceIrPackageManifest(bytes, info.manifest);
-    for (const version of [6, 7, 8]) {
+    for (const version of [6, 7, 8, 9, 10, 11]) {
       const legacy = structuredClone(info.manifest);
       legacy.version = legacy.metadata.manifestVersion = version;
       // Bypass the writer's current-schema validation. Changing only the two
-      // version digits preserves section offsets and isolates version admission.
+      // versions plus JSON whitespace preserves offsets and isolates admission.
       const oldPackage = rewriteSameLengthManifest(canonical, legacy);
       const runtime = await factory.createRuntime();
       let finishes = 0;
@@ -129,7 +114,7 @@ try {
       try {
         assert.throws(
           () => runtime.loadIrPackageSetBytes([oldPackage]),
-          /version: 9.*regenerate packages with the matching SDK/,
+          /version: 12.*regenerate packages with the matching SDK/,
         );
         assert.equal(finishes, 0);
         assert.equal(runtime.packageDeclCount(), 0);
@@ -153,7 +138,10 @@ function rewriteSameLengthManifest(bytes, manifest) {
     value => value.kind === IR_PACKAGE_SECTION.INTERFACE_MANIFEST,
   );
   assert.ok(section, "fixture must contain an interface manifest");
-  const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest));
+  const text = JSON.stringify(manifest);
+  const missingBytes = section.byteLength - 12 - Buffer.byteLength(text);
+  assert.ok(missingBytes >= 0, "version fixture must fit the existing section");
+  const manifestBytes = new TextEncoder().encode(text + " ".repeat(missingBytes));
   assert.equal(manifestBytes.byteLength, section.byteLength - 12);
   const output = Uint8Array.from(bytes);
   output.set(manifestBytes, section.offset + 12);

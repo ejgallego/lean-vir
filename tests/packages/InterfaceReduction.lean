@@ -153,21 +153,48 @@ private def expectConstructorNames (type : Expr) (expected : Array (Name × Stri
     | throwError "constructor-name classification failed"
   let .ok encoded := Json.parse descriptor.toJson
     | throwError "constructor-name JSON failed"
-  let .ok constructors := (encoded.getObjVal? "constructors").bind Json.getArr?
+  let .ok native := encoded.getObjVal? "native"
+    | throwError "native descriptor missing"
+  let .ok metadata := native.getObjVal? "metadata"
+    | throwError "native metadata missing"
+  let .ok constructors := (metadata.getObjVal? "constructors").bind Json.getArr?
     | throwError "constructor-name array missing"
+  let .ok value := encoded.getObjVal? "value"
+    | throwError "JavaScript value mapping missing"
+  let .ok valueTag := value.getObjValAs? String "tag"
+    | throwError "JavaScript value mapping tag missing"
+  let labels ← if valueTag == "enum" then do
+    let .ok labels := (value.getObjVal? "cases").bind Json.getArr?
+      | throwError "enum case spellings missing"
+    labels.mapM fun item =>
+      match item.getStr? with
+      | .ok label => pure label
+      | .error _ => throwError "enum case spelling must be a string"
+  else if valueTag == "variant" then do
+    let .ok cases := (value.getObjVal? "cases").bind Json.getArr?
+      | throwError "variant cases missing"
+    cases.mapM fun item => do
+      let .ok label := item.getObjValAs? String "kind"
+        | throwError "variant spelling missing"
+      pure label
+  else throwError "constructor spelling mappings must use enum or variant values"
   expect "constructor count" (constructors.size == expected.size)
+  expect "case spelling count" (labels.size == expected.size)
   for h : index in *...expected.size do
     let some constructor := constructors[index]?
       | throwError "constructor missing"
     let .ok name := constructor.getObjValAs? String "name"
       | throwError "constructor Name missing"
-    let .ok label := constructor.getObjValAs? String "jsName"
-      | throwError "constructor label missing"
-    let .ok tag := constructor.getObjValAs? Nat "tag"
-      | throwError "constructor tag missing"
+    let some label := labels[index]?
+      | throwError "constructor spelling missing"
     expect "canonical constructor Name" (name == expected[index].1.toString)
     expect "relative constructor label" (label == expected[index].2)
-    expect "constructor order" (tag == index)
+    match constructor.getObjVal? "tag" with
+    | .error _ => pure ()
+    | .ok _ => throwError "constructor ordinal must come from table position"
+    match constructor.getObjVal? "jsName" with
+    | .error _ => pure ()
+    | .ok _ => throwError "JavaScript spelling must live in the value mapping"
 
 run_elab do
   for name in #[``direct, ``projected, ``parameterized] do
@@ -223,19 +250,27 @@ run_elab do
   expect "polymorphic tree owner" (name == ``PolyTree)
   let some next := variants[1]? | throwError "polymorphic tree next constructor missing"
   let some child := next.fields[0]? | throwError "polymorphic tree child field missing"
+  let .customInductive `Option _ optionCtors := child.type
+    | throwError "polymorphic tree Option must use generic constructors"
+  let some optionSome := optionCtors[1]? | throwError "missing Option.some"
+  let some optionValue := optionSome.fields[0]? | throwError "missing Option.some payload"
   expect "polymorphic tree self field"
-    (child.type == .option (.recursiveSelf ``PolyTree "InterfaceReduction.PolyTree Nat"))
+    (optionValue.type == .recursiveRef ``PolyTree "InterfaceReduction.PolyTree Nat" 1)
   let polyCell := mkApp (mkConst ``PolyCell [.zero]) nat
   let .ok (.structure name _ descriptor) ← interfaceType polyCell
     | throwError "universe-polymorphic structure classification failed"
   expect "polymorphic structure owner" (name == ``PolyCell)
   let some next := descriptor.fields[1]? | throwError "polymorphic structure next field missing"
+  let .customInductive `Option _ optionCtors := next.type
+    | throwError "polymorphic projection Option must use generic constructors"
+  let some optionSome := optionCtors[1]? | throwError "missing Option.some"
+  let some optionValue := optionSome.fields[0]? | throwError "missing Option.some payload"
   expect "polymorphic projection self field"
-    (next.type == .option (.recursiveSelf ``PolyCell "InterfaceReduction.PolyCell Nat"))
+    (optionValue.type == .recursiveRef ``PolyCell "InterfaceReduction.PolyCell Nat" 1)
   let universeTree := mkConst ``UniverseTree [.zero]
   let .ok (.customInductive _ _ _) ← interfaceType universeTree
     | throwError "universe-polymorphic parameter-free recursion failed"
-  let .ok (.recursiveSelf _ _) ← (classifyType (.mdata {} universeTree) #[⟨universeTree⟩]).run
+  let .ok (.recursiveRef _ _ 0) ← (classifyType (.mdata {} universeTree) #[⟨universeTree⟩]).run
     | throwError "outer metadata must not alter recursion identity"
   let .error universeError ← (classifyType (mkConst ``UniverseTree [.succ .zero]) #[⟨universeTree⟩]).run
     | throwError "different universe instances must not share recursion identity"
@@ -256,12 +291,12 @@ run_elab do
       | throwError "binder syntax must remain part of structural identity"
     expect "binder identity reason" (errorCause binderError == .nonUniformRecursive .inductive ``FamilyTree)
 
-  -- Layout lookup converts only compiler exceptions to typed unsupported cases.
-  let .error layoutError ← (taggedUnionType #[] `MissingUnion "MissingUnion"
-      #[(`MissingUnion.missing, nat)]).run
-    | throwError "missing compiler layout must produce a typed classifier error"
-  expect "layout compiler exception reason"
-    (layoutError == .constructorLayoutUnavailable `MissingUnion.missing)
+  -- Declaration resolution precedes layout lookup in the selected producer path.
+  let missingInductive := mkConst `MissingInductive
+  let .error missingInductiveError ← (inductiveType #[] missingInductive).run
+    | throwError "an absent inductive declaration must fail before layout lookup"
+  expect "missing inductive declaration reason"
+    (errorCause missingInductiveError == .unsupportedType missingInductive)
   let compilerErrorEscaped ← try
     let _ ← (withContext .arrayElement
       (liftM (throwError "compiler-exception-control" : CoreM InterfaceType) : ClassifyM InterfaceType)).run
@@ -316,7 +351,7 @@ run_elab do
       expect "named callback argument" (args == #[{ name := "value", type := .nat }])
   | result => throwError "value callback descriptor: {repr result}"
   expect "callback encoding" (callback.toJson ==
-    "{\"type\":\"Function\",\"interfaceTag\":24,\"kind\":\"function\",\"effect\":\"pure\",\"args\":[{\"name\":\"value\",\"type\":{\"type\":\"Nat\",\"interfaceTag\":0}}],\"result\":{\"type\":\"String\",\"interfaceTag\":3}}")
+    "{\"native\":{\"type\":{\"tag\":\"leanObject\"},\"metadata\":{\"signature\":{\"args\":[{\"type\":{\"tag\":\"nat\"}}],\"result\":{\"type\":{\"tag\":\"string\"}},\"effect\":\"pure\"}}},\"value\":{\"tag\":\"function\",\"args\":[{\"tag\":\"bigint\"}],\"result\":{\"tag\":\"string\"}}}")
   let .ok valueSignature ← analyzeExportInterface (← getConstInfo ``valueCallback).type
     | throwError "value callback signature failed"
   match Vir.HostValidation.validateHostImportBoundary .hostImport "test.valueCallback" valueSignature with

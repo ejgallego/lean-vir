@@ -4,24 +4,14 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { INTERFACE_TAG } from "./interface-tags.js";
-
-export function objectTypeNeedsBoxedBoundary(type) {
-  switch (type?.interfaceTag) {
-    case INTERFACE_TAG.FLOAT:
-    case INTERFACE_TAG.FLOAT32:
-    case INTERFACE_TAG.UINT64:
-      return true;
-    case INTERFACE_TAG.STRUCTURE: {
-      const fields = type.fields;
-      const trivial = trivialStructureField(type, fields);
-      return trivial !== null && objectTypeNeedsBoxedBoundary(trivial.type);
-    }
-    default:
-      return false;
-  }
+export function objectTypeNeedsBoxedBoundary(pair) {
+  return nativeNeedsBoxedBoundary(pair.native);
 }
 
-export function trivialStructureField(type, fields) {
-  return type.trivialFieldIndex === undefined ? null : fields[type.trivialFieldIndex];
+function nativeNeedsBoxedBoundary(native) {
+  const type = native.type;
+  if (type?.tag === "float" || (type?.tag === "unsigned" && type.width === 64)) return true;
+  const constructors = native.metadata?.constructors;
+  return constructors?.length === 1 && constructors[0].representation === "identity"
+    ? nativeNeedsBoxedBoundary(constructors[0].fields[0].type) : false;
 }

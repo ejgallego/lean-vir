@@ -7,8 +7,8 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 import { VirRuntime } from "../../web/src/runtime/core.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { normalizeDecimal, normalizeBoundedUnsignedDecimal } from "../../web/src/runtime/primitive-value-normalizers.js";
+import { boundary, nativeDescriptor } from "../support/interface-fixtures.mjs";
 
 test("direct fixed-width boxing reports null constructor results as lowering failures", () => {
   const runtime = Object.create(VirRuntime.prototype);
@@ -20,8 +20,12 @@ test("direct fixed-width boxing reports null constructor results as lowering fai
       vir_obj_usize_scalar(value) { assert.equal(value, 0); calls++; return 0; },
     },
   });
-  for (const [interfaceTag, name] of [[INTERFACE_TAG.UINT64, "UInt64"], [INTERFACE_TAG.USIZE, "USize"]]) {
-    assert.throws(() => runtime.makeObjectValue({ interfaceTag }, 0, "zero"),
+  for (const [width, valueTag, name] of [[64, "bigint", "UInt64"], ["usize", "number", "USize"]]) {
+    const type = boundary(
+      nativeDescriptor("unsigned", { width }),
+      { tag: valueTag },
+    );
+    assert.throws(() => runtime.makeObjectValue(type, 0, "zero"),
       new RegExp(`could not be lowered to a Lean ${name} object`));
   }
   assert.equal(calls, 2);
@@ -37,11 +41,12 @@ test("direct USize transport rejects wider targets before calling the ABI", () =
       vir_obj_ctor_scalar_data() { assert.fail("must not inspect a wider USize field"); },
     },
   });
-  const type = { interfaceTag: INTERFACE_TAG.USIZE };
+  const type = boundary(
+    nativeDescriptor("unsigned", { width: "usize" }),
+    { tag: "number" },
+  );
   assert.throws(() => runtime.makeObjectValue(type, 1n << 32n, "wide"), /requires a wasm32 runtime/);
   assert.throws(() => runtime.liftObjectValue(type, 1, "wide"), /requires a wasm32 runtime/);
-  assert.throws(() => runtime.readObjectUSizeField(
-    { objectFieldCount: 0, usizeFieldCount: 1 }, 1, 0, "wide"), /requires a wasm32 runtime/);
 });
 
 test("decimal clients retain their existing text normalization", () => {

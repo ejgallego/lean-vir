@@ -43,7 +43,7 @@ test("internal primitive composition excludes structural codecs and browser prov
   for (const input of Object.keys(inputs)) {
     assert.doesNotMatch(
       input,
-      /\/(?:object-values|object-abi|vir-value-normalizers)\.js$/,
+      /\/(?:object-values|object-abi)\.js$/,
     );
     assert.doesNotMatch(
       input,

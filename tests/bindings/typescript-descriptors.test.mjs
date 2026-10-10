@@ -19,7 +19,6 @@ import {
 } from "../../scripts/bindings/type-anchor-format.mjs";
 import { renderTypeAnchorReport } from "../../scripts/bindings/type-anchor-renderer.mjs";
 import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 
 test("semantic type operators remain opaque while readonly array/tuple views are preserved", async () => {
   const directory = await mkdtemp(join(tmpdir(), "lean-vir-ts-operators-"));
@@ -330,17 +329,38 @@ test("the comparator fails closed on TypeScript absence semantics", async () => 
       artifact: "lean-vir-ir-package",
       metadata: {},
       exports: [{
-        id: "maybeString",
-        jsName: "maybeString",
         entry: "Demo.maybeString",
         nameKey: "s44656d6f/s6d61796265537472696e67/",
         source: "Demo.lean",
         startup: false,
         args: [],
         result: {
-          type: "Option String",
-          interfaceTag: INTERFACE_TAG.OPTION,
-          element: { type: "String", interfaceTag: INTERFACE_TAG.STRING },
+          native: {
+            type: { tag: "leanObject" },
+            metadata: {
+              declaration: "Option",
+              constructors: [
+                { name: "Option.none", representation: "immediate", fields: [] },
+                {
+                  name: "Option.some",
+                  representation: "object",
+                  storage: { objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0 },
+                  fields: [{
+                    name: "val",
+                    type: { type: { tag: "string" } },
+                    location: { tag: "object", index: 0 },
+                  }],
+                },
+              ],
+            },
+          },
+          value: {
+            tag: "variant",
+            cases: [
+              { kind: "none", payload: "none" },
+              { kind: "some", payload: "value", value: { tag: "string" } },
+            ],
+          },
         },
         effect: "pure",
       }],
@@ -352,8 +372,8 @@ test("the comparator fails closed on TypeScript absence semantics", async () => 
     assert.deepEqual(
       report.results.map((result) => [result.id, result.status, result.diagnostics[0]?.code]),
       [
-        ["maybe_undefined", "weak", "typescript_undefined_not_represented"],
-        ["missing_absence", "weak", "typescript_absence_provenance_missing"],
+        ["maybe_undefined", "weak", "descriptor_kind_mismatch"],
+        ["missing_absence", "weak", "descriptor_kind_mismatch"],
         ["optional_property", "weak", "typescript_optional_property_not_represented"],
       ],
     );

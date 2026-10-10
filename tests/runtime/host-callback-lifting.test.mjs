@@ -11,12 +11,32 @@ import { registerHostCallRollback } from "../../web/src/host-boundary.js";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { VirHostState } from "../../web/src/runtime/host-state.js";
 import { HOST_IMPORT_BOUNDARY } from "../../web/src/runtime/interface-manifest.js";
-import { INTERFACE_TAG as T } from "../../web/src/runtime/interface-tags.js";
+import {
+  arrayBoundary,
+  booleanBoundary,
+  boundary,
+  enumBoundary,
+  functionBoundary,
+  nativeDescriptor,
+  resourceBoundary,
+  unitBoundary,
+} from "../support/interface-fixtures.mjs";
 
-const resource = { interfaceTag: T.RESOURCE };
-const unit = { interfaceTag: T.UNIT };
-const callback = { interfaceTag: T.FUNCTION, args: [], result: unit, effect: "runtime" };
-const array = element => ({ interfaceTag: T.ARRAY, element });
+const resource = resourceBoundary();
+const unit = unitBoundary();
+const callback = functionBoundary([], unit, "runtime");
+const nat = boundary(nativeDescriptor("nat"), { tag: "bigint" });
+const int = boundary(nativeDescriptor("int"), { tag: "bigint" });
+const string = boundary(nativeDescriptor("string"), { tag: "string" });
+const unsigned = (width) => boundary(
+  nativeDescriptor("unsigned", { width }),
+  { tag: width === 64 ? "bigint" : "number" },
+);
+const floating = (width) => boundary(
+  nativeDescriptor("float", { width }),
+  { tag: "number" },
+);
+const array = (element) => arrayBoundary(element.native, element.value);
 
 // Count registry traversals without instrumentation in production code.
 class CountedRoots extends Set {
@@ -48,6 +68,7 @@ function harness(t, { lower = () => 1 } = {}) {
     vir_obj_array_size: obj => objects.get(obj).length,
     vir_obj_array_get: (obj, index) => objects.get(obj)[index],
     vir_obj_dec: obj => decremented.push(obj),
+    vir_obj_scalar: ordinal => ordinal + 1,
   };
   Object.assign(runtime, {
     exports, hostState: state,
@@ -106,17 +127,17 @@ test("explicit scalar conversions do not traverse callback roots", t => {
     vir_obj_uint64_value: () => 1n,
     vir_obj_usize_value: () => 1,
     vir_upstream_target_pointer_bytes: () => 4,
+    vir_obj_is_scalar: () => 1,
+    vir_obj_scalar_value: () => 1,
     vir_obj_float_value: () => 1,
     vir_obj_float32_value: () => 1,
   });
-  for (const interfaceTag of [T.UNIT, T.BOOL, T.NAT, T.INT, T.STRING,
-    T.UINT8, T.UINT16, T.UINT32, T.UINT64, T.USIZE, T.FLOAT, T.FLOAT32]) {
-    h.call([{ interfaceTag }], [1], () => {}, HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION);
+  for (const type of [unit, booleanBoundary(), nat, int, string,
+    unsigned(8), unsigned(16), unsigned(32), unsigned(64), unsigned("usize"),
+    floating(64), floating(32)]) {
+    h.call([type], [1], () => {}, HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION);
   }
-  h.call([{ interfaceTag: T.SIMPLE_ENUM, constructors: [
-    { name: "Example.Enum.zero", jsName: "zero", tag: 0 },
-    { name: "Example.Enum.one", jsName: "one", tag: 1 },
-  ] }], [1],
+  h.call([enumBoundary("Example.Enum", ["zero", "one"])], [2],
     value => assert.equal(value, "one"), HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION);
   assert.equal(h.runtime.hostState.leanObjectHandleCells.scans, 0);
   assert.deepEqual(h.released, []);
@@ -138,7 +159,7 @@ test("functions and nested composites retain callbacks without a registry census
 
 test("callback-free composites need no registry census either", t => {
   const h = harness(t);
-  h.objects.set(1, [2]);
+  h.objects.set(1, [1]);
   h.call([array(unit)], [1], values => assert.deepEqual(values, [undefined]),
     HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION);
   assert.equal(h.runtime.hostState.leanObjectHandleCells.scans, 0);
@@ -217,7 +238,7 @@ for (const fail of [false, true]) {
     h.runtime.exports.vir_closure_apply_objects = () => 1;
     const invoke = () => VirRuntime.prototype.callClosure.call(h.runtime,
       { runtime: h.runtime, object: 60, live: true,
-        callType: { args: [], effect: "pure", result: array(callback) } }, [],
+      callType: functionBoundary([], array(callback)) }, [],
     );
     if (fail) {
       assert.throws(invoke, /\[1\] is unavailable/);
@@ -229,11 +250,3 @@ for (const fail of [false, true]) {
     assert.equal(countLiveCallbacks(h.runtime.hostState), 57);
   });
 }
-
-test("unknown descriptors still reject without a callback census", t => {
-  const h = harness(t);
-  assert.throws(() => h.call([callback, { interfaceTag: 999 }], [1, 2], () => assert.fail("host entered"),
-    HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION), /unsupported object ABI result type/);
-  assert.equal(h.runtime.hostState.leanObjectHandleCells.scans, 0);
-  assert.deepEqual(h.released, []);
-});

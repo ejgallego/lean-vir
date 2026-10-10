@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collection-bindings.js";
 import { VirRuntime } from "../../web/src/runtime/core.js";
+import { arrayBoundary, nativeDescriptor } from "../support/interface-fixtures.mjs";
 
 test("literal construction defines own data properties; ordinary assignment and push stay native", () => {
   const b = createJsCollectionHostBindings();
@@ -99,16 +100,16 @@ test("structural array lifting creates dense own elements and releases borrowed 
       __proto__: null, value: pointer, writable: true, enumerable: true, configurable: true,
     }),
   };
-  const type = { element: { interfaceTag: 1 } };
-  const originalLift = runtime.liftObjectValue;
+  const type = arrayBoundary(nativeDescriptor("string"), { tag: "string" });
+  const originalLift = runtime.readObjectString;
   const previous = Object.getOwnPropertyDescriptor(Array.prototype, "0");
   let setterCalls = 0;
   try {
     Object.defineProperty(Array.prototype, "0", {
       configurable: true, set() { setterCalls++; },
     });
-    runtime.liftObjectValue = (_type, pointer) => pointer;
-    const values = runtime.liftObjectArrayValue(type, 1, "test");
+    runtime.readObjectString = (pointer) => pointer;
+    const values = VirRuntime.prototype.liftObjectValue.call(runtime, type, 1, "test");
     assert.deepEqual(values, [11, 12, 13]);
     assert.equal(setterCalls, 0);
     assert.equal(values.length, 3);
@@ -119,24 +120,24 @@ test("structural array lifting creates dense own elements and releases borrowed 
     }
     assert.deepEqual(released, [11, 12, 13]);
     const sentinel = new Error("structural lift failed");
-    runtime.liftObjectValue = (_type, pointer) => {
+    runtime.readObjectString = (pointer) => {
       if (pointer === 12) throw sentinel;
       return pointer;
     };
-    assert.throws(() => runtime.liftObjectArrayValue(type, 1, "test"),
+    assert.throws(() => VirRuntime.prototype.liftObjectValue.call(runtime, type, 1, "test"),
       error => error === sentinel);
     assert.deepEqual(released, [11, 12, 13, 11, 12],
       "the failing field is released once; later fields are not read");
     const defineProperty = Object.defineProperty;
     const definitionFailure = new Error("structural array definition failed");
-    runtime.liftObjectValue = (_type, pointer) => pointer;
+    runtime.readObjectString = (pointer) => pointer;
     try {
       Object.defineProperty = (target, name, descriptor) => {
         if (target !== released && Array.isArray(target) && name === 1 && descriptor.value === 12)
           throw definitionFailure;
         return defineProperty(target, name, descriptor);
       };
-      assert.throws(() => runtime.liftObjectArrayValue(type, 1, "test"),
+      assert.throws(() => VirRuntime.prototype.liftObjectValue.call(runtime, type, 1, "test"),
         error => error === definitionFailure);
     } finally {
       Object.defineProperty = defineProperty;
@@ -145,7 +146,7 @@ test("structural array lifting creates dense own elements and releases borrowed 
       "the failed definition releases its borrowed element once; later elements are not read");
     assert.equal(setterCalls, 0);
   } finally {
-    runtime.liftObjectValue = originalLift;
+    runtime.readObjectString = originalLift;
     if (previous) Object.defineProperty(Array.prototype, "0", previous);
     else delete Array.prototype["0"];
   }

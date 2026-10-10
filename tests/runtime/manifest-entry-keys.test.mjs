@@ -8,15 +8,18 @@ import {
   INTERFACE_MANIFEST_VERSION,
   validateInterfaceManifest,
 } from "../../web/src/runtime/interface-manifest.js";
+import { primitiveBoundary } from "../support/interface-fixtures.mjs";
+
+const nat = () => primitiveBoundary("nat", "bigint");
 
 function manifest() {
   return {
     version: INTERFACE_MANIFEST_VERSION,
     metadata: {},
     exports: ["a", "b"].map((name, index) => ({
-      entry: `${name}.entry`, id: `${name}Id`, jsName: `${name}Js`,
+      entry: `${name}.entry`,
       nameKey: index === 0 ? "s61/" : "s62/",
-      args: [], result: { type: "Nat", interfaceTag: 0 },
+      args: [], result: nat(),
       effect: "pure", startup: false,
     })),
   };
@@ -33,40 +36,41 @@ function hostImport(slot, symbol) {
     symbol,
     arity: 2,
     erasedPrefixArgs: 0,
-    args: [{ name: "value", type: { type: "Nat", interfaceTag: 0 } }],
-    result: { type: "Nat", interfaceTag: 0 },
+    args: [{ name: "value", type: nat() }],
+    result: nat(),
     effect: "runtime",
   };
 }
 
-for (const first of ["entry", "id", "jsName"]) {
-  for (const second of ["entry", "id", "jsName"]) {
-    test(`export aliases cannot collide across ${first} and ${second}`, () => {
+test("distinct dotted and underscored entries coexist", () => {
+  const value = manifest();
+  value.exports[0].entry = "Duplicate.entry";
+  value.exports[1].entry = "Duplicate_entry";
+  assert.equal(validateInterfaceManifest(value), value);
+});
+
+test("duplicate entries reject independently of structural identities", () => {
+  const value = manifest();
+  value.exports[1].entry = value.exports[0].entry;
+  assert.throws(() => validateInterfaceManifest(value), /entry duplicates another interface export/);
+});
+
+for (const field of ["id", "jsName"]) {
+  for (const spelling of ["legacy", "", undefined]) {
+    test(`retired export ${field} rejects even when ${String(spelling)}`, () => {
       const value = manifest();
-      value.exports[0][first] = "Collision";
-      value.exports[1][second] = "Collision";
-      assert.throws(() => validateInterfaceManifest(value), /duplicates another interface export alias "Collision"/);
-      value.exports.reverse();
-      assert.throws(() => validateInterfaceManifest(value), /duplicates another interface export alias "Collision"/);
+      value.exports[0][field] = spelling;
+      assert.throws(() => validateInterfaceManifest(value), /is retired; use the full Lean entry name/);
     });
   }
 }
 
-test("aliases for the same export may share a spelling, including object property names", () => {
-  for (const alias of ["shared", "constructor", "__proto__", "toString"]) {
+test("entry names may be object property names", () => {
+  for (const entry of ["constructor", "__proto__", "toString"]) {
     const value = manifest();
-    Object.assign(value.exports[0], { entry: alias, id: alias, jsName: alias });
+    value.exports[0].entry = entry;
     assert.equal(validateInterfaceManifest(value), value);
   }
-});
-
-test("absent and empty optional aliases do not reserve callable names", () => {
-  const value = manifest();
-  for (const entry of value.exports) {
-    delete entry.id;
-    entry.jsName = "";
-  }
-  assert.equal(validateInterfaceManifest(value), value);
 });
 
 test("host import symbols and their boxed spellings share one native namespace", () => {
