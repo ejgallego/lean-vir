@@ -10,7 +10,8 @@ import {
   normalizeBoundedUnsignedBigInt,
 } from "./primitive-value-normalizers.js";
 
-// Bind immutable admitted compiler facts to the selected JS representation.
+// Precondition: immutable admitted compiler facts and a supported selected view.
+// Bind those facts to the selected JS representation.
 // Plans reuse managed allocation/ownership and construct values directly.
 // No intermediate normalized tree or second descriptor interpretation is needed.
 export function compileNativeValueCodec(runtime, pair) {
@@ -19,8 +20,6 @@ export function compileNativeValueCodec(runtime, pair) {
 
 function compileValueCodec(runtime, native, view, bindings = []) {
   if ("ref" in native) {
-    if (view.tag !== "recursive" || bindings[native.ref] === undefined)
-      throw new Error("unbound recursive interface");
     return bindings[native.ref];
   }
   const primitive = compilePrimitiveValueCodec(runtime, native, view);
@@ -43,8 +42,7 @@ function compileValueCodec(runtime, native, view, bindings = []) {
         break;
       }
       if (view.tag === "sequence" && view.chain === undefined) {
-        const elementType = native.metadata?.arrayElement;
-        if (elementType === undefined) throw new Error("array codec requires native array metadata");
+        const elementType = native.metadata.arrayElement;
         const element = compile(elementType, view.element);
         codec.lower = (value, label, scratch) => {
           requireArray(value, label);
@@ -66,10 +64,7 @@ function compileValueCodec(runtime, native, view, bindings = []) {
         };
         break;
       }
-      const constructors = native.metadata?.constructors;
-      if (!["unit", "boolean", "enum", "sequence", "variant", "record"].includes(view.tag))
-        throw new Error(`unsupported object view ${view.tag}`);
-      if (constructors === undefined) throw new Error("structural codec requires constructor metadata");
+      const constructors = native.metadata.constructors;
       const scope = [codec, ...bindings];
       if (view.tag === "sequence") {
         Object.assign(codec, compileChain(runtime, constructors, view, scope, compile));
@@ -96,9 +91,7 @@ function compileValueCodec(runtime, native, view, bindings = []) {
           return plans[index].lift(obj, label);
         };
       } else if (view.tag === "record") {
-        if (constructors.length !== 1) throw new Error("record view requires one constructor");
         const fieldKeys = view.fields.map(field => field.key);
-        if (fieldKeys.some(key => typeof key !== "string")) throw new Error("record keys must be strings");
         const keys = new Set(fieldKeys);
         const ctor = constructorKernel(runtime, constructors[0], view.fields, scope, compile,
           key => value => value[key], false, value => value);
@@ -119,12 +112,10 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
   const groups = new Map();
   for (const mapping of mappings) {
     const index = mapping.path[0];
-    if (!Number.isInteger(index) || !ctor.fields[index]) throw new Error("unknown constructor field path");
     let group = groups.get(index);
     if (group === undefined) { group = []; groups.set(index, group); }
     group.push(mapping);
   }
-  if (groups.size !== ctor.fields.length) throw new Error("view must cover native fields");
   const fields = ctor.fields.map((field, index) => {
     const group = groups.get(index);
     if (group.length === 1 && group[0].path.length === 1) {
@@ -132,7 +123,6 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
       return { field, codec: compile(field.type, mapping.value, scope),
         read: reader(mapping.key), key: mapping.key, keys: [mapping.key], nested: false };
     }
-    if (single || group.some(mapping => mapping.path.length === 1)) throw new Error("overlapping constructor field paths");
     const nested = group.map(mapping => ({ ...mapping, path: mapping.path.slice(1) }));
     return { field, codec: compile(field.type, { tag: "record", fields: nested }, scope),
       read: value => Object.fromEntries(group.map(mapping => [mapping.key, reader(mapping.key)(value)])),
@@ -259,14 +249,8 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
 }
 
 function compileChain(runtime, constructors, view, scope, compile) {
-  const { nil, cons, head, tail } = view.chain ?? {};
-  const empty = constructors[nil], cell = constructors[cons];
-  if (constructors.length !== 2 || empty?.representation !== "immediate" || cell?.representation !== "object" ||
-      cell.fields.length !== 2 || head === tail || !cell.fields[head] || !cell.fields[tail] ||
-      !Object.hasOwn(cell.fields[tail].type, "ref") || cell.fields[tail].type.ref !== 0 ||
-      cell.storage.objectFieldCount !== 2 ||
-      cell.storage.usizeFieldCount !== 0 || cell.storage.scalarByteSize !== 0 ||
-      !cell.fields.every(field => field.location.tag === "object")) throw new Error("unsupported chain traversal");
+  const { nil, cons, head, tail } = view.chain;
+  const cell = constructors[cons];
   const element = compile(cell.fields[head].type, view.element, scope);
   const headIndex = cell.fields[head].location.index, tailIndex = cell.fields[tail].location.index;
   return {

@@ -42,7 +42,6 @@ export function defaultValueForType(pair, bindings = [], depth = 0) {
   switch (view?.tag) {
     case "bigint":
     case "number":
-    case "safeInteger":
       return 0;
     case "string":
       return "";

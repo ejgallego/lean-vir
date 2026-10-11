@@ -19,7 +19,7 @@ const MAX_UINT64 = 0xffffffffffffffffn;
 const MAX_WASM32_USIZE = 0xffffffffn;
 const MAX_WASM32_SCALAR_NAT = 0x7fffffffn;
 
-const primitiveViews = new Set(["bigint", "safeInteger", "number", "string", "bytes", "unit", "boolean", "jsReference", "leanReference"]);
+const primitiveViews = new Set(["bigint", "number", "string", "bytes", "unit", "boolean", "jsReference", "leanReference"]);
 
 export class PrimitiveObjectRuntime extends ObjectRuntime {
   objectArgumentSupported(pair) { return primitiveViews.has(pair?.value?.tag); }
@@ -150,14 +150,11 @@ export class PrimitiveObjectRuntime extends ObjectRuntime {
 export function compilePrimitiveValueCodec(runtime, native, view) {
   if (native.ref !== undefined) return null;
   const type = native.type, codec = {};
-  const expect = tag => { if (view.tag !== tag) throw new Error(`${type.tag} requires ${tag} view`); };
   switch (type.tag) {
     case "nat":
     case "int": {
-      if (!["bigint", "safeInteger"].includes(view.tag)) throw new Error("integer view required");
-      const safe = view.tag === "safeInteger", signed = type.tag === "int";
+      const signed = type.tag === "int";
       codec.lower = (value, label) => {
-        if (safe && !Number.isSafeInteger(value)) throw new Error(`${label} must be a safe integer`);
         // Use the native scalar operation for exactly representable wasm32 Nats.
         // Heap naturals and textual inputs keep arbitrary-precision conversion.
         if (!signed && runtime.targetPointerBytes() === 4 && (
@@ -167,34 +164,24 @@ export function compilePrimitiveValueCodec(runtime, native, view) {
         return runtime.makeObjectDecimal(signed ? "vir_obj_int" : "vir_obj_nat",
           normalizeDecimal(value, label, { signed }), label);
       };
-      codec.lift = (obj, label) => {
-        const value = signed ? BigInt(runtime.readObjectDecimal(obj, "vir_obj_int_decimal"))
-          : runtime.readObjectNat(obj);
-        if (!safe) return value;
-        const number = Number(value);
-        if (!Number.isSafeInteger(number)) throw new Error(`${label} exceeds safe integer range`);
-        return number;
-      };
+      codec.lift = obj => signed ? BigInt(runtime.readObjectDecimal(obj, "vir_obj_int_decimal"))
+        : runtime.readObjectNat(obj);
       break;
     }
     case "string":
-      expect("string");
       codec.lower = (value, label) => runtime.makeObjectString(value, label);
       codec.lift = obj => runtime.readObjectString(obj);
       break;
     case "byteArray":
-      expect("bytes");
       codec.lower = (value, label) => runtime.makeObjectByteArray(value, label);
       codec.lift = obj => runtime.readObjectByteArray(obj);
       break;
     case "resource":
-      expect("jsReference");
       codec.lower = (value, label) => runtime.makeObjectResource(value, label);
       codec.lift = (obj, label) => runtime.liftObjectResource(obj, label);
       break;
     case "unsigned": {
       const width = type.width;
-      expect(width === 64 ? "bigint" : "number");
       if (width === "usize") runtime.requireWasm32USize();
       if (width === 8 || width === 16) {
         codec.lower = (value, label) => runtime.makeObjectScalar(
@@ -211,7 +198,6 @@ export function compilePrimitiveValueCodec(runtime, native, view) {
       break;
     }
     case "float": {
-      expect("number");
       const single = type.width === 32;
       codec.lower = (value, label) => single ? runtime.makeObjectFloat32(value, label)
         : runtime.makeObjectFloat(value, label);

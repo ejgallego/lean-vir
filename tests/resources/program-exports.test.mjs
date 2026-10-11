@@ -140,7 +140,10 @@ test("constructor order, lexical recursion and callback effects are ABI facts", 
     interfaceSignatureKey({ ...signature, result: callback }),
     interfaceSignatureKey({
       ...signature,
-      result: boundary(callback.native, { ...callback.value, result: { tag: "safeInteger" } }),
+      result: boundary({ ...callback.native, metadata: {
+        ...callback.native.metadata,
+        signature: { ...callback.native.metadata.signature, effect: "runtime" },
+      } }, callback.value),
     }),
   );
   assert.equal(
@@ -167,7 +170,6 @@ test("core native kinds compose with distinct value mappings", () => {
   const treeSequence = arrayBoundary(recursive.native, recursive.value);
   const descriptors = [
     primitiveBoundary("nat", "bigint"),
-    primitiveBoundary("nat", "safeInteger"),
     primitiveBoundary("int", "bigint"),
     primitiveBoundary("string", "string"),
     primitiveBoundary("byteArray", "bytes"),
@@ -189,4 +191,13 @@ test("core native kinds compose with distinct value mappings", () => {
     args: [], result, effect: "pure",
   }));
   assert.equal(keys.length, new Set(keys).size);
+});
+
+test("independent integer expectations require the producer's BigInt view", () => {
+  for (const tag of ["nat", "int"]) {
+    const unsupported = primitiveBoundary(tag, "safeInteger");
+    assert.throws(() => snapshotExpectedExports({
+      "Root.run": { args: [unsupported], result: nat, effect: "pure" },
+    }), /incompatible/);
+  }
 });

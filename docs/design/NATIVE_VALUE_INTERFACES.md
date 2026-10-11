@@ -1,421 +1,103 @@
 # Native descriptors and JavaScript value interfaces
 
-Status: producer/runtime migration implemented locally for PR #233.
-The [typed contract and examples](native-value-interfaces.ts) describe the emitted
-pair. The [binder](../../web/src/runtime/native-value-codecs.js) consumes admitted
-compiler metadata directly in optional object conversion; scalar operations and
-reference ownership remain available in the managed composition.
-
-The compiler emits the native facts and the default JavaScript view together.
-There is no snapshot adapter, compatibility reader, or runtime declaration-name
-selection. The binder covers primitives, enum/Bool/Unit, packed fields, inherited
-records, arrays, recursive constructor values, expression conversion and callable
-results. Public custom-leaf construction remains a separate API decision.
-
-See [performance and slow paths](../../benchmarks/NATIVE_CODECS.md#performance-and-slow-paths)
-for measured limits and the cost model. This source migration needs a matching
-runtime/program release before consumer adoption.
-
-VIR should describe a Lean value's compiled representation once and allow
-different codecs to use that description. A JavaScript shape and a traversal
-algorithm are choices above that representation. They do not require another
-description of its storage.
-
-## The pair
-
-```ts
-interface BoundaryInterface {
-  native: NativeDescriptor;
-  value: ValueInterface;
-}
-
-interface NativeDescriptor {
-  type: NativeType; // Primitive | LeanObject | Resource
-  metadata?: CompilerMetadata;
-}
-```
-
-`NativeType` identifies the core runtime operation and ownership boundary.
-Optional compiler metadata supplies constructor order, field types, physical
-field locations, allocation sizes, recursive references, and callable signatures.
-`ValueInterface` selects JavaScript representations and the mappings needed to
-interpret them. A compiled codec binds the two, checks their compatibility once,
-and caches its lowering/lifting plan.
-
-Opaque Lean-object passage requires no layout metadata. Structural conversion
-requires a constructor table; array conversion requires a compiler-confirmed
-native-array element descriptor; calling an object requires a compiler-owned
-signature. These facts enable chosen
-operations without creating separate core kinds for records, closures, or Expr.
-The metadata is optional information on the same descriptor, not a second type
-registry or an automatic conversion requirement.
-
-The pair is used at a callable boundary. Its two members do not both describe
-field types or physical layouts. A value interface refers to logical field
-positions in the native descriptor; it never repeats object slot indices, scalar
-offsets, or allocation counts. An application can reuse one admitted native
-descriptor with several explicitly selected value interfaces.
-
-Use one `tag` discriminant in each runtime-type or value-interface union. The
-draft uses readable string tags; there is no simultaneous numeric `interfaceTag`
-and textual `kind` describing
-the same category. Numeric wire discriminants, if selected later, would replace
-the strings rather than accompany them.
-
-The package manifest stores complete pairs once in `interfaces`. Callable
-argument `type` and `result` fields are package-local integer indices. Admission
-validates each closed pair and resolves those indices to the same pair objects;
-runtime-facing entries carry resolved pairs and omit the wire table. The old
-inline callable-root encoding is removed. Nested descriptors and selected views
-stay inline within each table entry, using lexical refs for recursion.
-
-Cache a bound plan by the admitted pair identity within a runtime. A package
-index is not a global type/codec ID or a runtime handle. No table entry refers to
-another table entry, so no table dependency graph or recursive linking pass is
-needed. Expected signatures compare resolved facts and views; local numbering
-cannot change signature agreement.
-
-Two identities have different jobs. Compiler recursion classification uses the
-complete applied Lean type, including parameters and universes. Pair sharing
-uses the complete deterministic conversion encoding, including instantiated
-fields, layout facts, declaration names and the selected view. Different
-instantiations stay distinct when their conversion facts differ. Erased or
-phantom parameters can legitimately produce identical pairs; sharing them does
-not establish Lean type equality. Declaration names alone are insufficient.
-
-## Core native tags
-
-| Tag | Required facts / native operation |
-| --- | --- |
-| `nat`, `int` | Existing arbitrary-precision native construction and inspection. |
-| `string`, `byteArray` | Existing distinct native string and byte-array operations. |
-| `unsigned` | Width: 8, 16, 32, 64, or target `usize`. |
-| `float` | Width: 32 or 64. |
-| `leanObject` | Lean-owned values, including constructors, arrays, closures, and Expr; common retain/release operations. |
-| `resource` | JavaScript rooting and release at the exact resource boundary. |
-
-There are no native List, Option, Prod, Array, record, enum, or tagged-union tags.
-Unit and Bool are Lean objects with constructor metadata. Their JavaScript
-meanings belong to the value interface. Native arrays, function signatures and
-Expr conversion also leave the core tag set: they describe optional operations
-on Lean objects.
-Resource has a distinct rooting policy and can be regarded as a boundary
-primitive. Remaining primitive tags identify native ABI operations which a
-constructor table alone does not supply; this is not a proposal to reconstruct
-String or Nat through stdlib internals. The sequence codec still uses efficient
-native array allocation/indexing helpers, just as an expression codec uses
-expression helpers. Those operations do not require separate core type tags.
-
-`metadata.arrayElement` is emitted only for compiler-confirmed Lean Array storage.
-It supplies the element descriptor for a selected sequence codec. It is not an
-element hint authorizing array operations on arbitrary constructors. A List's
-sequence codec instead binds its constructor table and explicit chain traversal.
-
-Recursive metadata uses `{ ref: depth }`, referring to an enclosing constructor
-description. It is a schema reference, not another kind of runtime value.
-The runtime's core object passage does not need to interpret it. Optional
-structural codecs resolve it when binding their cached plans.
-
-Each constructor has one representation:
-
-| Representation | Facts |
-| --- | --- |
-| `immediate` | No runtime fields; immediate ordinal is its position in the table. |
-| `object` | Runtime fields, their locations, and compiler storage counts. |
-| `identity` | Sole modeled field used directly for a compiler-confirmed trivial wrapper. |
-
-The constructor's table position is its ordinal. Do not store a second ordinal
-that admission must compare with the position. This preserves the current
-producer invariant rather than inventing a new tag lookup scheme. Storage counts
-remain explicit compiler facts: interfaces must not infer allocation sizes from
-the subset or order of field locations.
-
-The first version admits identity wrappers with one modeled field. It needs no
-second field-index fact for that case. Wrappers with additional erased fields
-remain subject to the existing classification limits; this draft does not add
-proof/default reconstruction.
-
-Declaration names remain producer-owned identity/diagnostic metadata. JavaScript
-spellings are emitted in the producer's default value interface using the existing
-central constructor-label rule. A consumer never guesses a spelling from a
-qualified name. An explicit alternate interface can choose other spellings;
-this is a selected mapping, not acceptance of aliases in one codec.
-
-Nominal facts also admit specialized policies: `Lean.Expr` selects its syntax
-operations, and generic `Lean.Vir.Js` resource passage differs from named resource
-boundaries. Equal physical storage alone does not establish equal conversion
-contracts. A future compiler shape model can provide storage facts through this
-producer boundary while keeping selected views and nominal policy facts explicit;
-this format does not guess that future API or introduce provisional shape IDs.
-
-## Value tags
-
-| Tag | JavaScript value and mapping |
-| --- | --- |
-| `bigint` | Exact integral values, with native range checks where applicable. |
-| `number` | Floating-point or bounded unsigned values; native width determines the checks. |
-| `safeInteger` | Checked integer-number adapter; reject unsafe values in both directions. |
-| `string`, `bytes` | String and Uint8Array. |
-| `unit` | `undefined`, for a sole nullary constructor. |
-| `boolean` | Explicit false/true constructor ordinals. |
-| `enum` | One distinct string for each constructor, in native constructor order. |
-| `record` | Ordinary object; explicit keys and native field paths. |
-| `variant` | `{ kind }`, `{ kind, value }`, or `{ kind, fields }` per constructor. |
-| `sequence` | Dense JS array; native-array traversal or explicit linked traversal. |
-| `recursive` | Reuse the codec of the native recursive target. |
-| `jsReference`, `leanReference` | Existing exact-JS and opaque-Lean carrier meanings. |
-| `function` | Callback argument/result interfaces, subject to current boundary support. |
-| `expr` | Existing explicit expression representation. |
-
-`number` and `safeInteger` are separate decisions. The default Nat/Int interface
-is `bigint`; a wire codec can explicitly select a safe-integer subdomain. That
-adapter must reject large integers, not round them. Selecting it does not imply
-that every value of an unbounded Lean type can be materialized through it.
-
-These tags specify canonical output and conversion policy, not strict input
-JavaScript types. The default `bigint` view also accepts safe integer Numbers and
-decimal strings for Nat/Int/UInt64; USize's `number` view accepts those integer
-inputs too. The `unit` view lowers either null or undefined and lifts undefined.
-The explicit `safeInteger` adapter requires safe integer Numbers in both
-directions. Range checks remain those of the paired native type.
-
-`variant.cases` follows native constructor order. It supplies the JS spelling and
-payload shape, without repeating tags, field types, or layouts. A zero-field
-payload is `none`, a one-field payload can be `value`, and named payloads use
-`fields`. Admission checks field coverage and constructor coverage. Ordinary
-conversion checks the caller's actual kind, keys, payload, and values.
-
-`record` requires one native constructor. Its keys can map directly to fields or
-to nested paths, such as an inherited parent's field. All required construction
-inputs must be supplied. Defaults and omitted fields are application wire rules,
-not inferred by this interface.
-
-`sequence.chain` selects nil/cons constructor ordinals and logical head/tail
-field positions. The compiled plan obtains their physical locations from the
-descriptor and uses an iterative traversal. It does not dispatch on `name ===
-"List"`. Without `chain`, a sequence must bind to a Lean-object descriptor with
-native-array metadata.
-The first version supports the ordinary two-constructor head/tail chain, not an
-arbitrary graph traversal language.
-
-Sequence output is a fresh dense array. Input must be a JavaScript Array and is
-read by numeric index: holes yield undefined unless an inherited numeric
-property supplies a value, and getters participate. An element codec determines
-whether that value is accepted; Unit accepts undefined, while Nat rejects it.
-Native arrays lower from the first index forward; linked sequences lower from
-the last index backward to construct an owned tail. Both lift forward. This
-codec materializes indexed values; it does not preserve sparse slots, prototypes
-or getter effects. Use ordinary data arrays when read order should be irrelevant.
-
-Reference and callback interfaces preserve ownership and boundary semantics.
-A `function` view requires signature metadata, including the execution effect;
-its binding checks the actual boundary role as well as shape compatibility.
-An `expr` view selects the specialized expression codec after admission confirms
-the compiler-owned type identity is `Lean.Expr`. Neither operation needs a core
-function or expression tag. These codecs retain the existing callable and expression operations.
-
-The specialized Expr adapter has a restricted domain and is not lossless for
-all Lean.Expr values: lowering mdata uses its child, and lifting omits the
-metadata payload. Its Name grammar is also restricted. See the
-[JS API](../guides/JS_API.md#calls-and-manifest); selecting `expr` does not extend
-the lossless constructor/field guarantee of generic structural conversion.
-
-In particular, `JSL α` remains `Js (LeanRef.Handle α)`: its boundary is a
-`resource` descriptor with a `jsReference` view, and its payload type is opaque.
-The `leanReference` view applies to the existing native `leanObject` boundary.
-Selecting a view does not manufacture a JSL carrier for an arbitrary output type.
-
-## Replacement of existing tags
-
-| Existing descriptor category | Core type / optional compiler facts | Default value interface |
-| --- | --- | --- |
-| Nat / Int (0 / 1) | `nat` / `int` | `bigint` |
-| Bool (2) | `leanObject`, constructors | `boolean` |
-| String (3) | `string` | `string` |
-| UInt8 / UInt16 / UInt32 (4 / 5 / 6) | `unsigned`, corresponding width | `number`, checked against the native range |
-| UInt64 (7) | `unsigned`, width 64 | `bigint` |
-| USize (8) | `unsigned`, target usize | `number` for the current wasm32 boundary |
-| ByteArray (9) | `byteArray` | `bytes` |
-| Float / Float32 (10 / 11) | `float`, width 64 / 32 | `number` |
-| Simple enum (14) | `leanObject`, constructors | `enum` |
-| Lean.Expr (15) | `leanObject`, declaration identity | `expr` |
-| Array (16) | `leanObject`, native-array element descriptor | `sequence` |
-| Structure (20) | `leanObject`, constructors | `record` |
-| Tagged union (21) | `leanObject`, constructors | `variant` |
-| Unit (22) | `leanObject`, constructors | `unit` |
-| Resource (23) | `resource` | `jsReference` |
-| Function (24) | `leanObject`, signature | `function` |
-| Custom inductive (25) | `leanObject`, constructors | `variant`, or an explicit alternate view |
-| Recursive reference (26) | Metadata reference `{ ref: depth }`; no core type | `recursive` |
-| Lean object (27) | `leanObject` | `leanReference` |
-
-Previously retired List/Option/Prod categories (17/18/19) stay retired. Their
-native form is `leanObject` with constructor metadata; default views are
-respectively `sequence`, `variant`, and `record`. These are migration choices,
-not compatibility modes.
-
-## Examples
-
-The typed examples define one `Option Nat` descriptor and two interfaces:
-
-```js
-// Producer's default interface.
-{ kind: "none" }
-{ kind: "some", value: 42n }
-
-// An explicitly selected alternate interface over the same descriptor.
-{ kind: "absent" }
-{ kind: "present", value: 42n }
-```
-
-Each individual codec accepts only its selected spelling. Both retain constructor
-distinctions. Nested Options therefore remain lossless, including `some none`
-and `some ()`. The draft provides no automatic nullable/bare-value Option view.
-An application may author a restricted shorthand separately.
-
-One `List Nat` descriptor supports both an iterative sequence interface:
-
-```js
-[1n, 2n]
-```
-
-and a constructor interface:
-
-```js
-{
-  kind: "cons",
-  fields: {
-    head: 1n,
-    tail: {
-      kind: "cons",
-      fields: { head: 2n, tail: { kind: "nil" } },
-    },
-  },
-}
-```
-
-The sequence codec is a specialization of traversal, not another native layout.
-Prod is a one-constructor descriptor with a record view. Sum and Except use the
-same constructor descriptor with variant views. An enum uses immediate
-constructors with an enum view; Bool uses the same native form with a boolean
-view. Unit uses one immediate constructor with a unit view.
-
-## Recursion and ownership
-
-Every constructor table binds one metadata recursive scope, regardless of
-the chosen JS shape. Arrays and function signatures do not invent aggregate
-owners. Thus `Tree -> Option Tree -> Tree` refers to depth 1, whereas a List's
-tail refers to depth 0. Sum/Except no longer have a separate transparent category;
-the producer must emit depths for the unified binder rule. Reusing old numeric
-depths unchanged would be incorrect.
-
-The value interface's `recursive` tag carries no second depth. Its paired native
-reference determines the owner, and the bound codec for that owner determines the
-representation. In a sequence plan, the chain tail is handled iteratively while
-element references still resolve in the native scope.
-
-Only complete closed callable pairs are shared. Extracting a nested Option/List
-fragment can leave a reference to an enclosing Tree free, even if two fragments
-have identical JSON. Native admission owns lexical scope validation; view
-admission checks the selected mapping without a second owner stack. Binding
-resolves native depths to its enclosing codec placeholders. These responsibilities
-stay separate from package-local index resolution.
-
-A metadata reference currently admits only a `recursive` view, reusing the
-enclosing whole codec. It cannot select an opaque `leanReference` just at that
-recursive child. Callable argument/result descriptors start independent closed
-roots; an enclosing aggregate's reference cannot escape into a callback.
-General recursive conversion requires finite trees and does not promise cycle
-handling, preservation of graph sharing, or stack safety for arbitrary depth.
-
-Constructor creation preserves existing transfer-on-success ownership. A failed
-conversion releases its partial owned values; inspection retains fields for its
-documented scope. Public JS values contain no raw pointers. Compiling a different
-view must not create a second object ownership policy or shared-service lifetime.
-
-The lowering/lifting kernel remains part of optional object conversion. It can
-specialize a plan for object-only layouts, immediate values, trivial wrappers,
-and linked sequences. Canonical descriptors do not require one generic recursive
-walker on every call. Plans remain cached over immutable admitted metadata.
-
-## What is validated where
-
-Pair admission checks the native boundary, optional metadata structure, layouts,
-ordinals by position, recursive scope, and native/view compatibility. It checks
-distinct spellings, constructor and field coverage, primitive compatibility, and
-sequence shape. Binding builds cached plans from those immutable admitted facts.
-Dynamic conversion checks caller values, returned discriminants and ownership.
-It does not revalidate the descriptor at each node.
-
-Constructor, array and signature metadata forms are mutually exclusive and
-belong only to `leanObject`; primitive/resource descriptors may carry declaration
-identity. The typed contract models that association and closed callable roots.
-Numeric ranges, slot coverage, path overlap and lexical scope remain admission
-checks that TypeScript does not express.
-
-Native/value, metadata, layout and mapping records reject unknown keys. The outer
-manifest, provenance, callable entries, named arguments and targets currently
-permit additional keys, except explicitly retired export aliases. Those extra
-keys have no runtime meaning; they are not extension points for new codecs.
-Diagnostics are producer report data and only their containing array is checked.
-This policy does not make every manifest record an exact-key schema.
-
-Record fields and variant payload properties must be own properties. The variant
-kind is read as a property and may be inherited. Unknown enumerable string keys
-are rejected; symbols and non-enumerable extras are outside that check. Lifting
-produces ordinary writable own data properties, not the input prototype or its
-accessors.
-
-A supported structural codec preserves constructor and field information through
-Lean -> JS -> Lean within its stated domain. Expr's specialized limitations above
-are separate. Explicit restricted adapters state their accepted domain and
-reject values outside it. Field output must use own data properties so that keys
-such as `__proto__` do not acquire assignment semantics. These requirements are
-independent of JSON serialization.
-
-## Relationship to explicit application codecs
-
-A value interface describes the native structural boundary. It is not a generated
-replacement for arbitrary ToJson/FromJson instances. Application codecs own their
-wire mappings, defaults, custom leaves, and error rules; those choices cannot be
-recovered from compiled layouts.
-
-For example, an ordinary-JSON view of Lean.Json would need an explicit codec for
-its public semantic constructors and object iteration. The presence of a native
-descriptor does not authorize hand-written TreeMap storage access. The retained
-Verso codec can use the native construction kernel after a public opaque
-construction interface is implemented and qualified, while keeping its wire
-semantics separate.
-
-This draft deliberately does not invent a codec registry, a manifest schema for
-arbitrary JavaScript functions, or a public raw-pointer construction API. The
-scope/lifetime and custom-leaf call operations of the public construction seam
-remain a subsequent contract. This document is not a dependency release for
-consumer integration.
-
-## Migration and qualification
-
-Reduce the core type set to primitives, Lean objects, and resources. Move
-constructor layouts, signatures, and recursion references into optional
-compiler metadata and generate explicit default value interfaces. Keep primitive
-ABI kernels, layout-plan caching, and existing ownership operations. Compile
-the pair once; select linked traversal through the value interface rather than declaration-name
-dispatch. Remove the simultaneous kind/interfaceTag category fields.
-
-Before adopting that slice, qualify enums/Bool/Unit, trivial and inherited
-records, nested Options, both List views, and Tree through Option/List/Prod and
-Sum/Except. Preserve callback and failure/reuse cases. Migration is a breaking
-contract change with one matching runtime revision, not compatibility adapters.
-The local source cut uses manifest 12 / combined compatibility 6, preserving
-ABI 4 and binary package format 11. Runtime publication, lock selection, and
-consumer adoption remain separately owned.
-
-Performance evaluation should distinguish schema unification from codec
-implementation. Compare the same value interface and full call boundary before
-and after, then separately compare alternate interfaces. Retain the current
-regression measurements; a smaller schema alone is not evidence of faster
-conversion. The existing List specialization remains a useful algorithm to reuse.
-
-Earlier retained timing screens used the prototype and predate producer
-migration. Fresh comparisons must use the emitted pair through the ordinary
-runtime call path, with matched SDK/program identities and correctness checks.
+The [manifest format reference](../reference/IRPKG_FORMAT.md#interface-descriptors)
+is authoritative for the current encoding and admission constraints. Its
+[typed grammar](native-value-interfaces.ts) provides the compact field definitions.
+This document explains the design choices; it is not another specification or a
+public API for constructing descriptors or selecting alternate views.
+
+## Compiler facts and value representations
+
+The compiler emits a complete `{ native, value }` pair. Native facts identify the
+primitive operation, Lean-object storage or resource ownership boundary, with
+constructor order, physical layouts, array elements or callable signatures where
+needed. The value interface describes JavaScript shape and spelling using logical
+field paths. It contains no second copy of field types or physical locations.
+
+The runtime binds admitted pairs into cached codecs. Core scalar operations and
+opaque reference passage remain available in the managed composition; structural
+materialization belongs to optional object conversion. The public runtime consumes
+the producer's emitted pair and does not expose a view-selection mechanism.
+
+This split lets Option, Prod, Sum, Except, records and user-defined inductives use
+one constructor kernel. Native arrays keep their efficient allocation/indexing
+operations. Lists use compiler-owned constructors with an iterative sequence
+codec. These are traversal choices over native facts, not additional native tags.
+
+## Tagged Option
+
+Every Option uses `{ kind: "none" }` or `{ kind: "some", value }`. This preserves
+`none`, `some none`, and `some ()` without type-dependent nullable shorthand.
+`Js.Nullable` and `Js.UndefinedOr` retain exact JavaScript resource values.
+
+Integer outputs use the producer's BigInt representation for Nat, Int and UInt64.
+Safe integer Number inputs and decimal-string inputs remain convenient coercions;
+there is no separate Number-result adapter for unbounded integers. Concrete input
+and output rules belong to the [JS API](../guides/JS_API.md#calls-and-manifest).
+
+## Recursion and local sharing
+
+Every constructor table binds a lexical scope. A native `{ ref: depth }` identifies
+an enclosing constructor description; the paired recursive view reuses its codec.
+Arrays are transparent to those scopes, and callable positions start closed roots.
+For example, `Tree -> Option Tree -> Tree` refers to depth 1; a List tail refers to
+its own description at depth 0. Complete recursive callback signatures are allowed;
+a reference to the enclosing aggregate cannot escape into a callback.
+
+Package-local manifest indices have a separate purpose: sharing complete closed
+native/value pairs. Nested open fragments are not interned. Admission resolves
+indices to shared immutable objects, without a global registry or a linking pass.
+Bound codecs and callback signature plans remain runtime-local.
+
+Sharing compares complete conversion encodings: instantiated fields, layouts,
+nominal metadata and value mappings. Equal encodings establish boundary-contract
+agreement, not general Lean type equality. Erased or phantom parameters may leave
+identical facts. Compiler recursion analysis instead uses the fully applied Lean
+expression with structural parameter/universe identity. Finite descent can follow
+supported aliases without weakening that identity rule.
+
+This format needs no provisional compiler shape IDs. A future compiler shape API
+can supply storage facts through the producer boundary, while nominal policies
+and JavaScript mappings remain explicit. Mutual families and independently opaque
+recursive-child views remain separate design questions with concrete caller needs.
+
+## Admission, capability and ownership
+
+Manifest admission establishes the grammar, physical layouts, lexical scopes and
+native/view mapping consistency. Binding consumes those immutable facts; it does
+not repeat descriptor validation. A physically valid layout can still require a
+conversion the optional codec does not support, such as an enclosing packed
+identity-wrapper field. Capability checks preserve that distinction and allow
+supported sibling exports to remain callable.
+
+Conversion checks actual values, payloads, numeric ranges, returned discriminants,
+native operation failures and live handles. Constructor creation transfers owned
+fields on success; failed lowering releases partial values. Inspection releases
+acquired children after use. Scratch buffers belong to one lowering operation and
+refresh their memory views after allocation or growth. Callback codec reuse does
+not merge the ownership of independent closure handles.
+
+Generic structural conversion preserves constructor/field distinctions within
+its supported domain. It materializes finite values and does not promise cycle
+handling, graph-identity preservation or arbitrary-depth stack safety. The
+specialized Expr view has separate metadata/Name restrictions; it is not a
+lossless codec for every Lean.Expr.
+
+The [format reference](../reference/IRPKG_FORMAT.md#validation-and-trust-limits)
+states what inventory integrity, native call-table comparison and independent
+consumer expectations establish. These checks do not prove executable semantics;
+real Lean observations and boundary tests provide program-specific evidence.
+
+## Application codecs and measured costs
+
+Applications choose whether to materialize Lean state, retain opaque JSL values,
+or pass exact JS resources. A native descriptor does not imply automatic JSON
+conversion. Explicit application codecs own persistence/wire mappings, defaults,
+custom leaves and error rules; those semantics cannot be inferred from layouts.
+The public opaque construction seam remains a separate API decision.
+
+[Native codec measurements](../../benchmarks/NATIVE_CODECS.md) retain the methodology,
+cost model and experiment evidence. Raw manifest reduction, compressed transfer,
+bundle size and complete encode/call/decode latency are different measurements.
+The next performance decision should use a representative consumer's full operation
+with matched runtime/program inputs and independent semantic checks.

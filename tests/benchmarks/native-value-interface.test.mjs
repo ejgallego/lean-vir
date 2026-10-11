@@ -149,13 +149,15 @@ test("one native Option preserves all distinctions under different views", () =>
   assert.equal(h.objects.size, 0);
 });
 
-test("safe integer is an explicit view with range checks in both directions", () => {
-  const h = heap(), codec = compileNativeValueInterface(h.runtime, nat, { tag: "safeInteger" });
+test("BigInt representation accepts safe Number inputs and preserves larger results", () => {
+  const h = heap(), codec = compileNativeValueInterface(h.runtime, nat, bigint);
   assert.throws(() => codec.lower(Number.MAX_SAFE_INTEGER + 1, "input"), /safe integer/);
-  const big = compileNativeValueInterface(h.runtime, nat, bigint);
-  const obj = big.lower(9007199254740993n, "input");
-  assert.throws(() => codec.lift(obj, "output"), /safe integer range/);
-  h.dec(obj); assert.equal(h.objects.size, 0);
+  for (const value of [0, 42, Number.MAX_SAFE_INTEGER, 9007199254740993n, "9007199254740993"]) {
+    const obj = codec.lower(value, "input");
+    assert.equal(codec.lift(obj, "output"), BigInt(value));
+    h.dec(obj);
+  }
+  assert.equal(h.objects.size, 0);
 });
 
 test("an identity constructor uses its own ordinal when its payload has another tag", () => {

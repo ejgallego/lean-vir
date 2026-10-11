@@ -4,7 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-// Draft contract, not a runtime module or a supported construction API.
+// Type grammar for the current manifest-12 contract.
+// Normative constraints: docs/reference/IRPKG_FORMAT.md#interface-descriptors.
+// This is neither a runtime module nor a public descriptor-construction API.
 // NativeType is the core boundary. Compiler metadata feeds optional codecs;
 // ValueInterface chooses a JS encoding without changing that boundary.
 
@@ -162,7 +164,6 @@ export interface ChainTraversal {
 export type ValueInterface =
   | { readonly tag: "bigint" }
   | { readonly tag: "number" }
-  | { readonly tag: "safeInteger" }
   | { readonly tag: "string" }
   | { readonly tag: "bytes" }
   | { readonly tag: "unit" }
@@ -219,126 +220,8 @@ export interface ManifestBoundaryTable {
   readonly interfaces: readonly BoundaryInterface[];
 }
 
-// Concrete examples use the same native descriptor with different value views.
-// These layout facts illustrate the draft, not a replacement metadata producer.
-export const optionNatDescriptor: NativeDescriptor = {
-  type: { tag: "leanObject" },
-  metadata: {
-    declaration: "Option",
-    constructors: [
-      { name: "Option.none", representation: "immediate", fields: [] },
-      {
-        name: "Option.some", representation: "object",
-        storage: { objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0 },
-        fields: [{
-          name: "val", type: { type: { tag: "nat" } },
-          location: { tag: "object", index: 0 },
-        }],
-      },
-    ],
-  },
-};
-
-export const taggedOptionNat: BoundaryInterface = {
-  native: optionNatDescriptor,
-  value: {
-    tag: "variant",
-    cases: [
-      { kind: "none", payload: "none" },
-      { kind: "some", payload: "value", value: { tag: "bigint" } },
-    ],
-  },
-};
-
-// The caller chooses a different spelling, without changing layout metadata.
-export const alternateOptionNat: BoundaryInterface = {
-  native: optionNatDescriptor,
-  value: {
-    tag: "variant",
-    cases: [
-      { kind: "absent", payload: "none" },
-      { kind: "present", payload: "value", value: { tag: "bigint" } },
-    ],
-  },
-};
-
-export const listNatDescriptor: NativeDescriptor = {
-  type: { tag: "leanObject" },
-  metadata: {
-    declaration: "List",
-    constructors: [
-      { name: "List.nil", representation: "immediate", fields: [] },
-      {
-        name: "List.cons", representation: "object",
-        storage: { objectFieldCount: 2, usizeFieldCount: 0, scalarByteSize: 0 },
-        fields: [
-          { name: "head", type: { type: { tag: "nat" } }, location: { tag: "object", index: 0 } },
-          { name: "tail", type: { ref: 0 }, location: { tag: "object", index: 1 } },
-        ],
-      },
-    ],
-  },
-};
-
-export const arrayListNat: BoundaryInterface = {
-  native: listNatDescriptor,
-  value: {
-    tag: "sequence",
-    chain: { nil: 0, cons: 1, head: 0, tail: 1 },
-    element: { tag: "bigint" },
-  },
-};
-
-export const constructorListNat: BoundaryInterface = {
-  native: listNatDescriptor,
-  value: {
-    tag: "variant",
-    cases: [
-      { kind: "nil", payload: "none" },
-      {
-        kind: "cons",
-        payload: "fields",
-        fields: [
-          { key: "head", path: [0], value: { tag: "bigint" } },
-          { key: "tail", path: [1], value: { tag: "recursive" } },
-        ],
-      },
-    ],
-  },
-};
-
-// Retaining a Lean object does not require its constructor layout. Metadata can
-// later serve a selected structural codec without adding another core tag.
-export const opaqueObject: BoundaryInterface = {
-  native: { type: { tag: "leanObject" } },
-  value: { tag: "leanReference" },
-};
-
-export const exactJsResource: BoundaryInterface = {
-  native: { type: { tag: "resource" } },
-  value: { tag: "jsReference" },
-};
-
-export const arrayNat: BoundaryInterface = {
-  native: { type: { tag: "leanObject" }, metadata: { arrayElement: { type: { tag: "nat" } } } },
-  value: { tag: "sequence", element: { tag: "bigint" } },
-};
-
-// Callability is an operation plus compiler-owned signature, not an object kind.
-export const callableObject: BoundaryInterface = {
-  native: {
-    type: { tag: "leanObject" },
-    metadata: { signature: {
-      args: [{ type: { tag: "nat" } }],
-      result: { type: { tag: "nat" } }, effect: "pure",
-    } },
-  },
-  value: { tag: "function", args: [{ tag: "bigint" }], result: { tag: "bigint" } },
-};
-
-// Specialized Expr conversion is an optional operation. Its nominal type must
-// be admitted as compatible before binding; the core only retains an object.
-export const expressionObject: BoundaryInterface = {
-  native: { type: { tag: "leanObject" }, metadata: { declaration: "Lean.Expr" } },
-  value: { tag: "expr" },
-};
+// Counts, positions, depths and indices are u32 values. Admission additionally
+// checks storage coverage and widths (including erased identity wrappers),
+// disjoint in-range field paths, constructor/mapping coverage and distinct JS
+// spellings, native/view compatibility and closed lexical recursive scopes.
+// Those semantic constraints are normative in the format reference above.

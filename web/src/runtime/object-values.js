@@ -609,11 +609,13 @@ export function withObjectValues(Base) {
     }
 
     makeObjectListFromOwnedElements(elementObjs, label) {
-      let tail = this.makeObjectScalar(0, `${label}.nil`);
+      const scratch = new ConstructorScratch(this);
+      let tail = 0;
       try {
+        tail = this.makeObjectScalar(0, `${label}.nil`);
         for (let index = elementObjs.length - 1; index >= 0; index--) {
           const fields = [elementObjs[index], tail];
-          const cons = this.makeObjectCtorFromOwnedFields(
+          const cons = scratch.createObjects(
             1,
             fields,
             `${label}[${index}]`,
@@ -626,34 +628,8 @@ export function withObjectValues(Base) {
         tail = 0;
         return list;
       } finally {
-        if (tail !== 0) {
-          this.exports.vir_obj_dec(tail);
-        }
-      }
-    }
-
-    makeObjectCtorFromOwnedFields(tag, fields, label) {
-      let fieldsPtr = 0;
-      try {
-        if (fields.length !== 0) {
-          fieldsPtr = this.allocByteLength(
-            fields.length * 4,
-            `${label} field pointer array`,
-          );
-          this.writePointerArray(fieldsPtr, fields);
-        }
-        const obj = this.exports.vir_obj_ctor(tag, fieldsPtr, fields.length);
-        if (obj === 0) {
-          throw new Error(
-            `${label} could not be lowered to a Lean constructor object`,
-          );
-        }
-        fields.length = 0;
-        return obj;
-      } finally {
-        if (fieldsPtr !== 0) {
-          this.freeBytes(fieldsPtr);
-        }
+        try { if (tail !== 0) this.exports.vir_obj_dec(tail); }
+        finally { scratch.dispose(); }
       }
     }
 

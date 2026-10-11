@@ -170,9 +170,6 @@ private partial def recordFieldJson
     ("value", valueInterfaceJson type)
   ]
 
-private partial def inductiveRecordFieldsJson (fields : Array InductiveField) : Array String :=
-  fields.mapIdx fun index field => recordFieldJson field.name #[index] field.type
-
 private partial def variantCaseJson
     (kind : String) (fields : Array (String × InterfaceType)) : String :=
   match fields.toList with
@@ -223,40 +220,23 @@ private partial def inheritedRecordFieldsJson
 private partial def customInductiveValueJson
     (name : Name) (constructors : Array InductiveConstructor) : String :=
   if name == `List then
-    let nilIndex := constructors.findIdx? fun constructor =>
-      constructorLabel name constructor.constructorName == "nil" && constructor.fields.isEmpty
-    let consIndex := constructors.findIdx? fun constructor =>
-      constructorLabel name constructor.constructorName == "cons" && constructor.fields.size == 2
-    match nilIndex, consIndex with
-    | some nilIndex, some consIndex =>
-        match constructors[consIndex]? with
-        | none => inductiveVariantValueJson name constructors
-        | some cons =>
-            let headIndex := cons.fields.findIdx? (·.name == "head")
-            let tailIndex := cons.fields.findIdx? (·.name == "tail")
-            match headIndex, tailIndex with
-            | some headIndex, some tailIndex =>
-                match cons.fields[headIndex]? with
-                | some head => jsonObject #[
-                    ("tag", jsonString "sequence"),
-                    ("element", valueInterfaceJson head.type),
-                    ("chain", jsonObject #[
-                      ("nil", jsonNat nilIndex),
-                      ("cons", jsonNat consIndex),
-                      ("head", jsonNat headIndex),
-                      ("tail", jsonNat tailIndex)
-                    ])
-                  ]
-                | none => inductiveVariantValueJson name constructors
-            | _, _ => inductiveVariantValueJson name constructors
-    | _, _ => inductiveVariantValueJson name constructors
-  else if name == `Prod then
-    match constructors.toList with
-    | [constructor] => jsonObject #[
-        ("tag", jsonString "record"),
-        ("fields", jsonArray (inductiveRecordFieldsJson constructor.fields))
-      ]
-    | _ => inductiveVariantValueJson name constructors
+    -- This is the pinned compiler's List declaration, not a user-selected
+    -- linked representation. Layouts still come from the constructor metadata.
+    let shape : List (Name × List InductiveField) :=
+      constructors.toList.map (fun ctor => (ctor.constructorName, ctor.fields.toList))
+    match shape with
+    | [(`List.nil, []), (`List.cons, [
+        { name := "head", type := element, .. },
+        { name := "tail", type := .recursiveRef _ _ 0, .. }])] =>
+        jsonObject #[
+          ("tag", jsonString "sequence"),
+          ("element", valueInterfaceJson element),
+          ("chain", jsonObject #[
+            ("nil", jsonNat 0), ("cons", jsonNat 1),
+            ("head", jsonNat 0), ("tail", jsonNat 1)
+          ])
+        ]
+    | _ => panic! "interface encoder: unexpected compiler-owned List constructor shape"
   else
     inductiveVariantValueJson name constructors
 

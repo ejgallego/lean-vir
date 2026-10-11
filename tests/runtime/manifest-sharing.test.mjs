@@ -7,7 +7,7 @@ import test from "node:test";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { validateInterfaceManifest, interfaceSignatureKey, INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
 import { encodeInterfaceManifest } from "../../scripts/packages/irpkg-format.mjs";
-import { primitiveBoundary, unitBoundary, objectBoundary, objectConstructor, immediateConstructor, nativeField } from "../support/interface-fixtures.mjs";
+import { primitiveBoundary, enumBoundary, unitBoundary, objectBoundary, objectConstructor, immediateConstructor, nativeField } from "../support/interface-fixtures.mjs";
 
 const nat = primitiveBoundary("nat", "bigint");
 function wire(interfaces, argument = 0, result = 0) {
@@ -70,8 +70,9 @@ test("sharing closed roots preserves lexical depth and separates enclosing owner
 });
 
 test("edited manifest encoding compares complete views and canonical property order", () => {
-  const safe = { native: nat.native, value: { tag: "safeInteger" } };
-  const manifest = { ...wire([]), exports: [{ ...wire([]).exports[0], args: [{ name: "a", type: nat }, { name: "b", type: { value: nat.value, native: nat.native } }], result: safe }] };
+  const flag = enumBoundary("Flag", ["off", "on"]);
+  const reversed = { native: flag.native, value: { tag: "enum", cases: ["on", "off"] } };
+  const manifest = { ...wire([]), exports: [{ ...wire([]).exports[0], args: [{ name: "a", type: flag }, { name: "b", type: { value: flag.value, native: flag.native } }], result: reversed }] };
   delete manifest.interfaces;
   const encoded = encodeInterfaceManifest(manifest);
   assert.equal(encoded.interfaces.length, 2);

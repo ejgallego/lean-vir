@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { interfaceSignatureKey } from "../runtime/interface-manifest.js";
+import { admittedSignatureKey, interfaceSignatureKey } from "../runtime/interface-manifest.js";
 
 export function snapshotExpectedExports(value) {
   if (value === undefined) return new Map();
@@ -43,7 +43,7 @@ export function resolveProgramExports(rootExports, expected = new Map()) {
       throw new Error(`missing program export ${declaration}`);
     if (
       signatureKey !==
-      interfaceSignatureKey({
+      admittedSignatureKey({
         args: entry.args.map((arg) => arg.type),
         result: entry.result,
         effect: entry.effect,

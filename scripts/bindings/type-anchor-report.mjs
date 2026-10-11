@@ -433,7 +433,6 @@ function leanShape(pair, bindings = []) {
   switch (view?.tag) {
     case "bigint":
     case "number":
-    case "safeInteger":
       return { kind: "primitive", name: nativePrimitiveName(nativeType) };
     case "string":
       return { kind: "primitive", name: "String" };

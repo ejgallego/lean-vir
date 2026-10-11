@@ -5,7 +5,7 @@ representations through public `runtime.call`. It measures no JSON data conversi
 Configuration and reports use JSON only as a file format.
 
 This is a reduced mechanism screen, not an application performance target.
-Keep the older specialized and generic codec paths as references. Reuse retained
+Retain earlier SDK/package pairs as comparison controls. Reuse retained
 measurements for architectural review; run a focused comparison when a concrete
 change needs evidence. Full sweeps are optional and are not a release gate.
 
@@ -80,7 +80,7 @@ changes and prepare the matching SDKs separately before recording an accepted
 comparison. `run` performs no builds.
 
 The driver uses the ordinary public call path for each independently retained
-SDK/package pair. The producer/runtime migration emits the pair directly;
+SDK/package pair. The ordinary producer emits the pair directly;
 no snapshot adapter or benchmark-specific binder is installed. Cold first-call
 observations include lazy binding; warmed calls reuse the admitted cached plan.
 The shared fixture and Wasm/native program sections remain comparison controls.
@@ -126,77 +126,36 @@ without reproducing pointer encoding or retaining heap objects. Enum, Bool and
 Unit representations still come from their chosen value interface. Logical field
 mappings, physical storage and recursive scope remain distinct facts.
 
-Sampling of nested values identified field loops, pointer writes, field
-inspection and Nat/UTF conversion. The builtin `encode`/`decode` frames refer to
-UTF handling in these callers; they are not evidence of JSON data conversion.
-Numeric Wasm frames were not assigned names speculatively. Sampling shares are
-attribution hints, not predicted application savings.
+## Recorded comparisons and next measurement
 
-The emitted-pair migration was compared with the preceding generic production
-codec using Node 24.21.0, an AMD Ryzen AI 9 HX 370, identical Wasm/native program
-sections, sizes 16/1024, small/large integers, and eight alternating AB/BA pairs.
-At 1,024, the median paired roundtrip changes **before the new optimizations** were:
+The [historical mechanism screens](https://github.com/ejgallego/lean-vir/blob/b6d11badcb5119589cd861cc6901be2a4b0ad677/benchmarks/NATIVE_CODECS.md#performance-and-slow-paths)
+record the initial pair migration, scalar-Nat path and scratch-view comparisons,
+with their separate immediate baselines and limitations. Preserve their SDK/
+program identities and raw samples when comparing another change. Do not combine
+ratios from those separate screens into a predicted application speedup.
 
-| Family | Small integers | Large integers |
+The matched whole-pair-sharing comparison records:
+
+| Measurement | Inline pairs | Shared pairs |
 | --- | ---: | ---: |
-| Records | -6.8% | -1.8% |
-| Recursive Tree | -15.0% | -5.6% |
-| Nested List/Option/Prod | -12.8% | -4.9% |
-| Enum array | -43.3% | -43.0% |
-| String control | -0.7% | -7.0% |
-| Byte-array control | -2.4% | -2.3% |
+| Callable pair occurrences / table entries | 52 | 10 |
+| Manifest JSON bytes | 55,258 | 17,712 |
+| Manifest offline gzip bytes | 2,585 | 2,171 |
+| Whole-package offline gzip bytes | 3,760 | 3,325 |
+| Resolved object/array identities | 1,882 | 445 |
 
-Negative means faster. These are mechanism measurements, not application
-forecasts. The initial inline pair migration grew the manifest section from
-46,095 to 55,270 bytes, about 20%. Fresh-runtime
-creation medians were 7.7ms and 8.3ms across eight observations each. Imports and
-first calls remain separately recorded; this small screen does not establish a
-cold-browser startup result.
+All non-manifest native sections and all 26 callable signatures agree. Object
+counts are static graph identities, not heap measurements. Sharing has no new
+timing or application/startup speedup claim. Runtime lines, compressed bundle
+size, manifest size and whole-call cost remain separate measurements.
 
-Package-local sharing subsequently stores those 52 callable argument/result
-pairs as 10 complete table entries. Against the corrected inline source, the
-same fresh program's manifest JSON shrank from 55,258 to 17,712 bytes (68.0%).
-Offline gzip shrank from 2,585 to 2,171 bytes (16.0%); whole-package gzip shrank
-from 3,760 to 3,325 bytes. All non-manifest native sections and all 26 callable
-signatures are unchanged. Resolved object/array identities decrease from 1,882
-to 445; these are static graph counts, not measured heap bytes. No new timing
-campaign or application/startup speedup is claimed for sharing. The call-path
-timings below predate this wire-only change.
+The next comparison should use an actual caller's complete encode/call/decode
+workflow, including the materialization it requests. Constructor creation, field
+acquisition/release, value checks and output allocation remain costs. Heap
+integers and real strings retain UTF conversion. Sampled encode/decode frames
+identify UTF work in these callers, not JSON data serialization.
 
-A sampled nested-small-integer workload then identified decimal UTF conversion:
-`encode` alone accounted for about 9% of sampled time. Using existing native
-scalar operations for numeric Nat values through 2³¹−1 removed that text path.
-A separate matched comparison against the corrected migrated codec measured:
-
-| Family at 1,024 | Small integers | Large integers |
-| --- | ---: | ---: |
-| Records | -13.6% | -1.2% |
-| Nested List/Option/Prod | -35.7% | -1.6% |
-| Recursive Tree | -37.4% | -0.4% |
-
-The small nested/tree roundtrips improved in all eight pairs. Large-integer
-results remain close to baseline; their decimal path remains. Large-tree output
-was 3% slower in this screen, while unchanged controls also moved, so this is not
-proof of zero overhead. Boundary regression tests cover the largest scalar,
-heap values, exact larger integers, textual inputs, and invalid inputs.
-
-The follow-up profile put pointer-buffer writes first. Reusing the DataView
-inside an existing per-lowering scratch region gave another 14.2% improvement
-for small nested roundtrips and 10.5% for small trees in a focused eight-pair
-comparison; both improved in every pair. Large nested/tree improvements were
-4.1%/3.9%. This preserves explicit little-endian writes and refreshes the view
-when allocation or memory growth changes its backing buffer. A real Wasm test
-forces growth after the view has already been used. Unchanged enum controls
-varied between screens; their deltas are not attributed to this change.
-
-Those stages use different immediate baselines. Do not multiply their median
-ratios into a claimed combined speedup. The final profile still shows native
-constructor creation, field acquisition/release, shape checks and output
-materialization. Larger integers and real strings still use UTF conversion.
-No JSON data serialization, new native ABI, or borrowed-pointer API was added.
-
-The representative next comparison is an actual caller's complete encode/call/
-decode workflow, including the materialization it chooses. A JSL boundary can
-keep data opaque when the application does not need a JS graph. The view grammar
-should make that choice explicit; it should not infer application wire rules or
-route ordinary native calls through JSON serialization.
+An application can retain substantial Lean state through JSL when it needs only
+operations on that state. Explicit application codecs own wire rules and JSON
+serialization; ordinary native calls do not infer those rules. The existing
+focused harness is sufficient for a bounded next comparison.

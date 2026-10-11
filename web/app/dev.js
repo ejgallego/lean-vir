@@ -387,12 +387,6 @@ function parseInputValue(input, field) {
       return nativeType?.tag === "float"
         ? parseFloatText(text)
         : Number(parseNatText(text));
-    case "safeInteger": {
-      const integer = nativeType?.tag === "int" ? parseIntText(text) : parseNatText(text);
-      const value = Number(integer);
-      if (!Number.isSafeInteger(value)) throw new Error(`unsafe integer literal: ${text}`);
-      return value;
-    }
     case "boolean":
       if (field?.type === "checkbox") return Boolean(field.checked);
       if (String(text).trim() === "true") return true;

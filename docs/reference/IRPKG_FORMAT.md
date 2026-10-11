@@ -253,6 +253,11 @@ and [host bindings](HOST_BINDINGS.md) for authoring and lifetime rules.
 
 ## Interface descriptors
 
+This is the authoritative current manifest contract. The compact
+[TypeScript grammar](../design/native-value-interfaces.ts) spells its field types;
+[design rationale](../design/NATIVE_VALUE_INTERFACES.md) explains the representation
+and sharing decisions without defining another format.
+
 Manifest 12 stores complete `{ native, value }` pairs once in the required
 `interfaces` array. Exported and imported arguments retain their parameter names
 as `{ name, type: <index> }`; an entry result is an index. Indices are package-local
@@ -296,6 +301,30 @@ NativeDescriptor  = { type: NativeType, metadata?: CompilerMetadata }
 It is not a native type, JavaScript value or declaration-name lookup. Recursive
 value positions use `{ tag: "recursive" }` and bind to the corresponding
 native reference.
+
+Admission additionally requires:
+
+- Counts, table indices, field positions and lexical depths are u32 values.
+  Constructor and field names are nonempty and unique within their tables.
+- Stored object/usize slots are in range, unique and fully covered. Scalar
+  locations have sizes 1/2/4/8, stay within storage and do not overlap; compiler
+  padding is permitted. Packed types match their physical widths after following
+  erased identity wrappers. Valid storage does not establish codec capability.
+- Constructor, array and callable metadata forms are mutually exclusive.
+  Every constructor table introduces one lexical owner; arrays preserve the
+  enclosing scope and callable signature positions start fresh closed roots.
+- Record paths cross single-constructor objects, cover every native field and
+  do not overlap. Variant/enum mappings cover constructor order, have unique
+  spellings and match payload arity. Linked sequences have an immediate nil,
+  an object cons with two object fields, and a recursive tail at depth 0.
+- Native/value, metadata, constructor, layout and mapping records reject unknown
+  keys. Outer manifest/provenance/callable/argument/target records permit extra
+  keys except expressly retired export aliases; those keys add no runtime behavior.
+
+The compiler selects the mappings and the runtime freezes admitted pairs before
+caching plans. The binder consumes these facts; actual values and conversion
+capabilities are checked separately. Input own-property and numeric coercion
+rules belong to the [JS API](../guides/JS_API.md#calls-and-manifest).
 
 ### Native types and compiler metadata
 
@@ -353,14 +382,14 @@ logical field paths.
 
 ### Value interfaces
 
-`value.tag` selects the JavaScript representation. Constructor spellings and
-field keys live here, not on the native constructor table. A native descriptor
-can be paired with another explicit mapping, but a particular pair admits only
-its selected spelling and shape.
+`value.tag` describes the JavaScript representation emitted by the compiler.
+Constructor spellings and field keys live here, not on the native constructor
+table. The public runtime consumes the emitted pair; it has no alternate-view
+selector. Each pair admits only its specified spelling and shape.
 
 | Value tag | Selected JavaScript shape |
 | --- | --- |
-| `bigint`, `number`, `safeInteger` | BigInt, Number, or a checked safe-integer Number mapping. |
+| `bigint`, `number` | BigInt or Number mapping, as determined by the native type. |
 | `string`, `bytes`, `unit` | String, `Uint8Array`, or the unit mapping (`undefined`). |
 | `boolean` | `false` and `true` constructor ordinals. |
 | `enum` | `cases` string spellings in native constructor order. |
@@ -457,11 +486,14 @@ they cross as `Js α`. React nodes likewise remain exact native JS values under
 
 `leanObject` serves `Lean.Vir.LeanRef.toJSL` / `fromJSL`. Its `JSL α` handle
 retains an opaque Lean value and stays distinct from JavaScript-shaped `Js α`.
-Function descriptors are accepted only as host-import arguments. Their own
-arguments/results must be `Unit` or resources; nested callbacks are rejected.
-The JS function has no serialized numeric identity in its descriptor: the shim
-roots its closure with arity/effect metadata and JS keeps the full descriptor
-in private state. Pointer calls and callback rooting are specified in
+Function views lift returned Lean closures and host-import callback arguments.
+Invocation uses their native signature and effect; each callback owns a retained
+handle, while callbacks of the same type reuse runtime-local codecs. Ordinary
+export argument conversion does not lower JavaScript functions into Lean
+closures. The `hostResource` import boundary further restricts callback arguments
+and results to `Unit` or resources, with no nested callbacks. Closure identity
+is instance-owned state, not a serialized descriptor field. Pointer calls and
+callback rooting are specified in
 [OBJECT_ABI.md](OBJECT_ABI.md) and
 [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md#host-imports-and-reentrant-callbacks).
 

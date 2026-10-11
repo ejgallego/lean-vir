@@ -106,7 +106,7 @@ export function validateInterfaceManifest(
   // Each closed pair is admitted once. Callable positions reuse its identity;
   // nested lexical refs remain internal to that pair, never table references.
   manifest.interfaces.forEach((pair, index) =>
-    validateInterfaceRootType(pair, `embedded interface manifest interfaces[${index}]`));
+    validateInterfaceType(pair, `embedded interface manifest interfaces[${index}]`));
   const exports = validateManifestExports(manifest.exports, manifest.interfaces);
   const hostImports = validateManifestHostImports(manifest.hostImports ?? [], manifest.interfaces);
   validatePackageSetSurface(
@@ -315,15 +315,17 @@ export function validateInterfaceType(type, label = "interface type") {
   return validateBoundaryInterface(type, label);
 }
 
-function validateInterfaceRootType(type, label) {
-  validateInterfaceType(type, label);
-}
-
 export function interfaceSignatureKey({ args, result, effect }) {
   if (!Array.isArray(args)) throw new TypeError("signature.args must be an array");
   requireInterfaceEffect(effect, "signature.effect");
-  for (const arg of args) validateInterfaceRootType(arg, "signature argument");
-  validateInterfaceRootType(result, "signature.result");
+  for (const arg of args) validateInterfaceType(arg, "signature argument");
+  validateInterfaceType(result, "signature.result");
+  return admittedSignatureKey({ args, result, effect });
+}
+
+// Internal callers already hold admitted pairs; expectations use the validating
+// entry point above before being snapshotted into a comparison key.
+export function admittedSignatureKey({ args, result, effect }) {
   return JSON.stringify([args.map(boundaryInterfaceShape), boundaryInterfaceShape(result), effect]);
 }
 

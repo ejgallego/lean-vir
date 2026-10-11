@@ -144,7 +144,7 @@ function validateView(native, view, label) {
   const requireTag = accepted => { if (!accepted.includes(view.tag)) fail(`${label}.tag`, `is incompatible with ${tag}`); };
   if (primitiveTags.has(tag)) {
     object(view, ["tag"], label);
-    if (tag === "nat" || tag === "int") requireTag(["bigint", "safeInteger"]);
+    if (tag === "nat" || tag === "int") requireTag(["bigint"]);
     else if (tag === "unsigned") requireTag(native.type.width === 64 ? ["bigint"] : ["number"]);
     else requireTag([{ string: "string", byteArray: "bytes", float: "number" }[tag]]);
     return;
