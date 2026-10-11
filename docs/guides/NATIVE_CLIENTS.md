@@ -97,9 +97,10 @@ of runtime acquisition and Wasm production.
 
 ## Classifier and descriptor API
 
-Use `Vir.Compiler.Interface.Classify.Core.interfaceType` to classify a complete
-Lean type, `analyzeExportInterface` for an export declaration, and
-`classifyHostImportSignature` for a host import. Results use typed errors with
+Import `Vir.Compiler.Interface.Classify.Core` and use `Vir.Interface.interfaceType`
+to classify a complete Lean type. Import `Vir.Compiler.Interface.Classify.Signature`
+for `Vir.Interface.analyzeExportInterface` (an export declaration) and
+`Vir.Interface.classifyHostImportSignature` (a host import). Results use typed errors with
 argument, field and container context. Classification and pure JSON encoding
 are separate operations; ordinary clients need no recursion context or reduction
 helper.

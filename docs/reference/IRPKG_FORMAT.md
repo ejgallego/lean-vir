@@ -167,17 +167,21 @@ reference-counting behavior must also match the pinned upstream IR layouts.
 
 ## Embedded manifest
 
-The generator embeds the recursive interface type tree in section 5. Its
+The generator embeds the manifest and its complete interface-pair table in section 5. Its
 [`Manifest.Encode`](../../Vir/GeneratePackage/Manifest/Encode.lean) encoder emits:
 
 | Record | Fields |
 | --- | --- |
-| Manifest | `version`, `artifact: "lean-vir-ir-package"`, `metadata`, `exports`, `hostImports`, `diagnostics`. |
+| Manifest | `version`, `artifact: "lean-vir-ir-package"`, `metadata`, required `interfaces`, `exports`, `hostImports`, `diagnostics`. |
 | Metadata | `generator`, `packageFormatVersion`, `manifestVersion`, `leanVersion`, `leanToolchain`, `leanGithash`, `targets`, optional `packageSetMember: { module, role }`. |
 | Target | Exactly one origin field: compiled `module` or live-snapshot `source`; plus `mode`, `roots`, `resolvedRoots`. Source is document provenance, not a source-loading request. |
-| Export | full Lean call key `entry`, structural `nameKey`, diagnostic `source`, `args`, result pair, `effect`, Boolean `startup`. Each argument is `{ name, type: <BoundaryInterface> }`. |
-| Host import | `slot`, display `name`, structural `nameKey`, `source`, JS `target`, `boundary`, generated Wasm `symbol`, IR `arity`, `erasedPrefixArgs`, named arguments with `BoundaryInterface` pairs, result pair, `effect`. |
+| Export | full Lean call key `entry`, structural `nameKey`, diagnostic `source`, `args`, `result` interface index, `effect`, Boolean `startup`. Each argument is `{ name, type: <interface index> }`. |
+| Host import | `slot`, display `name`, structural `nameKey`, `source`, JS `target`, `boundary`, generated Wasm `symbol`, IR `arity`, `erasedPrefixArgs`, `args: [{ name, type: <interface index> }]`, `result` interface index, `effect`. |
 | Diagnostic | `name`, `source`, `reason`. |
+
+Interface indices are package-local u32 positions in `interfaces`. Admission
+resolves them to complete pairs in the runtime manifest; see
+[interface descriptors](#interface-descriptors) for that distinction.
 
 The current manifest version is 12 and every generated package must use it.
 Every export carries an explicit Boolean `startup` field. Volatile generation
