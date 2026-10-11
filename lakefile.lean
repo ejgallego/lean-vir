@@ -47,6 +47,8 @@ lean_lib Vir where
 
 /-- Pure format, JSON, Name and hashing utilities shared by native libraries. -/
 lean_lib VirPackageFormat where
+  -- Resource embedding calls Vir.sha256 during elaboration.
+  precompileModules := true
   roots := #[]
   globs := #[.submodules `Vir.Package, .one `Vir.Hash]
 
