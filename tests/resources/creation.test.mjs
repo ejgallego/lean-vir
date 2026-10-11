@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { build } from "esbuild";
+import { readFileSync } from "node:fs";
 import {
   descriptorContentId,
   sha256Hex,
 } from "../../web/src/resources/descriptor.js";
 import { VIR_COMPATIBILITY_VERSION } from "../../web/src/runtime/versions.js";
+import { primitiveBoundary } from "../support/interface-fixtures.mjs";
 
 // Exercise the real loader, envelope integrity and export resolver. Substitute
 // only the expensive package/runtime boundaries; browser.mjs admits real IR/Wasm.
@@ -39,11 +41,9 @@ const compiled = await build({
 const { createProgram } = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].contents).toString("base64")}`
 );
-const nat = { type: "Nat", interfaceTag: 0 };
+const nat = primitiveBoundary("nat", "bigint");
 const entry = {
   entry: "Root.run",
-  id: "run",
-  jsName: "run",
   args: [],
   result: nat,
   effect: "pure",
@@ -51,6 +51,55 @@ const entry = {
 const expected = () => ({
   "Root.run": { args: [], result: { ...nat }, effect: "pure" },
 });
+const runtimeNotices = ["LICENSE", "NOTICE", "legal/lean.txt", "legal/dependencies.txt"];
+
+test("the documented independent contract creates a program through the public loader", async () =>
+  fixture(async (s) => {
+    const guide = readFileSync(new URL("../../docs/guides/RESOURCE_LIFETIME.md", import.meta.url), "utf8");
+    const source = guide.match(/<!-- resource-contract-example -->\s*```js\n([\s\S]*?)\n```/)[1];
+    const string = primitiveBoundary("string", "string");
+    s.manifest.exports = [{
+      entry: "Client.Program.greet", args: [{ name: "name", type: string }],
+      result: string, effect: "pure",
+    }];
+    s.runtime.interfaceManifest = s.manifest;
+    s.creation.resolve(s.runtime);
+    const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+    const runExample = new AsyncFunction("createProgram", "runtimeManifestUrl", "programManifestUrl", `${source}\nreturn program;`);
+    const program = await runExample(createProgram, s.options.runtimeManifestUrl, s.options.programManifestUrl);
+    try {
+      assert.equal(s.instances, 1);
+      assert.ok(s.requests.length > 0, "the example proceeds past signature validation to acquisition");
+    } finally { program.dispose(); }
+    assert.equal(s.disposed, 1);
+  }));
+
+test("runtime distribution notices do not require startup retrieval", async () =>
+  fixture(async (s) => {
+    s.fetchOverride = async (url) => {
+      const path = new URL(url).pathname;
+      if (runtimeNotices.some((name) => path === `/runtime/${name}`))
+        throw new Error("notice download is not needed for execution");
+      return s.respond(url);
+    };
+    s.creation.resolve(s.runtime);
+    const program = await createProgram(s.options);
+    try {
+      assert.equal(program.call("Root.run"), 42n);
+      for (const path of ["/runtime/runtime.js", "/runtime/runtime.wasm", "/program/set.json"])
+        assert.ok(s.requests.some((request) => request.path === path));
+      assert.equal(s.requests.some((request) =>
+        runtimeNotices.some((name) => request.path === `/runtime/${name}`)), false);
+      // The descriptor and distribution still contain every notice.
+      const envelope = await s.respond("http://vir.test/runtime/bundle.json").json();
+      for (const name of runtimeNotices)
+        assert.ok(envelope.descriptor.files.some((file) => file.path === name));
+    } finally {
+      program.dispose();
+    }
+    assert.equal(s.disposed, 1);
+  }));
+
 function withResponseType(s, pathname, type, body = undefined) {
   s.fetchOverride = async (url) => {
     const response = s.respond(url);
@@ -132,6 +181,7 @@ async function fixture(body) {
         ? [
             ["runtime.js", "export {}", "text/javascript"],
             ["runtime.wasm", "wasm", "application/wasm"],
+            ...runtimeNotices.map((path) => [path, `notice for ${path}`, "text/plain"]),
           ]
         : [["set.json", "{}", "application/json"]];
     const descriptor = {
@@ -183,7 +233,7 @@ async function fixture(body) {
       metadata: { leanGithash: compatibility.leanRevision },
       exports: [
         structuredClone(entry),
-        { ...entry, entry: "Root.extra", id: "extra", jsName: "extra" },
+        { ...entry, entry: "Root.extra" },
       ],
     },
     factory() {
@@ -203,12 +253,10 @@ async function fixture(body) {
       interfaceManifest: {
         exports: [
           structuredClone(entry),
-          { ...entry, entry: "Root.extra", id: "extra", jsName: "extra" },
+          { ...entry, entry: "Root.extra" },
           {
             ...entry,
             entry: "Dependency.hidden",
-            id: "hidden",
-            jsName: "hidden",
           },
         ],
       },
@@ -267,7 +315,7 @@ function trackedController() {
 test("wrong ABI is rejected before runtime creation", async () =>
   fixture(async (s) => {
     const exports = expected();
-    exports["Root.run"].result = { type: "String", interfaceTag: 3 };
+    exports["Root.run"].result = primitiveBoundary("string", "string");
     // The public option is recognized by own-property presence, not enumeration.
     Object.defineProperty(s.options, "expectedExports", { value: exports });
     s.creation.resolve(s.runtime);
@@ -319,7 +367,7 @@ for (const [name, change] of [
   [
     "result type",
     (e) => {
-      e["Root.run"].result = { type: "String", interfaceTag: 3 };
+      e["Root.run"].result = primitiveBoundary("string", "string");
     },
   ],
   [
@@ -350,11 +398,9 @@ test("expected full name and signature snapshot survive caller mutation", async 
     s.runtime.interfaceManifest.exports[0].args = [
       { name: "other display name", type: nat },
     ];
-    exports["Root.run"].args = [
-      { interfaceTag: 0, type: "Nat", diagnostics: { ignored: true } },
-    ];
+    exports["Root.run"].args = [structuredClone(nat)];
     const pending = createProgram({ ...s.options, expectedExports: exports });
-    exports["Root.run"].args[0].interfaceTag = 3;
+    exports["Root.run"].args[0].native.type.tag = "string";
     await s.started.promise;
     s.creation.resolve(s.runtime);
     const program = await pending;
@@ -639,7 +685,7 @@ test("same arity with wrong argument type rejects at admission", async () =>
   fixture(async (s) => {
     s.manifest.exports[0].args = [{ name: "n", type: nat }];
     const exports = expected();
-    exports["Root.run"].args = [{ type: "String", interfaceTag: 3 }];
+    exports["Root.run"].args = [primitiveBoundary("string", "string")];
     await assert.rejects(
       createProgram({ ...s.options, expectedExports: exports }),
       (e) => e.phase === "program-validation",
@@ -655,7 +701,7 @@ test("installed interface is checked again and rejected instances are disposed",
         exports: [
           {
             ...entry,
-            result: { type: "String", interfaceTag: 3 },
+            result: primitiveBoundary("string", "string"),
           },
         ],
       },

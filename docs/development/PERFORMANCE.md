@@ -93,12 +93,9 @@ npm run bench:env-lookup -- \
 ```
 
 The profiling path uses the optimized, unstripped debug Wasm companion. Its
-timings are marked diagnostic and are not before/after evidence. See
-[Environment Lookup Performance](../design/ENVIRONMENT_LOOKUP_PERFORMANCE.md) for the
-baseline and final profiles, measured representation experiments, and accepted
-local design.
-[ULC-0001](../design/IR_DECLARATION_LOOKUP.md)
-owns the remaining environment/provider API decision.
+timings are marked diagnostic and are not before/after evidence. The
+[upstream boundary](../reference/UPSTREAM_BOUNDARY.md#real-ir-and-declaration-lookup)
+explains declaration lookup and package ownership.
 
 When the intervention is a Wasm build mode rather than a source-checkout
 change, compare two frozen artifacts in one process:
@@ -119,9 +116,10 @@ difference. Use the median of the per-round candidate/control ratios as the
 headline; the report retains the more outlier-sensitive geometric mean and the
 slower/equal/faster round counts as diagnostics.
 
-The `Std.Format` conversion rows and measured
-manifest-derived normalization-plan cache are documented in
-[Custom Inductive Object Conversion Performance](../design/OBJECT_CONVERSION_PERFORMANCE.md).
+The `Std.Format` conversion rows exercise structural conversion separately from
+the complete Wasm call. The
+[runtime composition](MANAGED_RUNTIME_COMPOSITION.md) explains immutable
+manifest-derived layout plans and per-call value ownership.
 
 Compare two saved reports with:
 

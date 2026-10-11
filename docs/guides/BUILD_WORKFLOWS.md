@@ -3,8 +3,8 @@
 The first-release application workflow is library-owned preparation through
 Lake, followed by site generation and browser loading. Follow the
 [application guide](EMBEDDED_RESOURCES.md) for setup; this page explains the
-implementation, not a choice of user workflows. Qualification is recorded in
-the [acceptance checklist](../development/RESOURCE_ACCEPTANCE.md).
+implementation, not a choice of user workflows. [Support scope](../SUPPORT.md)
+defines which behavior is supported.
 
 The client library declares `+ProgramModule:virResourcePack` as a `needs`
 dependency. The application imports its compiled `ResourceSet`, containing the
@@ -160,9 +160,8 @@ an explicit matched capability/profile contract, not merely passing this variabl
 
 ## Retained tools and replaced workflows
 
-- The older application staging and public resolved-input proposals, PR161 and
-  PR184, are closed in favor of library-owned resources. The first release is
-  still under review; existing demo and maintainer tooling has not all migrated.
+- Applications use library-owned resources. Repository demos and maintainer
+  tooling also retain the lower-level adapters described below.
 - `virPrograms`, handwritten resource recipes/export tables,
   `include_vir_library LibraryName`, `include_vir_program` and the library
   `virResourcePack` facet are removed. Declare each module's facet in the existing
@@ -183,8 +182,7 @@ requirement. See [the tooling inventory](../../scripts/packages/README.md) and
 the [contributor harness](../HARNESS.md) before changing or removing their callers.
 
 See the [generator reference](../reference/GENERATE_PACKAGE.md) for selection modes
-and removed source flags. Closing old proposals does not delete their retained
-source or evidence.
+and removed source flags.
 
 | Retained entry point | Why it remains / current caller |
 | --- | --- |

@@ -49,14 +49,9 @@ private def quotedExpr (type : Lean.Expr) : Lean.MessageData :=
 public inductive InterfaceClassifierContext where
   | callbackArgument (type : Lean.Expr)
   | callbackResult (type : Lean.Expr)
-  | constructorPayload (constructor : Lean.Name) (type : Lean.Expr)
   | constructorField (field : String) (constructor : Lean.Name) (type : Lean.Expr)
   | structureField (field structureName : Lean.Name) (type : Lean.Expr)
   | arrayElement
-  | listElement
-  | optionElement
-  | prodFst
-  | prodSnd
   | signatureArgument (type : Lean.Expr)
   | signatureResult (type : Lean.Expr)
   deriving BEq, Repr
@@ -80,10 +75,8 @@ public inductive InterfaceClassifierError where
   | constructorInvalidType (constructor : Lean.Name) (type : Lean.Expr)
   | constructorImplicitFields (constructor : Lean.Name)
   | constructorLayoutUnavailable (constructor : Lean.Name)
-  | constructorRuntimeFieldCount (constructor : Lean.Name) (actual : Nat)
   | constructorLayoutFieldCountMismatch (constructor : Lean.Name)
       (expected actual : Nat)
-  | constructorErasedRuntimeLayout (constructor : Lean.Name)
   | constructorFieldErasedRuntimeLayout (field : String) (constructor : Lean.Name)
   | structureConstructorCount (name : Lean.Name) (actual : Nat)
   | emptyStructure (name : Lean.Name)
@@ -106,17 +99,11 @@ private def InterfaceClassifierContext.wrap
       m!"unsupported callback argument type {quotedExpr type}: {reason}"
   | .callbackResult type =>
       m!"unsupported callback result type {quotedExpr type}: {reason}"
-  | .constructorPayload constructor type =>
-      m!"constructor `{constructor}` has unsupported payload type {quotedExpr type}: {reason}"
   | .constructorField field constructor type =>
       m!"field `{field}` of constructor `{constructor}` has unsupported type {quotedExpr type}: {reason}"
   | .structureField field structureName type =>
       m!"field `{field}` of structure `{structureName}` has unsupported type {quotedExpr type}: {reason}"
   | .arrayElement => m!"unsupported Array element type: {reason}"
-  | .listElement => m!"unsupported List element type: {reason}"
-  | .optionElement => m!"unsupported Option element type: {reason}"
-  | .prodFst => m!"unsupported Prod fst type: {reason}"
-  | .prodSnd => m!"unsupported Prod snd type: {reason}"
   | .signatureArgument type => m!"unsupported argument type {quotedExpr type}: {reason}"
   | .signatureResult type => m!"unsupported result type {quotedExpr type}: {reason}"
 
@@ -149,12 +136,8 @@ public def InterfaceClassifierError.toMessageData : InterfaceClassifierError →
       m!"constructor `{constructor}` has unsupported implicit/instance fields"
   | .constructorLayoutUnavailable constructor =>
       m!"could not compute runtime layout for constructor `{constructor}`"
-  | .constructorRuntimeFieldCount constructor _ =>
-      m!"constructor `{constructor}` must have exactly one runtime field"
   | .constructorLayoutFieldCountMismatch constructor _ _ =>
       m!"runtime layout for constructor `{constructor}` does not match its field count"
-  | .constructorErasedRuntimeLayout constructor =>
-      m!"constructor `{constructor}` has erased or void runtime layout"
   | .constructorFieldErasedRuntimeLayout field constructor =>
       m!"field `{field}` of constructor `{constructor}` has erased or void runtime layout"
   | .structureConstructorCount name _ =>

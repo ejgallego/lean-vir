@@ -6,9 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Lean.Compiler.LCNF.Main
 public import Lean.Compiler.LCNF.ToImpureType
-public import Vir.Compiler.Interface.Classify.Error
 public import Vir.Compiler.Interface.Model
 public import Vir.Compiler.InterfaceValidation
 
@@ -20,9 +18,6 @@ namespace Vir.Interface
 
 open Lean.IR
 open Vir.InterfaceValidation
-
-/-- Aggregate applications already visited while classifying recursive interface types. -/
-abbrev RecursiveSeen := Array (Name × String)
 
 def InterfaceEffect.ofEffectKind : Vir.InterfaceValidation.EffectKind → InterfaceEffect
   | .runtime => .runtime
@@ -67,57 +62,6 @@ def preserveInterfaceHead (name : Name) : Bool :=
     | `Except
     | `Lean.Vir.Js => true
     | _ => false
-
-/-- Whether a reduced type can be classified without a term-local context. -/
-private def isClosedTypeExpr (e : Lean.Expr) : Bool :=
-  !e.hasLooseBVars && !e.hasFVar && !e.hasMVar
-
-/--
-Small head-only reduction, not `whnf`: beta, abbreviations, and projections of
-closed constructor values. Ordinary definitions may unfold only while exposing
-a projection's receiver. No match/recursor, let, opaque or irreducible reduction.
-The budget bounds definition chains and nested projections; exhaustion discards
-the attempt rather than accepting a partially reduced type.
--/
-private def reduceScopedHead (fuel : Nat) (recordReceiver : Bool) (e : Lean.Expr) :
-    CoreM (Option (Lean.Expr × Nat)) := do
-  let fuel + 1 := fuel | return none
-  let e := e.consumeMData
-  if preserveInterfaceHead e.getAppFn.constName then return some (e, fuel)
-  let beta := e.headBeta
-  if beta != e then return ← reduceScopedHead fuel recordReceiver beta
-  let env ← getEnv
-  match e.getAppFn with
-  | .proj typeName index receiver =>
-      if !isClosedTypeExpr receiver then return some (e, fuel)
-      let some (receiver, remaining) ← reduceScopedHead fuel true receiver | return none
-      let remaining := min fuel remaining
-      let some (.ctorInfo ctor) := env.find? receiver.getAppFn.constName
-        | return some (e, remaining)
-      -- Select only a fully applied constructor of the named structure.
-      if ctor.induct != typeName || (getStructureInfo? env typeName).isNone ||
-          receiver.getAppNumArgs != ctor.numParams + ctor.numFields ||
-          index >= ctor.numFields then return some (e, remaining)
-      let field := receiver.getArg! (ctor.numParams + index)
-      reduceScopedHead remaining recordReceiver (mkAppN field e.getAppArgs)
-  | .const name levels =>
-      match env.find? name with
-      | some (.defnInfo info) =>
-          if getReducibilityStatusCore env name == .irreducible ||
-              !(info.hints.isAbbrev || recordReceiver) then return some (e, fuel)
-          let value := (ConstantInfo.defnInfo info).instantiateValueLevelParams! levels
-          reduceScopedHead fuel recordReceiver (value.beta e.getAppArgs)
-      | _ => return some (e, fuel)
-  | _ => return some (e, fuel)
-termination_by fuel
-decreasing_by all_goals omega
-
-def reduceTypeAliases (e : Lean.Expr) : CoreM Lean.Expr := do
-  let aliased ← Vir.InterfaceValidation.reduceTypeAliases preserveInterfaceHead e
-  let some (reduced, _) ← reduceScopedHead 32 false aliased | return aliased
-  -- In particular, beta may discard a constructor-field bvar in a constant
-  -- family, but may not turn a dependent field into the generic bvar ABI lane.
-  return if isClosedTypeExpr reduced then reduced else aliased
 
 def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   e.consumeMData.constName?.bind primitiveInterfaceType?
@@ -218,36 +162,6 @@ def fieldLayout? : Lean.Compiler.LCNF.CtorFieldInfo → Option FieldLayout
   | .scalar size offset _ => some (.scalar size offset)
   | .erased | .void => none
 
-def recursiveSeenContains (seen : RecursiveSeen) (name : Name) (key : String) : Bool :=
-  seen.any fun (seenName, seenKey) => seenName == name && seenKey == key
-
-def recursiveSeenContainsName (seen : RecursiveSeen) (name : Name) : Bool :=
-  seen.any fun (seenName, _) => seenName == name
-
-def recursiveSeenLastMatches (seen : RecursiveSeen) (name : Name) (key : String) : Bool :=
-  match seen[seen.size - 1]? with
-  | some (seenName, seenKey) => seenName == name && seenKey == key
-  | none => false
-
-inductive RecursiveVisit where
-  | selfReference
-  | descend (nextSeen : RecursiveSeen)
-  | error (error : InterfaceClassifierError)
-
-def recursiveVisit
-    (seen : RecursiveSeen) (kind : InterfaceAggregateKind) (name : Name) (key : String)
-    (isRec : Bool) :
-    RecursiveVisit :=
-  if recursiveSeenContains seen name key then
-    if recursiveSeenLastMatches seen name key then
-      .selfReference
-    else
-      .error (.mutuallyRecursive kind name)
-  else if isRec && recursiveSeenContainsName seen name then
-    .error (.nonUniformRecursive kind name)
-  else
-    .descend (seen.push (name, key))
-
 def binderArgName (fallback : Nat) (name : Name) : String :=
   let candidate := name.toString
   if name.isAnonymous || candidate.startsWith "_" || candidate.contains '_' then
@@ -261,17 +175,6 @@ def effectResultRaw? (e : Lean.Expr) : Option (InterfaceEffect × Lean.Expr) :=
   match effectHead? fn, Array.toList args with
   | some effect, [result] => some (effect, result)
   | _, _ => none
-
-def effectResult? (e : Lean.Expr) : CoreM (Option (InterfaceEffect × Lean.Expr)) := do
-  match effectResultRaw? e with
-  | some result => return some result
-  | none =>
-      let e := e.consumeMData
-      let reduced ← reduceTypeAliases e
-      if reduced == e then
-        return none
-      else
-        return effectResultRaw? reduced
 
 def isRuntimeErasedTypeBinder (domain : Lean.Expr) : Bool :=
   domain.consumeMData.isSort

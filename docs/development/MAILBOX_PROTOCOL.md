@@ -237,10 +237,15 @@ An implementation claim identifies the sole writer; transfer names the new
 owner and checkpoint. Worktree retirement separately requires maintainer
 approval and checks of cleanliness, commit reachability and remote/PR state.
 
-A thread can be archived only when **every** branch ends in `closed` or
-`cancelled`. The archive command moves the complete thread to
-`archive/<thread-id>/`; completed-but-unclosed and active free-form threads stay
-in the active mailbox. Archiving a thread does not remove its source worktree.
+A thread can normally be archived only when **every** branch ends in `closed` or
+`cancelled`. The coordinator may explicitly archive a historical thread whose
+branches all end in `completed`, using `mailbox:archive -- THREAD-ID --completed`,
+after recording its disposition in the workboard/evidence. This moves the original
+messages without inventing closure replies or rewriting their states. It is
+history relocation, not a new acceptance, publication or task-completion claim.
+Keep unresolved review/dependency handoffs active; the flag cannot archive an
+open, blocked or otherwise active branch. The archive command moves the complete
+thread to `archive/<thread-id>/`. Archiving does not remove its source worktree.
 Archived messages are deletable only after their outcome is retained durably.
 
 ## Concise Checkpoints
@@ -277,6 +282,13 @@ Keep one CI owner per PR; avoid duplicate watches and routine receipt echoes.
 Independent substantive review remains useful and does not transfer ownership.
 
 ## Commands
+
+`mailbox:list` prints at most 20 recent compact thread summaries by default,
+with an explicit notice when entries are omitted. Use `--details` for the full
+index/metadata/warnings, `--all` for all compact entries including terminal
+threads, or `--json` for uncapped machine-readable inspection.
+The mailbox is supporting evidence, not a roster of running agents; read the
+current workboard rather than interpreting old thread states as active work.
 
 Validate and atomically publish a complete draft message:
 

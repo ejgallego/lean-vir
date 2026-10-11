@@ -1,0 +1,69 @@
+/*
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+*/
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { readIrPackageInfo } from "../../web/src/runtime/ir-package.js";
+import { generateIrPackage } from "./shared.mjs";
+
+const directory = await mkdtemp(join(tmpdir(), "vir-descriptor-regressions-"));
+try {
+  const path = join(directory, "regressions.irpkg");
+  await generateIrPackage("DescriptorRegressions", new URL("../../fixtures/runtime/DescriptorRegressions.lean", import.meta.url), path, "marked");
+  const bytes = await readFile(path), info = readIrPackageInfo(bytes);
+  for (const [name, location] of [["wrapperEntry", "scalar"], ["boolWrapperEntry", "scalar"], ["usizeWrapperEntry", "usize"]]) {
+    const pair = info.manifest.exports.find(entry => entry.entry === `DescriptorRegressions.${name}`).result;
+    const field = pair.native.metadata.constructors[0].fields[1];
+    assert.equal(field.location.tag, location, "compiler actually packs the wrapper");
+    assert.equal(field.type.metadata.constructors[0].representation, "identity");
+  }
+  for (const profile of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
+    const runtime = await createVirRuntimeFactory({ wasmBytes: await readFile(new URL(`../../web/public/${profile}`, import.meta.url)) }).createRuntime({ irPackageSet: [bytes] });
+    const host = runtime.hostState;
+    const call = (name, ...values) => runtime.call(`DescriptorRegressions.${name}`, ...values);
+    let callback;
+    try {
+      assert.equal(call("ordinaryEntry", 41n), 42n, "valid packed metadata must not block sibling exports");
+      for (const name of ["wrapperEntry", "boolWrapperEntry", "usizeWrapperEntry"]) {
+        const entry = runtime.findManifestEntry(`DescriptorRegressions.${name}`);
+        assert.equal(runtime.objectArgumentSupported(entry.args[0].type), false);
+        assert.equal(runtime.objectResultSupported(entry.result), false);
+        assert.throws(() => call(name, {}), /does not support|unsupported/);
+        assert.equal(runtime.failure, null);
+        assert.equal(call("ordinaryEntry", 41n), 42n);
+      }
+      const nested = [[], [0n, 42n], [900719925474099312345n]];
+      assert.deepEqual(call("nestedAlias", nested), nested);
+      const deeper = [[], nested, [[], [7n]]];
+      assert.deepEqual(call("deeperAlias", deeper), deeper);
+      const packedCallback = call("wrapperCallback", undefined);
+      assert.throws(() => packedCallback({}), /does not support callback signature/);
+      assert.equal(runtime.failure, null);
+      assert.equal(call("ordinaryEntry", 41n), 42n);
+
+      let compiled = 0;
+      const bind = runtime.nativeValueCodec;
+      runtime.nativeValueCodec = function (pair) {
+        if (!this.nativeValueCodecs?.has(pair)) compiled++;
+        return bind.call(this, pair);
+      };
+      callback = call("listCallback", undefined);
+      const before = compiled;
+      assert.deepEqual(callback([]), []);
+      assert.equal(compiled - before, 2, "argument/result codecs bind during the first invocation");
+      const warm = compiled;
+      for (let i = 0; i < 20; i++) assert.deepEqual(callback([]), []);
+      const rows = [{ first: 1n, second: 2n, third: 3n }];
+      assert.deepEqual(callback(rows), rows);
+      assert.equal(compiled, warm, "even empty structural collections reuse their codecs");
+      assert.equal(runtime.exports.vir_resource_roots_active(), 0);
+    } finally { runtime.dispose(); }
+    assert.throws(() => callback([]), /disposed runtime/);
+    assert.equal(host.leanObjectHandleCells.size, 0);
+  }
+} finally { await rm(directory, { recursive: true, force: true }); }
+console.log("packed-wrapper admission, finite alias descent and callback cache: both-profile PASS");

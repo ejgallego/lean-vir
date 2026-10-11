@@ -1,12 +1,10 @@
 # Managed runtime composition
 
-The public browser and Node factories use the full runtime composition. Their
-construction, ownership, conversion and retirement contracts remain unchanged.
-Applications can already keep Lean values and functions opaque through `JSL`
-using the public factories. This extraction separates that existing ownership
-and invocation machinery from optional structural conversion. The internal
-primitive composition qualifies this dependency boundary; it is excluded from
-public package exports and the SDK.
+The public browser and Node factories use the full runtime composition.
+Applications can keep Lean values and functions opaque through `JSL` using
+those factories. Ownership and invocation machinery are separate from optional
+structural conversion. The internal primitive composition exercises that
+dependency boundary; it is excluded from public package exports and the SDK.
 
 Both compositions share these modules:
 
@@ -84,7 +82,7 @@ JavaScript reachability and terminal runtime disposal retain their current
 meaning; see [Lean-backed value lifetimes](../reference/HOST_BINDINGS.md#lean-backed-javascript-values)
 for provider-cleanup admission and healthy versus failed retirement.
 Canceling a timeout does not release a separately reachable carrier or
-interrupt a synchronous Lean call. This split adds no per-value public disposal,
+interrupt a synchronous Lean call. Neither composition adds per-value public disposal,
 cycle collection or post-trap interpreter re-entry. The existing four permitted
 retirement-safe Wasm exports and native-cleanup quarantine are unchanged.
 

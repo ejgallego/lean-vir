@@ -12,6 +12,9 @@ public import Vir.React.Types
 public meta import Vir.Attributes
 public meta import Vir.Compiler.HostValidation
 public meta import Vir.Compiler.Interface.Encode
+-- Policy controls intentionally inspect private traversal without exporting it.
+meta import all Vir.Compiler.Interface.Classify.Core
+meta import Vir.Compiler.Interface.Classify.Reduce
 
 public section
 
@@ -29,6 +32,11 @@ example : Text = String := rfl
 def direct (x : String) : String := x
 @[vir_export] def projected (x : Text) : Text := x
 @[vir_export] def parameterized (x : (carrierOf String).type) : String := x
+
+abbrev Nats := List Nat
+abbrev MoreNats := List Nats
+@[vir_export] def nestedAlias (xs : List Nats) : List Nats := xs
+@[vir_export] def deeperAlias (xs : List MoreNats) : List MoreNats := xs
 
 inductive FamilyValue (β : Nat → Type) where
   | mk (key : Nat) (value : β key)
@@ -69,6 +77,27 @@ end
 inductive OrdinaryTree where
   | leaf
   | next (child : Option OrdinaryTree)
+
+universe u
+
+inductive PolyTree (α : Type u) where
+  | leaf (value : α)
+  | next (child : Option (PolyTree α))
+
+structure PolyCell (α : Type u) where
+  value : α
+  next : Option (PolyCell α)
+
+inductive UniverseTree : Type u where
+  | leaf
+  | next (child : Option UniverseTree)
+
+@[vir_export] def polymorphicTreeIdentity (value : PolyTree Nat) : PolyTree Nat := value
+@[vir_export] def polymorphicCellIdentity (value : PolyCell Nat) : PolyCell Nat := value
+
+inductive FamilyTree (β : Nat → Type) where
+  | leaf (value : β 0)
+  | next (child : Option (FamilyTree β))
 
 -- A complete callback result descriptor owns its own recursion.
 def treeCallback (_f : Unit → OrdinaryTree) : Unit := ()
@@ -129,21 +158,48 @@ private def expectConstructorNames (type : Expr) (expected : Array (Name × Stri
     | throwError "constructor-name classification failed"
   let .ok encoded := Json.parse descriptor.toJson
     | throwError "constructor-name JSON failed"
-  let .ok constructors := (encoded.getObjVal? "constructors").bind Json.getArr?
+  let .ok native := encoded.getObjVal? "native"
+    | throwError "native descriptor missing"
+  let .ok metadata := native.getObjVal? "metadata"
+    | throwError "native metadata missing"
+  let .ok constructors := (metadata.getObjVal? "constructors").bind Json.getArr?
     | throwError "constructor-name array missing"
+  let .ok value := encoded.getObjVal? "value"
+    | throwError "JavaScript value mapping missing"
+  let .ok valueTag := value.getObjValAs? String "tag"
+    | throwError "JavaScript value mapping tag missing"
+  let labels ← if valueTag == "enum" then do
+    let .ok labels := (value.getObjVal? "cases").bind Json.getArr?
+      | throwError "enum case spellings missing"
+    labels.mapM fun item =>
+      match item.getStr? with
+      | .ok label => pure label
+      | .error _ => throwError "enum case spelling must be a string"
+  else if valueTag == "variant" then do
+    let .ok cases := (value.getObjVal? "cases").bind Json.getArr?
+      | throwError "variant cases missing"
+    cases.mapM fun item => do
+      let .ok label := item.getObjValAs? String "kind"
+        | throwError "variant spelling missing"
+      pure label
+  else throwError "constructor spelling mappings must use enum or variant values"
   expect "constructor count" (constructors.size == expected.size)
+  expect "case spelling count" (labels.size == expected.size)
   for h : index in *...expected.size do
     let some constructor := constructors[index]?
       | throwError "constructor missing"
     let .ok name := constructor.getObjValAs? String "name"
       | throwError "constructor Name missing"
-    let .ok label := constructor.getObjValAs? String "jsName"
-      | throwError "constructor label missing"
-    let .ok tag := constructor.getObjValAs? Nat "tag"
-      | throwError "constructor tag missing"
+    let some label := labels[index]?
+      | throwError "constructor spelling missing"
     expect "canonical constructor Name" (name == expected[index].1.toString)
     expect "relative constructor label" (label == expected[index].2)
-    expect "constructor order" (tag == index)
+    match constructor.getObjVal? "tag" with
+    | .error _ => pure ()
+    | .ok _ => throwError "constructor ordinal must come from table position"
+    match constructor.getObjVal? "jsName" with
+    | .error _ => pure ()
+    | .ok _ => throwError "JavaScript spelling must live in the value mapping"
 
 run_elab do
   for name in #[``direct, ``projected, ``parameterized] do
@@ -184,6 +240,21 @@ run_elab do
     | throwError "family argument missing"
   expectConstructorNames familyType #[( ``FamilyValue.mk, "mk")]
   let nat := mkConst ``Nat
+  let lists := mkApp (mkConst ``List [.zero])
+  let .ok explicitNested ← interfaceType (lists (lists nat))
+    | throwError "explicit nested Lists must be supported"
+  let .ok aliasNested ← interfaceType (← argumentType ``nestedAlias)
+    | throwError "abbreviated nested Lists must be supported"
+  expect "abbreviated finite List descent" (aliasNested.toJson == explicitNested.toJson)
+  let .ok explicitDeeper ← interfaceType (lists (lists (lists nat)))
+    | throwError "explicit deeper Lists must be supported"
+  let .ok aliasDeeper ← interfaceType (← argumentType ``deeperAlias)
+    | throwError "deeper abbreviated Lists must be supported"
+  expect "nested abbreviations preserve finite descent" (aliasDeeper.toJson == explicitDeeper.toJson)
+  let .error growingError ← (classifyType (lists (lists nat)) #[⟨lists nat⟩]).run
+    | throwError "a growing applied recursion context must stay rejected"
+  expect "growing applied recursion reason"
+    (errorCause growingError == .nonUniformRecursive .inductive ``List)
   expectConstructorNames (mkApp2 (mkConst ``Sum [.zero, .zero]) nat string)
     #[( `Sum.inl, "inl"), (`Sum.inr, "inr")]
   expectConstructorNames (mkApp2 (mkConst ``Except [.zero, .zero]) string nat)
@@ -192,20 +263,81 @@ run_elab do
     #[( ``«Constructor.names».«left.value», "«left.value»"), (``«Constructor.names».right, "right")]
   expectConstructorNames (mkConst ``Status) #[( ``Status.ready, "ready"), (``Status.done, "done")]
 
+  -- Applied declaration universes reach recursively synthesized field types.
+  let polyTree := mkApp (mkConst ``PolyTree [.zero]) nat
+  let .ok (.customInductive name _ variants) ← interfaceType polyTree
+    | throwError "universe-polymorphic tree classification failed"
+  expect "polymorphic tree owner" (name == ``PolyTree)
+  let some next := variants[1]? | throwError "polymorphic tree next constructor missing"
+  let some child := next.fields[0]? | throwError "polymorphic tree child field missing"
+  let .customInductive `Option _ optionCtors := child.type
+    | throwError "polymorphic tree Option must use generic constructors"
+  let some optionSome := optionCtors[1]? | throwError "missing Option.some"
+  let some optionValue := optionSome.fields[0]? | throwError "missing Option.some payload"
+  expect "polymorphic tree self field"
+    (optionValue.type == .recursiveRef ``PolyTree "InterfaceReduction.PolyTree Nat" 1)
+  let polyCell := mkApp (mkConst ``PolyCell [.zero]) nat
+  let .ok (.structure name _ descriptor) ← interfaceType polyCell
+    | throwError "universe-polymorphic structure classification failed"
+  expect "polymorphic structure owner" (name == ``PolyCell)
+  let some next := descriptor.fields[1]? | throwError "polymorphic structure next field missing"
+  let .customInductive `Option _ optionCtors := next.type
+    | throwError "polymorphic projection Option must use generic constructors"
+  let some optionSome := optionCtors[1]? | throwError "missing Option.some"
+  let some optionValue := optionSome.fields[0]? | throwError "missing Option.some payload"
+  expect "polymorphic projection self field"
+    (optionValue.type == .recursiveRef ``PolyCell "InterfaceReduction.PolyCell Nat" 1)
+  let universeTree := mkConst ``UniverseTree [.zero]
+  let .ok (.customInductive _ _ _) ← interfaceType universeTree
+    | throwError "universe-polymorphic parameter-free recursion failed"
+  let .ok (.recursiveRef _ _ 0) ← (classifyType (.mdata {} universeTree) #[⟨universeTree⟩]).run
+    | throwError "outer metadata must not alter recursion identity"
+  let .error universeError ← (classifyType (mkConst ``UniverseTree [.succ .zero]) #[⟨universeTree⟩]).run
+    | throwError "different universe instances must not share recursion identity"
+  expect "universe identity reason" (errorCause universeError == .nonUniformRecursive .inductive ``UniverseTree)
+  -- Existing metadata values, rather than their debug spelling, determine identity.
+  let annotated (id : Nat) := mkApp (mkConst ``PolyTree [.zero])
+    (.mdata (({} : MData).setNat `origin id) nat)
+  let .error metadataError ← (classifyType (annotated 2) #[⟨annotated 1⟩]).run
+    | throwError "distinct nested metadata must have distinct recursion keys"
+  expect "nested metadata identity reason" (errorCause metadataError == .nonUniformRecursive .inductive ``PolyTree)
+  let family (name : Name) (binder : BinderInfo) :=
+    mkApp (mkConst ``FamilyTree) (.lam name nat string binder)
+  for (original, changed) in #[
+      (family `left .default, family `right .default),
+      (family `left .default, family `left .implicit)] do
+    expect "alpha equality is broader than recursion identity" (original == changed)
+    let .error binderError ← (classifyType changed #[⟨original⟩]).run
+      | throwError "binder syntax must remain part of structural identity"
+    expect "binder identity reason" (errorCause binderError == .nonUniformRecursive .inductive ``FamilyTree)
+
+  -- Declaration resolution precedes layout lookup in the selected producer path.
+  let missingInductive := mkConst `MissingInductive
+  let .error missingInductiveError ← (inductiveType #[] missingInductive).run
+    | throwError "an absent inductive declaration must fail before layout lookup"
+  expect "missing inductive declaration reason"
+    (errorCause missingInductiveError == .unsupportedType missingInductive)
+  let compilerErrorEscaped ← try
+    let _ ← (withContext .arrayElement
+      (liftM (throwError "compiler-exception-control" : CoreM InterfaceType) : ClassifyM InterfaceType)).run
+    pure false
+  catch _ => pure true
+  expect "context adaptation must not catch compiler exceptions" compilerErrorEscaped
+
   -- Callback invocation has no enclosing aggregate owner: fail finitely.
   let node := mkConst ``CallbackNode
   let .error nodeError ← interfaceType node
     | throwError "recursive callback aggregate must be rejected"
   expect "recursive callback result reason"
     (errorCause nodeError == .recursiveCallback ``CallbackNode)
-  let context : RecursiveSeen := #[(``CallbackNode, toString node)]
+  let context : RecursiveSeen := #[⟨node⟩]
   for type in #[
       .forallE `_arg node (mkConst ``Unit) .default,
       mkApp (mkConst ``IO) node,
       .forallE `_arg (mkConst ``Unit) (mkApp (mkConst ``Option [.zero]) node) .default,
       .forallE `_arg (mkConst ``Unit)
         (mkApp2 (mkConst ``Sum [.zero, .zero]) node string) .default] do
-    let .error error ← interfaceType type context
+    let .error error ← (classifyType type context).run
       | throwError "recursive callback boundary must be rejected"
     expect "callback argument/effect/container owner diagnostic"
       (errorCause error == .recursiveCallback ``CallbackNode)
@@ -219,9 +351,8 @@ run_elab do
     (errorCause mutualError == .mutuallyRecursive .inductive ``CallbackLeft)
   let natInstance := mkApp (mkConst ``CallbackParam [.zero]) (mkConst ``Nat)
   let stringInstance := mkApp (mkConst ``CallbackParam [.zero]) string
-  let .error nonuniformError ← interfaceType
-      (.forallE `_arg (mkConst ``Unit) stringInstance .default)
-      #[(``CallbackParam, toString natInstance)]
+  let .error nonuniformError ← (classifyType (.forallE `_arg (mkConst ``Unit) stringInstance .default)
+      #[⟨natInstance⟩]).run
     | throwError "nonuniform recursive callback context must be rejected"
   expect "nonuniform callback recursion reason"
     (errorCause nonuniformError == .nonUniformRecursive .inductive ``CallbackParam)
@@ -240,7 +371,7 @@ run_elab do
       expect "named callback argument" (args == #[{ name := "value", type := .nat }])
   | result => throwError "value callback descriptor: {repr result}"
   expect "callback encoding" (callback.toJson ==
-    "{\"type\":\"Function\",\"interfaceTag\":24,\"kind\":\"function\",\"effect\":\"pure\",\"args\":[{\"name\":\"value\",\"type\":{\"type\":\"Nat\",\"interfaceTag\":0}}],\"result\":{\"type\":\"String\",\"interfaceTag\":3}}")
+    "{\"native\":{\"type\":{\"tag\":\"leanObject\"},\"metadata\":{\"signature\":{\"args\":[{\"type\":{\"tag\":\"nat\"}}],\"result\":{\"type\":{\"tag\":\"string\"}},\"effect\":\"pure\"}}},\"value\":{\"tag\":\"function\",\"args\":[{\"tag\":\"bigint\"}],\"result\":{\"tag\":\"string\"}}}")
   let .ok valueSignature ← analyzeExportInterface (← getConstInfo ``valueCallback).type
     | throwError "value callback signature failed"
   match Vir.HostValidation.validateHostImportBoundary .hostImport "test.valueCallback" valueSignature with

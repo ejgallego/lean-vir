@@ -1,7 +1,7 @@
 # Five-minute native infoview tour
 
-Use this worktree's VS Code window (`native-infoview-port`), with the Lean 4
-extension enabled. No browser development server is needed for these widgets.
+Open the VIR checkout in VS Code with the Lean 4 extension enabled.
+No browser development server is needed for these experimental widgets.
 If VS Code asks about workspace trust, review and approve it yourself to enable
 the extension. Open **Lean 4: InfoView: Toggle InfoView** from the command palette
 if the Infoview is hidden.
@@ -33,7 +33,7 @@ the term or the popup's pin icon to pin it; the icon changes to show it is pinne
 Click again to unpin and close, or use Escape/the close button to dismiss it.
 The popup uses the editor's theme colors, with monospace code above a separator
 and UI-font documentation below. Markdown markers still display literally;
-rendered Markdown/math and selection/navigation remain separate follow-ups.
+rendered Markdown/math and selection/navigation are not implemented.
 The compact Copy control beside the goal count copies the full, unfiltered state
 and reports “Copied” or “Copy failed”.
 
@@ -63,8 +63,8 @@ its widget shows the current source URI and first goal.
 This ports the goal panel and interactive code, not the surrounding infoview
 shell. Native expression selection and modifier-click definition navigation
 are not implemented yet; native popups now float, but documentation is plain
-text. The upstream checkpoint retains upstream behavior. See the
-[port assessment](../development/NATIVE_INFOVIEW_PORT.md) for exact coverage and
+text. The upstream component retains upstream behavior. See the
+[example reference](../development/NATIVE_INFOVIEW_PORT.md) for implementation details and
 the known upstream development-StrictMode popup limitation.
 
 ## If something looks stuck
@@ -72,8 +72,7 @@ the known upstream development-StrictMode popup limitation.
 Allow the initial Lean elaboration and widget package generation to finish.
 Keep the cursor inside a proof, and check the Problems panel for actual errors.
 If needed, run **Lean 4: Server: Restart Server**, especially after upgrading
-the imported VIR library. The construction refinement fixes the earlier
-JSX-local unused-variable warnings.
+the imported VIR library.
 
 To refresh the built workspace and browser demo packages from its terminal:
 

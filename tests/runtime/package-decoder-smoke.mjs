@@ -13,6 +13,7 @@ import {
   replaceIrPackageManifest,
 } from "../../scripts/packages/irpkg-format.mjs";
 import { assert, readRuntimeArtifacts } from "./shared.mjs";
+import { primitiveBoundary } from "../support/interface-fixtures.mjs";
 
 const { wasmBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 const factory = createVirRuntimeFactory({ wasmBytes });
@@ -96,7 +97,7 @@ for (const [field, mutate] of [
   [
     "boxed boundary",
     (m) => {
-      m.exports[0].result = { type: "Float", interfaceTag: 10 };
+      m.exports[0].result = primitiveBoundary("float", "number", { width: 64 });
     },
   ],
 ]) {

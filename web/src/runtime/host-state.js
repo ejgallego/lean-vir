@@ -17,7 +17,6 @@ import {
   throwWithCleanup,
 } from "./cleanup.js";
 import { HOST_IMPORT_BOUNDARY } from "./interface-manifest.js";
-import { INTERFACE_TAG } from "./interface-tags.js";
 
 const MAX_FINALIZER_ERRORS = 16;
 const MAX_FINALIZER_ERROR_MESSAGE_LENGTH = 2048;
@@ -353,16 +352,16 @@ export class VirHostState {
 
 function isLeanObjectDescriptor(type) {
   return (
-    type?.interfaceTag === INTERFACE_TAG.LEAN_OBJECT &&
-    type?.kind === "leanObject"
+    type?.native?.type?.tag === "leanObject" &&
+    type?.value?.tag === "leanReference"
   );
 }
 
 function isGenericJsResourceDescriptor(type) {
   return (
-    type?.interfaceTag === INTERFACE_TAG.RESOURCE &&
-    type?.kind === "resource" &&
-    type?.name === "Lean.Vir.Js"
+    type?.native?.type?.tag === "resource" &&
+    type?.value?.tag === "jsReference" &&
+    type?.native?.metadata?.declaration === "Lean.Vir.Js"
   );
 }
 

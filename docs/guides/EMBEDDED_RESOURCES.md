@@ -120,6 +120,5 @@ creations have independent Lean state. [Optional contracts/lifecycle](RESOURCE_L
 and [opaque Lean state](OPAQUE_LEAN_STATE.md) document capabilities beyond this
 first call; they are not additional application setup steps.
 
-[Build internals](BUILD_WORKFLOWS.md) account for retained developer tooling;
-[qualification](../development/RESOURCE_ACCEPTANCE.md) distinguishes current and
-historical evidence. DOM/React/editor integrations remain [experimental](../SUPPORT.md).
+[Build internals](BUILD_WORKFLOWS.md) account for retained developer tooling.
+DOM/React/editor integrations remain [experimental](../SUPPORT.md).

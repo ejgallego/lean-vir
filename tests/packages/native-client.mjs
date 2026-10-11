@@ -13,6 +13,15 @@ import { fileURLToPath } from "node:url";
 import { interfaceSignatureKey } from "../../web/src/runtime/interface-manifest.js";
 import { snapshotExpectedExports, resolveProgramExports } from "../../web/src/resources/program-exports.js";
 import { readIrPackageInfo } from "../../web/src/runtime/ir-package.js";
+import {
+  arrayBoundary,
+  immediateConstructor,
+  nativeField,
+  objectBoundary,
+  objectConstructor,
+  primitiveBoundary,
+  unitBoundary,
+} from "../support/interface-fixtures.mjs";
 
 // Independent producer and cold native-precompiled consumer: a developer's
 // dependency cache could conceal accidental umbrella imports. Retain evidence.
@@ -54,6 +63,28 @@ assert.match(run(["lake", "env", "lean", visibility], "codec-private-json", 1),
 writeFileSync(visibility, "module\npublic meta import Vir.Compiler.Interface.Encode\n" +
   "public meta import Vir.Package.Json\n#check Vir.GeneratePackage.jsonString\n");
 run(["lake", "env", "lean", visibility], "codec-explicit-json");
+// Check the public surface independently: expected failures must not mask it.
+const classifierVisibility = join(client, "ClassifierVisibility.lean");
+const classifierImport = "module\npublic meta import Vir.Compiler.Interface.Classify.Signature\n";
+writeFileSync(classifierVisibility, classifierImport +
+  "#check Vir.Interface.interfaceType\n#check Vir.Interface.analyzeExportInterface\n" +
+  "#check Vir.Interface.classifyExportSignature\n#check Vir.Interface.classifyHostImportSignature\n");
+run(["lake", "env", "lean", classifierVisibility], "classifier-public-api");
+const privateTraversalHelpers = ["RecursiveSeen", "recursiveVisit", "functionType", "inductiveType",
+  "structureType", "classifyType"];
+const nonReexportedReductionHelpers = ["reduceTypeAliases", "effectResult?"];
+const hiddenFromSignature = [...privateTraversalHelpers, ...nonReexportedReductionHelpers];
+writeFileSync(classifierVisibility, classifierImport + hiddenFromSignature.map(
+  (name) => `#check Vir.Interface.${name}\n`).join(""));
+const classifierVisibilityOutput = run(["lake", "env", "lean", classifierVisibility], "classifier-hidden-helpers", 1);
+for (const name of hiddenFromSignature) {
+  assert.ok(classifierVisibilityOutput.includes(`Unknown identifier \`Vir.Interface.${name}\``),
+    `classifier helper ${name} must not be exposed by Signature`);
+}
+// Reduction is a low-level module, not private declarations in Core.
+writeFileSync(classifierVisibility, "module\npublic meta import Vir.Compiler.Interface.Classify.Reduce\n" +
+  nonReexportedReductionHelpers.map((name) => `#check Vir.Interface.${name}\n`).join(""));
+run(["lake", "env", "lean", classifierVisibility], "classifier-direct-reduction-import");
 const modules = ["Vir", ...readdirSync(join(producer, "Vir"), { recursive: true })
   .filter((path) => path.endsWith(".lean"))
   .map((path) => "Vir." + path.slice(0, -5).replaceAll("/", ".").replaceAll("\\", "."))];
@@ -80,21 +111,29 @@ const expectedExports = {
   "NativeClient.nested": JSON.parse(nestedSignature),
 };
 const signatures = snapshotExpectedExports(expectedExports);
-for (const [declaration, type, tag] of [
-  ["NativeClient.greet", "String", 3], ["NativeClient.double", "Nat", 0],
+for (const [declaration, expectedType] of [
+  ["NativeClient.greet", primitiveBoundary("string", "string")],
+  ["NativeClient.double", primitiveBoundary("nat", "bigint")],
 ]) {
-  const expectedType = { type, interfaceTag: tag };
   assert.deepEqual(expectedExports[declaration].args, [expectedType],
     "caller arguments contain types only, without parameter display names");
   assert.equal(signatures.get(declaration),
     interfaceSignatureKey({ args: [expectedType], result: expectedType, effect: "pure" }));
 }
 
-const nat = { type: "Nat", interfaceTag: 0 };
-const string = { type: "String", interfaceTag: 3 };
-const unit = { type: "Unit", interfaceTag: 22 };
-const nested = { type: "Array Option Nat", interfaceTag: 16, kind: "array",
-  element: { type: "Option Nat", interfaceTag: 18, kind: "option", element: nat } };
+const nat = primitiveBoundary("nat", "bigint");
+const string = primitiveBoundary("string", "string");
+const unit = unitBoundary();
+const option = objectBoundary("Option", [
+  immediateConstructor("Option.none"),
+  objectConstructor("Option.some", {
+    objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0,
+  }, [nativeField("val", nat.native, { tag: "object", index: 0 })]),
+], { tag: "variant", cases: [
+  { kind: "none", payload: "none" },
+  { kind: "some", payload: "value", value: nat.value },
+] });
+const nested = arrayBoundary(option.native, option.value);
 for (const [declaration, args, result, effect] of [
   ["NativeClient.nullary", [], unit, "pure"],
   ["NativeClient.multiple", [string, nat], nat, "pure"],

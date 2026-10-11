@@ -14,7 +14,6 @@ import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bin
 import { createBrowserHostBindings } from "../../web/src/vir-host-bindings.js";
 import { VirHostState } from "../../web/src/runtime/host-state.js";
 import { HOST_IMPORT_BOUNDARY } from "../../web/src/runtime/interface-manifest.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 
 function hoverEnvironment({
   failObserve = null,
@@ -91,9 +90,11 @@ function assertAggregateWithErrors(error, expected) {
 function callHoverThroughHostState({ environment, loweringError, captured, lifecycle = null }) {
   const bindings = createInfoviewPanelBindings({ lifecycle });
   const resourceType = {
-    interfaceTag: INTERFACE_TAG.RESOURCE,
-    kind: "resource",
-    name: "Lean.Vir.Js",
+    native: {
+      type: { tag: "resource" },
+      metadata: { declaration: "Lean.Vir.Js" },
+    },
+    value: { tag: "jsReference" },
   };
   const values = new Map([
     [1, environment.reference],

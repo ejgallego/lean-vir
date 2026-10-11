@@ -13,6 +13,7 @@ import {
   readIrPackageInfo,
 } from "../../web/src/runtime/ir-package.js";
 import { asBytes } from "../../web/src/runtime/vir-codec.js";
+import { boundaryInterfaceShape } from "../../web/src/runtime/value-interfaces.js";
 import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
 
 export {
@@ -25,6 +26,30 @@ export {
 
 const textEncoder = new TextEncoder();
 
+/** Encode an edited resolved manifest using the current package-local table.
+ * This only shares complete pairs; it does not synthesize compiler metadata. */
+export function encodeInterfaceManifest(manifest) {
+  const interfaces = [], indices = new Map();
+  const index = pair => {
+    const key = JSON.stringify(boundaryInterfaceShape(pair));
+    let id = indices.get(key);
+    if (id === undefined) {
+      id = interfaces.length;
+      indices.set(key, id);
+      interfaces.push(pair);
+    }
+    return id;
+  };
+  const entry = value => ({
+    ...value,
+    args: value.args.map(arg => ({ ...arg, type: index(arg.type) })),
+    result: index(value.result),
+  });
+  const exports = manifest.exports.map(entry);
+  const hostImports = (manifest.hostImports ?? []).map(entry);
+  return { ...manifest, interfaces, exports, hostImports };
+}
+
 /**
  * Rewrite a package manifest and its corruption checksum for tests and tools.
  * This does not update the binary call tables or establish agreement with them.
@@ -32,11 +57,9 @@ const textEncoder = new TextEncoder();
 export function replaceIrPackageManifest(input, manifest) {
   const bytes = asBytes(input, "IR package bytes");
   const info = readIrPackageInfo(bytes);
-  const manifestText = JSON.stringify(
-    validateInterfaceManifest(manifest, {
-      packageFormatVersion: info.package.version,
-    }),
-  );
+  const encoded = encodeInterfaceManifest(manifest);
+  validateInterfaceManifest(encoded, { packageFormatVersion: info.package.version });
+  const manifestText = JSON.stringify(encoded);
   const manifestBytes = textEncoder.encode(manifestText);
   const manifestSection = requireSection(
     info.package.sections,

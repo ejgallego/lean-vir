@@ -18,3 +18,6 @@ open InterfaceReduction
 @[vir_export] def importedGenericProjection (x : (carrierOf String).type) : String := x
 @[vir_export] def importedConstantFamily (x : FamilyValue (fun _ => String)) :
     FamilyValue (fun _ => String) := x
+
+@[vir_export] def importedPolyTree (value : PolyTree Nat) : PolyTree Nat := value
+@[vir_export] def importedPolyCell (value : PolyCell Nat) : PolyCell Nat := value

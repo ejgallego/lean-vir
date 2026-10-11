@@ -4,32 +4,14 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { INTERFACE_TAG } from "./interface-tags.js";
-
-export function directJsArgumentSupported(type) {
-  if (directJsValueSupported(type)) {
-    return true;
-  }
-  if (type?.interfaceTag !== INTERFACE_TAG.FUNCTION) {
-    return false;
-  }
-  const args = type.args;
-  return (
-    args.every((arg) => directJsValueSupported(arg.type)) &&
-    directJsValueSupported(type.result)
-  );
+export function directJsArgumentSupported(pair) {
+  if (directJsValueSupported(pair.value)) return true;
+  if (pair.value.tag !== "function") return false;
+  return pair.value.args.every(directJsValueSupported) && directJsValueSupported(pair.value.result);
 }
 
-export function directJsResultSupported(type) {
-  return directJsValueSupported(type);
-}
+export function directJsResultSupported(pair) { return directJsValueSupported(pair.value); }
 
-function directJsValueSupported(type) {
-  switch (type?.interfaceTag) {
-    case INTERFACE_TAG.UNIT:
-    case INTERFACE_TAG.RESOURCE:
-      return true;
-    default:
-      return false;
-  }
+function directJsValueSupported(view) {
+  return view.tag === "unit" || view.tag === "jsReference";
 }

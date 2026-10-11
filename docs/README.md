@@ -29,6 +29,8 @@ experimental conveniences; shipped coverage is not a support commitment.
 
 - [Build internals](guides/BUILD_WORKFLOWS.md): Lake acquisition, generation,
   runtime distribution and retained contributor tools.
+- [Resource bundles](reference/RESOURCE_BUNDLES.md): values, compatibility,
+  embedding, acquisition and publication contracts.
 - [Optional resource contracts and lifecycle](guides/RESOURCE_LIFETIME.md):
   independent callable expectations, cancellation and overlapping loads.
 - [Package tooling](guides/PACKAGES.md): loose compiler outputs and SDK installation.
@@ -43,6 +45,8 @@ experimental conveniences; shipped coverage is not a support commitment.
 - [Generator](reference/GENERATE_PACKAGE.md): module inputs, closure selection and output.
 - [Package format](reference/IRPKG_FORMAT.md): binary sections and embedded manifest/types.
 - [Object ABI](reference/OBJECT_ABI.md): Lean object construction and pointer ownership.
+- [Runtime composition](development/MANAGED_RUNTIME_COMPOSITION.md): shared
+  ownership machinery and optional structural conversion.
 - [Upstream boundary](reference/UPSTREAM_BOUNDARY.md): interpreter and package-provider contract.
 - [Client-native externs](reference/CLIENT_NATIVE_EXTERNS.md): C/C++ provider integration.
 
@@ -58,19 +62,3 @@ experimental conveniences; shipped coverage is not a support commitment.
   [API inventory](API_COVERAGE.md): tracked coverage.
 - [CONTRIBUTING.md](../CONTRIBUTING.md): contribution rules;
   [Mailbox protocol](development/MAILBOX_PROTOCOL.md): agent coordination.
-
-## Design: proposals and dated evidence
-
-The [upstream proposal](design/IR_DECLARATION_LOOKUP.md) explains the declaration-provider
-API request and the experiment behind it.
-
-- [Runtime simplification](development/RUNTIME_SIMPLIFICATION.md) separates the
-  Infoview loader cleanup from proposed runtime ownership and reload changes.
-  [Use-case contracts](design/VIR_USE_CASES.md) state the behavior those changes
-  must preserve and the remaining acceptance gaps.
-- [Environment lookup](design/ENVIRONMENT_LOOKUP_PERFORMANCE.md) and
-  [object conversion](design/OBJECT_CONVERSION_PERFORMANCE.md) record measured design
-  decisions. Their timings belong to the recorded workloads and versions,
-  not to every current build.
-- [Package payload analysis](design/IRPKG_PAYLOAD_ANALYSIS.md) is a dated size snapshot,
-  not a report of current package sizes.

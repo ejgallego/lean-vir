@@ -21,6 +21,7 @@ import {
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { encodeDescriptor } from "../../web/src/resources/descriptor.js";
+import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
 import {
   irPackageManifestChecksum,
   readIrPackageInfo,
@@ -313,6 +314,12 @@ function mutateMemberBytes(files, role, transform) {
 }
 // These are the native adapter's actual framing boundary, not full IR decoding.
 // Keep outer/set hashes valid so rejection must come from the selected member.
+function obsoleteManifestField(text, field) {
+  const current = `${JSON.stringify(field)}:${INTERFACE_MANIFEST_VERSION}`;
+  const retired = `${JSON.stringify(field)}:${INTERFACE_MANIFEST_VERSION - 1}`;
+  return replaceFixture(text, current, retired.padEnd(current.length, " "));
+}
+
 for (const role of ["root", "dependency"]) {
   for (const [label, transform] of [
     ["package-magic", bytes => { bytes[4] ^= 1; }],
@@ -343,8 +350,8 @@ for (const role of ["root", "dependency"]) {
 }
 for (const role of ["root", "dependency"]) {
   for (const [label, transform] of [
-    ["obsolete-interface", (text) => replaceFixture(text, '"version":9', '"version":8')],
-    ["wrong-manifest-metadata", (text) => replaceFixture(text, '"manifestVersion":9', '"manifestVersion":8')],
+    ["obsolete-interface", (text) => obsoleteManifestField(text, "version")],
+    ["wrong-manifest-metadata", (text) => obsoleteManifestField(text, "manifestVersion")],
     ["wrong-package-metadata", (text) => replaceFixture(text, '"packageFormatVersion":11', '"packageFormatVersion":10')],
     ["wrong-lean-revision", (text, manifest) => replaceFixture(text,
       `"leanGithash":${JSON.stringify(manifest.metadata.leanGithash)}`,
