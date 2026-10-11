@@ -8,6 +8,7 @@ import {
   INTERFACE_MANIFEST_VERSION,
   validateInterfaceManifest,
 } from "../../web/src/runtime/interface-manifest.js";
+import { encodeInterfaceManifest } from "../../scripts/packages/irpkg-format.mjs";
 import { primitiveBoundary } from "../support/interface-fixtures.mjs";
 
 const nat = () => primitiveBoundary("nat", "bigint");
@@ -46,13 +47,13 @@ test("distinct dotted and underscored entries coexist", () => {
   const value = manifest();
   value.exports[0].entry = "Duplicate.entry";
   value.exports[1].entry = "Duplicate_entry";
-  assert.equal(validateInterfaceManifest(value), value);
+  assert.deepEqual(validateInterfaceManifest(encodeInterfaceManifest(value)), { ...value, hostImports: [] });
 });
 
 test("duplicate entries reject independently of structural identities", () => {
   const value = manifest();
   value.exports[1].entry = value.exports[0].entry;
-  assert.throws(() => validateInterfaceManifest(value), /entry duplicates another interface export/);
+  assert.throws(() => validateInterfaceManifest(encodeInterfaceManifest(value)), /entry duplicates another interface export/);
 });
 
 for (const field of ["id", "jsName"]) {
@@ -60,7 +61,7 @@ for (const field of ["id", "jsName"]) {
     test(`retired export ${field} rejects even when ${String(spelling)}`, () => {
       const value = manifest();
       value.exports[0][field] = spelling;
-      assert.throws(() => validateInterfaceManifest(value), /is retired; use the full Lean entry name/);
+      assert.throws(() => validateInterfaceManifest(encodeInterfaceManifest(value)), /is retired; use the full Lean entry name/);
     });
   }
 }
@@ -69,7 +70,7 @@ test("entry names may be object property names", () => {
   for (const entry of ["constructor", "__proto__", "toString"]) {
     const value = manifest();
     value.exports[0].entry = entry;
-    assert.equal(validateInterfaceManifest(value), value);
+    assert.deepEqual(validateInterfaceManifest(encodeInterfaceManifest(value)), { ...value, hostImports: [] });
   }
 });
 
@@ -81,7 +82,7 @@ test("host import symbols and their boxed spellings share one native namespace",
     const value = manifest();
     value.hostImports = symbols.map((symbol, slot) => hostImport(slot, symbol));
     assert.throws(
-      () => validateInterfaceManifest(value),
+      () => validateInterfaceManifest(encodeInterfaceManifest(value)),
       /symbol alias "collision___boxed" belongs to more than one host import/,
     );
   }
@@ -89,5 +90,5 @@ test("host import symbols and their boxed spellings share one native namespace",
   const distinct = manifest();
   distinct.hostImports = [hostImport(0, "native_first"), hostImport(1, "native_second")];
   for (const entry of distinct.hostImports) entry.name = "same display name";
-  assert.equal(validateInterfaceManifest(distinct), distinct);
+  assert.deepEqual(validateInterfaceManifest(encodeInterfaceManifest(distinct)), distinct);
 });

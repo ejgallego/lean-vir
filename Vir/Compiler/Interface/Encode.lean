@@ -302,12 +302,6 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
     ("value", valueInterfaceJson ty)
   ]
 
-/-- Encode a named argument without depending on generator metadata. -/
-partial def InterfaceArg.toJson (arg : InterfaceArg) : String :=
-  jsonObject #[
-    ("name", jsonString arg.name),
-    ("type", arg.type.toJson)
-  ]
 
 end
 

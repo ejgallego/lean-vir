@@ -62,11 +62,26 @@ and textual `kind` describing
 the same category. Numeric wire discriminants, if selected later, would replace
 the strings rather than accompany them.
 
-Keep the initial pair inline at its callable boundary. This draft adds no global
-type/codec registry or separate ID table. Cache a bound plan by the admitted
-descriptor and interface identities, never by a declaration name or display
-label. Compiler recursion classification still uses the complete applied Lean
-type, including parameters and universes.
+The package manifest stores complete pairs once in `interfaces`. Callable
+argument `type` and `result` fields are package-local integer indices. Admission
+validates each closed pair and resolves those indices to the same pair objects;
+runtime-facing entries carry resolved pairs and omit the wire table. The old
+inline callable-root encoding is removed. Nested descriptors and selected views
+stay inline within each table entry, using lexical refs for recursion.
+
+Cache a bound plan by the admitted pair identity within a runtime. A package
+index is not a global type/codec ID or a runtime handle. No table entry refers to
+another table entry, so no table dependency graph or recursive linking pass is
+needed. Expected signatures compare resolved facts and views; local numbering
+cannot change signature agreement.
+
+Two identities have different jobs. Compiler recursion classification uses the
+complete applied Lean type, including parameters and universes. Pair sharing
+uses the complete deterministic conversion encoding, including instantiated
+fields, layout facts, declaration names and the selected view. Different
+instantiations stay distinct when their conversion facts differ. Erased or
+phantom parameters can legitimately produce identical pairs; sharing them does
+not establish Lean type equality. Declaration names alone are insufficient.
 
 ## Core native tags
 
@@ -125,6 +140,13 @@ spellings are emitted in the producer's default value interface using the existi
 central constructor-label rule. A consumer never guesses a spelling from a
 qualified name. An explicit alternate interface can choose other spellings;
 this is a selected mapping, not acceptance of aliases in one codec.
+
+Nominal facts also admit specialized policies: `Lean.Expr` selects its syntax
+operations, and generic `Lean.Vir.Js` resource passage differs from named resource
+boundaries. Equal physical storage alone does not establish equal conversion
+contracts. A future compiler shape model can provide storage facts through this
+producer boundary while keeping selected views and nominal policy facts explicit;
+this format does not guess that future API or introduce provisional shape IDs.
 
 ## Value tags
 
@@ -291,6 +313,13 @@ The value interface's `recursive` tag carries no second depth. Its paired native
 reference determines the owner, and the bound codec for that owner determines the
 representation. In a sequence plan, the chain tail is handled iteratively while
 element references still resolve in the native scope.
+
+Only complete closed callable pairs are shared. Extracting a nested Option/List
+fragment can leave a reference to an enclosing Tree free, even if two fragments
+have identical JSON. Native admission owns lexical scope validation; view
+admission checks the selected mapping without a second owner stack. Binding
+resolves native depths to its enclosing codec placeholders. These responsibilities
+stay separate from package-local index resolution.
 
 A metadata reference currently admits only a `recursive` view, reusing the
 enclosing whole codec. It cannot select an opaque `leanReference` just at that

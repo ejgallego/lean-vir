@@ -28,7 +28,7 @@ function array(value, label) {
 export function validateBoundaryInterface(pair, label = "interface type") {
   object(pair, ["native", "value"], label);
   validateNative(pair.native, [], `${label}.native`);
-  validateView(pair.native, pair.value, [], `${label}.value`);
+  validateView(pair.native, pair.value, `${label}.value`);
   return pair;
 }
 
@@ -126,7 +126,7 @@ function validateLocation(field, storage, objects, usizes, scalars, label) {
   } else fail(`${label}.location.tag`, "is not supported");
 }
 
-function validateView(native, view, owners, label) {
+function validateView(native, view, label) {
   if (!record(view)) fail(label, "must be an object");
   if (Object.hasOwn(native, "ref")) {
     object(view, ["tag"], label);
@@ -143,7 +143,7 @@ function validateView(native, view, owners, label) {
     return;
   }
   if (tag === "resource") { object(view, ["tag"], label); requireTag(["jsReference"]); return; }
-  const constructors = metadata?.constructors, scope = [native, ...owners];
+  const constructors = metadata?.constructors;
   switch (view.tag) {
     case "leanReference": object(view, ["tag"], label); return;
     case "expr":
@@ -156,15 +156,15 @@ function validateView(native, view, owners, label) {
       if (signature === undefined) fail(label, "requires callable signature metadata");
       array(view.args, `${label}.args`);
       if (view.args.length !== signature.args.length) fail(`${label}.args`, "must cover every callable argument");
-      view.args.forEach((arg, i) => validateView(signature.args[i], arg, [], `${label}.args[${i}]`));
-      validateView(signature.result, view.result, [], `${label}.result`);
+      view.args.forEach((arg, i) => validateView(signature.args[i], arg, `${label}.args[${i}]`));
+      validateView(signature.result, view.result, `${label}.result`);
       return;
     }
     case "sequence": {
       object(view, ["tag", "element", "chain"], label);
       if (view.chain === undefined) {
         if (metadata?.arrayElement === undefined) fail(label, "requires native-array metadata");
-        validateView(metadata.arrayElement, view.element, owners, `${label}.element`);
+        validateView(metadata.arrayElement, view.element, `${label}.element`);
       } else {
         object(view.chain, ["nil", "cons", "head", "tail"], `${label}.chain`);
         for (const key of ["nil", "cons", "head", "tail"]) uint(view.chain[key], `${label}.chain.${key}`);
@@ -174,7 +174,7 @@ function validateView(native, view, owners, label) {
           cell.fields.length !== 2 || head === tail || !cell.fields[head] || cell.fields[tail]?.type.ref !== 0 ||
           cell.storage.objectFieldCount !== 2 || cell.storage.usizeFieldCount || cell.storage.scalarByteSize ||
           !cell.fields.every(field => field.location.tag === "object")) fail(`${label}.chain`, "does not describe a supported linked sequence");
-        validateView(cell.fields[head].type, view.element, scope, `${label}.element`);
+        validateView(cell.fields[head].type, view.element, `${label}.element`);
       }
       return;
     }
@@ -194,7 +194,7 @@ function validateView(native, view, owners, label) {
     case "record": {
       object(view, ["tag", "fields"], label);
       if (constructors?.length !== 1) fail(label, "requires one constructor");
-      validateMappings(native, constructors[0].fields, view.fields, scope, label);
+      validateMappings(constructors[0].fields, view.fields, label);
       return;
     }
     case "variant": {
@@ -210,10 +210,10 @@ function validateView(native, view, owners, label) {
         if (item.payload === "none") { if (fields.length || item.value !== undefined || item.fields !== undefined) fail(at, "requires a nullary constructor"); }
         else if (item.payload === "value") {
           if (fields.length !== 1 || item.fields !== undefined) fail(at, "requires one field");
-          validateView(fields[0].type, item.value, scope, `${at}.value`);
+          validateView(fields[0].type, item.value, `${at}.value`);
         } else if (item.payload === "fields") {
           if (item.value !== undefined) fail(at, "has unexpected value mapping");
-          validateMappings(native, fields, item.fields, scope, at);
+          validateMappings(fields, item.fields, at);
         } else fail(`${at}.payload`, "is not supported");
       });
       return;
@@ -222,7 +222,7 @@ function validateView(native, view, owners, label) {
   }
 }
 
-function validateMappings(native, fields, mappings, scope, label) {
+function validateMappings(fields, mappings, label) {
   array(mappings, `${label}.fields`);
   const keys = new Set(), paths = [];
   for (const [index, mapping] of mappings.entries()) {
@@ -231,7 +231,7 @@ function validateMappings(native, fields, mappings, scope, label) {
     if (typeof mapping.key !== "string" || keys.has(mapping.key)) fail(`${at}.key`, "must be a unique string"); keys.add(mapping.key);
     array(mapping.path, `${at}.path`);
     if (!mapping.path.length) fail(`${at}.path`, "must be non-empty");
-    let targetFields = fields, child, owners = scope;
+    let targetFields = fields, child;
     mapping.path.forEach((position, depth) => {
       uint(position, `${at}.path[${depth}]`);
       child = targetFields[position]?.type;
@@ -239,10 +239,10 @@ function validateMappings(native, fields, mappings, scope, label) {
       if (depth + 1 !== mapping.path.length) {
         const ctors = child.metadata?.constructors;
         if (ctors?.length !== 1) fail(`${at}.path`, "must traverse single-constructor objects");
-        targetFields = ctors[0].fields; owners = [child, ...owners];
+        targetFields = ctors[0].fields;
       }
     });
-    validateView(child, mapping.value, owners, `${at}.value`);
+    validateView(child, mapping.value, `${at}.value`);
     paths.push(mapping.path);
   }
   function coverage(current, selected) {

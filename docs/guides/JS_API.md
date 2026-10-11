@@ -341,10 +341,14 @@ application ownership: VIR does not dispose supplied maps when runtimes shut dow
 
 ## Calls And Manifest
 
-- `vir.interfaceManifest` is the embedded package manifest. The runtime freezes
-  this internally owned JSON tree, including nested type descriptors, on
+- `vir.interfaceManifest` is the admitted, resolved package manifest. The wire
+  format's package-local `interfaces` table and integer callable references are
+  resolved to shared pair objects; the runtime-facing manifest omits that table.
+  The runtime freezes this internally owned descriptor graph on
   installation so cached export, layout, and normalization plans cannot drift.
   Use `structuredClone(vir.interfaceManifest)` for editable inspection data.
+  Cloning preserves sharing within the graph. Clone a chosen pair separately
+  before replacing it if an edit should affect only one argument/result position.
   This does not freeze application values passed through host bindings.
 - `vir.packageMetadata` is `vir.interfaceManifest.metadata`, including the
   package format version, Lean toolchain, source targets, and resolved roots.

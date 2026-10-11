@@ -101,12 +101,13 @@ assert.equal(calls.length, 8);
 const installCalls = [];
 const invalidManifestText = JSON.stringify({
   version: INTERFACE_MANIFEST_VERSION,
+  interfaces: [entry("invalid", undefined).result],
   metadata: {
     packageFormatVersion: 11,
     manifestVersion: INTERFACE_MANIFEST_VERSION,
     targets: [],
   },
-  exports: [entry("invalid", undefined)],
+  exports: [{ ...entry("invalid", undefined), result: 0 }],
 });
 const invalidManifestBytes = new TextEncoder().encode(invalidManifestText);
 const memory = new WebAssembly.Memory({ initial: 1 });

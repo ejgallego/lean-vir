@@ -5,6 +5,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { encodeInterfaceManifest } from "../../scripts/packages/irpkg-format.mjs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -190,7 +191,7 @@ declare function schedule(value: number): void;
     hostImports: [],
     diagnostics: [],
   };
-  await writeFile(manifest, `${JSON.stringify(manifestValue, null, 2)}\n`);
+  await writeFile(manifest, `${JSON.stringify(encodeInterfaceManifest(manifestValue), null, 2)}\n`);
   await writeFile(inventory, `${JSON.stringify({
     format: "lean-vir-js-inventory",
     version: 1,
@@ -224,7 +225,7 @@ declare function schedule(value: number): void;
       targets: [{ target: "demo.reset", path: ["Demo.reset"] }],
     }],
   }, null, 2)}\n`);
-  await writeFile(invalidAliasManifest, `${JSON.stringify({
+  await writeFile(invalidAliasManifest, `${JSON.stringify(encodeInterfaceManifest({
     ...manifestValue,
     metadata: {
       typeAnchorAliases: [{
@@ -234,7 +235,7 @@ declare function schedule(value: number): void;
         descriptor: "resource",
       }],
     },
-  }, null, 2)}\n`);
+  }), null, 2)}\n`);
 
   run(["scripts/bindings/generate-ts-descriptors.mjs", "--anchors", anchors, "--out", descriptors, types]);
   run([

@@ -10,6 +10,7 @@ public import Vir.Compiler.Interface.Encode
 public import Vir.GeneratePackage.Manifest
 public import Vir.Package.Json
 public import Vir.Package.Name
+import Std.Data.HashMap
 
 public section
 
@@ -19,19 +20,46 @@ namespace Vir.GeneratePackage
 
 open Vir.Interface
 
-def InterfaceExport.toJson (entry : InterfaceExport) : String :=
-  jsonObject #[
+/-- Package-local conversion identities. Keys are complete deterministic pair
+encodings, including instantiated fields and the selected value interface.
+This is not Lean type equality: erased/phantom parameters may leave identical
+conversion facts, and an index never identifies a declaration or runtime value. -/
+private structure BoundaryTable where
+  pairs : Array String := #[]
+  indices : Std.HashMap String Nat := {}
+
+private def boundaryIndex (type : InterfaceType) : StateM BoundaryTable Nat := do
+  let encoded := type.toJson
+  let table ← get
+  if let some index := table.indices[encoded]? then
+    return index
+  let index := table.pairs.size
+  set { table with pairs := table.pairs.push encoded, indices := table.indices.insert encoded index }
+  return index
+
+private def argumentJson (arg : InterfaceArg) : StateM BoundaryTable String := do
+  return jsonObject #[
+    ("name", jsonString arg.name),
+    ("type", jsonNat (← boundaryIndex arg.type))
+  ]
+
+private def exportJson (entry : InterfaceExport) : StateM BoundaryTable String := do
+  let args ← entry.args.mapM argumentJson
+  let result ← boundaryIndex entry.result
+  return jsonObject #[
     ("entry", jsonName entry.entry),
     ("nameKey", jsonString (Vir.nameKey entry.entry)),
     ("source", jsonString entry.source),
-    ("args", jsonArray (entry.args.map InterfaceArg.toJson)),
-    ("result", entry.result.toJson),
+    ("args", jsonArray args),
+    ("result", jsonNat result),
     ("effect", entry.effect.toJson),
     ("startup", jsonBool entry.startup)
   ]
 
-def HostImport.toJson (entry : HostImport) : String :=
-  jsonObject #[
+private def hostImportJson (entry : HostImport) : StateM BoundaryTable String := do
+  let args ← entry.args.mapM argumentJson
+  let result ← boundaryIndex entry.result
+  return jsonObject #[
     ("slot", jsonNat entry.slot),
     ("name", jsonName entry.name),
     ("nameKey", jsonString (Vir.nameKey entry.name)),
@@ -41,8 +69,8 @@ def HostImport.toJson (entry : HostImport) : String :=
     ("symbol", jsonString entry.symbol),
     ("arity", jsonNat entry.arity),
     ("erasedPrefixArgs", jsonNat entry.erasedPrefixArgs),
-    ("args", jsonArray (entry.args.map InterfaceArg.toJson)),
-    ("result", entry.result.toJson),
+    ("args", jsonArray args),
+    ("result", jsonNat result),
     ("effect", entry.effect.toJson)
   ]
 
@@ -86,12 +114,18 @@ def PackageMetadata.toJson (metadata : PackageMetadata) : String :=
   jsonObject fields
 
 def InterfaceManifest.toJson (manifest : InterfaceManifest) : String :=
+  let encode : StateM BoundaryTable (Array String × Array String) := do
+    let exports ← manifest.exports.mapM exportJson
+    let hostImports ← manifest.hostImports.mapM hostImportJson
+    return (exports, hostImports)
+  let ((exports, hostImports), table) := encode.run {}
   jsonObject #[
     ("version", jsonNat currentInterfaceManifestVersion),
     ("artifact", jsonString packageMagic),
     ("metadata", manifest.metadata.toJson),
-    ("exports", jsonArray (manifest.exports.map InterfaceExport.toJson)),
-    ("hostImports", jsonArray (manifest.hostImports.map HostImport.toJson)),
+    ("interfaces", jsonArray table.pairs),
+    ("exports", jsonArray exports),
+    ("hostImports", jsonArray hostImports),
     ("diagnostics", jsonArray (manifest.diagnostics.map PackageDiagnostic.toJson))
   ]
 

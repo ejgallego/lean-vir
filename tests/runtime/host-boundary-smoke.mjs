@@ -199,7 +199,7 @@ import {
       return value;
     },
   });
-  const resourceResult = resourceBoundary();
+  const resourceResult = resourceBoundary({ tag: "jsReference" }, { declaration: "Lean.Vir.Js" });
   const structuralResult = objectBoundary(
     "Test.Result",
     [objectConstructor("Test.Result.mk", {

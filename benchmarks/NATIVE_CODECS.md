@@ -147,11 +147,21 @@ At 1,024, the median paired roundtrip changes **before the new optimizations** w
 | Byte-array control | -2.4% | -2.3% |
 
 Negative means faster. These are mechanism measurements, not application
-forecasts. The manifest grew from 46,095 to 55,270 bytes, about 20%; separating
-native facts from value mappings does not make inline JSON smaller. Fresh-runtime
+forecasts. The initial inline pair migration grew the manifest section from
+46,095 to 55,270 bytes, about 20%. Fresh-runtime
 creation medians were 7.7ms and 8.3ms across eight observations each. Imports and
 first calls remain separately recorded; this small screen does not establish a
 cold-browser startup result.
+
+Package-local sharing subsequently stores those 52 callable argument/result
+pairs as 10 complete table entries. Against the corrected inline source, the
+same fresh program's manifest JSON shrank from 55,258 to 17,712 bytes (68.0%).
+Offline gzip shrank from 2,585 to 2,171 bytes (16.0%); whole-package gzip shrank
+from 3,760 to 3,325 bytes. All non-manifest native sections and all 26 callable
+signatures are unchanged. Resolved object/array identities decrease from 1,882
+to 445; these are static graph counts, not measured heap bytes. No new timing
+campaign or application/startup speedup is claimed for sharing. The call-path
+timings below predate this wire-only change.
 
 A sampled nested-small-integer workload then identified decimal UTF conversion:
 `encode` alone accounted for about 9% of sampled time. Using existing native

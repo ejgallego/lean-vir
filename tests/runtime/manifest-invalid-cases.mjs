@@ -28,17 +28,17 @@ export const invalidManifestCases = [
   {
     name: "boundary requires a native descriptor",
     mutate: (manifest) => { delete manifest.exports[0].result.native; },
-    pattern: /result\.native must be an object/,
+    pattern: /native must be an object/,
   },
   {
     name: "boundary requires an explicit JavaScript value mapping",
     mutate: (manifest) => { delete manifest.exports[0].result.value; },
-    pattern: /result\.value must be an object/,
+    pattern: /value must be an object/,
   },
   {
     name: "legacy interface tags cannot be attached to a descriptor pair",
     mutate: (manifest) => { manifest.exports[0].result.interfaceTag = 0; },
-    pattern: /result\.interfaceTag is not supported/,
+    pattern: /interfaceTag is not supported/,
   },
   {
     name: "the native type no longer carries a display type string",

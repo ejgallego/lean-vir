@@ -202,6 +202,23 @@ export interface CallableInterface {
   readonly effect: Effect;
 }
 
+// Wire indices are package-local u32 positions. They select whole closed pairs;
+// RecursiveDescriptorRef.ref remains a separate lexical depth inside a pair.
+export type ManifestInterfaceIndex = number;
+export interface ManifestArgument {
+  readonly name: string;
+  readonly type: ManifestInterfaceIndex;
+}
+// Callable positions only; entry/provenance/host fields are separate manifest facts.
+export interface ManifestCallSignature {
+  readonly args: readonly ManifestArgument[];
+  readonly result: ManifestInterfaceIndex;
+  readonly effect: Effect;
+}
+export interface ManifestBoundaryTable {
+  readonly interfaces: readonly BoundaryInterface[];
+}
+
 // Concrete examples use the same native descriptor with different value views.
 // These layout facts illustrate the draft, not a replacement metadata producer.
 export const optionNatDescriptor: NativeDescriptor = {

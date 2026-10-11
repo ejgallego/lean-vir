@@ -16,7 +16,6 @@ import { formatInterfaceEffectPrefix } from "../src/runtime/interface-effects.js
 import {
   formatInterfaceType,
   manifestDiagnostics,
-  validateInterfaceManifest,
 } from "../src/runtime/interface-manifest.js";
 import { createBrowserReactRuntimeFactory } from "./browser-react-runtime.js";
 import {
@@ -305,9 +304,9 @@ function inputOverride(entry, input, index) {
   return null;
 }
 
-function validatedManifestEntries(manifest) {
-  const validated = validateInterfaceManifest(manifest);
-  const diagnostics = manifestDiagnostics(validated);
+function manifestEntries(manifest) {
+  // The candidate runtime has already admitted and frozen its resolved manifest.
+  const diagnostics = manifestDiagnostics(manifest);
   if (diagnostics.length > 0) {
     const lines = diagnostics.map(
       (diagnostic) =>
@@ -317,7 +316,7 @@ function validatedManifestEntries(manifest) {
       `package contains unsupported interface exports:\n${lines.join("\n")}`,
     );
   }
-  return validated.exports;
+  return manifest.exports;
 }
 
 function renderManifestEntries(entries, requestedEntryName) {
@@ -436,7 +435,7 @@ async function loadPackageSet(
   let entries;
   let requestedEntryName;
   try {
-    entries = validatedManifestEntries(candidate.interfaceManifest);
+    entries = manifestEntries(candidate.interfaceManifest);
     requestedEntryName = consumeRequestedEntry(entries);
   } catch (error) {
     candidate.dispose();

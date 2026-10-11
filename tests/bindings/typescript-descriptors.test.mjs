@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { encodeInterfaceManifest } from "../../scripts/packages/irpkg-format.mjs";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -324,7 +325,7 @@ test("the comparator fails closed on TypeScript absence semantics", async () => 
         { id: "optional_property", lean: "Demo.maybeString", ts: "optionalProperty" },
       ],
     }, null, 2)}\n`);
-    await writeFile(manifest, `${JSON.stringify({
+    await writeFile(manifest, `${JSON.stringify(encodeInterfaceManifest({
       version: INTERFACE_MANIFEST_VERSION,
       artifact: "lean-vir-ir-package",
       metadata: {},
@@ -366,7 +367,7 @@ test("the comparator fails closed on TypeScript absence semantics", async () => 
       }],
       hostImports: [],
       diagnostics: [],
-    }, null, 2)}\n`);
+    }), null, 2)}\n`);
 
     const report = await buildTypeAnchorReport({ descriptors, manifest });
     assert.deepEqual(

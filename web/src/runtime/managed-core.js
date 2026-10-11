@@ -578,10 +578,11 @@ function guardWasmExports(exports, hostState) {
 // Only called on the runtime's own parsed JSON, never caller-owned host values
 // or standalone validator inputs. Cached call/layout plans require stable data.
 function freezeManifestTree(manifest) {
-  const pending = [manifest];
+  const pending = [manifest], seen = new Set();
   while (pending.length !== 0) {
     const value = pending.pop();
-    if (value === null || typeof value !== "object") continue;
+    if (value === null || typeof value !== "object" || seen.has(value)) continue;
+    seen.add(value);
     Object.freeze(value);
     for (const child of Object.values(value)) pending.push(child);
   }

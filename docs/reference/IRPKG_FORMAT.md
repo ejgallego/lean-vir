@@ -253,10 +253,11 @@ and [host bindings](HOST_BINDINGS.md) for authoring and lifetime rules.
 
 ## Interface descriptors
 
-Manifest 12 represents each exported or imported argument and result as one
-`{ native, value }` pair. An argument retains its parameter name as
-`{ name, type: <pair> }`; an entry result is the pair directly. The compiler
-derives native representation facts and a default JavaScript mapping together.
+Manifest 12 stores complete `{ native, value }` pairs once in the required
+`interfaces` array. Exported and imported arguments retain their parameter names
+as `{ name, type: <index> }`; an entry result is an index. Indices are package-local
+nonnegative u32 positions in that array. A package with no callable surface can
+have an empty table. The compiler derives native facts and a default mapping together.
 Native field types and storage live in compiler metadata. The value interface
 selects a JavaScript representation and refers to those fields without
 duplicating their types or physical layout.
@@ -267,6 +268,23 @@ experimental structural converter. Official support follows the
 promise. Pair validation happens at manifest admission. Optional conversion
 binds admitted pairs into cached codecs; ordinary calls and opaque reference
 passage do not require structural conversion.
+
+Admission validates each table entry as a closed pair, then resolves callable
+indices to those pair objects. Runtime-facing manifests omit the table and have
+resolved argument/result pairs. Multiple uses share immutable descriptor identity
+and the per-runtime codec cache. The wire input remains unchanged; no expanded
+descriptor copy is made for each use. Inline callable-root pairs are rejected.
+
+Table entries contain no references to other table entries. Nested `{ ref: depth }`
+values refer exclusively to enclosing constructor scopes inside that pair.
+Moving an entire closed pair preserves those depths; nested open fragments are
+not extracted or interned. Expected signatures compare resolved complete shapes,
+independently of local table numbering and parameter display names.
+
+The sharing key is the complete conversion encoding, not declaration name or
+Lean type equality. Instantiated fields, layouts and selected mappings participate;
+phantom/erased parameters may yield equal encodings. This does not make package
+indices usable as nominal types, declarations or runtime values.
 
 ```text
 BoundaryInterface = { native: NativeDescriptor, value: ValueInterface }

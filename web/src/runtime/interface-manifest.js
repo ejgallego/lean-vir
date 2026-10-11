@@ -21,7 +21,7 @@ export const HOST_IMPORT_BOUNDARY = Object.freeze({
 });
 
 export const INTERFACE_MANIFEST_SHAPE_ERROR =
-  `embedded interface manifest must be { version: ${INTERFACE_MANIFEST_VERSION}, metadata: {...}, exports: [...] }; ` +
+  `embedded interface manifest must be { version: ${INTERFACE_MANIFEST_VERSION}, metadata: {...}, interfaces: [...], exports: [...] }; ` +
   "regenerate packages with the matching SDK";
 
 function isRecord(value) {
@@ -73,6 +73,7 @@ export function validateInterfaceManifest(
     !Number.isInteger(manifest.version) ||
     manifest.version !== INTERFACE_MANIFEST_VERSION ||
     !isRecord(manifest.metadata) ||
+    !Array.isArray(manifest.interfaces) ||
     !Array.isArray(manifest.exports)
   ) {
     throw new Error(INTERFACE_MANIFEST_SHAPE_ERROR);
@@ -102,16 +103,19 @@ export function validateInterfaceManifest(
     manifest.version,
     packageFormatVersion,
   );
-  const exports = manifest.exports;
-  validateManifestExports(exports);
-  const hostImports = manifest.hostImports ?? [];
-  validateManifestHostImports(hostImports);
+  // Each closed pair is admitted once. Callable positions reuse its identity;
+  // nested lexical refs remain internal to that pair, never table references.
+  manifest.interfaces.forEach((pair, index) =>
+    validateInterfaceRootType(pair, `embedded interface manifest interfaces[${index}]`));
+  const exports = validateManifestExports(manifest.exports, manifest.interfaces);
+  const hostImports = validateManifestHostImports(manifest.hostImports ?? [], manifest.interfaces);
   validatePackageSetSurface(
     manifest.metadata.packageSetMember,
     exports,
     hostImports,
   );
-  return manifest;
+  const { interfaces: _interfaces, ...rest } = manifest;
+  return { ...rest, exports, hostImports };
 }
 
 function validateManifestMetadata(
@@ -152,10 +156,10 @@ function validateManifestMetadata(
   validatePackageSetMember(metadata.packageSetMember, metadata.targets, label);
 }
 
-function validateManifestExports(exports) {
+function validateManifestExports(exports, interfaces) {
   const entries = new Set();
   const identities = new Set();
-  exports.forEach((entry, index) => {
+  return exports.map((entry, index) => {
     const label = `embedded interface manifest exports[${index}]`;
     if (!isRecord(entry)) {
       throw new Error(`${label} must be an object`);
@@ -175,17 +179,11 @@ function validateManifestExports(exports) {
     if (!Array.isArray(entry.args)) {
       throw new Error(`${label}.args must be an array`);
     }
-    entry.args.forEach((arg, argIndex) => {
-      const argLabel = `${label}.args[${argIndex}]`;
-      if (!isRecord(arg)) {
-        throw new Error(`${argLabel} must be an object`);
-      }
-      requireString(arg.name, `${argLabel}.name`);
-      validateInterfaceRootType(arg.type, `${argLabel}.type`);
-    });
-    validateInterfaceRootType(entry.result, `${label}.result`);
+    const args = resolveArguments(entry.args, interfaces, label);
+    const result = resolveInterfaceIndex(entry.result, interfaces, `${label}.result`);
     requireNameKey(entry.nameKey, `${label}.nameKey`);
     requireUnique(identities, entry.nameKey, `${label}.nameKey`);
+    return { ...entry, args, result };
   });
 }
 
@@ -232,10 +230,10 @@ function validatePackageSetSurface(member, exports, hostImports) {
   }
 }
 
-function validateManifestHostImports(hostImports) {
+function validateManifestHostImports(hostImports, interfaces) {
   const identities = new Set();
   const symbolAliases = new Map();
-  hostImports.forEach((entry, index) => {
+  return hostImports.map((entry, index) => {
     const label = `embedded interface manifest hostImports[${index}]`;
     if (!isRecord(entry)) {
       throw new Error(`${label} must be an object`);
@@ -264,15 +262,8 @@ function validateManifestHostImports(hostImports) {
     if (!Array.isArray(entry.args)) {
       throw new Error(`${label}.args must be an array`);
     }
-    entry.args.forEach((arg, argIndex) => {
-      const argLabel = `${label}.args[${argIndex}]`;
-      if (!isRecord(arg)) {
-        throw new Error(`${argLabel} must be an object`);
-      }
-      requireString(arg.name, `${argLabel}.name`);
-      validateInterfaceRootType(arg.type, `${argLabel}.type`);
-    });
-    validateInterfaceRootType(entry.result, `${label}.result`);
+    const args = resolveArguments(entry.args, interfaces, label);
+    const result = resolveInterfaceIndex(entry.result, interfaces, `${label}.result`);
     requireInterfaceEffect(entry.effect, `${label}.effect`);
     const expectedArity =
       entry.erasedPrefixArgs +
@@ -286,6 +277,22 @@ function validateManifestHostImports(hostImports) {
     requireHostImportBoundary(entry.boundary, `${label}.boundary`);
     requireNameKey(entry.nameKey, `${label}.nameKey`);
     requireUnique(identities, entry.nameKey, `${label}.nameKey`, "host import");
+    return { ...entry, args, result };
+  });
+}
+
+function resolveInterfaceIndex(index, interfaces, label) {
+  requireNonNegativeInteger(index, label);
+  if (index >= interfaces.length) throw new Error(`${label} has no interface at index ${index}`);
+  return interfaces[index];
+}
+
+function resolveArguments(args, interfaces, label) {
+  return args.map((arg, index) => {
+    const at = `${label}.args[${index}]`;
+    if (!isRecord(arg)) throw new Error(`${at} must be an object`);
+    requireString(arg.name, `${at}.name`);
+    return { ...arg, type: resolveInterfaceIndex(arg.type, interfaces, `${at}.type`) };
   });
 }
 

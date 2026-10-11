@@ -402,7 +402,7 @@ export async function smokeRunnerFatalRecovery(cdp, origin) {
         return {
           ready: document.querySelector("#status")?.textContent?.trim() === "Ready" &&
             !document.querySelector("#dev-run-entry").disabled,
-          text: field.value, kind: constructor.value,
+          text: field.value, kind: constructor.selectedOptions[0]?.textContent,
           fieldDisabled: field.disabled, constructorDisabled: constructor.disabled,
           calls: window.__virTestResolvedCalls,
         };

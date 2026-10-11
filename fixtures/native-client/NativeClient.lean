@@ -30,12 +30,12 @@ run_meta do
     unless argument.type == expected &&
         signature.result == expected && signature.effect == .pure do
       Lean.throwError "unexpected interface for {name}"
-    let .ok encoded := Lean.Json.parse argument.toJson
-      | Lean.throwError "invalid native-loaded argument encoding"
-    let .ok encodedName := encoded.getObjValAs? String "name"
-      | Lean.throwError "missing native-loaded argument name"
-    let .ok encodedType := encoded.getObjVal? "type"
-      | Lean.throwError "missing native-loaded argument type"
+    let .ok encoded := Lean.Json.parse signature.toExpectedSignatureJson
+      | Lean.throwError "invalid native-loaded signature encoding"
+    let .ok encodedArgs := encoded.getObjValAs? (Array Lean.Json) "args"
+      | Lean.throwError "missing native-loaded argument types"
+    let #[encodedType] := encodedArgs
+      | Lean.throwError "unexpected native-loaded argument count"
     let .ok encodedNative := encodedType.getObjVal? "native"
       | Lean.throwError "missing native-loaded native descriptor"
     let .ok nativeType := encodedNative.getObjVal? "type"
@@ -50,10 +50,9 @@ run_meta do
       | .nat => ("nat", "bigint")
       | .string => ("string", "string")
       | _ => ("", "")
-    unless encodedName == argument.name &&
-        nativeTag == expectedNativeTag && valueTag == expectedValueTag &&
+    unless nativeTag == expectedNativeTag && valueTag == expectedValueTag &&
         signature.effect.toJson == "\"pure\"" do
-      Lean.throwError "unexpected native-loaded argument/effect encoding"
+      Lean.throwError "unexpected native-loaded signature/effect encoding"
 
 -- Encoding data uses the current schema/compatibility, not a frozen fixture pin.
 public def NativeClient.descriptor : Vir.Resources.Descriptor := {

@@ -158,6 +158,7 @@ export const runtimeTests = Object.freeze(
     { id: "recursive-owner", file: "recursive-owner-smoke.mjs", group: "lean" },
     { id: "option-values", file: "option-values-smoke.mjs", group: "lean" },
     { id: "native-value-codecs", file: "native-value-codecs-smoke.mjs", group: "lean" },
+    { id: "manifest-sharing", file: "manifest-sharing-smoke.mjs", group: "lean" },
     { id: "json-codecs", file: "json-codecs-smoke.mjs", group: "lean" },
     { id: "tamagotchi-codecs", file: "tamagotchi-codecs-smoke.mjs", group: "lean" },
     { id: "sdk-import", file: "sdk-import-smoke.mjs", group: "lean" },
