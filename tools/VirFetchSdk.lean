@@ -15,6 +15,15 @@ namespace Vir.FetchSdk
 
 def sdkVersion : String := "0.1.0"
 
+/-- Lean-aligned release names omit a zero patch component, retaining rc suffixes. -/
+def releaseTagForVersion (version : String) : String :=
+  let parts := version.splitOn "-"
+  let core := parts.headD version
+  let core := if core.endsWith ".0" then (core.dropEnd 2).toString else core
+  String.intercalate "-" (core :: parts.tail)
+
+def sdkReleaseTag : String := releaseTagForVersion Lean.versionString
+
 structure Options where
   out : FilePath := "web/public/vendor/lean-vir"
   archive? : Option String := none
@@ -31,7 +40,7 @@ def usage : String :=
   "usage: lake exe lean_vir/vir_fetch_sdk [--out DIR] [--archive FILE | --url URL | --tag TAG | --commit SHA [--repo OWNER/REPO]]\n" ++
   "       lake exe lean_vir/vir_fetch_sdk --verify-installed DIR [--expect-version VERSION] [--expect-commit SHA]\n\n" ++
   "Installs a lean-vir-sdk.tar.gz archive into DIR and verifies lean-vir-artifact.json checksums.\n\n" ++
-  s!"The default source is release v{sdkVersion}. Use --expect-version VERSION or --expect-commit SHA to reject a mismatched SDK.\n\n" ++
+  s!"The default source is Lean-aligned release {sdkReleaseTag}. Use --expect-version VERSION or --expect-commit SHA to reject a mismatched SDK.\n\n" ++
   "Environment fallbacks: VIR_SDK_ARCHIVE, VIR_SDK_URL, VIR_SDK_TAG, VIR_SDK_COMMIT, VIR_SDK_EXPECT_COMMIT, VIR_SDK_REPO."
 
 partial def parseArgs (args : List String) (opts : Options := {}) : Except String Options :=
@@ -120,7 +129,7 @@ def sourceFromOptions (opts : Options) : IO Source := do
                               | some commit => return .commit commit
                               | none =>
                                   let repo := repo.getD opts.repo
-                                  return .url s!"https://github.com/{repo}/releases/download/v{sdkVersion}/lean-vir-sdk.tar.gz"
+                                  return .url s!"https://github.com/{repo}/releases/download/{sdkReleaseTag}/lean-vir-sdk.tar.gz"
 
 def expectedCommitFromOptions (opts : Options) : IO (Option String) := do
   match opts.expectCommit? with

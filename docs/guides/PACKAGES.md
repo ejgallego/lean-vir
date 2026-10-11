@@ -211,9 +211,12 @@ resource release does not provide an SDK archive for this command.
 lake build :virSdk
 ```
 
-This installs the release matching the installed `lean_vir` package version
-under `.lake/build/vir/sdk/`. That GitHub release must exist. For an unreleased
-revision, select the exact dependency commit:
+This installs the release matching the Lean toolchain under
+`.lake/build/vir/sdk/`: for example, Lean `v4.35.0-rc4` selects tag `4.35-rc4`.
+Stable `v4.35.0` selects `4.35`; a nonzero patch such as `v4.35.1` is retained.
+Milestone numbers and the SDK manifest version do not select the release tag.
+That GitHub release must exist. `VIR_SDK_TAG` selects an explicit release tag.
+For an unreleased revision, select the exact dependency commit:
 
 ```bash
 VIR_SDK_COMMIT=<lean-vir-revision> lake build :virSdk

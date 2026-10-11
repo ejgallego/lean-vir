@@ -345,8 +345,8 @@ module_facet vir (mod : Module) : System.FilePath :=
 private def virSdkVersion : String := "0.1.0"
 
 /--
-Install and verify the matching VIR browser SDK under the package build
-directory.
+Install and verify the Lean-toolchain release of the VIR browser SDK under
+the package build directory. The SDK manifest version is checked separately.
 -/
 package_facet virSdk (pkg : Package) : System.FilePath := do
   let fetcherJob ← vir_fetch_sdk.fetch
@@ -369,6 +369,7 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
   fetcherJob.mapM fun fetcher => do
     addTrace (← computeTrace fetcher)
     addPureTrace virSdkVersion "VIR SDK version"
+    addPureTrace Lean.versionString "VIR SDK release toolchain"
     addPureTrace sourceConfig "VIR SDK source"
     if let some archive := archive? then
       addTrace (← computeTrace (System.FilePath.mk archive))
