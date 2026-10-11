@@ -28,6 +28,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:quiet
+      - run: npm run test:mailbox
       - run: npm run test:native-client
       - run: npm run test:packages:unit
       - run: npm run test:tutorials
