@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { inspect } from "node:util";
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
 import { assert, generateIrPackage, join, readFile, writeRuntimeFixture } from "./shared.mjs";
 
@@ -20,10 +21,14 @@ try {
     irPackageSet: [await readFile(packagePath)],
   });
   const call = (name, ...args) => { calls++; return runtime.call(`FloatMath.${name}`, ...args); };
-  const equal = (name, args, expected) => assert.ok(Object.is(call(name, ...args), expected), name);
+  const equal = (name, args, expected) =>
+    assert.equal(call(name, ...args), expected, `${name}(${args.map(x => inspect(x)).join(", ")})`);
   const near = (name, args, expected) => {
     const actual = call(name, ...args);
-    assert.ok(Number.isFinite(actual) && Math.abs(actual - expected) <= Math.abs(expected) * 2e-14, name);
+    assert.ok(
+      Number.isFinite(actual) && Math.abs(actual - expected) <= Math.abs(expected) * 2e-14,
+      `${name}(${args.map(x => inspect(x)).join(", ")}): actual ${inspect(actual)}, expected approximately ${inspect(expected)}`,
+    );
   };
   try {
     assert.equal(runtime.interfaceManifest.exports.length, 25);
@@ -38,12 +43,13 @@ try {
     equal("log", [0], -Infinity);
     equal("log", [-1], NaN);
     equal("exp", [-Infinity], 0);
-    for (const x of [NaN, Infinity, -Infinity, 0, -0, Number.MIN_VALUE, 1]) {
+    for (const x of [NaN, Infinity, -Infinity, 0, -0, Number.MIN_VALUE, -Number.MIN_VALUE, 1, 1e40, -1e40]) {
       equal("isNaN", [x], Number.isNaN(x));
       equal("isFinite", [x], Number.isFinite(x));
-      equal("nan32", [x], Number.isNaN(x));
-      equal("finite32", [x], Number.isFinite(x));
-      equal("inf32", [x], Math.abs(x) === Infinity);
+      const x32 = Math.fround(x); // Arguments narrow before Lean receives them.
+      equal("nan32", [x], Number.isNaN(x32));
+      equal("finite32", [x], Number.isFinite(x32));
+      equal("inf32", [x], Math.abs(x32) === Infinity);
     }
     for (const x of [-1.5, -0.5, -0, 0, 0.5, 1.5, Infinity, -Infinity]) {
       equal("ceil", [x], Math.ceil(x));
@@ -60,7 +66,10 @@ try {
     equal("bits", [1], 0x3ff0000000000000n);
     equal("bits32", [-0], 0x80000000);
     equal("bits32", [1], 0x3f800000);
-    for (const x of [0, -0, 1 + 2 ** -24, 1 + 3 * 2 ** -24, 2 ** -149, 2 ** -150, 1e40])
+    for (const x of [
+      0, -0, 1 + 2 ** -24, 1 + 3 * 2 ** -24, -(1 + 2 ** -24), -(1 + 3 * 2 ** -24),
+      2 ** -149, -(2 ** -149), 2 ** -150, -(2 ** -150), 1e40, -1e40,
+    ])
       equal("narrow", [x], Math.fround(x));
     for (const x of [0, -0, 2 ** -149, 1 + 2 ** -23, 3.4028234663852886e38])
       equal("widen", [x], Math.fround(x));

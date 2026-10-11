@@ -40,6 +40,31 @@ does not prove provider availability. Project providers extend this static
 selection through [CLIENT_NATIVE_EXTERNS.md](CLIENT_NATIVE_EXTERNS.md), using the
 same manifest for package native-over-fallback selection and the Wasm build.
 
+## Native floating-point math
+
+Use Lean's ordinary `Float` and `Float32` operations, not a VIR-specific math
+facade. For example, an exported exponential needs no custom host provider:
+
+```lean
+module
+public import Init.Data.Float
+public meta import Vir.Attributes
+public section
+
+@[vir_export] def exponential (x : Float) : Float := x.exp
+```
+
+The [native catalog](../../Vir/Compiler/NativeExterns.lean) selects the supported
+operations; transporting a numeric type does not imply support for every
+upstream function on that type. New catalog entries require matching runtime
+bytes, not just updated Lean sources. Scalar math uses Lean's native providers
+and linked libm; finite transcendental results are not promised bit-identical
+across different libm implementations. `fma` uses fused rounding, and
+`Float.round`/`Float32.round` round halfway cases away from zero, unlike
+JavaScript's `Math.round` for negative halfway cases. See
+[numeric transport](../guides/JS_API.md#calls-and-manifest) for the
+JavaScript boundary.
+
 ## Native boxed wrappers
 
 [`NativeExternSpec`](../../Vir/Compiler/NativeExterns.lean) stores VIR policy:

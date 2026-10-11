@@ -508,6 +508,14 @@ ByteArray results are returned as `Uint8Array`; `Float` and `Float32` values are
 JavaScript numbers. Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them
 use generated Lean `_boxed` declarations automatically.
 
+`Float32` arguments narrow to binary32 before Lean receives them, including
+overflow to infinity and underflow to signed zero; results are returned as
+JavaScript numbers representing those binary32 values. `Float.toBits` returns
+`UInt64` as `BigInt`, while `Float32.toBits` returns `UInt32` as a number.
+Number transport does not imply that every upstream math operation is available:
+the native catalog and matching runtime must support it. See
+[native floating-point math](../reference/UPSTREAM_BOUNDARY.md#native-floating-point-math).
+
 `Lean.Vir.JsValue.ofFloat` and `Lean.Vir.JsValue.toFloat` also accept every
 JavaScript number and preserve NaN, infinities, and signed zero across the
 opaque `Lean.Vir.Js Float` resource boundary.
