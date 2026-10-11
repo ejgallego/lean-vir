@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -12,8 +12,8 @@ async function fixture(t) {
   t.after(() => rm(dir, { recursive: true, force: true }));
   return dir;
 }
-function run(args) {
-  const child = spawn(process.execPath, [runner, ...args]);
+function run(args, { cwd, execArgv = [] } = {}) {
+  const child = spawn(process.execPath, [...execArgv, runner, ...args], { cwd });
   let stdout = '', stderr = '';
   child.stdout.on('data', chunk => { stdout += chunk; });
   child.stderr.on('data', chunk => { stderr += chunk; });
@@ -28,6 +28,33 @@ test('success captures both streams and prints one line', async t => {
   assert.equal(result.stderr, '');
   assert.match(await readFile(log, 'utf8'), /out/);
   assert.match(await readFile(log, 'utf8'), /err/);
+});
+test('independent PID namespaces and identical clocks cannot share default logs', async t => {
+  const cwd = await fixture(t);
+  const preload = 'const D=Date;globalThis.Date=class extends D{constructor(...args){super(...(args.length?args:["2026-10-10T08:52:26.320Z"]))}};Object.defineProperty(process,"pid",{value:14});';
+  const execArgv = ['--import', `data:text/javascript,${encodeURIComponent(preload)}`];
+  const results = await Promise.all(['first', 'second'].map(marker =>
+    run(['--', process.execPath, '-e', `console.log(${JSON.stringify(marker)})`], { cwd, execArgv }).done));
+  for (const result of results) assert.equal(result.code, 0, result.stderr);
+  const logs = results.map(result => resolve(cwd, result.stdout.trim().match(/; log: (.+)$/)[1]));
+  assert.notEqual(logs[0], logs[1]);
+  assert.equal(await readFile(logs[0], 'utf8'), 'first\n');
+  assert.equal(await readFile(logs[1], 'utf8'), 'second\n');
+});
+test('default log reservation cannot overwrite an existing log or start the command', async t => {
+  const cwd = await fixture(t);
+  await mkdir(join(cwd, 'build', 'logs'), { recursive: true });
+  const file = join(cwd, 'build', 'logs', '2026-10-10T08-52-26-320Z-14-fixed-node.log');
+  await writeFile(file, 'retained evidence\n');
+  const preload = 'import crypto from "node:crypto";import {syncBuiltinESMExports} from "node:module";crypto.randomUUID=()=>"fixed";syncBuiltinESMExports();const D=Date;globalThis.Date=class extends D{constructor(...args){super(...(args.length?args:["2026-10-10T08:52:26.320Z"]))}};Object.defineProperty(process,"pid",{value:14});';
+  const marker = join(cwd, 'started');
+  const result = await run(['--', process.execPath, '-e', `require('fs').writeFileSync(${JSON.stringify(marker)}, 'yes')`], {
+    cwd, execArgv: ['--import', `data:text/javascript,${encodeURIComponent(preload)}`],
+  }).done;
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /EEXIST/);
+  assert.equal(await readFile(file, 'utf8'), 'retained evidence\n');
+  await assert.rejects(readFile(marker), { code: 'ENOENT' });
 });
 test('failure preserves exit code and bounds displayed tail', async t => {
   const log = join(await fixture(t), 'out.log');

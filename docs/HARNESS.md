@@ -169,6 +169,8 @@ npm run quiet -- -- npm test
 Use `--log PATH` and `--tail N` before `--` to select a log or change the
 default 40-line failure excerpt. Command exit codes are preserved. Log-open
 failure prevents startup; log-write failure stops the command.
+Default logs have unique names and are created exclusively; a collision cannot
+overwrite another run. An explicit `--log PATH` intentionally replaces that file.
 
 On POSIX, Ctrl-C/SIGTERM stops the command's process group, escalating after
 one second; cancellation exits 130/143. Deliberately detached sessions are

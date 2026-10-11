@@ -5,6 +5,7 @@ import { basename, dirname, relative, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { finished } from "node:stream/promises";
+import { randomUUID } from "node:crypto";
 
 function usage(write = console.error) {
   write(`usage: node scripts/quiet-run.mjs [--log PATH] [--tail LINES] -- COMMAND [ARG...]
@@ -49,7 +50,7 @@ function parseArgs(argv) {
 function defaultLog(command) {
   const safeName = basename(command).replaceAll(/[^A-Za-z0-9_.-]/g, "_");
   const stamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
-  return resolve("build", "logs", `${stamp}-${process.pid}-${safeName}.log`);
+  return resolve("build", "logs", `${stamp}-${process.pid}-${randomUUID()}-${safeName}.log`);
 }
 
 function displayPath(path) {
@@ -99,7 +100,7 @@ if (options.help) {
   const onTerm = () => interrupt("SIGTERM");
   try {
     mkdirSync(dirname(logPath), { recursive: true });
-    log = createWriteStream(logPath);
+    log = createWriteStream(logPath, { flags: options.log ? "w" : "wx" });
     // Never start a command unless its diagnostic log can actually be opened.
     await once(log, "open");
     const logDone = finished(log).catch(error => { logError = error; });
