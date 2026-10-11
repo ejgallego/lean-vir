@@ -29,10 +29,20 @@ private inductive RecursiveStep where
   | reference (depth : Nat)
   | descend (nextSeen : RecursiveSeen)
 
+/-- Search a concrete parameter using only the head reductions already permitted
+by classification. This does not normalize or change structural recursion keys. -/
+private partial def containsReducedType (key : ExprStructEq) (parameter : Lean.Expr) : CoreM Bool := do
+  if (parameter.find? (fun subterm => (⟨subterm⟩ : ExprStructEq) == key)).isSome then
+    return true
+  let parameter ← reduceTypeAliases parameter
+  if (⟨parameter⟩ : ExprStructEq) == key then return true
+  parameter.foldlM (fun found child =>
+    if found then pure true else containsReducedType key child) false
+
 private def recursiveVisit
     (seen : RecursiveSeen) (kind : InterfaceAggregateKind) (type : Lean.Expr)
     (isRec : Bool) (mutualFamily : List Name) :
-    Except InterfaceClassifierError RecursiveStep :=
+    CoreM (Except InterfaceClassifierError RecursiveStep) := do
   let key : ExprStructEq := ⟨type.consumeMData⟩
   let name := key.val.getAppFn.constName
   -- Generic containers bind scopes too: Tree → Option Tree → Tree is an
@@ -41,17 +51,19 @@ private def recursiveVisit
   if let some index := seen.findIdx? (· == key) then
     if seen.any (fun previous => previous.val.getAppFn.constName != name &&
         mutualFamily.contains previous.val.getAppFn.constName) then
-      .error (.mutuallyRecursive kind name)
+      return .error (.mutuallyRecursive kind name)
     else
-      .ok (.reference (seen.size - index - 1))
+      return .ok (.reference (seen.size - index - 1))
   -- Descending a concrete parameter (List (List Nat) → List Nat) is finite.
   -- A recursive field that grows/changes its parameter remains nonuniform.
-  else if isRec && seen.any (fun previous => previous.val.getAppFn.constName == name) &&
-      !(seen.any fun previous => previous.val.getAppArgs.any fun parameter =>
-        (Lean.Expr.find? (fun subterm => (⟨subterm⟩ : ExprStructEq) == key) parameter).isSome) then
-    .error (.nonUniformRecursive kind name)
+  else if isRec && seen.any (fun previous => previous.val.getAppFn.constName == name) then
+    for previous in seen do
+      for parameter in previous.val.getAppArgs do
+        if ← containsReducedType key parameter then
+          return .ok (.descend (seen.push key))
+    return .error (.nonUniformRecursive kind name)
   else
-    .ok (.descend (seen.push key))
+    return .ok (.descend (seen.push key))
 
 private abbrev ClassifyM := ExceptT InterfaceClassifierError CoreM
 
@@ -134,7 +146,7 @@ private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
   let env ← getEnv
   let some (.inductInfo indInfo) := env.find? name
     | throwThe InterfaceClassifierError (.unsupportedType e)
-  match ← liftM (recursiveVisit seenTypes .inductive e indInfo.isRec indInfo.all) with
+  match ← ExceptT.mk (recursiveVisit seenTypes .inductive e indInfo.isRec indInfo.all) with
   | .reference depth =>
       return (.recursiveRef name (exprTypeLabel e) depth)
   | .descend nextSeen =>
@@ -186,7 +198,7 @@ private partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
     | throwThe InterfaceClassifierError (.unsupportedType e)
   let some structInfo := getStructureInfo? env name
     | throwThe InterfaceClassifierError (.unsupportedType e)
-  match ← liftM (recursiveVisit seenTypes .structure e indInfo.isRec indInfo.all) with
+  match ← ExceptT.mk (recursiveVisit seenTypes .structure e indInfo.isRec indInfo.all) with
   | .reference depth =>
       return (.recursiveRef name (exprTypeLabel e) depth)
   | .descend nextSeen =>

@@ -40,7 +40,22 @@ export function withObjectValues(Base) {
       this.requireFunction("vir_closure_apply_objects");
       const type = cell.callType;
       const signature = type.native.metadata.signature;
-      const fnArgs = signature.args;
+      this.callbackValueInterfaces ??= new WeakMap();
+      let plan = this.callbackValueInterfaces.get(type);
+      if (plan === undefined) {
+        // Stable pairs let the existing runtime-local codec cache bind each
+        // signature position once, independent of the number of invocations.
+        plan = {
+          args: signature.args.map((native, index) =>
+            Object.freeze({ native, value: type.value.args[index] })),
+          result: Object.freeze({ native: signature.result, value: type.value.result }),
+        };
+        if (!plan.args.every(arg => this.objectArgumentSupported(arg)) ||
+            !this.objectResultSupported(plan.result))
+          throw new Error("object ABI does not support callback signature");
+        this.callbackValueInterfaces.set(type, plan);
+      }
+      const fnArgs = plan.args;
       const argObjs = [];
       try {
         let argvPtr = 0;
@@ -50,7 +65,7 @@ export function withObjectValues(Base) {
           // undefined, and convert each declared argument normally.
           fnArgs.forEach((arg, index) => {
             argObjs.push(
-              this.makeObjectValue({ native: arg, value: type.value.args[index] }, args[index], `callback argument ${index + 1}`),
+              this.makeObjectValue(arg, args[index], `callback argument ${index + 1}`),
             );
           });
           if (this.hostState?.callError) throw this.hostState.callError;
@@ -78,7 +93,7 @@ export function withObjectValues(Base) {
             throw new Error(this.lastClosureCallError() || "closure call failed");
           }
           return this.liftObjectValue(
-            { native: signature.result, value: type.value.result }, resultObj, "callback result",
+            plan.result, resultObj, "callback result",
           );
         } finally {
           if (argvPtr !== 0) this.freeBytes(argvPtr);

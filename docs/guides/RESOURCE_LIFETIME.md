@@ -13,16 +13,21 @@ publisher. Keep the exact resource files together when deploying them.
 
 A client can require its independently reviewed callable contract at creation:
 
+<!-- resource-contract-example -->
 ```js
 const pending = new AbortController();
+const stringInterface = {
+  native: { type: { tag: "string" } },
+  value: { tag: "string" },
+};
 const program = await createProgram({
   runtimeManifestUrl,
   programManifestUrl,
   signal: pending.signal,
   expectedExports: {
     "Client.Program.greet": {
-      args: [{ type: "String", interfaceTag: 3 }],
-      result: { type: "String", interfaceTag: 3 },
+      args: [stringInterface],
+      result: stringInterface,
       effect: "pure",
     },
   },

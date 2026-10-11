@@ -102,7 +102,14 @@ function validateNative(native, owners, label) {
 }
 
 function validateLocation(field, storage, objects, usizes, scalars, label) {
-  const at = field.location, native = field.type;
+  const at = field.location;
+  // The compiler erases identity constructors in enclosing packed layouts.
+  // Admission checks physical storage; selected-view conversion is a separate
+  // capability check and may still decline these wrappers.
+  let native = field.type;
+  while (native.metadata?.constructors?.length === 1 &&
+      native.metadata.constructors[0].representation === "identity")
+    native = native.metadata.constructors[0].fields[0].type;
   object(at, ["tag", "index", "offset", "size"], `${label}.location`);
   if (at.tag === "object" || at.tag === "usize") {
     uint(at.index, `${label}.location.index`);

@@ -37,8 +37,9 @@ function compileValueCodec(runtime, native, view, bindings = []) {
         break;
       }
       if (view.tag === "function") {
+        const callType = Object.freeze({ native, value: view });
         codec.lower = (_value, label) => { throw new Error(`${label} cannot be a JavaScript function at this boundary`); };
-        codec.lift = (obj, label) => runtime.liftObjectFunction({ native, value: view }, obj, label);
+        codec.lift = (obj, label) => runtime.liftObjectFunction(callType, obj, label);
         break;
       }
       if (view.tag === "sequence" && view.chain === undefined) {

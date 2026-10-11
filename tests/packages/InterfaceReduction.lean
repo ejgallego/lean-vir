@@ -33,6 +33,11 @@ def direct (x : String) : String := x
 @[vir_export] def projected (x : Text) : Text := x
 @[vir_export] def parameterized (x : (carrierOf String).type) : String := x
 
+abbrev Nats := List Nat
+abbrev MoreNats := List Nats
+@[vir_export] def nestedAlias (xs : List Nats) : List Nats := xs
+@[vir_export] def deeperAlias (xs : List MoreNats) : List MoreNats := xs
+
 inductive FamilyValue (β : Nat → Type) where
   | mk (key : Nat) (value : β key)
 
@@ -235,6 +240,21 @@ run_elab do
     | throwError "family argument missing"
   expectConstructorNames familyType #[( ``FamilyValue.mk, "mk")]
   let nat := mkConst ``Nat
+  let lists := mkApp (mkConst ``List [.zero])
+  let .ok explicitNested ← interfaceType (lists (lists nat))
+    | throwError "explicit nested Lists must be supported"
+  let .ok aliasNested ← interfaceType (← argumentType ``nestedAlias)
+    | throwError "abbreviated nested Lists must be supported"
+  expect "abbreviated finite List descent" (aliasNested.toJson == explicitNested.toJson)
+  let .ok explicitDeeper ← interfaceType (lists (lists (lists nat)))
+    | throwError "explicit deeper Lists must be supported"
+  let .ok aliasDeeper ← interfaceType (← argumentType ``deeperAlias)
+    | throwError "deeper abbreviated Lists must be supported"
+  expect "nested abbreviations preserve finite descent" (aliasDeeper.toJson == explicitDeeper.toJson)
+  let .error growingError ← (classifyType (lists (lists nat)) #[⟨lists nat⟩]).run
+    | throwError "a growing applied recursion context must stay rejected"
+  expect "growing applied recursion reason"
+    (errorCause growingError == .nonUniformRecursive .inductive ``List)
   expectConstructorNames (mkApp2 (mkConst ``Sum [.zero, .zero]) nat string)
     #[( `Sum.inl, "inl"), (`Sum.inr, "inr")]
   expectConstructorNames (mkApp2 (mkConst ``Except [.zero, .zero]) string nat)

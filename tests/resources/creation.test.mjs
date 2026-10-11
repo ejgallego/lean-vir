@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { build } from "esbuild";
+import { readFileSync } from "node:fs";
 import {
   descriptorContentId,
   sha256Hex,
@@ -51,6 +52,27 @@ const expected = () => ({
   "Root.run": { args: [], result: { ...nat }, effect: "pure" },
 });
 const runtimeNotices = ["LICENSE", "NOTICE", "legal/lean.txt", "legal/dependencies.txt"];
+
+test("the documented independent contract creates a program through the public loader", async () =>
+  fixture(async (s) => {
+    const guide = readFileSync(new URL("../../docs/guides/RESOURCE_LIFETIME.md", import.meta.url), "utf8");
+    const source = guide.match(/<!-- resource-contract-example -->\s*```js\n([\s\S]*?)\n```/)[1];
+    const string = primitiveBoundary("string", "string");
+    s.manifest.exports = [{
+      entry: "Client.Program.greet", args: [{ name: "name", type: string }],
+      result: string, effect: "pure",
+    }];
+    s.runtime.interfaceManifest = s.manifest;
+    s.creation.resolve(s.runtime);
+    const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+    const runExample = new AsyncFunction("createProgram", "runtimeManifestUrl", "programManifestUrl", `${source}\nreturn program;`);
+    const program = await runExample(createProgram, s.options.runtimeManifestUrl, s.options.programManifestUrl);
+    try {
+      assert.equal(s.instances, 1);
+      assert.ok(s.requests.length > 0, "the example proceeds past signature validation to acquisition");
+    } finally { program.dispose(); }
+    assert.equal(s.disposed, 1);
+  }));
 
 test("runtime distribution notices do not require startup retrieval", async () =>
   fixture(async (s) => {
