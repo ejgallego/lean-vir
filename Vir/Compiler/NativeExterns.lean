@@ -143,8 +143,7 @@ private def floatFormattingExternSpecs : Array NativeExternSpec :=
 
 /--
 The measured basic Float remainder: infinity classification plus the ordinary
-Float32 arithmetic, equality, and strict-order operations. This closes the
-low-cost non-libm frontier while leaving `pow` and the broad math surface out.
+Float32 arithmetic, equality, and strict-order operations.
 -/
 private def floatBasicCompletionExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `Float #["isInf"] ++
@@ -167,6 +166,16 @@ isolated release cost is 3,019 raw bytes (2,512 bytes under deterministic gzip).
 -/
 private def floatLogExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `Float #["log2"]
+
+/-- Scalar math, classification, bit casts, and Float32 narrowing/widening. -/
+private def floatMathCompletionExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `Float #[
+    "exp", "log", "isNaN", "isFinite", "ceil", "toBits", "pow", "exp2",
+    "log10", "tan", "asin", "atan", "toFloat32", "fma"
+  ] ++ boxedExternSpecs `Float32 #[
+    "isNaN", "isFinite", "isInf", "toBits", "toFloat", "abs", "sqrt",
+    "floor", "ceil", "round", "fma"
+  ]
 
 /--
 The remeasured internal raw-byte accessor. The expanded scalar and string
@@ -1132,7 +1141,8 @@ def nativeExternSpecs : Array NativeExternSpec := #[
   }
 ] ++ primitiveCompletionExternSpecs ++ floatCoreExternSpecs ++
   floatFormattingExternSpecs ++ floatBasicCompletionExternSpecs ++
-  floatGeometryMathExternSpecs ++ floatLogExternSpecs ++ stringByteAccessorExternSpecs ++
+  floatGeometryMathExternSpecs ++ floatLogExternSpecs ++ floatMathCompletionExternSpecs ++
+  stringByteAccessorExternSpecs ++
   byteArrayCopySliceExternSpecs ++ byteArrayRuntimeFrontierExternSpecs
 
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=
