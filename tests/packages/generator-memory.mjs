@@ -23,7 +23,6 @@ import {
 } from "../../scripts/packages/irpkg-generator.mjs";
 import { readIrPackageInfo } from "../../scripts/packages/irpkg-format.mjs";
 import { repositoryRoot } from "../../scripts/repository-paths.mjs";
-import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
 
 const usage =
   "usage: node tests/packages/generator-memory.mjs [--no-build]\n" +
@@ -105,7 +104,7 @@ assert.ok(peakRssKiB > 0, "peak RSS measurement must be nonzero");
 
 const bytes = await readFile(packagePath);
 const info = readIrPackageInfo(bytes);
-const manifest = validateInterfaceManifest(info.manifest);
+const manifest = info.manifest;
 const expectedExports = new Set();
 let exported = false;
 for (let index = 0; index < plan.targetArgs.length; index += 1) {

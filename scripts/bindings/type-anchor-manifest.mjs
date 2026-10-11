@@ -16,7 +16,10 @@ import {
   assertDistinctModulePackageOutputs,
   normalizeModulePackageConfig,
 } from "../packages/module-package-config.mjs";
-import { readIrPackageFile } from "../packages/irpkg-format.mjs";
+import {
+  encodeInterfaceManifest,
+  readIrPackageFile,
+} from "../packages/irpkg-format.mjs";
 import { repositoryRoot as root } from "../repository-paths.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
@@ -138,7 +141,7 @@ export async function runTypeAnchorManifestCli(argv) {
 
   const info = await readIrPackageFile(packagePath);
   const manifest = normalizeTypeAnchorManifest(info.manifest, aliases);
-  const text = `${JSON.stringify(manifest, null, 2)}\n`;
+  const text = `${JSON.stringify(encodeInterfaceManifest(manifest), null, 2)}\n`;
   const action = await emitGeneratedFile(cli.out, text, {
     check: cli.check,
     root,

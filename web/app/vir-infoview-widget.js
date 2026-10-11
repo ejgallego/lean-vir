@@ -11,7 +11,6 @@ import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.j
 import { createVirRuntime as createBundledVirRuntime } from "../src/vir-runtime.js";
 import { widgetErrorMessage as errorMessage } from "./vir-widget-errors.js";
 import { isEffectfulInterfaceEffect } from "../src/runtime/interface-effects.js";
-import { INTERFACE_TAG } from "../src/runtime/interface-tags.js";
 import { collectCleanupError } from "../src/runtime/cleanup.js";
 
 const e = React.createElement;
@@ -307,7 +306,7 @@ export function validateWidgetComponentEntry(runtime, entryName) {
   if (
     !isEffectfulInterfaceEffect(entry.effect) ||
     entry.args?.length !== 0 ||
-    entry.result?.interfaceTag !== INTERFACE_TAG.RESOURCE
+    entry.result?.native?.type?.tag !== "resource"
   ) {
     throw new Error(
       `VIR widget component entry ${entryName} must be an effectful () -> Component entry`,

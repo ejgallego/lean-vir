@@ -8,16 +8,24 @@ import assert from "node:assert/strict";
 
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
+import {
+  immediateConstructor,
+  objectBoundary,
+} from "../support/interface-fixtures.mjs";
+
+const unit = objectBoundary(
+  "Unit",
+  [immediateConstructor("Unit.unit")],
+  { tag: "unit" },
+);
 
 function entry(name, startup) {
   return {
-    id: name,
-    jsName: name,
     entry: name,
     nameKey: `s${Buffer.from(name).toString("hex")}/`,
     source: "StartupRuntime.lean",
     args: [],
-    result: { type: "Unit", interfaceTag: 22 },
+    result: unit,
     effect: "dom",
     startup,
   };
@@ -93,12 +101,13 @@ assert.equal(calls.length, 8);
 const installCalls = [];
 const invalidManifestText = JSON.stringify({
   version: INTERFACE_MANIFEST_VERSION,
+  interfaces: [entry("invalid", undefined).result],
   metadata: {
     packageFormatVersion: 11,
     manifestVersion: INTERFACE_MANIFEST_VERSION,
     targets: [],
   },
-  exports: [entry("invalid", undefined)],
+  exports: [{ ...entry("invalid", undefined), result: 0 }],
 });
 const invalidManifestBytes = new TextEncoder().encode(invalidManifestText);
 const memory = new WebAssembly.Memory({ initial: 1 });

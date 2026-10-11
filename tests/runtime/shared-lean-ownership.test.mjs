@@ -7,10 +7,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { VirHostState } from "../../web/src/runtime/host-state.js";
-import { INTERFACE_TAG as T } from "../../web/src/runtime/interface-tags.js";
 import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
+import { functionBoundary, primitiveBoundary, unitBoundary } from "../support/interface-fixtures.mjs";
 
-const type = { args: [], result: { interfaceTag: T.UNIT }, effect: "pure" };
+const unit = unitBoundary();
+const type = functionBoundary([], unit);
 
 function harness() {
   const increments = [], decrements = [];
@@ -96,7 +97,7 @@ test("native release and untracking errors are both retained without repeating c
 test("argument conversion cannot enter a callback whose owner retired during preparation", () => {
   const { runtime, decrements } = harness();
   delete runtime.callClosure;
-  const callType = { ...type, args: [{ name: "value", type: { interfaceTag: T.UNIT } }] };
+  const callType = functionBoundary([unit], unit);
   const callback = runtime.liftObjectFunction(callType, 100, "callback");
   const cell = runtime.leanCallbackCell(callback, "callback");
   let entered = 0;
@@ -206,7 +207,7 @@ test("retirement detaches cells while preserving cleanup failures and finalizer 
 test("untransferred callback arguments are released even when argv cleanup throws", () => {
   const { runtime, decrements } = harness();
   delete runtime.callClosure;
-  const callback = runtime.liftObjectFunction({ ...type, args: [{ name: "value", type: type.result }] }, 100, "callback");
+  const callback = runtime.liftObjectFunction(functionBoundary([unit], unit), 100, "callback");
   const original = new Error("preparation sentinel"), cleanup = new Error("argv cleanup sentinel");
   runtime.exports.vir_closure_apply_objects = () => assert.fail("native entry");
   runtime.makeObjectValue = () => 200;

@@ -10,7 +10,7 @@ import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collec
 import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindings.js";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { VirHostState } from "../../web/src/runtime/host-state.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+import { functionBoundary, resourceBoundary, unitBoundary } from "../support/interface-fixtures.mjs";
 
 const objects = createJsCollectionHostBindings();
 const requireString = createJsValueHostBindings()["js.string.fromAny"];
@@ -19,14 +19,18 @@ test("callback formal parameters ignore extras and receive undefined when absent
   const runtime = Object.create(VirRuntime.prototype);
   const lowered = [];
   Object.assign(runtime, {
-    exports: { vir_closure_apply_objects() { return 1; }, vir_obj_dec() {} },
+    exports: {
+      vir_closure_apply_objects() { return 1; },
+      vir_obj_dec() {},
+      vir_obj_scalar: ordinal => ordinal + 1,
+    },
     makeObjectValue(_type, value) { lowered.push(value); return lowered.length; },
     allocByteLength: () => 4,
     writePointerArray(_ptr, args) { assert.equal(args.length, 1); },
     freeBytes() {},
     releaseOwnedObjects() {},
   });
-  const type = { effect: "runtime", result: { interfaceTag: INTERFACE_TAG.UNIT }, args: [{ name: "value", type: { interfaceTag: INTERFACE_TAG.RESOURCE } }] };
+  const type = functionBoundary([resourceBoundary()], unitBoundary(), "runtime");
   const value = {};
   const args = [value];
   Object.defineProperty(args, 1, { get() { assert.fail("unused argument must not be lowered"); } });
@@ -125,7 +129,7 @@ test("callback bridge preserves the String check error as a Promise rejection", 
       },
     });
     const project = () => runtime.callClosure({ runtime, object: 1, live: true,
-      callType: { args: [], effect: "pure", result: { interfaceTag: INTERFACE_TAG.UNIT } } }, []);
+      callType: functionBoundary([], unitBoundary()) }, []);
     await assert.rejects(objects["js.promise.thenValue"](Promise.resolve({}), project),
       (error) => error === hostError && error instanceof TypeError);
     assert.equal(hostState.takeCallError(), null);

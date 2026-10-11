@@ -26,24 +26,44 @@ nested metadata and universe levels; no alpha or definitional reduction is used.
 private abbrev RecursiveSeen := Array ExprStructEq
 
 private inductive RecursiveStep where
-  | selfReference
+  | reference (depth : Nat)
   | descend (nextSeen : RecursiveSeen)
+
+/-- Search a concrete parameter using only the head reductions already permitted
+by classification. This does not normalize or change structural recursion keys. -/
+private partial def containsReducedType (key : ExprStructEq) (parameter : Lean.Expr) : CoreM Bool := do
+  if (parameter.find? (fun subterm => (⟨subterm⟩ : ExprStructEq) == key)).isSome then
+    return true
+  let parameter ← reduceTypeAliases parameter
+  if (⟨parameter⟩ : ExprStructEq) == key then return true
+  parameter.foldlM (fun found child =>
+    if found then pure true else containsReducedType key child) false
 
 private def recursiveVisit
     (seen : RecursiveSeen) (kind : InterfaceAggregateKind) (type : Lean.Expr)
-    (isRec : Bool) :
-    Except InterfaceClassifierError RecursiveStep :=
+    (isRec : Bool) (mutualFamily : List Name) :
+    CoreM (Except InterfaceClassifierError RecursiveStep) := do
   let key : ExprStructEq := ⟨type.consumeMData⟩
   let name := key.val.getAppFn.constName
-  if seen.contains key then
-    if seen.back? == some key then
-      .ok .selfReference
+  -- Generic containers bind scopes too: Tree → Option Tree → Tree is an
+  -- enclosing reference, not mutually recursive declarations. The environment's
+  -- actual mutual family remains unsupported.
+  if let some index := seen.findIdx? (· == key) then
+    if seen.any (fun previous => previous.val.getAppFn.constName != name &&
+        mutualFamily.contains previous.val.getAppFn.constName) then
+      return .error (.mutuallyRecursive kind name)
     else
-      .error (.mutuallyRecursive kind name)
-  else if isRec && seen.any (fun key => key.val.getAppFn.constName == name) then
-    .error (.nonUniformRecursive kind name)
+      return .ok (.reference (seen.size - index - 1))
+  -- Descending a concrete parameter (List (List Nat) → List Nat) is finite.
+  -- A recursive field that grows/changes its parameter remains nonuniform.
+  else if isRec && seen.any (fun previous => previous.val.getAppFn.constName == name) then
+    for previous in seen do
+      for parameter in previous.val.getAppArgs do
+        if ← containsReducedType key parameter then
+          return .ok (.descend (seen.push key))
+    return .error (.nonUniformRecursive kind name)
   else
-    .ok (.descend (seen.push key))
+    return .ok (.descend (seen.push key))
 
 private abbrev ClassifyM := ExceptT InterfaceClassifierError CoreM
 
@@ -63,14 +83,16 @@ private def constructorStorage (layout : Lean.Compiler.LCNF.CtorLayout) : Constr
 
 /-- A closure invocation cannot carry an enclosing aggregate's recursive owner.
 Complete structures/inductives establish their own owner when marshalled. -/
-private partial def enclosingRecursiveOwner? : InterfaceType → Option Name
-  | .recursiveSelf name _ => some name
-  | .array element | .list element | .option element => enclosingRecursiveOwner? element
-  | .prod fst snd => enclosingRecursiveOwner? fst <|> enclosingRecursiveOwner? snd
-  | .taggedUnion _ _ constructors =>
-      constructors.findSome? fun constructor => enclosingRecursiveOwner? constructor.payloadType
+private partial def enclosingRecursiveOwner? (bound : Nat := 0) : InterfaceType → Option Name
+  | .recursiveRef name _ depth => if depth < bound then none else some name
+  | .array element => enclosingRecursiveOwner? bound element
+  | .customInductive _ _ constructors =>
+      constructors.findSome? fun constructor =>
+        constructor.fields.findSome? fun field => enclosingRecursiveOwner? (bound + 1) field.type
+  | .structure _ _ descriptor =>
+      descriptor.fields.findSome? fun field => enclosingRecursiveOwner? (bound + 1) field.type
   | .function args result _ =>
-      args.findSome? (fun arg => enclosingRecursiveOwner? arg.type) <|> enclosingRecursiveOwner? result
+      args.findSome? (fun arg => enclosingRecursiveOwner? bound arg.type) <|> enclosingRecursiveOwner? bound result
   | _ => none
 
 private def constructorFieldTypes? (type : Lean.Expr) : Option (Array (String × Lean.Expr)) :=
@@ -100,7 +122,7 @@ private partial def functionType (type : Lean.Expr) (seenTypes : RecursiveSeen)
       else
         let argType ← withContext (.callbackArgument domain) do
           let argType ← classifyType domain seenTypes
-          if let some owner := enclosingRecursiveOwner? argType then
+          if let some owner := enclosingRecursiveOwner? 0 argType then
             throwThe InterfaceClassifierError (.recursiveCallback owner)
           return argType
         functionType body seenTypes (args.push {
@@ -110,27 +132,10 @@ private partial def functionType (type : Lean.Expr) (seenTypes : RecursiveSeen)
       let (effect, result) := effectResult.getD (.pure, result)
       let resultType ← withContext (.callbackResult result) do
         let resultType ← classifyType result seenTypes
-        if let some owner := enclosingRecursiveOwner? resultType then
+        if let some owner := enclosingRecursiveOwner? 0 resultType then
           throwThe InterfaceClassifierError (.recursiveCallback owner)
         return resultType
       return (.function args resultType effect)
-
-private partial def taggedUnionType (seenTypes : RecursiveSeen) (name : Name) (label : String)
-    (constructors : Array (Name × Lean.Expr)) :
-    ClassifyM InterfaceType := do
-  let mut variants : Array TaggedUnionVariant := #[]
-  for (ctorName, fieldExpr) in constructors do
-    let layout ← constructorLayout ctorName (.constructorLayoutUnavailable ctorName)
-    if layout.fieldInfo.size != 1 then
-      throwThe InterfaceClassifierError (.constructorRuntimeFieldCount ctorName layout.fieldInfo.size)
-    let some fieldLayout := fieldLayout? layout.fieldInfo[0]!
-      | throwThe InterfaceClassifierError (.constructorErasedRuntimeLayout ctorName)
-    let fieldType ← withContext (.constructorPayload ctorName fieldExpr) (classifyType fieldExpr seenTypes)
-    variants := variants.push {
-      constructorName := ctorName
-      payloadType := fieldType, payloadLayout := fieldLayout
-      storage := constructorStorage layout }
-  return (.taggedUnion name label variants)
 
 private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
     ClassifyM InterfaceType := do
@@ -141,9 +146,9 @@ private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
   let env ← getEnv
   let some (.inductInfo indInfo) := env.find? name
     | throwThe InterfaceClassifierError (.unsupportedType e)
-  match ← liftM (recursiveVisit seenTypes .inductive e indInfo.isRec) with
-  | .selfReference =>
-      return (.recursiveSelf name (exprTypeLabel e))
+  match ← ExceptT.mk (recursiveVisit seenTypes .inductive e indInfo.isRec indInfo.all) with
+  | .reference depth =>
+      return (.recursiveRef name (exprTypeLabel e) depth)
   | .descend nextSeen =>
     if indInfo.numIndices != 0 then
       throwThe InterfaceClassifierError (.indexedInductive name)
@@ -193,9 +198,9 @@ private partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
     | throwThe InterfaceClassifierError (.unsupportedType e)
   let some structInfo := getStructureInfo? env name
     | throwThe InterfaceClassifierError (.unsupportedType e)
-  match ← liftM (recursiveVisit seenTypes .structure e indInfo.isRec) with
-  | .selfReference =>
-      return (.recursiveSelf name (exprTypeLabel e))
+  match ← ExceptT.mk (recursiveVisit seenTypes .structure e indInfo.isRec indInfo.all) with
+  | .reference depth =>
+      return (.recursiveRef name (exprTypeLabel e) depth)
   | .descend nextSeen =>
     if indInfo.numIndices != 0 then
       throwThe InterfaceClassifierError (.indexedStructure name)
@@ -232,6 +237,7 @@ private partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
         fields := fields.push {
           name := fieldName.toString, type := fieldType, layout := fieldLayout, isSubobject }
       return (.structure name (exprTypeLabel e) {
+        constructorName := ctorName
         trivialField?
         storage := constructorStorage layout
         fields })
@@ -259,24 +265,6 @@ private partial def classifyType (e : Lean.Expr) (seenTypes : RecursiveSeen) :
               match fn, Array.toList args with
               | `Array, [arg] =>
                   return .array (← withContext .arrayElement (classifyType arg seenTypes))
-              | `List, [arg] =>
-                  return .list (← withContext .listElement (classifyType arg seenTypes))
-              | `Option, [arg] =>
-                  return .option (← withContext .optionElement (classifyType arg seenTypes))
-              | `Prod, [lhs, rhs] =>
-                  let lhsTy ← withContext .prodFst (classifyType lhs seenTypes)
-                  let rhsTy ← withContext .prodSnd (classifyType rhs seenTypes)
-                  return .prod lhsTy rhsTy
-              | `Sum, [lhs, rhs] =>
-                  taggedUnionType seenTypes `Sum (exprTypeLabel e) #[
-                    (`Sum.inl, lhs),
-                    (`Sum.inr, rhs)
-                  ]
-              | `Except, [err, ok] =>
-                  taggedUnionType seenTypes `Except (exprTypeLabel e) #[
-                    (`Except.error, err),
-                    (`Except.ok, ok)
-                  ]
               | _, _ =>
                   match simpleEnumType? env e with
                   | some ty => return ty

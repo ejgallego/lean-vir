@@ -35,25 +35,6 @@ def collectPackageMetadata (targets : Array Target) (index : DeclIndex) : Packag
     targets := targets.map (targetMetadataFor index)
   }
 
-def duplicateInterfaceExportDiagnostic? (exports : Array InterfaceExport) (entry : InterfaceExport) :
-    Option PackageDiagnostic :=
-  match exports.find? (fun existing => existing.id == entry.id) with
-  | some existing =>
-      some {
-        name := entry.entry
-        source := entry.source
-        reason := s!"interface export id `{entry.id}` duplicates `{existing.entry}` from `{existing.source}`"
-      }
-  | none =>
-      match exports.find? (fun existing => existing.jsName == entry.jsName) with
-      | some existing =>
-          some {
-            name := entry.entry
-            source := entry.source
-            reason := s!"interface export JavaScript name `{entry.jsName}` duplicates `{existing.entry}` from `{existing.source}`"
-          }
-      | none => none
-
 def collectInterfaceManifest
     (metadata : PackageMetadata)
     (targets : Array Target)
@@ -86,11 +67,7 @@ def collectInterfaceManifest
           match ← runCoreForSource source env (interfaceExportFor index source name) with
           | .ok entry =>
               if !manifest.exports.any (fun existing => existing.entry == entry.entry) then
-                match duplicateInterfaceExportDiagnostic? manifest.exports entry with
-                | some diagnostic =>
-                    manifest := { manifest with diagnostics := manifest.diagnostics.push diagnostic }
-                | none =>
-                    manifest := { manifest with exports := manifest.exports.push entry }
+                manifest := { manifest with exports := manifest.exports.push entry }
           | .error diagnostic =>
               manifest := { manifest with diagnostics := manifest.diagnostics.push diagnostic }
   return manifest

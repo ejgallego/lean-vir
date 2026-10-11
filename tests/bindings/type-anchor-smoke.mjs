@@ -5,6 +5,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { encodeInterfaceManifest } from "../../scripts/packages/irpkg-format.mjs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -12,7 +13,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
-import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { repositoryRoot } from "../../scripts/repository-paths.mjs";
 
 const root = repositoryRoot;
@@ -103,27 +103,54 @@ declare function schedule(value: number): void;
     ],
   }, null, 2)}\n`);
 
+  const stringPair = {
+    native: { type: { tag: "string" } },
+    value: { tag: "string" },
+  };
+  const boxBase = {
+    type: { tag: "leanObject" },
+    metadata: {
+      declaration: "Demo.BoxBase",
+      constructors: [{
+        name: "Demo.BoxBase.mk",
+        representation: "object",
+        storage: { objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0 },
+        fields: [{
+          name: "value",
+          type: stringPair.native,
+          location: { tag: "object", index: 0 },
+        }],
+      }],
+    },
+  };
   const boxType = {
-    type: "Demo.Box",
-    interfaceTag: INTERFACE_TAG.STRUCTURE,
-    kind: "structure",
-    name: "Demo.Box",
-    objectFieldCount: 1,
-    usizeFieldCount: 0,
-    scalarByteSize: 0,
-    fields: [
-      {
-        name: "value",
-        type: { type: "String", interfaceTag: INTERFACE_TAG.STRING },
-        layout: { kind: "object", index: 0 },
+    native: {
+      type: { tag: "leanObject" },
+      metadata: {
+        declaration: "Demo.Box",
+        constructors: [{
+          name: "Demo.Box.mk",
+          representation: "object",
+          storage: { objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 0 },
+          fields: [{
+            name: "base",
+            type: boxBase,
+            location: { tag: "object", index: 0 },
+          }],
+        }],
       },
-    ],
+    },
+    value: {
+      tag: "record",
+      fields: [{ key: "value", path: [0, 0], value: { tag: "string" } }],
+    },
   };
   const controlsType = {
-    type: "Demo.Controls",
-    interfaceTag: INTERFACE_TAG.RESOURCE,
-    kind: "resource",
-    name: "Demo.Controls",
+    native: {
+      type: { tag: "resource" },
+      metadata: { declaration: "Demo.Controls" },
+    },
+    value: { tag: "jsReference" },
   };
 
   const manifestValue = {
@@ -132,22 +159,21 @@ declare function schedule(value: number): void;
     metadata: {},
     exports: [
       {
-        id: "bump",
-        jsName: "bump",
         entry: "Demo.bump",
         nameKey: "s44656d6f/s62756d70/",
         source: "Demo.lean",
         startup: false,
         args: [
           { name: "box", type: boxType },
-          { name: "count", type: { type: "Nat", interfaceTag: INTERFACE_TAG.NAT } },
+          {
+            name: "count",
+            type: { native: { type: { tag: "nat" } }, value: { tag: "bigint" } },
+          },
         ],
         result: boxType,
         effect: "pure",
       },
       {
-        id: "getLabel",
-        jsName: "getLabel",
         entry: "Demo.getLabel",
         nameKey: "s44656d6f/s6765744c6162656c/",
         source: "Demo.lean",
@@ -158,14 +184,14 @@ declare function schedule(value: number): void;
             type: controlsType,
           },
         ],
-        result: { type: "String", interfaceTag: INTERFACE_TAG.STRING },
+        result: stringPair,
         effect: "dom",
       },
     ],
     hostImports: [],
     diagnostics: [],
   };
-  await writeFile(manifest, `${JSON.stringify(manifestValue, null, 2)}\n`);
+  await writeFile(manifest, `${JSON.stringify(encodeInterfaceManifest(manifestValue), null, 2)}\n`);
   await writeFile(inventory, `${JSON.stringify({
     format: "lean-vir-js-inventory",
     version: 1,
@@ -180,14 +206,26 @@ declare function schedule(value: number): void;
         effect: "dom",
         args: [
           { name: "controls", type: controlsType },
-          { name: "value", type: { type: "String", interfaceTag: INTERFACE_TAG.STRING } },
+          { name: "value", type: stringPair },
         ],
-        result: { type: "Unit", interfaceTag: INTERFACE_TAG.UNIT },
+        result: {
+          native: {
+            type: { tag: "leanObject" },
+            metadata: {
+              constructors: [{
+                name: "Unit.unit",
+                representation: "immediate",
+                fields: [],
+              }],
+            },
+          },
+          value: { tag: "unit" },
+        },
       },
       targets: [{ target: "demo.reset", path: ["Demo.reset"] }],
     }],
   }, null, 2)}\n`);
-  await writeFile(invalidAliasManifest, `${JSON.stringify({
+  await writeFile(invalidAliasManifest, `${JSON.stringify(encodeInterfaceManifest({
     ...manifestValue,
     metadata: {
       typeAnchorAliases: [{
@@ -197,7 +235,7 @@ declare function schedule(value: number): void;
         descriptor: "resource",
       }],
     },
-  }, null, 2)}\n`);
+  }), null, 2)}\n`);
 
   run(["scripts/bindings/generate-ts-descriptors.mjs", "--anchors", anchors, "--out", descriptors, types]);
   run([

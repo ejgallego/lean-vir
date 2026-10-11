@@ -11,7 +11,6 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { repositoryRoot } from "../../scripts/repository-paths.mjs";
 import { readIrPackageInfo } from "../../web/src/runtime/ir-package.js";
-import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import { createTestModuleProject } from "../support/module-project.mjs";
 import { resolveVirIrpkgPathSync } from "../../scripts/packages/irpkg-generator.mjs";
@@ -58,7 +57,6 @@ try {
     );
     const bytes = await readFile(output);
     const info = readIrPackageInfo(bytes);
-    validateInterfaceManifest(info.manifest);
     assert.ok(
       info.manifest.metadata.targets.every(
         (target) => target.module === moduleName && target.source === undefined,
@@ -199,7 +197,6 @@ public def PrivateHost.answer (value : String) : Lean.Vir.RuntimeM String := do
   ], { cwd: privateHost.directory, env: privateHost.env(), encoding: "utf8" }));
   const privateBytes = await readFile(privateOutput);
   const privateManifest = readIrPackageInfo(privateBytes).manifest;
-  validateInterfaceManifest(privateManifest);
   assert.deepEqual(privateManifest.exports.map((entry) => entry.entry), ["PrivateHost.answer"]);
   const privateImport = privateManifest.hostImports.find((entry) => entry.target === "test.private.echo");
   assert.ok(privateImport);

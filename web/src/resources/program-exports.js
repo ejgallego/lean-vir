@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { interfaceSignatureKey } from "../runtime/interface-manifest.js";
+import { admittedSignatureKey, interfaceSignatureKey } from "../runtime/interface-manifest.js";
 
 export function snapshotExpectedExports(value) {
   if (value === undefined) return new Map();
@@ -28,8 +28,8 @@ export function snapshotExpectedExports(value) {
   return expected;
 }
 
-// Only the root member supplies callable entries; convenience aliases such as
-// id and jsName are never used to select a Lean declaration.
+// Only the root member supplies callable entries, keyed by full Lean name.
+// nameKey preserves native identity.
 export function resolveProgramExports(rootExports, expected = new Map()) {
   const declarations = new Map();
   for (const entry of rootExports) {
@@ -43,7 +43,7 @@ export function resolveProgramExports(rootExports, expected = new Map()) {
       throw new Error(`missing program export ${declaration}`);
     if (
       signatureKey !==
-      interfaceSignatureKey({
+      admittedSignatureKey({
         args: entry.args.map((arg) => arg.type),
         result: entry.result,
         effect: entry.effect,

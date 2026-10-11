@@ -230,7 +230,7 @@ try {
         expectedExports: {
           'Vir.Resources.Test.prettyScore': {
             args: [],
-            result: {type: 'Nat', interfaceTag: 0},
+            result: {native: {type: {tag: 'nat'}}, value: {tag: 'bigint'}},
             effect: 'pure',
           },
         },
@@ -444,7 +444,7 @@ try {
   );
   const missingExport = await evaluate(cdp, `(async () => {
     const expectedExports = {'Missing.export': {
-      args: [], result: {type: 'Nat', interfaceTag: 0}, effect: 'pure'}};
+      args: [], result: {native: {type: {tag: 'nat'}}, value: {tag: 'bigint'}}, effect: 'pure'}};
     try { await openResourceProgram({expectedExports}); return {unexpected: true}; }
     catch (error) { return {message: error.cause?.message, phase: error.phase}; }
   })()`);
@@ -543,7 +543,7 @@ try {
   assert.equal(requests.includes("/elsewhere"), false);
   const strict = await evaluate(cdp, `(async () => {
     const expectation = {'Vir.Resources.Test.prettyScore':
-      {args: [], result: {type: 'String', interfaceTag: 3}, effect: 'pure'}};
+      {args: [], result: {native: {type: {tag: 'string'}}, value: {tag: 'string'}}, effect: 'pure'}};
     let phase;
     try { await openResourceProgram({expectedExports: expectation}); }
     catch (error) { phase = error.phase; }

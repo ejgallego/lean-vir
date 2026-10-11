@@ -82,14 +82,21 @@ assert.deepEqual(publicEntries.get("Lean.Vir.Browser.Document.getTitle")?.interf
     {
       name: "document",
       type: {
-        type: "Js",
-        interfaceTag: 23,
-        kind: "resource",
-        name: "Lean.Vir.Js",
+        native: {
+          type: { tag: "resource" },
+          metadata: { declaration: "Lean.Vir.Js" },
+        },
+        value: { tag: "jsReference" },
       },
     },
   ],
-  result: { type: "Js", interfaceTag: 23, kind: "resource", name: "Lean.Vir.Js" },
+  result: {
+    native: {
+      type: { tag: "resource" },
+      metadata: { declaration: "Lean.Vir.Js" },
+    },
+    value: { tag: "jsReference" },
+  },
 });
 assert.equal(
   publicEntries.get("Lean.Vir.Browser.Document.current")?.targets[0]?.target,

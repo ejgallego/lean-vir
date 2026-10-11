@@ -147,7 +147,7 @@ See the [descriptor schema](../reference/IRPKG_FORMAT.md#package-set-descriptor)
 ordering, integrity and duplicate-identity rules. Browsers load neither
 `.olean` nor Lean's raw `.ir` files.
 
-The supported compatibility tuple is manifest 9, package format 11 and runtime
+The supported compatibility tuple is manifest 12, package format 11 and runtime
 ABI 4. Generate the package set and install the JavaScript/Wasm SDK from the
 same `lean_vir` revision. After changing that revision or the generator,
 regenerate the `.irpkg` members and descriptor and reinstall the matching SDK.
@@ -352,8 +352,8 @@ Deep links select a package and entry:
 dev.html?package=local-quickstart.irpkg&entry=QuickstartApp.Program.total
 ```
 
-`entry` accepts a manifest `entry`, `id`, or `jsName` alias from the
-[shared call namespace](JS_API.md#calls-and-manifest). The Pages
+`entry` uses the full Lean declaration name from the manifest
+[call interface](JS_API.md#calls-and-manifest). The Pages
 build's `prepare:pages` step generates URL-loadable samples in one generator
 session; [HARNESS.md](../HARNESS.md) owns site build/check commands. Generated
 packages, reports and `web/dist/` remain ignored local outputs.

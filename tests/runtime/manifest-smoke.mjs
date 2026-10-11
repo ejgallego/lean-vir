@@ -266,62 +266,62 @@ const reactUseStateImports = hostRuntime.interfaceManifest.hostImports.filter(
 assert.equal(reactUseStateImports.length, 1);
 assert.equal(reactUseStateImports[0]?.effect, "react");
 assert.equal(reactUseStateImports[0]?.boundary, "hostResource");
-assert.equal(reactUseStateImports[0]?.args[0]?.type?.kind, "resource");
-assert.equal(reactUseStateImports[0]?.args[0]?.type?.name, "Lean.Vir.Js");
-assert.equal(reactUseStateImports[0]?.args[0]?.type?.type, "Js");
-assert.equal(reactUseStateImports[0]?.result?.type, "Js");
+assert.equal(reactUseStateImports[0]?.args[0]?.type?.native?.type?.tag, "resource");
+assert.equal(reactUseStateImports[0]?.args[0]?.type?.native?.metadata?.declaration, "Lean.Vir.Js");
+assert.equal(reactUseStateImports[0]?.args[0]?.type?.value?.tag, "jsReference");
+assert.equal(reactUseStateImports[0]?.result?.value?.tag, "jsReference");
 const reactUseReducerImports = hostRuntime.interfaceManifest.hostImports.filter(
   (entry) => entry.target === "react.useReducer",
 );
 assert.equal(reactUseReducerImports.length, 1);
 for (const entry of reactUseReducerImports) {
   assert.equal(entry.effect, "react");
-  assert.equal(entry.args[0]?.type?.kind, "resource");
-  assert.equal(entry.args[0]?.type?.type, "Js");
-  assert.equal(entry.args[1]?.type?.type, "Js");
-  assert.equal(entry.result?.type, "Js");
+  assert.equal(entry.args[0]?.type?.native?.type?.tag, "resource");
+  assert.equal(entry.args[0]?.type?.value?.tag, "jsReference");
+  assert.equal(entry.args[1]?.type?.value?.tag, "jsReference");
+  assert.equal(entry.result?.value?.tag, "jsReference");
 }
 const reactUseRefImports = hostRuntime.interfaceManifest.hostImports.filter(
   (entry) => entry.target === "react.useRef",
 );
 assert.equal(reactUseRefImports.length, 1);
 assert.equal(reactUseRefImports[0]?.effect, "react");
-assert.equal(reactUseRefImports[0]?.args[0]?.type?.kind, "resource");
-assert.equal(reactUseRefImports[0]?.result?.type, "Js");
-assert.equal(reactUseRefImports[0]?.result?.name, "Lean.Vir.Js");
+assert.equal(reactUseRefImports[0]?.args[0]?.type?.native?.type?.tag, "resource");
+assert.equal(reactUseRefImports[0]?.result?.value?.tag, "jsReference");
+assert.equal(reactUseRefImports[0]?.result?.native?.metadata?.declaration, "Lean.Vir.Js");
 const reactUseMemoImports = hostRuntime.interfaceManifest.hostImports.filter(
   (entry) => entry.target === "react.useMemo",
 );
 assert.equal(reactUseMemoImports.length, 1);
 assert.equal(reactUseMemoImports[0]?.effect, "react");
-assert.equal(reactUseMemoImports[0]?.args[0]?.type?.kind, "resource");
-assert.equal(reactUseMemoImports[0]?.args[0]?.type?.type, "Js");
-assert.equal(reactUseMemoImports[0]?.args[1]?.type?.type, "Js");
-assert.equal(reactUseMemoImports[0]?.args[1]?.type?.name, "Lean.Vir.Js");
-assert.equal(reactUseMemoImports[0]?.result?.type, "Js");
+assert.equal(reactUseMemoImports[0]?.args[0]?.type?.native?.type?.tag, "resource");
+assert.equal(reactUseMemoImports[0]?.args[0]?.type?.value?.tag, "jsReference");
+assert.equal(reactUseMemoImports[0]?.args[1]?.type?.value?.tag, "jsReference");
+assert.equal(reactUseMemoImports[0]?.args[1]?.type?.native?.metadata?.declaration, "Lean.Vir.Js");
+assert.equal(reactUseMemoImports[0]?.result?.value?.tag, "jsReference");
 for (const target of [
   "js.value.function.binary",
   "js.value.function.nullary",
 ]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.boundary, "explicitConversion");
-  assert.equal(entry?.args[0]?.type?.kind, "function");
-  assert.equal(entry?.result?.type, "Js");
+  assert.equal(entry?.args[0]?.type?.value?.tag, "function");
+  assert.equal(entry?.result?.value?.tag, "jsReference");
 }
 const reactRefGetImports = hostRuntime.interfaceManifest.hostImports.filter(
   (entry) => entry.target === "react.ref.get",
 );
 assert.equal(reactRefGetImports.length, 1);
 assert.equal(reactRefGetImports[0]?.effect, "runtime");
-assert.equal(reactRefGetImports[0]?.args[0]?.type?.kind, "resource");
-assert.equal(reactRefGetImports[0]?.result?.type, "Js");
+assert.equal(reactRefGetImports[0]?.args[0]?.type?.native?.type?.tag, "resource");
+assert.equal(reactRefGetImports[0]?.result?.value?.tag, "jsReference");
 const reactRefSetImports = hostRuntime.interfaceManifest.hostImports.filter(
   (entry) => entry.target === "react.ref.set",
 );
 assert.equal(reactRefSetImports.length, 1);
 assert.equal(reactRefSetImports[0]?.effect, "runtime");
-assert.equal(reactRefSetImports[0]?.args[0]?.type?.kind, "resource");
-assert.equal(reactRefSetImports[0]?.args[1]?.type?.type, "Js");
+assert.equal(reactRefSetImports[0]?.args[0]?.type?.native?.type?.tag, "resource");
+assert.equal(reactRefSetImports[0]?.args[1]?.type?.value?.tag, "jsReference");
 for (const target of [
   "js.string",
   "js.string.value",
@@ -342,8 +342,8 @@ assert.equal(leanRefImports.length, 1);
 for (const entry of leanRefImports) {
   assert.equal(entry.effect, "runtime");
   assert.equal(entry.boundary, "objectHandle");
-  assert.equal(entry.args[0]?.type?.kind, "leanObject");
-  assert.equal(entry.result?.type, "Js");
+  assert.equal(entry.args[0]?.type?.native?.type?.tag, "leanObject");
+  assert.equal(entry.result?.value?.tag, "jsReference");
 }
 const leanRefValueImports = hostRuntime.interfaceManifest.hostImports.filter(
   (entry) => entry.target === "js.leanRef.value",
@@ -352,8 +352,8 @@ assert.equal(leanRefValueImports.length, 1);
 for (const entry of leanRefValueImports) {
   assert.equal(entry.effect, "runtime");
   assert.equal(entry.boundary, "objectHandle");
-  assert.equal(entry.args[0]?.type?.type, "Js");
-  assert.equal(entry.result?.kind, "leanObject");
+  assert.equal(entry.args[0]?.type?.value?.tag, "jsReference");
+  assert.equal(entry.result?.native?.type?.tag, "leanObject");
 }
 assert.deepEqual(
   hostRuntime.interfaceManifest.hostImports
@@ -372,39 +372,39 @@ const documentSetTitleImport = hostRuntime.interfaceManifest.hostImports.find(
 );
 assert.equal(documentSetTitleImport?.boundary, "hostResource");
 assert.equal(documentSetTitleImport?.args[0]?.name, "document");
-assert.equal(documentSetTitleImport?.args[0]?.type?.type, "Js");
-assert.equal(documentSetTitleImport?.args[1]?.type?.type, "Js");
+assert.equal(documentSetTitleImport?.args[0]?.type?.value?.tag, "jsReference");
+assert.equal(documentSetTitleImport?.args[1]?.type?.value?.tag, "jsReference");
 const documentGetTitleImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.document.getTitle",
 );
-assert.equal(documentGetTitleImport?.result?.type, "Js");
+assert.equal(documentGetTitleImport?.result?.value?.tag, "jsReference");
 assert.equal(documentGetTitleImport?.args[0]?.name, "document");
-assert.equal(documentGetTitleImport?.args[0]?.type?.type, "Js");
+assert.equal(documentGetTitleImport?.args[0]?.type?.value?.tag, "jsReference");
 const querySelectorImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.document.querySelector",
 );
-assert.equal(querySelectorImport?.args[0]?.type?.type, "Js");
+assert.equal(querySelectorImport?.args[0]?.type?.value?.tag, "jsReference");
 assert.equal(querySelectorImport?.args[0]?.name, "document");
-assert.equal(querySelectorImport?.args[1]?.type?.type, "Js");
+assert.equal(querySelectorImport?.args[1]?.type?.value?.tag, "jsReference");
 const keyboardEventNarrowingImport = hostImportTarget(
   "browser.keyboardEvent.fromEvent",
 );
-assert.equal(keyboardEventNarrowingImport?.args[0]?.type?.type, "Event");
-assert.equal(keyboardEventNarrowingImport?.result?.type, "Js");
+assert.equal(keyboardEventNarrowingImport?.args[0]?.type?.native?.metadata?.declaration, "Lean.Vir.Browser.Event");
+assert.equal(keyboardEventNarrowingImport?.result?.value?.tag, "jsReference");
 const keyboardEventKeyImport = hostImportTarget("browser.keyboardEvent.getKey");
-assert.equal(keyboardEventKeyImport?.args[0]?.type?.type, "KeyboardEvent");
-assert.equal(keyboardEventKeyImport?.result?.type, "Js");
+assert.equal(keyboardEventKeyImport?.args[0]?.type?.native?.metadata?.declaration, "Lean.Vir.Browser.KeyboardEvent");
+assert.equal(keyboardEventKeyImport?.result?.value?.tag, "jsReference");
 const eventTargetImport = hostImportTarget("react.syntheticEvent.currentTarget");
-assert.equal(eventTargetImport?.args[0]?.type?.type, "Js");
-assert.equal(eventTargetImport?.result?.type, "Js");
+assert.equal(eventTargetImport?.args[0]?.type?.value?.tag, "jsReference");
+assert.equal(eventTargetImport?.result?.value?.tag, "jsReference");
 const nativeEventImport = hostImportTarget("react.syntheticEvent.nativeEvent");
-assert.equal(nativeEventImport?.args[0]?.type?.type, "Js");
-assert.equal(nativeEventImport?.result?.type, "Event");
+assert.equal(nativeEventImport?.args[0]?.type?.value?.tag, "jsReference");
+assert.equal(nativeEventImport?.result?.native?.metadata?.declaration, "Lean.Vir.Browser.Event");
 for (const member of ["preventDefault", "stopPropagation"]) {
   const entry = hostImportTarget(`react.syntheticEvent.${member}`);
   assert.equal(entry?.effect, "react");
-  assert.equal(entry?.args[0]?.type?.type, "Js");
-  assert.equal(entry?.result?.type, "Unit");
+  assert.equal(entry?.args[0]?.type?.value?.tag, "jsReference");
+  assert.equal(entry?.result?.value?.tag, "unit");
 }
 for (const member of ["target", "currentTarget", "preventDefault", "stopPropagation"])
   assert.equal(hostImportTarget(`browser.event.${member}`), undefined,
@@ -413,75 +413,69 @@ const eventTargetNarrowingImport = hostImportTarget(
   "browser.eventTarget.asElement",
 );
 assert.equal(eventTargetNarrowingImport?.args[0]?.name, "target");
-assert.equal(eventTargetNarrowingImport?.args[0]?.type?.type, "Js");
-assert.equal(eventTargetNarrowingImport?.result?.type, "Js");
+assert.equal(eventTargetNarrowingImport?.args[0]?.type?.value?.tag, "jsReference");
+assert.equal(eventTargetNarrowingImport?.result?.value?.tag, "jsReference");
 const inlineStyleNarrowingImport = hostImportTarget(
   "browser.elementCSSInlineStyle.fromElement",
 );
-assert.equal(inlineStyleNarrowingImport?.args[0]?.type?.type, "Element");
-assert.equal(inlineStyleNarrowingImport?.result?.type, "Js");
+assert.equal(inlineStyleNarrowingImport?.args[0]?.type?.native?.metadata?.declaration, "Lean.Vir.Browser.Element");
+assert.equal(inlineStyleNarrowingImport?.result?.value?.tag, "jsReference");
 const inlineStyleGetterImport = hostImportTarget(
   "browser.elementCSSInlineStyle.getStyle",
 );
-assert.equal(
-  inlineStyleGetterImport?.args[0]?.type?.type,
-  "ElementCSSInlineStyle",
-);
-assert.equal(inlineStyleGetterImport?.result?.type, "CSSStyleDeclaration");
+assert.equal(inlineStyleGetterImport?.args[0]?.type?.native?.metadata?.declaration, "Lean.Vir.Browser.ElementCSSInlineStyle");
+assert.equal(inlineStyleGetterImport?.result?.native?.metadata?.declaration, "Lean.Vir.Browser.CSSStyleDeclaration");
 const setStylePropertyImport = hostImportTarget(
   "browser.cssStyleDeclaration.setProperty",
 );
-assert.equal(
-  setStylePropertyImport?.args[0]?.type?.type,
-  "CSSStyleDeclaration",
-);
+assert.equal(setStylePropertyImport?.args[0]?.type?.native?.metadata?.declaration, "Lean.Vir.Browser.CSSStyleDeclaration");
 const getCheckedImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.htmlInputElement.getChecked",
 );
-assert.equal(getCheckedImport?.result?.type, "Js");
+assert.equal(getCheckedImport?.result?.value?.tag, "jsReference");
 const setTimeoutImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.timer.setTimeout",
 );
-assert.equal(setTimeoutImport?.args[0]?.type?.kind, "function");
-assert.equal(setTimeoutImport?.args[1]?.type?.type, "Js");
+assert.equal(setTimeoutImport?.args[0]?.type?.value?.tag, "function");
+assert.equal(setTimeoutImport?.args[1]?.type?.value?.tag, "jsReference");
 const setIntervalImport = hostImportTarget("browser.timer.setInterval");
-assert.equal(setIntervalImport?.args[0]?.type?.kind, "function");
-assert.equal(setIntervalImport?.args[1]?.type?.type, "Js");
-assert.equal(setIntervalImport?.result?.type, "Interval");
+assert.equal(setIntervalImport?.args[0]?.type?.value?.tag, "function");
+assert.equal(setIntervalImport?.args[1]?.type?.value?.tag, "jsReference");
+assert.equal(setIntervalImport?.result?.native?.metadata?.declaration, "Lean.Vir.Browser.Interval");
 const clearIntervalImport = hostImportTarget("browser.timer.clearInterval");
-assert.equal(clearIntervalImport?.args[0]?.type?.type, "Interval");
+assert.equal(clearIntervalImport?.args[0]?.type?.native?.metadata?.declaration, "Lean.Vir.Browser.Interval");
 const animationFrameImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.animation.requestAnimationFrame",
 );
-assert.equal(animationFrameImport?.args[0]?.type?.kind, "function");
-assert.equal(animationFrameImport?.args[0]?.type?.args[0]?.type?.type, "Js");
+assert.equal(animationFrameImport?.args[0]?.type?.value?.tag, "function");
+assert.equal(animationFrameImport?.args[0]?.type?.value?.args[0]?.tag, "jsReference");
 const testCallNatCallbackImport =
   hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "test.callNatCallback",
   );
 assert.equal(testCallNatCallbackImport?.effect, "runtime");
-assert.equal(testCallNatCallbackImport?.args[0]?.type?.type, "Js");
-assert.equal(testCallNatCallbackImport?.args[1]?.type?.kind, "function");
-assert.equal(testCallNatCallbackImport?.args[1]?.type?.effect, "runtime");
+assert.equal(testCallNatCallbackImport?.args[0]?.type?.value?.tag, "jsReference");
+assert.equal(testCallNatCallbackImport?.args[1]?.type?.value?.tag, "function");
+assert.equal(testCallNatCallbackImport?.args[1]?.type?.native?.metadata?.signature?.effect, "runtime");
 assert.equal(
-  testCallNatCallbackImport?.args[1]?.type?.args[0]?.type?.type,
-  "Js",
+  testCallNatCallbackImport?.args[1]?.type?.value?.args[0]?.tag,
+  "jsReference",
 );
-assert.equal(testCallNatCallbackImport?.args[1]?.type?.result?.type, "Js");
-assert.equal(testCallNatCallbackImport?.result?.type, "Js");
+assert.equal(testCallNatCallbackImport?.args[1]?.type?.value?.result?.tag, "jsReference");
+assert.equal(testCallNatCallbackImport?.result?.value?.tag, "jsReference");
 const testRecordNatImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "test.recordNat",
 );
 assert.equal(testRecordNatImport?.effect, "dom");
-assert.equal(testRecordNatImport?.args[0]?.type?.type, "Js");
+assert.equal(testRecordNatImport?.args[0]?.type?.value?.tag, "jsReference");
 const reactRenderNodeImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "react.root.renderNode",
 );
 if (reactRenderNodeImport !== undefined) {
-  assert.equal(reactRenderNodeImport.args[0]?.type?.type, "ReactRoot");
-  assert.equal(reactRenderNodeImport.args[0]?.type?.kind, "resource");
-  assert.equal(reactRenderNodeImport.args[1]?.type?.type, "Js");
-  assert.equal(reactRenderNodeImport.result?.type, "Unit");
+  assert.equal(reactRenderNodeImport.args[0]?.type?.native?.metadata?.declaration, "Lean.Vir.React.Root");
+  assert.equal(reactRenderNodeImport.args[0]?.type?.native?.type?.tag, "resource");
+  assert.equal(reactRenderNodeImport.args[1]?.type?.value?.tag, "jsReference");
+  assert.equal(reactRenderNodeImport.result?.value?.tag, "unit");
 }
 for (const target of [
   "js.value.function.nullaryVoid",
@@ -489,7 +483,7 @@ for (const target of [
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "runtime");
   assert.equal(entry?.boundary, "explicitConversion");
-  assert.equal(entry?.result?.type, "Js");
+  assert.equal(entry?.result?.value?.tag, "jsReference");
 }
 assert.equal(
   hostRuntime.interfaceManifest.hostImports.some((entry) =>
@@ -503,22 +497,22 @@ for (const target of ["react.node.text", "react.elementType.tag"]) {
 const reactCreateElementImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "react.node.createElement",
 );
-assert.equal(reactCreateElementImport?.args[0]?.type?.type, "Js");
-assert.equal(reactCreateElementImport?.args[1]?.type?.type, "Js");
-assert.equal(reactCreateElementImport?.args[2]?.type?.type, "Js");
+assert.equal(reactCreateElementImport?.args[0]?.type?.value?.tag, "jsReference");
+assert.equal(reactCreateElementImport?.args[1]?.type?.value?.tag, "jsReference");
+assert.equal(reactCreateElementImport?.args[2]?.type?.value?.tag, "jsReference");
 for (const target of ["react.props.withData.make", "react.props.withData.get"]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "react");
-  assert.equal(entry?.args[0]?.type?.type, "Js");
-  assert.equal(entry?.args[0]?.type?.kind, "resource");
-  assert.equal(entry?.result?.type, "Js");
+  assert.equal(entry?.args[0]?.type?.value?.tag, "jsReference");
+  assert.equal(entry?.args[0]?.type?.native?.type?.tag, "resource");
+  assert.equal(entry?.result?.value?.tag, "jsReference");
 }
 const reactFragmentImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "react.node.fragment",
 );
 assert.equal(reactFragmentImport?.effect, "react");
-assert.equal(reactFragmentImport?.args[0]?.type?.type, "Js");
-assert.equal(reactFragmentImport?.args[1]?.type?.type, "Js");
+assert.equal(reactFragmentImport?.args[0]?.type?.value?.tag, "jsReference");
+assert.equal(reactFragmentImport?.args[1]?.type?.value?.tag, "jsReference");
 const browserRuntime = await createBrowserVirRuntime({
   wasmBytes,
   irPackageSet: [hostPackageBytes],
@@ -545,7 +539,7 @@ for (const manifest of [
   }
 }
 assert.throws(() => {
-  fibEntry.args[0].type.interfaceTag = 1;
+  fibEntry.args[0].type.native.type.tag = "int";
 }, TypeError);
 assert.throws(() => {
   runtime.interfaceManifest.exports.reverse();
@@ -563,7 +557,8 @@ assert.ok(
   (runtime.entryCallCache.get(fibEntry)?.callSlot ?? 0) > 0,
   "expected fib call slot to be cached",
 );
-assert.equal(runtime.exportsByName.fib(12), 144n);
+assert.equal("exportsByName" in runtime, false);
+assert.equal(runtime.call("fib", 12), 144n);
 assert.equal(
   hostRuntime.call("HostInterop.titleHandshake", "runtime smoke"),
   "Lean VIR host: runtime smoke",

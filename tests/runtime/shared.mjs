@@ -22,6 +22,8 @@ import {
   prepareVirIrpkgSync,
 } from "../../scripts/packages/irpkg-generator.mjs";
 import { createTestModuleProject } from "../support/module-project.mjs";
+import { encodeInterfaceManifest } from "../../scripts/packages/irpkg-format.mjs";
+import { primitiveBoundary } from "../support/interface-fixtures.mjs";
 import {
   INTERFACE_MANIFEST_ARTIFACT,
   INTERFACE_MANIFEST_VERSION,
@@ -111,13 +113,11 @@ const validManifestShape = {
   metadata: {},
   exports: [
     {
-      id: "ok",
-      jsName: "ok",
       entry: "ok",
       nameKey: "s6f6b/",
       source: "Ok.lean",
-      args: [{ name: "arg1", type: { type: "Nat", interfaceTag: 0 } }],
-      result: { type: "Nat", interfaceTag: 0 },
+      args: [{ name: "arg1", type: primitiveBoundary("nat", "bigint") }],
+      result: primitiveBoundary("nat", "bigint"),
       effect: "pure",
       startup: false,
     },
@@ -126,7 +126,7 @@ const validManifestShape = {
 
 export function assertValidManifestShape() {
   assert.equal(
-    validateInterfaceManifest(structuredClone(validManifestShape)).exports[0]
+    validateInterfaceManifest(encodeInterfaceManifest(structuredClone(validManifestShape))).exports[0]
       .entry,
     "ok",
   );
@@ -145,15 +145,15 @@ export function assertValidManifestShape() {
       args: [
         {
           name: "value",
-          type: { type: "Nat", interfaceTag: 0 },
+          type: primitiveBoundary("nat", "bigint"),
         },
       ],
-      result: { type: "Nat", interfaceTag: 0 },
+      result: primitiveBoundary("nat", "bigint"),
       effect: "pure",
     },
   ];
   assert.equal(
-    validateInterfaceManifest(withPureHostImport).hostImports[0].arity,
+    validateInterfaceManifest(encodeInterfaceManifest(withPureHostImport)).hostImports[0].arity,
     1,
   );
   const legacySourceRoot = structuredClone(validManifestShape);
@@ -170,7 +170,7 @@ export function assertValidManifestShape() {
     role: "root",
   };
   assert.equal(
-    validateInterfaceManifest(legacySourceRoot).metadata.packageSetMember
+    validateInterfaceManifest(encodeInterfaceManifest(legacySourceRoot)).metadata.packageSetMember
       .module,
     "Opaque-Module-Identity",
   );
@@ -179,7 +179,7 @@ export function assertValidManifestShape() {
 export function assertInvalidManifest(mutator, pattern, options = {}) {
   const manifest = structuredClone(validManifestShape);
   mutator(manifest);
-  assert.throws(() => validateInterfaceManifest(manifest, options), pattern);
+  assert.throws(() => validateInterfaceManifest(encodeInterfaceManifest(manifest), options), pattern);
 }
 
 export function wait(ms) {
