@@ -14,6 +14,8 @@
   "scripts": {
     "setup": "npm run fetch:lean && npm run install:wasi && npm run build:demo",
     "doctor": "node scripts/doctor.mjs",
+    "quiet": "node scripts/quiet-run.mjs",
+    "test:quiet": "node --test scripts/quiet-run.test.mjs",
     "mailbox:check": "node scripts/mailbox.mjs check",
     "mailbox:list": "node scripts/mailbox.mjs list",
     "mailbox:deliver": "node scripts/mailbox.mjs deliver",
