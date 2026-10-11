@@ -8,7 +8,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import test from "node:test";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
-import { readIrPackageInfo, replaceIrPackageManifest } from "../../scripts/packages/irpkg-format.mjs";
+import { encodeInterfaceManifest, readIrPackageInfo, replaceIrPackageManifest } from "../../scripts/packages/irpkg-format.mjs";
 import { IR_PACKAGE_SECTION, irPackageManifestChecksum } from "../../web/src/runtime/ir-package.js";
 import { assert, createRuntimeModuleProject, join, readFile } from "./shared.mjs";
 
@@ -138,7 +138,8 @@ function rewriteSameLengthManifest(bytes, manifest) {
     value => value.kind === IR_PACKAGE_SECTION.INTERFACE_MANIFEST,
   );
   assert.ok(section, "fixture must contain an interface manifest");
-  const text = JSON.stringify(manifest);
+  // Keep shared wire indices even when bypassing admission for negative fixtures.
+  const text = JSON.stringify(encodeInterfaceManifest(manifest));
   const missingBytes = section.byteLength - 12 - Buffer.byteLength(text);
   assert.ok(missingBytes >= 0, "version fixture must fit the existing section");
   const manifestBytes = new TextEncoder().encode(text + " ".repeat(missingBytes));
