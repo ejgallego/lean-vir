@@ -68,6 +68,10 @@ private def immediateConstructorJson (name : Name) : String :=
     ("fields", jsonArray #[])
   ]
 
+private def FieldCheck.toJson : FieldCheck → String
+  | .unicodeScalar => jsonObject #[("tag", jsonString "unicodeScalar")]
+  | .natLt bound => jsonObject #[("tag", jsonString "natLt"), ("bound", jsonString (toString bound))]
+
 mutual
 
 private partial def nativeDescriptorJson (type : InterfaceType) : String :=
@@ -163,12 +167,12 @@ private partial def structureConstructorJson (descriptor : StructureDescriptor) 
       ]
 
 private partial def recordFieldJson
-    (key : String) (path : Array Nat) (type : InterfaceType) : String :=
-  jsonObject #[
+    (key : String) (path : Array Nat) (type : InterfaceType) (check? : Option FieldCheck := none) : String :=
+  jsonObject (#[
     ("key", jsonString key),
     ("path", jsonArray (path.map jsonNat)),
     ("value", valueInterfaceJson type)
-  ]
+  ] ++ (match check? with | none => #[] | some check => #[("check", check.toJson)]))
 
 private partial def variantCaseJson
     (kind : String) (fields : Array (String × InterfaceType)) : String :=
@@ -212,9 +216,9 @@ private partial def inheritedRecordFieldsJson
       | .structure _ _ parent =>
           result := result ++ inheritedRecordFieldsJson parent.fields path
       | _ =>
-          result := result.push (recordFieldJson field.name path field.type)
+          result := result.push (recordFieldJson field.name path field.type field.check?)
     else
-      result := result.push (recordFieldJson field.name path field.type)
+      result := result.push (recordFieldJson field.name path field.type field.check?)
   return result
 
 private partial def customInductiveValueJson

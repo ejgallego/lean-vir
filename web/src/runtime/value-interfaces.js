@@ -234,7 +234,7 @@ function validateMappings(fields, mappings, label) {
   const keys = new Set(), paths = [];
   for (const [index, mapping] of mappings.entries()) {
     const at = `${label}.fields[${index}]`;
-    object(mapping, ["key", "path", "value"], at);
+    object(mapping, ["key", "path", "value", "check"], at);
     if (typeof mapping.key !== "string" || keys.has(mapping.key)) fail(`${at}.key`, "must be a unique string"); keys.add(mapping.key);
     array(mapping.path, `${at}.path`);
     if (!mapping.path.length) fail(`${at}.path`, "must be non-empty");
@@ -250,6 +250,18 @@ function validateMappings(fields, mappings, label) {
       }
     });
     validateView(child, mapping.value, `${at}.value`);
+    if (mapping.check !== undefined) {
+      const check = mapping.check, label = `${at}.check`;
+      object(check, ["tag", "bound"], label);
+      if (check.tag === "unicodeScalar") {
+        if (check.bound !== undefined || child.type?.tag !== "unsigned" || child.type.width !== 32)
+          fail(label, "requires a UInt32 field without a bound");
+      } else if (check.tag === "natLt") {
+        if (child.type?.tag !== "nat" || typeof check.bound !== "string" ||
+            !/^(?:0|[1-9][0-9]*)$/.test(check.bound) || check.bound.trim() !== check.bound)
+          fail(label, "requires a Nat field and canonical natural bound");
+      } else fail(`${label}.tag`, "is not supported");
+    }
     paths.push(mapping.path);
   }
   function coverage(current, selected) {

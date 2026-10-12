@@ -431,9 +431,9 @@ experimental even when package generation accepts its descriptor. See
 for minimal reference interop.
 
 Compiler-erased single-field wrappers can occupy scalar or USize storage inside
-an enclosing record. These layouts are admitted, while automatic conversion of
-the packed wrapper fields remains unsupported. Supported sibling exports in the
-same package remain callable.
+an enclosing record. Their converters retain the wrapped field's scalar/USize
+operations and reconstruct the selected wrapper shape. Flattened mappings that
+cross packed wrappers remain unsupported; supported sibling exports stay callable.
 
 Implemented interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
 `Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,

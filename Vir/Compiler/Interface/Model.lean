@@ -59,6 +59,13 @@ structure ConstructorStorage where
   scalarByteSize : Nat
   deriving BEq, Repr
 
+/-- Explicit value-domain facts for selected validated structure fields.
+Storage erasure alone does not establish these constraints. -/
+inductive FieldCheck where
+  | unicodeScalar
+  | natLt (bound : Nat)
+  deriving BEq, Repr
+
 mutual
 
 /-- A Lean type classified for VIR's JavaScript interface. -/
@@ -106,6 +113,7 @@ structure StructureField where
   layout : FieldLayout
   /-- An inherited parent retains its own layout; host object keys are flattened. -/
   isSubobject : Bool
+  check? : Option FieldCheck := none
   deriving BEq, Repr
 
 structure StructureDescriptor where

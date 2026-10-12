@@ -22,6 +22,18 @@ namespace JsonSafeValues
 @[vir_export] def bytesIdentity (value : ByteArray) := value
 @[vir_export] def privateIdentity (value : JsonSafePrivate.Secret) := value
 @[vir_export] def privateAmount (value : JsonSafePrivate.Secret) := JsonSafePrivate.amount value
+@[vir_export] def charIdentity (value : Char) := value
+@[vir_export] def charAmount (value : Char) := value.toNat
+@[vir_export] def finIdentity (value : Fin 100) := value
+@[vir_export] def finAmount (value : Fin 100) := value.val
+
+inductive Numbering where
+  | nat (value : Nat)
+  | letter (value : Char)
+@[vir_export] def numberingIdentity (value : Numbering) := value
+@[vir_export] def numberingAmount : Numbering → Nat
+  | .nat value => value
+  | .letter value => value.toNat
 
 structure Packed where
   large : UInt64

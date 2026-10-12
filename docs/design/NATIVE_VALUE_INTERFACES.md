@@ -66,8 +66,8 @@ recursive-child views remain separate design questions with concrete caller need
 Manifest admission establishes the grammar, physical layouts, lexical scopes and
 native/view mapping consistency. Binding consumes those immutable facts; it does
 not repeat descriptor validation. A physically valid layout can still require a
-conversion the optional codec does not support, such as an enclosing packed
-identity-wrapper field. Capability checks preserve that distinction and allow
+conversion the optional codec does not support, such as flattened mappings
+that cross packed identity-wrapper storage. Capability checks preserve that distinction and allow
 supported sibling exports to remain callable.
 
 Conversion checks actual values, payloads, numeric ranges, returned discriminants,

@@ -176,8 +176,8 @@ test("packed UInt64 and Unit use the JSON-safe scalar contract", () => {
     tag: "record", fields: [{ key: "value", path: [0], value: u64.value }],
   });
   roundtrip(boxed, { value: "9007199254740993" });
-  assert.throws(() => h.bind(record([["wrapped", boxed, { tag: "scalar", offset: 0, size: 8 }]],
-    { objectFieldCount: 0, usizeFieldCount: 0, scalarByteSize: 8 })), /unsupported packed conversion/);
+  roundtrip(record([["wrapped", boxed, { tag: "scalar", offset: 0, size: 8 }]],
+    { objectFieldCount: 0, usizeFieldCount: 0, scalarByteSize: 8 }), { wrapped: { value: "9007199254740993" } });
 });
 
 test("strict JSON leaves reject coercions and clean up already constructed fields", () => {
@@ -220,4 +220,53 @@ test("native and JSON-safe plans cache separately within each runtime", () => {
   assert.equal(normal.lower(undefined, "argument"), 1);
   assert.throws(() => json.lower(undefined, "argument"), /null/);
   assert.throws(() => a.nativeValueCodec(pair, { representation: "unknown" }), /unsupported value representation/);
+});
+
+function checkedWrapper(pair, check) {
+  return objectBoundary("Checked", [identityConstructor("Checked.mk", { name: "val", type: pair.native })], {
+    tag: "record", fields: [{ key: "val", path: [0], value: pair.value, check }],
+  });
+}
+
+test("Unicode scalar validation applies before coercion and through packed wrappers", () => {
+  const char = checkedWrapper(primitiveBoundary("unsigned", "number", { width: 32 }), { tag: "unicodeScalar" });
+  const packed = record([["char", char, { tag: "scalar", offset: 0, size: 4 }]],
+    { objectFieldCount: 0, usizeFieldCount: 0, scalarByteSize: 4 });
+  for (const val of [0, 0xd7ff, 0xe000, 0xfdd0, 0xffff, 0x1f600, 0x10ffff]) {
+    roundtrip(char, { val }); roundtrip(packed, { char: { val } });
+  }
+  const h = harness(), boxedCodec = h.bind(char), packedCodec = h.bind(packed);
+  for (const val of [-1, 1.5, 0xd800, 0xdfff, 0x110000, 2 ** 32, 2 ** 32 + 65, "65"]) {
+    assert.throws(() => h.lower(boxedCodec, { val }), /Unicode scalar/);
+    assert.throws(() => h.lower(packedCodec, { char: { val } }), /Unicode scalar/);
+  }
+  const invalidResult = h.runtime.makeObjectUint32(0xd800);
+  try { assert.throws(() => boxedCodec.lift(invalidResult, "result"), /Unicode scalar/); }
+  finally { h.dec(invalidResult); }
+  assert.equal(h.heap.size, 0); assert.equal(h.buffers.size, 0);
+});
+
+test("Fin bounds are explicit, exact and never modulo or clamped", () => {
+  const fin = checkedWrapper(nat, { tag: "natLt", bound: "100" });
+  for (const val of ["0", "99"]) roundtrip(fin, { val });
+  const h = harness(), codec = h.bind(fin);
+  for (const val of ["100", "101", "9007199254740993", "-1"]) assert.throws(() => h.lower(codec, { val }));
+  const empty = h.bind(checkedWrapper(nat, { tag: "natLt", bound: "0" }));
+  assert.throws(() => h.lower(empty, { val: "0" }), /Fin 0/);
+  const large = checkedWrapper(nat, { tag: "natLt", bound: "9007199254740994" });
+  roundtrip(large, { val: "9007199254740993" });
+  assert.throws(() => h.lower(h.bind(large), { val: "9007199254740994" }), /Fin 9007199254740994/);
+  const partial = h.bind(record([["allocated", string], ["bounded", fin]]));
+  assert.throws(() => h.lower(partial, { allocated: "owned before failure", bounded: { val: "100" } }), /Fin 100/);
+  const invalidResult = h.runtime.makeObjectDecimal("nat", "100");
+  try { assert.throws(() => codec.lift(invalidResult, "result"), /Fin 100/); }
+  finally { h.dec(invalidResult); }
+  assert.equal(h.heap.size, 0);
+});
+
+test("field-check admission rejects incompatible storage domains and inexact bounds", () => {
+  assert.throws(() => validateBoundaryInterface(checkedWrapper(nat, { tag: "unicodeScalar" })), /requires a UInt32 field/);
+  assert.throws(() => validateBoundaryInterface(checkedWrapper(u64, { tag: "natLt", bound: "100" })), /requires a Nat field/);
+  for (const bound of [100, "01", "-1", "100\n", "1e2"])
+    assert.throws(() => validateBoundaryInterface(checkedWrapper(nat, { tag: "natLt", bound })), /canonical natural bound/);
 });

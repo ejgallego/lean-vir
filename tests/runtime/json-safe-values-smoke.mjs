@@ -36,6 +36,10 @@ try {
       const regularPrivate = { amount: BigInt(huge) };
       assert.equal(runtime.call("JsonSafeValues.privateAmount", regularPrivate), BigInt(huge));
       assert.deepEqual(runtime.call("JsonSafeValues.privateIdentity", regularPrivate), regularPrivate);
+      assert.equal(runtime.call("JsonSafeValues.charAmount", { val: 0x10ffff }), 0x10ffffn);
+      assert.throws(() => runtime.call("JsonSafeValues.charIdentity", { val: 0xd800 }), /Unicode scalar/);
+      assert.equal(runtime.call("JsonSafeValues.finAmount", { val: 99n }), 99n);
+      assert.throws(() => runtime.call("JsonSafeValues.finIdentity", { val: 100n }), /Fin 100/);
       // Local prototype selection seam, not a new public factory/call option.
       // The production call/ownership path receives the selected bound codecs.
       runtime.makeObjectValue = function (pair, value, label) {
@@ -60,6 +64,23 @@ try {
       assert.deepEqual(call("bytesIdentity", [0, 128, 255]), [0, 128, 255]);
       assert.equal(call("privateAmount", { amount: huge }), huge);
       assert.deepEqual(call("privateIdentity", { amount: huge }), { amount: huge });
+      for (const val of [0, 0xd7ff, 0xe000, 0xfdd0, 0xffff, 0x1f600, 0x10ffff]) {
+        assert.equal(call("charAmount", { val }), String(val));
+        assert.deepEqual(call("charIdentity", { val }), { val });
+        const letter = { kind: "letter", value: { val } };
+        assert.equal(call("numberingAmount", letter), String(val));
+        assert.deepEqual(call("numberingIdentity", letter), letter);
+      }
+      for (const val of [0xd800, 0xdfff, 0x110000, 2 ** 32 + 65]) {
+        assert.throws(() => call("charIdentity", { val }), /Unicode scalar/);
+        assert.throws(() => call("numberingIdentity", { kind: "letter", value: { val } }), /Unicode scalar/);
+        assert.equal(runtime.failure, null);
+      }
+      for (const val of ["0", "99"]) {
+        assert.equal(call("finAmount", { val }), val);
+        assert.deepEqual(call("finIdentity", { val }), { val });
+      }
+      for (const val of ["100", "101", "-1", huge]) assert.throws(() => call("finIdentity", { val }));
       const packed = { large: "18446744073709551615", marker: true, size: 42, tiny: 255 };
       const descriptor = runtime.findManifestEntry("JsonSafeValues.packedIdentity").args[0].type.native;
       const fields = descriptor.metadata.constructors[0].fields;

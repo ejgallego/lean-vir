@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import { compileConstructorValueInterface } from "./constructor-value-interface.js";
 import { compilePrimitiveValueCodec } from "./primitive-values.js";
 import { objectArgumentSupported, objectResultSupported } from "./object-abi.js";
+import { normalizeBoundedUnsignedBigInt } from "./primitive-value-normalizers.js";
 
 // Precondition: immutable admitted compiler facts and a supported selected view.
 // Bind those facts to the selected JS representation.
@@ -122,6 +123,10 @@ function compileValueCodec(runtime, native, view, bindings = [], jsonSafe = fals
             throw new Error(`${label} constructor is out of range`);
           return plans[index].lift(obj, label);
         };
+        if (identity) preservePackedOperations(codec, plans[0], (value, label) => {
+          shape.select(value, label);
+          return shape.cases[0].read(value, label);
+        });
       } else if (view.tag === "record") {
         const fieldKeys = view.fields.map(field => field.key);
         const keys = new Set(fieldKeys);
@@ -132,6 +137,10 @@ function compileValueCodec(runtime, native, view, bindings = [], jsonSafe = fals
           return ctor.lower(0, value, label, scratch);
         };
         codec.lift = (obj, label) => ctor.lift(obj, label);
+        preservePackedOperations(codec, ctor, (value, label) => {
+          requireRecord(value, keys, label);
+          return value;
+        });
       } else throw new Error(`unsupported constructor view ${view.tag}`);
       break;
     }
@@ -152,7 +161,7 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
     const group = groups.get(index);
     if (group.length === 1 && group[0].path.length === 1) {
       const mapping = group[0];
-      return { field, codec: compile(field.type, mapping.value, scope),
+      return { field, codec: checkedFieldCodec(compile(field.type, mapping.value, scope), mapping.check),
         read: reader(mapping.key), key: mapping.key, keys: [mapping.key], nested: false };
     }
     const nested = group.map(mapping => ({ ...mapping, path: mapping.path.slice(1) }));
@@ -171,14 +180,26 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
     lower: (index, _value, label) => runtime.makeObjectScalar(index, label),
     lift: () => build(undefined),
   };
-  if (ctor.representation === "identity") return {
-    lower: (_index, value, label, scratch) => fields[0].codec.lower(fields[0].read(value), label, scratch),
-    lift(obj, label) {
-      const value = fields[0].codec.lift(obj, label);
+  if (ctor.representation === "identity") {
+    const entry = fields[0];
+    function rebuild(value) {
       if (single) return build(value);
-      const output = { ...outputTemplate }; append(output, fields[0], value); return build(output);
-    },
-  };
+      const output = { ...outputTemplate }; append(output, entry, value); return build(output);
+    }
+    const result = {
+      lower: (_index, value, label, scratch) => entry.codec.lower(entry.read(value), label, scratch),
+      lift: (obj, label) => rebuild(entry.codec.lift(obj, label)),
+    };
+    if (entry.codec.scalar) result.scalar = {
+      write: (bytes, offset, size, value, label) => entry.codec.scalar.write(bytes, offset, size, entry.read(value), label),
+      read: (bytes, offset, size, label) => rebuild(entry.codec.scalar.read(bytes, offset, size, label)),
+    };
+    if (entry.codec.usize) result.usize = {
+      write: (value, label) => entry.codec.usize.write(entry.read(value), label),
+      read: value => rebuild(entry.codec.usize.read(value)),
+    };
+    return result;
+  }
   const storage = ctor.storage, objectOnly = storage.usizeFieldCount === 0 && storage.scalarByteSize === 0;
   // Physical slots are admitted facts. Bind the common small object layouts
   // once instead of branching on every field's location at every value.
@@ -278,6 +299,38 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
           return build(output);
         }),
   };
+}
+
+function preservePackedOperations(target, source, read) {
+  if (source.scalar) target.scalar = {
+    write: (bytes, offset, size, value, label) => source.scalar.write(bytes, offset, size, read(value, label), label),
+    read: source.scalar.read,
+  };
+  if (source.usize) target.usize = {
+    write: (value, label) => source.usize.write(read(value, label), label),
+    read: source.usize.read,
+  };
+}
+
+function checkedFieldCodec(codec, check) {
+  if (check === undefined) return codec;
+  const max = check.tag === "natLt" ? BigInt(check.bound) - 1n : null;
+  function validate(value, label) {
+    if (check.tag === "unicodeScalar") {
+      if (!Number.isInteger(value) || value < 0 || value >= 0x110000 || (value >= 0xd800 && value <= 0xdfff))
+        throw new Error(`${label} must be a Unicode scalar value`);
+    } else normalizeBoundedUnsignedBigInt(value, label, max, `Fin ${check.bound}`);
+    return value;
+  }
+  const result = {
+    lower: (value, label, scratch) => codec.lower(validate(value, label), label, scratch),
+    lift: (obj, label) => validate(codec.lift(obj, label), label),
+  };
+  if (codec.scalar) result.scalar = {
+    write: (bytes, offset, size, value, label) => codec.scalar.write(bytes, offset, size, validate(value, label), label),
+    read: (bytes, offset, size, label) => validate(codec.scalar.read(bytes, offset, size, label), label),
+  };
+  return Object.freeze(result);
 }
 
 function compileChain(runtime, constructors, view, scope, compile) {

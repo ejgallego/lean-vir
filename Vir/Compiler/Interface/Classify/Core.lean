@@ -233,16 +233,33 @@ private partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
           .structureLayoutFieldCountMismatch name structInfo.fieldNames.size layout.fieldInfo.size)
       if fieldExprs.size != structInfo.fieldNames.size then
         throwThe InterfaceClassifierError (.constructorInvalidType ctorName e)
+      let check? ← if name == ``Char then
+        pure (some FieldCheck.unicodeScalar)
+      else if name == ``Fin then do
+        let bound ← reduceTypeAliases args[0]!
+        let .lit (.natVal bound) := bound
+          | throwThe InterfaceClassifierError (.nonLiteralFinBound bound)
+        pure (some (FieldCheck.natLt bound))
+      else pure none
+      -- Only the pinned Char/Fin declarations have a selected validating rule.
+      -- Never skip proof fields merely because the compiler erased their storage.
+      if check?.isSome && (structInfo.fieldNames.size != 2 || structInfo.fieldNames[0]! != `val ||
+          structInfo.fieldNames[1]! != (if name == ``Char then `valid else `isLt)) then
+        throwThe InterfaceClassifierError (.constructorInvalidType ctorName e)
       let mut fields : Array StructureField := #[]
       for h : idx in *...structInfo.fieldNames.size do
         let fieldName := structInfo.fieldNames[idx]
         let isSubobject := (isSubobjectField? env name fieldName).isSome
-        let some fieldLayout := fieldLayout? layout.fieldInfo[idx]!
-          | throwThe InterfaceClassifierError (.structureFieldErasedRuntimeLayout fieldName name)
+        let fieldLayout ← match fieldLayout? layout.fieldInfo[idx]! with
+          | some layout => pure layout
+          | none =>
+              if check?.isSome && idx == 1 then continue
+              else throwThe InterfaceClassifierError (.structureFieldErasedRuntimeLayout fieldName name)
         let fieldExpr := fieldExprs[idx]!.2
         let fieldType ← withContext (.structureField fieldName name fieldExpr) (classifyType fieldExpr nextSeen)
         fields := fields.push {
-          name := fieldName.toString, type := fieldType, layout := fieldLayout, isSubobject }
+          name := fieldName.toString, type := fieldType, layout := fieldLayout, isSubobject
+          check? := if idx == 0 then check? else none }
       return (.structure name (exprTypeLabel e) {
         constructorName := ctorName
         trivialField?

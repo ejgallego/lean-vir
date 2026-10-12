@@ -64,10 +64,33 @@ declarations. The imported-private-field fixture qualifies generated conversion
 and independent Lean observations on both Wasm profiles. Source field names and
 compiler storage layouts still determine the same record mappings.
 
-Erased proof fields remain a generation error. Dropping `Char.valid` or a
-`Fin` bound proof would remove the evidence for an invariant without supplying a
-boundary check. Supporting such types needs an explicit, reusable rule that
-validates their runtime values; constructor storage alone does not supply it.
+The local constraint prototype recognizes Char and Fin with a closed natural
+literal bound. It keeps their data field and emits an explicit optional field
+check in the selected value mapping:
+
+```js
+{ key: "val", path: [0], value: { tag: "number" }, check: { tag: "unicodeScalar" } }
+{ key: "val", path: [0], value: { tag: "bigint" }, check: { tag: "natLt", bound: "100" } }
+```
+
+Char accepts every Unicode scalar, including NUL, astral values and noncharacters,
+and rejects surrogates and values at/above0x110000 before UInt32 coercion. Fin100
+accepts exactly0..99; no modulo/clamp. Constraints run in both regular and JSON-safe
+plans, including scalar packing and lifted results. Arbitrary erased-proof types
+remain a generation error. This is an explicit rule for the pinned declarations,
+not inference of a proposition from a void slot or a general proof validator.
+
+Identity wrappers now retain their child's scalar/usize operations and reconstruct
+their selected record/variant shape on lifting. This also supports existing simple
+packed UInt32/Bool/USize wrappers and returned callbacks. Flattened mappings that
+cross packed wrappers remain a capability limit.
+
+**Format gate:** optional field checks extend the current descriptor grammar.
+No shared manifest/resource revision or runtime lock has been changed in this
+local experiment. A deliberate format revision and matching source/runtime
+qualification are required before publication. Experimental packages here are
+local qualification inputs, not a claim that the published manifest-12/runtime6
+SDK supports these checks.
 
 The smoke test temporarily selects the prototype plans inside its own runtime's
 internal lowering/lifting methods. No public call configuration or independent
@@ -75,8 +98,9 @@ consumer-expectation format is introduced. A future public selection must agree
 at both endpoints and participate in the relevant contract checks.
 
 Matching native-server encoding is not implemented. Full Part Manual now passes
-the private InternalId field and stops at metadata.assignedNumber -> Numbering.letter
--> Char.valid, whose proof has erased runtime layout. Other independently observed
-NameMap/Fin limits remain; no complete Part descriptor is emitted.
+InternalId, Char and Fin100 metadata, then stops at content -> Block.other.container
+-> properties -> Verso.NameMap String, an unsupported ordinary type-definition
+head. A reusable library-provided validated map/leaf rule remains to be designed;
+no complete Part descriptor is emitted.
 Neither full-document browser acceptance nor performance has been qualified.
 Infoview JSON-RPC, consumer rendering/retention, pins and publication are unchanged.

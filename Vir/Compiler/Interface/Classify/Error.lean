@@ -84,6 +84,7 @@ public inductive InterfaceClassifierError where
   | structureLayoutUnavailable (name : Lean.Name)
   | structureLayoutFieldCountMismatch (name : Lean.Name) (expected actual : Nat)
   | structureFieldErasedRuntimeLayout (field structureName : Lean.Name)
+  | nonLiteralFinBound (bound : Lean.Expr)
   | jsMarkerOutsideResource (marker : Lean.Name)
   | runtimeErasedParameterAfterArguments (name : Lean.Name)
   | implicitOrInstanceArgument (name : Lean.Name)
@@ -148,6 +149,8 @@ public def InterfaceClassifierError.toMessageData : InterfaceClassifierError →
       m!"runtime layout for structure `{name}` does not match its field count"
   | .structureFieldErasedRuntimeLayout field structureName =>
       m!"field `{field}` of structure `{structureName}` has erased or void runtime layout"
+  | .nonLiteralFinBound bound =>
+      m!"Fin requires a closed natural-number literal bound, got {quotedExpr bound}"
   | .jsMarkerOutsideResource marker =>
       m!"JavaScript object marker `{marker}` must appear under `Lean.Vir.Js`; use `Lean.Vir.Js {marker}` at the boundary"
   | .runtimeErasedParameterAfterArguments name =>

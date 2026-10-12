@@ -28,11 +28,13 @@ try {
     let callback;
     try {
       assert.equal(call("ordinaryEntry", 41n), 42n, "valid packed metadata must not block sibling exports");
-      for (const name of ["wrapperEntry", "boolWrapperEntry", "usizeWrapperEntry"]) {
+      for (const [name, value] of [["wrapperEntry", 42], ["boolWrapperEntry", true], ["usizeWrapperEntry", 42]]) {
         const entry = runtime.findManifestEntry(`DescriptorRegressions.${name}`);
-        assert.equal(runtime.objectArgumentSupported(entry.args[0].type), false);
-        assert.equal(runtime.objectResultSupported(entry.result), false);
-        assert.throws(() => call(name, {}), /does not support|unsupported/);
+        assert.equal(runtime.objectArgumentSupported(entry.args[0].type), true);
+        assert.equal(runtime.objectResultSupported(entry.result), true);
+        const input = { label: "packed", wrapped: { value } };
+        assert.deepEqual(call(name, input), input);
+        assert.throws(() => call(name, {}), /missing/);
         assert.equal(runtime.failure, null);
         assert.equal(call("ordinaryEntry", 41n), 42n);
       }
@@ -41,7 +43,8 @@ try {
       const deeper = [[], nested, [[], [7n]]];
       assert.deepEqual(call("deeperAlias", deeper), deeper);
       const packedCallback = call("wrapperCallback", undefined);
-      assert.throws(() => packedCallback({}), /does not support callback signature/);
+      assert.deepEqual(packedCallback({ label: "callback", wrapped: { value: 42 } }), { label: "callback", wrapped: { value: 42 } });
+      assert.throws(() => packedCallback({}), /missing/);
       assert.equal(runtime.failure, null);
       assert.equal(call("ordinaryEntry", 41n), 42n);
 

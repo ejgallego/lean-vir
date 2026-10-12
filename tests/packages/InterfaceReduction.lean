@@ -429,8 +429,15 @@ run_elab do
   expect "budget leaves original type" ((← reduceTypeAliases deep) == deep)
   rejected "budget exhaustion" deep
   let indexed := mkApp (mkConst ``Indexed) (mkNatLit 0)
-  for ty in #[indexed, mkConst ``ErasedField, mkConst ``BoundedValue,
-      mkConst ``Char, mkApp (mkConst ``Fin) (mkNatLit 100)] do
+  for (ty, check) in #[(mkConst ``Char, FieldCheck.unicodeScalar),
+      (mkApp (mkConst ``Fin) (mkNatLit 100), FieldCheck.natLt 100)] do
+    let .ok (.structure _ _ descriptor) ← interfaceType ty
+      | throwError "validated structure rejected"
+    let some field := descriptor.fields[0]?
+      | throwError "validated data field missing"
+    expect "retained data field with explicit check"
+      (descriptor.fields.size == 1 && field.check? == some check)
+  for ty in #[indexed, mkConst ``ErasedField, mkConst ``BoundedValue] do
     rejected "direct unsupported layout" ty
     rejected "projection cannot bypass layout rejection" (project (mkApp (mkConst ``Carrier.mk) ty))
     rejected "beta cannot bypass layout rejection"
