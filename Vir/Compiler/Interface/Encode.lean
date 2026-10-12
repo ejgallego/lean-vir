@@ -8,6 +8,7 @@ module
 
 public import Vir.Compiler.Interface.Model
 import Vir.Package.Json
+import Vir.Package.Name
 
 public section
 
@@ -141,12 +142,12 @@ private partial def inductiveConstructorJson (constructor : InductiveConstructor
   else
     let fields := constructor.fields.map fun field =>
       storedFieldJson constructor.storage field.name field.type field.layout
-    jsonObject #[
+    jsonObject (#[
       ("name", jsonName constructor.constructorName),
       ("representation", jsonString "object"),
       ("storage", constructor.storage.toJson),
       ("fields", jsonArray fields)
-    ]
+    ] ++ (constructor.operation?.toArray.map fun name => ("operation", jsonString (Vir.nameKey name))))
 
 private partial def structureConstructorJson (descriptor : StructureDescriptor) : String :=
   match descriptor.trivialField?, descriptor.fields.toList with
@@ -159,12 +160,12 @@ private partial def structureConstructorJson (descriptor : StructureDescriptor) 
   | _, _ =>
       let fields := descriptor.fields.map fun field =>
         storedFieldJson descriptor.storage field.name field.type field.layout
-      jsonObject #[
+      jsonObject (#[
         ("name", jsonName descriptor.constructorName),
         ("representation", jsonString "object"),
         ("storage", descriptor.storage.toJson),
         ("fields", jsonArray fields)
-      ]
+      ] ++ (descriptor.operation?.toArray.map fun name => ("operation", jsonString (Vir.nameKey name))))
 
 private partial def recordFieldJson
     (key : String) (path : Array Nat) (type : InterfaceType) (check? : Option FieldCheck := none) : String :=

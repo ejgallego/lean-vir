@@ -373,7 +373,11 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
   callCacheFor(entry) {
     let cache = this.entryCallCache.get(entry);
     if (cache === undefined) {
-      const exportIndex = this.interfaceManifest?.exports?.indexOf(entry) ?? -1;
+      let exportIndex = this.interfaceManifest?.exports?.indexOf(entry) ?? -1;
+      if (exportIndex < 0) {
+        const operationIndex = this.interfaceManifest?.constructorOperations?.indexOf(entry) ?? -1;
+        if (operationIndex >= 0) exportIndex = this.interfaceManifest.exports.length + operationIndex;
+      }
       if (exportIndex < 0) {
         throw new Error("interface entry does not belong to this runtime");
       }

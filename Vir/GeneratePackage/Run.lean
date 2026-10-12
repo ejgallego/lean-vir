@@ -70,6 +70,24 @@ structure AnalyzedPackage where
 structure GeneratedPackage extends AnalyzedPackage where
   bytes : ByteArray
 
+private def collectInterfaceClosure (targets : Array Target) (index : DeclIndex) :
+    IO (Closure × InterfaceManifest) := do
+  let mut roots : Array Name := #[]
+  repeat
+    let closure := collectClosure targets index roots
+    let (imports, diagnostics) ← collectHostImports index closure
+    let manifest ← collectInterfaceManifest (collectPackageMetadata targets index) targets index imports diagnostics
+    let required := manifest.constructorOperations.map (·.entry)
+    if required.all roots.contains then return (closure, manifest)
+    roots := required.foldl (fun roots name => if roots.contains name then roots else roots.push name) roots
+
+/-- Retain compiler constructor operations even when the public callable only
+returns its input and its IR never constructs the type itself. -/
+unsafe def resolveInterfaceModuleClosure (targets : Array Target) (index : DeclIndex) : IO DeclIndex := do
+  let index ← resolveImportedModuleClosure targets index
+  let (_, manifest) ← collectInterfaceClosure targets index
+  resolveImportedModuleClosure targets index (manifest.constructorOperations.map (·.entry))
+
 private unsafe def loadRunDeclIndex (targets : Array Target)
     (importArts : NameMap ImportArtifacts) : IO DeclIndex := do
   let index ← loadDeclIndex targets importArts
@@ -78,7 +96,7 @@ private unsafe def loadRunDeclIndex (targets : Array Target)
     | some manifest =>
         let specs ← IO.ofExcept <| Vir.ClientNativeExternManifest.specs manifest
         pure { index with clientNativeExternSpecs := specs }
-  resolveImportedModuleClosure targets index
+  resolveInterfaceModuleClosure targets index
 
 def hasBlockingDiagnostics (closure : Closure) (manifest : InterfaceManifest) : Bool :=
   !closure.missingDecls.isEmpty ||
@@ -111,10 +129,7 @@ def analyzePackage
     (generatedAt : String)
     (targets : Array Target)
     (index : DeclIndex) : IO AnalyzedPackage := do
-  let closure := collectClosure targets index
-  let (hostImports, hostDiagnostics) ← collectHostImports index closure
-  let metadata := collectPackageMetadata targets index
-  let manifest ← collectInterfaceManifest metadata targets index hostImports hostDiagnostics
+  let (closure, manifest) ← collectInterfaceClosure targets index
   return {
     closure
     manifest

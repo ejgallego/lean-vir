@@ -21,8 +21,9 @@ export function encodePackageContract(manifest) {
     writer.u32(bytes.length);
     for (const byte of bytes) writer.u8(byte);
   };
-  writer.u32(manifest.exports.length);
-  for (const entry of manifest.exports) {
+  const calls = [...manifest.exports, ...(manifest.constructorOperations ?? [])];
+  writer.u32(calls.length);
+  for (const entry of calls) {
     string(entry.nameKey);
     writer.u32(entry.args.length);
     writer.u8(entry.effect !== "pure" ? 1 : 0);

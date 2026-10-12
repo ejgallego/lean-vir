@@ -250,7 +250,7 @@ def packageSections (closure : Closure) (manifest : InterfaceManifest) : Except 
   let hostImports ← emitToBytes do
     emitArray manifest.hostImports emitHostImport
   let exportSummaries ← emitToBytes do
-    emitArray manifest.exports emitInterfaceExportSummary
+    emitArray (manifest.exports ++ manifest.constructorOperations) emitInterfaceExportSummary
   let interfaceManifestJson := manifest.toJson
   let interfaceManifest ← emitToBytes do
     emitU64 (manifestChecksum interfaceManifestJson)

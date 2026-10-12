@@ -46,8 +46,9 @@ export function encodeInterfaceManifest(manifest) {
     result: index(value.result),
   });
   const exports = manifest.exports.map(entry);
+  const constructorOperations = (manifest.constructorOperations ?? []).map(entry);
   const hostImports = (manifest.hostImports ?? []).map(entry);
-  return { ...manifest, interfaces, exports, hostImports };
+  return { ...manifest, interfaces, exports, hostImports, constructorOperations };
 }
 
 /**

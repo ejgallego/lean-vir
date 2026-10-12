@@ -71,8 +71,12 @@ function validateNative(native, owners, label) {
     const names = new Set(), scope = [native, ...owners];
     metadata.constructors.forEach((ctor, i) => {
       const at = `${label}.metadata.constructors[${i}]`;
-      object(ctor, ["name", "representation", "storage", "fields"], at);
+      object(ctor, ["name", "representation", "storage", "fields", "operation"], at);
       string(ctor.name, `${at}.name`);
+      if (ctor.operation !== undefined) {
+        string(ctor.operation, `${at}.operation`);
+        if (ctor.representation !== "object") fail(`${at}.operation`, "requires object representation");
+      }
       if (names.has(ctor.name)) fail(`${at}.name`, "duplicates another constructor");
       names.add(ctor.name);
       array(ctor.fields, `${at}.fields`);

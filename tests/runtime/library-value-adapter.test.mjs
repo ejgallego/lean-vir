@@ -191,13 +191,12 @@ const computed = validateBoundaryInterface(objectBoundary("Computed", [objectCon
   tag: "record", fields: [{ key: "left", path: [0], value: string.value },
     { key: "right", path: [1], value: string.value }],
 }));
+computed.native.metadata.constructors[0].operation = "s436f6d7075746564/s6d6b/";
 
 function constructed(h) {
-  const entry = { entry: "Computed.mk", args: [{ type: string }, { type: string }], result: opaque, effect: "pure" };
-  h.runtime.interfaceManifest.exports.push(entry);
-  h.runtime.nativeConstructorOperations = new WeakMap([
-    [computed.native.metadata.constructors[0], compileLibraryConstructor(h.runtime, entry)],
-  ]);
+  const entry = { entry: "Computed.mk", nameKey: computed.native.metadata.constructors[0].operation,
+    args: [{ type: opaque }, { type: opaque }], result: opaque, effect: "pure" };
+  h.runtime.interfaceManifest.constructorOperations = [entry];
   return h.runtime.nativeValueCodec(computed);
 }
 
@@ -240,4 +239,10 @@ test("constructor operations require this runtime's pure opaque helper and corre
   const operation = h.runtime.nativeConstructorOperations.get(computed.native.metadata.constructors[0]);
   assert.throws(() => operation([], "constructor"), /argument count/);
   assert.equal(h.calls, 0);
+});
+
+test("required construction never falls back to raw allocation", () => {
+  const h = harness();
+  assert.throws(() => h.runtime.nativeValueCodec(computed), /requires its constructor operation/);
+  assert.equal(h.calls, 0); assert.equal(h.heap.size, 0);
 });

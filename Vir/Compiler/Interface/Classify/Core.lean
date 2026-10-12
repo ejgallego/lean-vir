@@ -81,6 +81,45 @@ private def constructorStorage (layout : Lean.Compiler.LCNF.CtorLayout) : Constr
   usizeFieldCount := layout.ctorInfo.usize
   scalarByteSize := layout.ctorInfo.ssize }
 
+/-- Follow the compiler's registered implementation, rather than allocating from
+the source constructor's layout. The pinned computed-field transform preserves
+logical arguments and prepends computed storage. Retain its typed operation;
+recognize only closed, scalar-cache cases until other shapes are supported. -/
+private def implementationLayout (name : Name) : ClassifyM (Lean.Compiler.LCNF.CtorLayout × Option Name) := do
+  let env ← getEnv
+  let some implementation := Lean.Compiler.getImplementedBy? env name
+    | return (← constructorLayout name (.constructorLayoutUnavailable name), none)
+  let some (.ctorInfo source) := env.find? name | throwThe InterfaceClassifierError (.constructorOperationUnsupported name "missing constructor")
+  if source.numParams != 0 then throwThe InterfaceClassifierError (.constructorOperationUnsupported name "parameterized constructor operation unsupported")
+  let some (.defnInfo info) := env.find? implementation | throwThe InterfaceClassifierError (.constructorOperationUnsupported name "missing implementation")
+  let mut body := info.value.consumeMData
+  let mut binders := 0
+  while let .lam _ _ next _ := body do
+    body := next.consumeMData
+    binders := binders + 1
+  unless binders == source.numFields do throwThe InterfaceClassifierError (.constructorOperationUnsupported name "unexpected operation binders")
+  let arguments := body.getAppArgs
+  unless body.getAppFn.constName == ``unsafeCast && arguments.size == 3 do
+    throwThe InterfaceClassifierError (.constructorOperationUnsupported name "unsupported operation body")
+  let value := arguments[2]!
+  let some (.ctorInfo actual) := env.find? value.getAppFn.constName
+    | throwThe InterfaceClassifierError (.constructorOperationUnsupported name "operation is not a constructor application")
+  unless actual.cidx == source.cidx && actual.numParams == 0 &&
+      actual.numFields >= source.numFields && value.getAppArgs.size == actual.numFields do
+    throwThe InterfaceClassifierError (.constructorOperationUnsupported name "operation changes constructor identity")
+  let offset := actual.numFields - source.numFields
+  for i in [:source.numFields] do
+    unless value.getAppArgs[offset + i]? == some (.bvar (source.numFields - i - 1)) do
+      throwThe InterfaceClassifierError (.constructorOperationUnsupported name "operation changes logical field")
+  let layout ← constructorLayout actual.name (.constructorLayoutUnavailable name)
+  for i in [:offset] do
+    unless (fieldLayout? layout.fieldInfo[i]!).any (fun l => match l with | .scalar .. => true | _ => false) do
+      throwThe InterfaceClassifierError (.constructorOperationUnsupported name "computed object/usize fields unsupported")
+  if source.numFields == 0 && (layout.ctorInfo.size != 0 || layout.ctorInfo.usize != 0 || layout.ctorInfo.ssize != 0) then
+    throwThe InterfaceClassifierError (.constructorOperationUnsupported name "computed storage on a fieldless constructor unsupported")
+  return ({ layout with fieldInfo := layout.fieldInfo.extract offset layout.fieldInfo.size },
+    if source.numFields == 0 then none else some implementation)
+
 /-- A closure invocation cannot carry an enclosing aggregate's recursive owner.
 Complete structures/inductives establish their own owner when marshalled. -/
 private partial def enclosingRecursiveOwner? (bound : Nat := 0) : InterfaceType → Option Name
@@ -177,7 +216,7 @@ private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
       let mut constructors : Array InductiveConstructor := #[]
       for ctorName in indInfo.ctors do
         let fieldExprs ← constructorFields e ctorName
-        let layout ← constructorLayout ctorName (.constructorLayoutUnavailable ctorName)
+        let (layout, operation?) ← implementationLayout ctorName
         if layout.fieldInfo.size != fieldExprs.size then
           throwThe InterfaceClassifierError (
             .constructorLayoutFieldCountMismatch ctorName fieldExprs.size layout.fieldInfo.size)
@@ -191,6 +230,7 @@ private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
           fields := fields.push { name := fieldName, type := fieldType, layout := fieldLayout }
         constructors := constructors.push {
           constructorName := ctorName
+          operation?
           storage := constructorStorage layout
           fields }
       return (.customInductive name (exprTypeLabel e) constructors)
@@ -225,9 +265,11 @@ private partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
       -- Record fields may be implicit constructor binders; their object keys
       -- are still explicit and required by the record value interface.
       let fieldExprs ← constructorFields e ctorName (allowImplicitFields := true)
-      let layout ← constructorLayout ctorName (.structureLayoutUnavailable name)
-      let trivialField? :=
-        (← Lean.Compiler.LCNF.hasTrivialImpureStructure? name).map (·.fieldIdx)
+      let (layout, operation?) ← implementationLayout ctorName
+      let trivialField? ←
+        if operation?.isSome then pure none
+        else do
+          pure ((← Lean.Compiler.LCNF.hasTrivialImpureStructure? name).map (·.fieldIdx))
       if layout.fieldInfo.size != structInfo.fieldNames.size then
         throwThe InterfaceClassifierError (
           .structureLayoutFieldCountMismatch name structInfo.fieldNames.size layout.fieldInfo.size)
@@ -262,6 +304,7 @@ private partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
           check? := if idx == 0 then check? else none }
       return (.structure name (exprTypeLabel e) {
         constructorName := ctorName
+        operation?
         trivialField?
         storage := constructorStorage layout
         fields })

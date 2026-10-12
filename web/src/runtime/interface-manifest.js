@@ -98,6 +98,8 @@ export function validateInterfaceManifest(
   ) {
     throw new Error("embedded interface manifest hostImports must be an array");
   }
+  if (manifest.constructorOperations !== undefined && !Array.isArray(manifest.constructorOperations))
+    throw new Error("embedded interface manifest constructorOperations must be an array");
   validateManifestMetadata(
     manifest.metadata,
     manifest.version,
@@ -108,14 +110,47 @@ export function validateInterfaceManifest(
   manifest.interfaces.forEach((pair, index) =>
     validateInterfaceType(pair, `embedded interface manifest interfaces[${index}]`));
   const exports = validateManifestExports(manifest.exports, manifest.interfaces);
+  const constructorOperations = validateManifestExports(manifest.constructorOperations ?? [], manifest.interfaces, "constructorOperations");
+  const operationByKey = new Map();
+  for (const entry of constructorOperations) {
+    const opaque = pair => pair.native.type?.tag === "leanObject" &&
+      pair.native.metadata === undefined && pair.value.tag === "leanReference";
+    if (entry.effect !== "pure" || entry.startup ||
+        !entry.args.every(arg => opaque(arg.type)) || !opaque(entry.result))
+      throw new Error("constructor operations require pure boxed-field -> opaque call contracts");
+    if (exports.some(exp => exp.nameKey === entry.nameKey))
+      throw new Error("constructor operation duplicates an application export");
+    operationByKey.set(entry.nameKey, entry);
+  }
+  for (const pair of manifest.interfaces) validateConstructorOperations(pair.native, operationByKey);
   const hostImports = validateManifestHostImports(manifest.hostImports ?? [], manifest.interfaces);
   validatePackageSetSurface(
     manifest.metadata.packageSetMember,
     exports,
     hostImports,
+    constructorOperations,
   );
   const { interfaces: _interfaces, ...rest } = manifest;
-  return { ...rest, exports, hostImports };
+  return { ...rest, exports, hostImports, constructorOperations };
+}
+
+function validateConstructorOperations(native, operations) {
+  const metadata = native.metadata;
+  if (metadata === undefined) return;
+  if (metadata.arrayElement !== undefined) validateConstructorOperations(metadata.arrayElement, operations);
+  if (metadata.signature !== undefined) {
+    metadata.signature.args.forEach(arg => validateConstructorOperations(arg, operations));
+    validateConstructorOperations(metadata.signature.result, operations);
+  }
+  for (const ctor of metadata.constructors ?? []) {
+    if (ctor.operation !== undefined) {
+      requireNameKey(ctor.operation, "constructor operation reference");
+      const entry = operations.get(ctor.operation);
+      if (entry === undefined || entry.args.length !== ctor.fields.length)
+        throw new Error(`${ctor.name} requires its matching constructor operation`);
+    }
+    ctor.fields.forEach(field => validateConstructorOperations(field.type, operations));
+  }
 }
 
 function validateManifestMetadata(
@@ -156,11 +191,11 @@ function validateManifestMetadata(
   validatePackageSetMember(metadata.packageSetMember, metadata.targets, label);
 }
 
-function validateManifestExports(exports, interfaces) {
+function validateManifestExports(exports, interfaces, kind = "exports") {
   const entries = new Set();
   const identities = new Set();
   return exports.map((entry, index) => {
-    const label = `embedded interface manifest exports[${index}]`;
+    const label = `embedded interface manifest ${kind}[${index}]`;
     if (!isRecord(entry)) {
       throw new Error(`${label} must be an object`);
     }
@@ -221,9 +256,9 @@ function validatePackageSetMember(member, targets, metadataLabel) {
   }
 }
 
-function validatePackageSetSurface(member, exports, hostImports) {
+function validatePackageSetSurface(member, exports, hostImports, constructorOperations) {
   if (member?.role !== "dependency") return;
-  if (exports.length !== 0 || hostImports.length !== 0) {
+  if (exports.length !== 0 || hostImports.length !== 0 || constructorOperations.length !== 0) {
     throw new Error(
       "embedded interface manifest dependency package-set members must not expose exports or host imports",
     );

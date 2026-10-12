@@ -103,6 +103,9 @@ structure InductiveField where
 
 structure InductiveConstructor where
   constructorName : Name
+  /-- Required compiler operation for computed-field construction. Its arguments
+  are the logical fields in declaration order; it returns an owned boxed value. -/
+  operation? : Option Name := none
   storage : ConstructorStorage
   fields : Array InductiveField
   deriving BEq, Repr
@@ -118,6 +121,7 @@ structure StructureField where
 
 structure StructureDescriptor where
   constructorName : Name
+  operation? : Option Name := none
   /-- Index into fields of the value representing Lean's trivial wrapper.
   This is a declaration/projection-order index, not a runtime storage slot. -/
   trivialField? : Option Nat
@@ -132,6 +136,20 @@ structure InterfaceArg where
   deriving BEq, Repr
 
 end
+
+/-- Required closed constructor operations, deduplicated by declaration identity.
+Recursive references already name an enclosing description and need no traversal. -/
+partial def InterfaceType.constructorOperations : InterfaceType → Array (Name × Nat)
+  | .array element => element.constructorOperations
+  | .customInductive _ _ constructors => constructors.flatMap fun ctor =>
+      (ctor.operation?.toArray.map (·, ctor.fields.size)) ++
+      ctor.fields.flatMap (·.type.constructorOperations)
+  | .structure _ _ descriptor =>
+      (descriptor.operation?.toArray.map (·, descriptor.fields.size)) ++
+      descriptor.fields.flatMap (·.type.constructorOperations)
+  | .function args result _ =>
+      args.flatMap (·.type.constructorOperations) ++ result.constructorOperations
+  | _ => #[]
 
 def InterfaceType.label : InterfaceType → String
   | .unit => "Unit"

@@ -113,6 +113,19 @@ export function compileLibraryConstructor(runtime, entry) {
   };
 }
 
+function constructorOperation(runtime, ctor) {
+  if (ctor.operation === undefined) return undefined;
+  runtime.nativeConstructorOperations ??= new WeakMap();
+  let operation = runtime.nativeConstructorOperations.get(ctor);
+  if (operation === undefined) {
+    const entry = runtime.interfaceManifest?.constructorOperations?.find(entry => entry.nameKey === ctor.operation);
+    if (entry === undefined) throw new Error(`${ctor.name} requires its constructor operation`);
+    operation = compileLibraryConstructor(runtime, entry);
+    runtime.nativeConstructorOperations.set(ctor, operation);
+  }
+  return operation;
+}
+
 // This checks profile eligibility, not descriptor grammar (already admitted).
 // Reject the complete domain before binding, rather than only visited values.
 function requireJsonSafeDomain(native, view, label) {
@@ -289,10 +302,9 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
     return result;
   }
   const storage = ctor.storage, objectOnly = storage.usizeFieldCount === 0 && storage.scalarByteSize === 0;
-  // Local explicit binding, installed before codec compilation. A future
-  // admitted contract must identify/require the selected operation. Weak keys
-  // are this runtime's actual constructor descriptors, not global type names.
-  const construct = runtime.nativeConstructorOperations?.get(ctor);
+  // Admission requires the operation; binding reuses its consuming call plan.
+  // Weak keys are this runtime's descriptors, not global type names.
+  const construct = constructorOperation(runtime, ctor);
   const lowerConstructed = construct === undefined ? undefined : (_index, value, label, scratch) => {
     const owned = [];
     try {
@@ -438,6 +450,7 @@ function checkedFieldCodec(codec, check) {
 function compileChain(runtime, constructors, view, scope, compile) {
   const { nil, cons, head, tail } = view.chain;
   const cell = constructors[cons];
+  const construct = constructorOperation(runtime, cell);
   const element = compile(cell.fields[head].type, view.element, scope);
   const headIndex = cell.fields[head].location.index, tailIndex = cell.fields[tail].location.index;
   return {
@@ -448,9 +461,9 @@ function compileChain(runtime, constructors, view, scope, compile) {
         for (let i = value.length - 1; i >= 0; i--) {
           const objects = [0, 0];
           try {
-            objects[headIndex] = element.lower(value[i], `${label}[${i}]`, scratch);
-            objects[tailIndex] = cursor; cursor = 0;
-            cursor = scratch.createObjects(cons, objects, label);
+            objects[construct === undefined ? headIndex : head] = element.lower(value[i], `${label}[${i}]`, scratch);
+            objects[construct === undefined ? tailIndex : tail] = cursor; cursor = 0;
+            cursor = construct === undefined ? scratch.createObjects(cons, objects, label) : construct(objects, label);
           } finally { runtime.releaseOwnedObjects(objects); }
         }
         const result = cursor; cursor = 0; return result;

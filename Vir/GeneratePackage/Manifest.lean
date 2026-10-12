@@ -70,6 +70,16 @@ def collectInterfaceManifest
                 manifest := { manifest with exports := manifest.exports.push entry }
           | .error diagnostic =>
               manifest := { manifest with diagnostics := manifest.diagnostics.push diagnostic }
+  let signatures := manifest.exports.map (fun entry => (entry.args, entry.result)) ++
+    hostImports.map (fun entry => (entry.args, entry.result))
+  for (args, result) in signatures do
+    let operations := args.flatMap (·.type.constructorOperations) ++ result.constructorOperations
+    for (operation, arity) in operations do
+      if !manifest.constructorOperations.any (·.entry == operation) then
+        manifest := { manifest with constructorOperations := manifest.constructorOperations.push {
+          entry := operation, source := "compiler constructor operation",
+          args := (Array.range arity).map fun i => { name := s!"field{i}", type := .leanObject },
+          result := .leanObject } }
   return manifest
 
 end Vir.GeneratePackage

@@ -75,13 +75,13 @@ public inductive InterfaceClassifierError where
   | constructorInvalidType (constructor : Lean.Name) (type : Lean.Expr)
   | constructorImplicitFields (constructor : Lean.Name)
   | constructorLayoutUnavailable (constructor : Lean.Name)
+  | constructorOperationUnsupported (constructor : Lean.Name) (reason : String)
   | constructorLayoutFieldCountMismatch (constructor : Lean.Name)
       (expected actual : Nat)
   | constructorFieldErasedRuntimeLayout (field : String) (constructor : Lean.Name)
   | structureConstructorCount (name : Lean.Name) (actual : Nat)
   | emptyStructure (name : Lean.Name)
   | recursiveInheritedStructure (name : Lean.Name)
-  | structureLayoutUnavailable (name : Lean.Name)
   | structureLayoutFieldCountMismatch (name : Lean.Name) (expected actual : Nat)
   | structureFieldErasedRuntimeLayout (field structureName : Lean.Name)
   | nonLiteralFinBound (bound : Lean.Expr)
@@ -134,6 +134,8 @@ public def InterfaceClassifierError.toMessageData : InterfaceClassifierError →
       m!"constructor `{constructor}` has unsupported implicit/instance fields"
   | .constructorLayoutUnavailable constructor =>
       m!"could not compute runtime layout for constructor `{constructor}`"
+  | .constructorOperationUnsupported constructor reason =>
+      m!"unsupported constructor operation for `{constructor}`: {reason}"
   | .constructorLayoutFieldCountMismatch constructor _ _ =>
       m!"runtime layout for constructor `{constructor}` does not match its field count"
   | .constructorFieldErasedRuntimeLayout field constructor =>
@@ -143,8 +145,6 @@ public def InterfaceClassifierError.toMessageData : InterfaceClassifierError →
   | .emptyStructure name => m!"empty structure `{name}` is not supported"
   | .recursiveInheritedStructure name =>
       m!"recursive inherited structure `{name}` is not supported"
-  | .structureLayoutUnavailable name =>
-      m!"could not compute runtime layout for structure `{name}`"
   | .structureLayoutFieldCountMismatch name _ _ =>
       m!"runtime layout for structure `{name}` does not match its field count"
   | .structureFieldErasedRuntimeLayout field structureName =>

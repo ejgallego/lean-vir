@@ -17,6 +17,7 @@ function manifest() {
   return {
     version: INTERFACE_MANIFEST_VERSION,
     metadata: {},
+    constructorOperations: [],
     exports: ["a", "b"].map((name, index) => ({
       entry: `${name}.entry`,
       nameKey: index === 0 ? "s61/" : "s62/",
