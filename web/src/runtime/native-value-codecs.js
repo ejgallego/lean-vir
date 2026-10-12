@@ -6,28 +6,60 @@ Author: Emilio J. Gallego Arias
 
 import { compileConstructorValueInterface } from "./constructor-value-interface.js";
 import { compilePrimitiveValueCodec } from "./primitive-values.js";
-import {
-  normalizeBoundedUnsignedBigInt,
-} from "./primitive-value-normalizers.js";
+import { objectArgumentSupported, objectResultSupported } from "./object-abi.js";
 
 // Precondition: immutable admitted compiler facts and a supported selected view.
 // Bind those facts to the selected JS representation.
 // Plans reuse managed allocation/ownership and construct values directly.
 // No intermediate normalized tree or second descriptor interpretation is needed.
-export function compileNativeValueCodec(runtime, pair) {
-  return compileValueCodec(runtime, pair.native, pair.value);
+export function compileNativeValueCodec(runtime, pair, { representation = "native" } = {}) {
+  if (representation !== "native" && representation !== "json-safe-v1")
+    throw new Error(`unsupported value representation ${representation}`);
+  const jsonSafe = representation === "json-safe-v1";
+  if (jsonSafe) {
+    requireJsonSafeDomain(pair.native, pair.value, "interface");
+    if (!objectArgumentSupported(pair) || !objectResultSupported(pair))
+      throw new Error("interface has unsupported packed conversion for json-safe-v1");
+  }
+  return compileValueCodec(runtime, pair.native, pair.value, [], jsonSafe);
 }
 
-function compileValueCodec(runtime, native, view, bindings = []) {
+// This checks profile eligibility, not descriptor grammar (already admitted).
+// Reject the complete domain before binding, rather than only visited values.
+function requireJsonSafeDomain(native, view, label) {
+  function valueDomain(value, path) {
+    if (["jsReference", "leanReference", "function", "expr"].includes(value.tag))
+      throw new Error(`${path}: ${value.tag} is unsupported by json-safe-v1`);
+    if (value.element) valueDomain(value.element, `${path}[]`);
+    for (const entry of value.fields ?? []) valueDomain(entry.value, `${path}.${entry.key}`);
+    for (const entry of value.cases ?? []) {
+      if (typeof entry === "string") continue;
+      if (entry.value) valueDomain(entry.value, `${path}.${entry.kind}.value`);
+      for (const field of entry.fields ?? []) valueDomain(field.value, `${path}.${entry.kind}.${field.key}`);
+    }
+  }
+  function nativeDomain(type, path) {
+    if (type.ref !== undefined) return;
+    if (["float", "resource"].includes(type.type.tag))
+      throw new Error(`${path}: ${type.type.tag} is unsupported by json-safe-v1`);
+    if (type.metadata?.arrayElement) nativeDomain(type.metadata.arrayElement, `${path}[]`);
+    for (const ctor of type.metadata?.constructors ?? [])
+      for (const field of ctor.fields) nativeDomain(field.type, `${path}.${ctor.name}.${field.name}`);
+  }
+  valueDomain(view, label);
+  nativeDomain(native, label);
+}
+
+function compileValueCodec(runtime, native, view, bindings = [], jsonSafe = false) {
   if ("ref" in native) {
     return bindings[native.ref];
   }
-  const primitive = compilePrimitiveValueCodec(runtime, native, view);
+  const primitive = compilePrimitiveValueCodec(runtime, native, view, { jsonSafe });
   if (primitive !== null) return primitive;
   const type = native.type;
   const codec = {};
   const compile = (type, value, scope = bindings) =>
-    compileValueCodec(runtime, type, value, scope);
+    compileValueCodec(runtime, type, value, scope, jsonSafe);
   switch (type.tag) {
     case "leanObject": {
       if (view.tag === "expr") {
@@ -185,7 +217,7 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
     }
     const ptr = runtime.exports.vir_obj_ctor_scalar_data(obj, at.tag === "usize" ? 0 : storage.usizeFieldCount);
     if (ptr === 0) throw new Error(`${label} scalar field is unavailable`);
-    if (at.tag === "usize") return new DataView(runtime.exports.memory.buffer, ptr, storage.usizeFieldCount * 4).getUint32(at.index * 4, true);
+    if (at.tag === "usize") return codec.usize.read(new DataView(runtime.exports.memory.buffer, ptr, storage.usizeFieldCount * 4).getUint32(at.index * 4, true));
     return codec.scalar.read(new DataView(runtime.exports.memory.buffer, ptr, storage.scalarByteSize), at.offset, at.size, label);
   }
   let liftObjects;
@@ -231,7 +263,7 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
           const at = entry.field.location, child = entry.read(value);
           const fieldLabel = `${label}.${entry.field.name}`;
           if (at.tag === "object") objects[at.index] = entry.codec.lower(child, fieldLabel, scratch);
-          else if (at.tag === "usize") usize[at.index] = normalizeBoundedUnsignedBigInt(child, fieldLabel, 0xffffffffn, "USize");
+          else if (at.tag === "usize") usize[at.index] = entry.codec.usize.write(child, fieldLabel);
           else entry.codec.scalar.write(scalars, at.offset, at.size, child, fieldLabel);
         }
         return objectOnly ? scratch.createObjects(index, objects, label)
