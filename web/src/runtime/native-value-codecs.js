@@ -8,6 +8,7 @@ import { compileConstructorValueInterface } from "./constructor-value-interface.
 import { compilePrimitiveValueCodec } from "./primitive-values.js";
 import { objectArgumentSupported, objectResultSupported } from "./object-abi.js";
 import { normalizeBoundedUnsignedBigInt } from "./primitive-value-normalizers.js";
+import { boundaryInterfaceShape } from "./value-interfaces.js";
 
 // Precondition: immutable admitted compiler facts and a supported selected view.
 // Bind those facts to the selected JS representation.
@@ -23,6 +24,74 @@ export function compileNativeValueCodec(runtime, pair, { representation = "nativ
       throw new Error("interface has unsupported packed conversion for json-safe-v1");
   }
   return compileValueCodec(runtime, pair.native, pair.value, [], jsonSafe);
+}
+
+// Local prototype seam, not a manifest-selected or public call API. Both helper
+// entries must already belong to this runtime's admitted package. A producer
+// still needs to retain and describe the closed typed helpers before adoption.
+// decode: wire -> Except String opaque; encode: opaque -> wire, both pure.
+export function compileLibraryValueAdapter(runtime, { decode, encode }, options = {}) {
+  runtime.requireLiveRuntime();
+  const decodeCache = runtime.callCacheFor(decode);
+  const encodeCache = runtime.callCacheFor(encode);
+  const constructors = decode.result.native.metadata?.constructors;
+  const errorType = constructors?.[0]?.fields[0]?.type;
+  const opaqueType = constructors?.[1]?.fields[0]?.type;
+  // These are helper protocol/capability checks, not descriptor admission.
+  if (decode.effect !== "pure" || encode.effect !== "pure" ||
+      decode.args.length !== 1 || encode.args.length !== 1 ||
+      decode.result.native.metadata?.declaration !== "Except" ||
+      constructors?.length !== 2 || constructors[0].name !== "Except.error" ||
+      constructors[1].name !== "Except.ok" ||
+      errorType?.type?.tag !== "string" ||
+      opaqueType?.type?.tag !== "leanObject" || opaqueType.metadata !== undefined ||
+      encode.args[0].type.value.tag !== "leanReference")
+    throw new Error("library adapter requires pure wire -> Except String opaque and opaque -> wire helpers");
+  for (const ctor of constructors) {
+    if (ctor.representation !== "object" || ctor.fields.length !== 1 ||
+        ctor.fields[0].location.tag !== "object" || ctor.fields[0].location.index !== 0)
+      throw new Error("library adapter requires object-backed Except payloads");
+  }
+  if (JSON.stringify(boundaryInterfaceShape(decode.args[0].type)) !==
+      JSON.stringify(boundaryInterfaceShape(encode.result)) ||
+      JSON.stringify(boundaryInterfaceShape({ native: opaqueType, value: encode.args[0].type.value })) !==
+      JSON.stringify(boundaryInterfaceShape(encode.args[0].type)))
+    throw new Error("library adapter helper domains disagree");
+  const input = runtime.nativeValueCodec(decode.args[0].type, options);
+  const output = runtime.nativeValueCodec(encode.result, options);
+
+  return Object.freeze({
+    lower(value, label, scratch) {
+      runtime.requireLiveRuntime();
+      const owned = [];
+      try {
+        owned.push(input.lower(value, label, scratch));
+        return runtime.callResolvedObjects(decode, decodeCache, owned, result => {
+          const tag = runtime.exports.vir_obj_tag(result);
+          if (tag !== 0 && tag !== 1)
+            throw new Error(`${label}: adapter returned an invalid Except constructor`);
+          const payload = runtime.ownedObjectField(result, 0, label);
+          if (tag === 1) return payload; // Acquired ref survives outer Except cleanup.
+          try { throw new Error(`${label}: ${runtime.readObjectString(payload)}`); }
+          finally { runtime.exports.vir_obj_dec(payload); }
+        });
+      } finally {
+        // Also covers failures before callResolvedObjects enters its consuming ABI.
+        runtime.releaseOwnedObjects(owned);
+      }
+    },
+    lift(obj, label) {
+      runtime.requireLiveRuntime();
+      const owned = [];
+      try {
+        // The enclosing converter owns obj. Give the consuming helper its own ref.
+        runtime.exports.vir_obj_inc(obj);
+        owned.push(obj);
+        return runtime.callResolvedObjects(encode, encodeCache, owned,
+          result => output.lift(result, label));
+      } finally { runtime.releaseOwnedObjects(owned); }
+    },
+  });
 }
 
 // This checks profile eligibility, not descriptor grammar (already admitted).
