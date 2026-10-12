@@ -58,12 +58,25 @@ payload amounts, packed fields and recursive structures independently of lifting
 It passes both Wasm profiles with ordinary JSON serialization/parsing in the test.
 Failure/recovery cases accompany the successful calls.
 
+Structure field types now come from the instantiated constructor, shared with
+inductive classification. An importing module need not contain private projection
+declarations. The imported-private-field fixture qualifies generated conversion
+and independent Lean observations on both Wasm profiles. Source field names and
+compiler storage layouts still determine the same record mappings.
+
+Erased proof fields remain a generation error. Dropping `Char.valid` or a
+`Fin` bound proof would remove the evidence for an invariant without supplying a
+boundary check. Supporting such types needs an explicit, reusable rule that
+validates their runtime values; constructor storage alone does not supply it.
+
 The smoke test temporarily selects the prototype plans inside its own runtime's
 internal lowering/lifting methods. No public call configuration or independent
 consumer-expectation format is introduced. A future public selection must agree
 at both endpoints and participate in the relevant contract checks.
 
-Matching native-server encoding is not implemented. Full Part Manual still
-cannot generate its descriptor at the previously established classifier frontier.
+Matching native-server encoding is not implemented. Full Part Manual now passes
+the private InternalId field and stops at metadata.assignedNumber -> Numbering.letter
+-> Char.valid, whose proof has erased runtime layout. Other independently observed
+NameMap/Fin limits remain; no complete Part descriptor is emitted.
 Neither full-document browser acceptance nor performance has been qualified.
 Infoview JSON-RPC, consumer rendering/retention, pins and publication are unchanged.

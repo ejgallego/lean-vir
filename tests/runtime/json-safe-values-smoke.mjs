@@ -9,13 +9,21 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import { ConstructorScratch } from "../../web/src/runtime/constructor-scratch.js";
-import { generateIrPackage } from "./shared.mjs";
+import { createRuntimeModuleProject } from "./shared.mjs";
 
 const directory = await mkdtemp(join(tmpdir(), "vir-json-safe-values-"));
 try {
   const packagePath = process.env.VIR_JSON_SAFE_PACKAGE ?? join(directory, "json-safe.irpkg");
-  if (!process.env.VIR_JSON_SAFE_PACKAGE)
-    await generateIrPackage("JsonSafeValues", new URL("../../fixtures/runtime/JsonSafeValues.lean", import.meta.url), packagePath, "marked");
+  if (!process.env.VIR_JSON_SAFE_PACKAGE) {
+    const project = await createRuntimeModuleProject(`${packagePath}.modules`, {
+      JsonSafePrivate: await readFile(new URL("../../fixtures/runtime/JsonSafePrivate.lean", import.meta.url), "utf8"),
+      JsonSafeValues: await readFile(new URL("../../fixtures/runtime/JsonSafeValues.lean", import.meta.url), "utf8"),
+    });
+    const built = project.build();
+    assert.equal(built.status, 0, built.stderr + built.stdout);
+    const generated = project.runVirIrpkg([packagePath, `${packagePath}.report.md`, "--target-marked-module", "JsonSafeValues"]);
+    assert.equal(generated.status, 0, generated.stderr + generated.stdout);
+  }
   const packageBytes = await readFile(packagePath);
   const wasmDirectory = process.env.VIR_JSON_SAFE_WASM_DIR
     ? pathToFileURL(`${process.env.VIR_JSON_SAFE_WASM_DIR}/`) : new URL("../../web/public/", import.meta.url);
@@ -24,6 +32,10 @@ try {
       .createRuntime({ irPackageSet: [packageBytes] });
     const call = (name, value) => runtime.call(`JsonSafeValues.${name}`, JSON.parse(JSON.stringify(value)));
     try {
+      const huge = "900719925474099312345678901234567890";
+      const regularPrivate = { amount: BigInt(huge) };
+      assert.equal(runtime.call("JsonSafeValues.privateAmount", regularPrivate), BigInt(huge));
+      assert.deepEqual(runtime.call("JsonSafeValues.privateIdentity", regularPrivate), regularPrivate);
       // Local prototype selection seam, not a new public factory/call option.
       // The production call/ownership path receives the selected bound codecs.
       runtime.makeObjectValue = function (pair, value, label) {
@@ -34,7 +46,6 @@ try {
       runtime.liftObjectValue = function (pair, obj, label) {
         return this.nativeValueCodec(pair, { representation: "json-safe-v1" }).lift(obj, label);
       };
-      const huge = "900719925474099312345678901234567890";
       for (const [index, value] of [{ kind: "none" }, { kind: "some", value: { kind: "none" } },
         { kind: "some", value: { kind: "some", value: huge } }].entries()) {
         assert.equal(call("nestedKind", value), index, "independent Lean constructor observation");
@@ -47,6 +58,8 @@ try {
       }
       assert.equal(call("intIdentity", `-${huge}`), `-${huge}`);
       assert.deepEqual(call("bytesIdentity", [0, 128, 255]), [0, 128, 255]);
+      assert.equal(call("privateAmount", { amount: huge }), huge);
+      assert.deepEqual(call("privateIdentity", { amount: huge }), { amount: huge });
       const packed = { large: "18446744073709551615", marker: true, size: 42, tiny: 255 };
       const descriptor = runtime.findManifestEntry("JsonSafeValues.packedIdentity").args[0].type.native;
       const fields = descriptor.metadata.constructors[0].fields;

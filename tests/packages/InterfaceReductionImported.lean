@@ -21,3 +21,8 @@ open InterfaceReduction
 
 @[vir_export] def importedPolyTree (value : PolyTree Nat) : PolyTree Nat := value
 @[vir_export] def importedPolyCell (value : PolyCell Nat) : PolyCell Nat := value
+
+@[vir_export] def importedPrivateKey (value : PrivateKey) : PrivateKey := value
+@[vir_export] def importedPrivateKeyAmount (value : PrivateKey) : Nat := privateKeyAmount value
+@[vir_export] def importedImplicitRecord (value : ImplicitRecord) := value
+@[vir_export] def importedConstantField (value : ConstantField (fun _ => String)) := value

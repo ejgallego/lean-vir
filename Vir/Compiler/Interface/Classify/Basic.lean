@@ -148,14 +148,6 @@ def instantiateForallPrefix? (type : Lean.Expr) (args : Array Lean.Expr) : Optio
     let .forallE _ _ body _ := type.consumeMData | none
     some (body.instantiate1 arg)
 
-def projectionFieldType? (numParams : Nat) (params : Array Lean.Expr) (projType : Lean.Expr) : Option Lean.Expr := do
-  if params.size != numParams then
-    none
-  let instantiated ← instantiateForallPrefix? projType params
-  match instantiated.consumeMData with
-  | .forallE _ _ body _ => some body
-  | _ => none
-
 def fieldLayout? : Lean.Compiler.LCNF.CtorFieldInfo → Option FieldLayout
   | .object index _ => some (.object index)
   | .usize index => some (.usize index)

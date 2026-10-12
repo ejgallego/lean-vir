@@ -95,17 +95,34 @@ private partial def enclosingRecursiveOwner? (bound : Nat := 0) : InterfaceType 
       args.findSome? (fun arg => enclosingRecursiveOwner? bound arg.type) <|> enclosingRecursiveOwner? bound result
   | _ => none
 
-private def constructorFieldTypes? (type : Lean.Expr) : Option (Array (String × Lean.Expr)) :=
+private def constructorFieldTypes? (type : Lean.Expr) (allowImplicitFields : Bool := false) : Option (Array (String × Lean.Expr)) :=
   let rec go (type : Lean.Expr) (fields : Array (String × Lean.Expr)) : Option (Array (String × Lean.Expr)) :=
     match type with
     | .mdata _ body => go body fields
     | .forallE name domain body binderInfo =>
-        if binderInfo != .default then
+        if !allowImplicitFields && binderInfo != .default then
           none
         else
           go body (fields.push (binderArgName (fields.size + 1) name, domain))
     | _ => some fields
   go type #[]
+
+/-- Constructor metadata is the source of field types for structures too.
+Private projections need not be present in an importing module. -/
+private def constructorFields (type : Lean.Expr) (ctorName : Name)
+    (allowImplicitFields : Bool := false) : ClassifyM (Array (String × Lean.Expr)) := do
+  let env ← getEnv
+  let some (.ctorInfo info) := env.find? ctorName
+    | throwThe InterfaceClassifierError (.constructorMissingDeclaration ctorName)
+  let owner := type.getAppFn.constName
+  if info.induct != owner then
+    throwThe InterfaceClassifierError (.constructorOwnerMismatch ctorName owner info.induct)
+  let ctorType := info.toConstantVal.instantiateTypeLevelParams type.getAppFn.constLevels!
+  let some instantiated := instantiateForallPrefix? ctorType type.getAppArgs
+    | throwThe InterfaceClassifierError (.constructorInvalidType ctorName info.type)
+  let some fields := constructorFieldTypes? instantiated allowImplicitFields
+    | throwThe InterfaceClassifierError (.constructorImplicitFields ctorName)
+  return fields
 
 mutual
 
@@ -159,16 +176,7 @@ private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
     else
       let mut constructors : Array InductiveConstructor := #[]
       for ctorName in indInfo.ctors do
-        let some (.ctorInfo ctorInfo) := env.find? ctorName
-          | throwThe InterfaceClassifierError (.constructorMissingDeclaration ctorName)
-        if ctorInfo.induct != name then
-          throwThe InterfaceClassifierError (.constructorOwnerMismatch ctorName name ctorInfo.induct)
-        -- Recursive fields must use the applied aggregate's universe instance.
-        let ctorType := ctorInfo.toConstantVal.instantiateTypeLevelParams e.getAppFn.constLevels!
-        let some instantiated := instantiateForallPrefix? ctorType args
-          | throwThe InterfaceClassifierError (.constructorInvalidType ctorName ctorInfo.type)
-        let some fieldExprs := constructorFieldTypes? instantiated
-          | throwThe InterfaceClassifierError (.constructorImplicitFields ctorName)
+        let fieldExprs ← constructorFields e ctorName
         let layout ← constructorLayout ctorName (.constructorLayoutUnavailable ctorName)
         if layout.fieldInfo.size != fieldExprs.size then
           throwThe InterfaceClassifierError (
@@ -214,25 +222,24 @@ private partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
       throwThe InterfaceClassifierError (.recursiveInheritedStructure name)
     else
       let ctorName := indInfo.ctors.head!
+      -- Record fields may be implicit constructor binders; their object keys
+      -- are still explicit and required by the record value interface.
+      let fieldExprs ← constructorFields e ctorName (allowImplicitFields := true)
       let layout ← constructorLayout ctorName (.structureLayoutUnavailable name)
       let trivialField? :=
         (← Lean.Compiler.LCNF.hasTrivialImpureStructure? name).map (·.fieldIdx)
       if layout.fieldInfo.size != structInfo.fieldNames.size then
         throwThe InterfaceClassifierError (
           .structureLayoutFieldCountMismatch name structInfo.fieldNames.size layout.fieldInfo.size)
+      if fieldExprs.size != structInfo.fieldNames.size then
+        throwThe InterfaceClassifierError (.constructorInvalidType ctorName e)
       let mut fields : Array StructureField := #[]
       for h : idx in *...structInfo.fieldNames.size do
         let fieldName := structInfo.fieldNames[idx]
         let isSubobject := (isSubobjectField? env name fieldName).isSome
         let some fieldLayout := fieldLayout? layout.fieldInfo[idx]!
           | throwThe InterfaceClassifierError (.structureFieldErasedRuntimeLayout fieldName name)
-        let some projName := structInfo.getProjFn? idx
-          | throwThe InterfaceClassifierError (.structureFieldMissingProjection fieldName name)
-        let some info := env.find? projName
-          | throwThe InterfaceClassifierError (.structureFieldMissingProjectionDeclaration fieldName name)
-        let projType := info.instantiateTypeLevelParams e.getAppFn.constLevels!
-        let some fieldExpr := projectionFieldType? indInfo.numParams args projType
-          | throwThe InterfaceClassifierError (.structureFieldInvalidProjectionType fieldName name info.type)
+        let fieldExpr := fieldExprs[idx]!.2
         let fieldType ← withContext (.structureField fieldName name fieldExpr) (classifyType fieldExpr nextSeen)
         fields := fields.push {
           name := fieldName.toString, type := fieldType, layout := fieldLayout, isSubobject }

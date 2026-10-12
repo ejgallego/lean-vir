@@ -3,6 +3,7 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 module
+public import JsonSafePrivate
 meta import Vir.Attributes
 public section
 namespace JsonSafeValues
@@ -19,6 +20,8 @@ namespace JsonSafeValues
 @[vir_export] def unitPresent (value : Option Unit) := value.isSome
 @[vir_export] def intIdentity (value : Int) := value
 @[vir_export] def bytesIdentity (value : ByteArray) := value
+@[vir_export] def privateIdentity (value : JsonSafePrivate.Secret) := value
+@[vir_export] def privateAmount (value : JsonSafePrivate.Secret) := JsonSafePrivate.amount value
 
 structure Packed where
   large : UInt64

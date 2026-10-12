@@ -84,9 +84,6 @@ public inductive InterfaceClassifierError where
   | structureLayoutUnavailable (name : Lean.Name)
   | structureLayoutFieldCountMismatch (name : Lean.Name) (expected actual : Nat)
   | structureFieldErasedRuntimeLayout (field structureName : Lean.Name)
-  | structureFieldMissingProjection (field structureName : Lean.Name)
-  | structureFieldMissingProjectionDeclaration (field structureName : Lean.Name)
-  | structureFieldInvalidProjectionType (field structureName : Lean.Name) (type : Lean.Expr)
   | jsMarkerOutsideResource (marker : Lean.Name)
   | runtimeErasedParameterAfterArguments (name : Lean.Name)
   | implicitOrInstanceArgument (name : Lean.Name)
@@ -151,12 +148,6 @@ public def InterfaceClassifierError.toMessageData : InterfaceClassifierError →
       m!"runtime layout for structure `{name}` does not match its field count"
   | .structureFieldErasedRuntimeLayout field structureName =>
       m!"field `{field}` of structure `{structureName}` has erased or void runtime layout"
-  | .structureFieldMissingProjection field structureName =>
-      m!"field `{field}` of structure `{structureName}` is missing a projection function"
-  | .structureFieldMissingProjectionDeclaration field structureName =>
-      m!"field `{field}` of structure `{structureName}` has no projection declaration"
-  | .structureFieldInvalidProjectionType field structureName type =>
-      m!"field `{field}` of structure `{structureName}` has invalid projection type {quotedExpr type}"
   | .jsMarkerOutsideResource marker =>
       m!"JavaScript object marker `{marker}` must appear under `Lean.Vir.Js`; use `Lean.Vir.Js {marker}` at the boundary"
   | .runtimeErasedParameterAfterArguments name =>

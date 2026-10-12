@@ -127,6 +127,28 @@ structure ErasedField where
   type : Type
   value : Nat
 
+-- Imported classifiers must use constructor metadata, even when private
+-- projections are absent from the importing module's environment.
+structure PrivateKey where
+  private mk ::
+  private value : Nat
+
+def privateKeyAmount (value : PrivateKey) : Nat := value.value
+
+structure BoundedValue where
+  value : Nat
+  valid : value < 100
+
+structure ImplicitRecord where
+  {value : Nat}
+
+structure ConstantField (β : Nat → Type) where
+  key : Nat
+  value : β key
+
+@[vir_export] def implicitRecordIdentity (value : ImplicitRecord) := value
+@[vir_export] def constantFieldIdentity (value : ConstantField (fun _ => String)) := value
+
 meta section
 
 open Lean Vir.Interface
@@ -407,7 +429,8 @@ run_elab do
   expect "budget leaves original type" ((← reduceTypeAliases deep) == deep)
   rejected "budget exhaustion" deep
   let indexed := mkApp (mkConst ``Indexed) (mkNatLit 0)
-  for ty in #[indexed, mkConst ``ErasedField] do
+  for ty in #[indexed, mkConst ``ErasedField, mkConst ``BoundedValue,
+      mkConst ``Char, mkApp (mkConst ``Fin) (mkNatLit 100)] do
     rejected "direct unsupported layout" ty
     rejected "projection cannot bypass layout rejection" (project (mkApp (mkConst ``Carrier.mk) ty))
     rejected "beta cannot bypass layout rejection"
