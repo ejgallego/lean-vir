@@ -129,6 +129,49 @@ npm run bench:compare -- build/perf/before.json build/perf/after.json
 
 ## Browser benchmark catalog
 
+### One client operation: public PrettyM calls
+
+`npm run bench:prettym` consumes an already published Slides site, the native
+`test-pretty --host-abi-corpus` JSON output, and that client's unchanged
+`web-lib/panel/pretty.js`. Prepare them with the selected Lean/VIR dependency
+and ordinary owning-library resource build/publisher. Keep source revisions,
+dependency substitution (if any), native build/oracle logs and artifact identity
+with the inputs. The command never builds Lean/Wasm, downloads a replacement
+runtime, or modifies the consumer/site.
+
+```bash
+npm run bench:prettym -- \
+  --site /path/to/prepared-site \
+  --corpus /path/to/native-corpus.json \
+  --adapter /path/to/client/web-lib/panel/pretty.js \
+  --output build/perf/prettym-first
+```
+
+The site supplies runtime/program URLs through its generated resource bootstrap;
+the driver does not infer content-ID directories or reconstruct envelopes. Its
+temporary page excludes the deck's DOM, fonts and presentation. Two independent
+programs call the actual compact-format adapter and public `program.call` path.
+
+This is an unchanged-artifact **A/A screen**, not an optimization comparison.
+It checks exact native text segments and ordered BigInt tags, calibrates one
+fixed batch size using control, then retains two warmups and eight alternating
+measured rounds. The headline includes compact conversion, normal argument and
+result conversion, execution and lightweight result consumption. Acquisition,
+creation, full equality/serialization and disposal are outside that clock.
+Natural browser GC applies; elapsed time is neither pure IR nor startup/paint.
+
+`report.json` contains raw observations/order, checked outputs, payload/source
+hashes, browser/version/command, failures and absolute milliseconds per corpus.
+The output directory must be new. Semantic failures invalidate a speed claim;
+failed runs are not filtered away. Timing thresholds are never correctness gates.
+For a reversed fresh-process screen, use `--reverse --repeats N` with the first
+run's repeat count. Inspect each process/order separately; no significance claim
+follows from a small median ratio. Stronger replication is a separate choice.
+
+`--check` performs a tiny native-output/public-loader smoke (zero warmups, two
+rounds, one corpus pass), not a performance campaign. Adapter/sampling/comparison
+units run through the ordinary `npm run test:bench`, without Lean or Wasm builds.
+
 The standalone application under `benchmarks/browser/` runs client examples,
 differential tests and browser performance campaigns. Its canonical example
 compares five `Std.Format.prettyM` backends. It runs independently of the VIR
