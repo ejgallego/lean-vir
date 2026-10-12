@@ -422,6 +422,10 @@ printf '%s\n' 'corrupt companion' >> "$tmp/sdk-bad/lean-vir-sdk/js/sdk-helper.js
 tar -czf "$tmp/lean-vir-sdk-bad.tar.gz" -C "$tmp/sdk-bad" lean-vir-sdk
 printf '%s\n' 'keep-existing-sdk' > "$tmp/existing-sdk/marker.txt"
 
+lake build vir_fetch_sdk
+env -u VIR_SDK_ARCHIVE -u VIR_SDK_URL -u VIR_SDK_TAG -u VIR_SDK_COMMIT -u VIR_SDK_REPO \
+  lake env lean tests/packages/SdkReleaseTag.lean
+
 if lake exe vir_fetch_sdk --archive "$tmp/lean-vir-sdk-bad.tar.gz" --out "$tmp/existing-sdk" \
     > "$tmp/bad-sdk.stdout" 2> "$tmp/bad-sdk.stderr"; then
   echo "corrupt SDK archive unexpectedly installed" >&2

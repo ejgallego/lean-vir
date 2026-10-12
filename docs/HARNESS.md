@@ -448,10 +448,16 @@ own explicit maintainer selection.
 
 ## Runtime Releases
 
-Tags named `v<package.json version>` trigger
-[release-sdk.yml](../.github/workflows/release-sdk.yml), which validates tag and
-ABI versions, builds the SDK, imports its packaged modules and uploads the
-archive plus a content-named runtime pack to the matching release. Runtime pack
+Release tags follow the pinned Lean toolchain: `4.35-rc4` for
+`leanprover/lean4:v4.35.0-rc4`, `4.35` for `v4.35.0`, and `4.35.1` for
+`v4.35.1`. Milestone numbers and the internal SDK manifest version are independent
+of these tags. `node scripts/release-tag.mjs` prints the current release tag.
+
+Numeric tags trigger [release-sdk.yml](../.github/workflows/release-sdk.yml),
+which rejects tags that do not match `lean-toolchain`, checks ABI versions,
+builds/imports the SDK and uploads the archive plus a content-named runtime pack.
+RC tags produce prereleases; content-addressed `resource-…` releases remain
+separate. Runtime pack
 publication uploads absent assets, verifies and reuses byte-identical assets on
 reruns, and rejects different bytes without replacing them. The SDK archive
 upload remains replaceable. Create the tag from the final merged commit
