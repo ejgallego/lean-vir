@@ -94,6 +94,25 @@ export function compileLibraryValueAdapter(runtime, { decode, encode }, options 
   });
 }
 
+// Prototype construction operation over already lowered, owned fields. The
+// package's typed pure helper computes runtime-only fields; no JS graph rebuild.
+export function compileLibraryConstructor(runtime, entry) {
+  runtime.requireLiveRuntime();
+  const cache = runtime.callCacheFor(entry);
+  if (entry.effect !== "pure" || entry.result.native.type.tag !== "leanObject" ||
+      entry.result.native.metadata !== undefined || entry.result.value.tag !== "leanReference")
+    throw new Error("constructor operation requires a pure opaque-result helper");
+  return (owned, label) => {
+    runtime.requireLiveRuntime();
+    if (owned.length !== entry.args.length)
+      throw new Error(`${label}: constructor operation argument count disagrees`);
+    return runtime.callResolvedObjects(entry, cache, owned, result => {
+      runtime.exports.vir_obj_inc(result);
+      return result; // Retained result survives the call's result cleanup.
+    });
+  };
+}
+
 // This checks profile eligibility, not descriptor grammar (already admitted).
 // Reject the complete domain before binding, rather than only visited values.
 function requireJsonSafeDomain(native, view, label) {
@@ -270,6 +289,20 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
     return result;
   }
   const storage = ctor.storage, objectOnly = storage.usizeFieldCount === 0 && storage.scalarByteSize === 0;
+  // Local explicit binding, installed before codec compilation. A future
+  // admitted contract must identify/require the selected operation. Weak keys
+  // are this runtime's actual constructor descriptors, not global type names.
+  const construct = runtime.nativeConstructorOperations?.get(ctor);
+  const lowerConstructed = construct === undefined ? undefined : (_index, value, label, scratch) => {
+    const owned = [];
+    try {
+      // Helpers take logical arguments in source order, each boxed by its codec.
+      // Physical storage (including computed fields) belongs to the helper.
+      for (const entry of fields)
+        owned.push(entry.codec.lower(entry.read(value), `${label}.${entry.field.name}`, scratch));
+      return construct(owned, label);
+    } finally { runtime.releaseOwnedObjects(owned); }
+  };
   // Physical slots are admitted facts. Bind the common small object layouts
   // once instead of branching on every field's location at every value.
   const objectFields = objectOnly ? [...fields].sort((a, b) => a.field.location.index - b.field.location.index) : null;
@@ -343,7 +376,7 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
     }
   }
   return {
-    lower: lowerObjects ?? ((index, value, label, scratch) => {
+    lower: lowerConstructed ?? lowerObjects ?? ((index, value, label, scratch) => {
       const objects = Array(storage.objectFieldCount).fill(0);
       const usize = objectOnly ? null : Array(storage.usizeFieldCount).fill(0n);
       const bytes = objectOnly ? null : new Uint8Array(storage.scalarByteSize);

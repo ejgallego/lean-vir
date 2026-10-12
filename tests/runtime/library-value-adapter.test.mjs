@@ -5,7 +5,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { VirRuntime } from "../../web/src/runtime/core.js";
-import { compileLibraryValueAdapter } from "../../web/src/runtime/native-value-codecs.js";
+import { compileLibraryValueAdapter, compileLibraryConstructor } from "../../web/src/runtime/native-value-codecs.js";
 import { validateBoundaryInterface } from "../../web/src/runtime/value-interfaces.js";
 import { ConstructorScratch } from "../../web/src/runtime/constructor-scratch.js";
 import {
@@ -67,7 +67,13 @@ function harness() {
     vir_free_bytes: ptr => { assert.ok(buffers.delete(ptr)); },
     vir_resolve_call_export(index) { resolved++; return mode === "resolve" ? 0 : index + 1; },
     vir_call_resolved_objects(slot, ptr, count) {
-      assert.equal(count, 1); calls++;
+      assert.equal(count, slot === 3 ? 2 : 1); calls++;
+      if (slot === 3) {
+        const fields = pointers(ptr, count);
+        if (mode === "null") { fields.forEach(dec); return 0; }
+        // Helper takes logical order and produces a different physical order.
+        return allocate({ tag: 0, fields: fields.reverse(), computed: true });
+      }
       const [input] = pointers(ptr, count);
       if (mode === "null") { dec(input); return 0; }
       if (slot === 1) {
@@ -91,7 +97,7 @@ function harness() {
   const encode = { entry: "Map.encode", args: [{ name: "value", type: opaque }], result: wire, effect: "pure" };
   runtime.interfaceManifest = { exports: [decode, encode] };
   const bind = runtime.nativeValueCodec;
-  runtime.nativeValueCodec = function (pair, options) {
+  runtime.nativeValueCodec = function (pair, options = {}) {
     const cache = options.representation === "json-safe-v1" ? this.jsonSafeValueCodecs : this.nativeValueCodecs;
     if (!cache?.has(pair)) compiled++;
     return bind.call(this, pair, options);
@@ -176,4 +182,62 @@ test("helper plans reject foreign entries, effects, incompatible domains and dis
   assert.throws(() => compileLibraryValueAdapter(first.runtime,
     { decode: first.decode, encode: first.encode }), /disposed/);
   assert.equal(first.heap.size, 0);
+});
+
+const computed = validateBoundaryInterface(objectBoundary("Computed", [objectConstructor("Computed.mk", {
+  objectFieldCount: 2, usizeFieldCount: 0, scalarByteSize: 8,
+}, [nativeField("left", string.native, { tag: "object", index: 1 }),
+  nativeField("right", string.native, { tag: "object", index: 0 })])], {
+  tag: "record", fields: [{ key: "left", path: [0], value: string.value },
+    { key: "right", path: [1], value: string.value }],
+}));
+
+function constructed(h) {
+  const entry = { entry: "Computed.mk", args: [{ type: string }, { type: string }], result: opaque, effect: "pure" };
+  h.runtime.interfaceManifest.exports.push(entry);
+  h.runtime.nativeConstructorOperations = new WeakMap([
+    [computed.native.metadata.constructors[0], compileLibraryConstructor(h.runtime, entry)],
+  ]);
+  return h.runtime.nativeValueCodec(computed);
+}
+
+test("constructor operations consume logical fields and preserve computed runtime construction", () => {
+  const h = harness(), codec = constructed(h), value = { left: "first", right: "second" };
+  for (let i = 0; i < 20; i++) {
+    const obj = h.lower(codec, value);
+    assert.equal(h.heap.get(obj).computed, true);
+    assert.equal(h.heap.get(obj).refs, 1);
+    assert.deepEqual(codec.lift(obj, "result"), value);
+    h.dec(obj);
+  }
+  assert.equal(h.resolved, 1); assert.equal(h.compiled, 1);
+  assert.equal(h.heap.size, 0); assert.equal(h.buffers.size, 0);
+});
+
+test("constructor operation failures respect the native transfer point", () => {
+  for (const mode of ["resolve", "null", "allocation", "later-field"]) {
+    const h = harness(), codec = constructed(h);
+    h.mode = mode; h.failAllocation = mode === "allocation";
+    const makeString = h.runtime.makeObjectString;
+    h.runtime.makeObjectString = value => {
+      if (mode === "later-field" && value === "second") throw new Error("later field rejected");
+      return makeString(value);
+    };
+    assert.throws(() => h.lower(codec, { left: "first", right: "second" }));
+    assert.equal(h.heap.size, 0, mode); assert.equal(h.buffers.size, 0, mode);
+    h.mode = "ok"; h.failAllocation = false; h.runtime.makeObjectString = makeString;
+    const obj = h.lower(codec, { left: "recovered", right: "value" });
+    h.dec(obj); assert.equal(h.heap.size, 0);
+  }
+});
+
+test("constructor operations require this runtime's pure opaque helper and correct arity", () => {
+  const h = harness();
+  assert.throws(() => compileLibraryConstructor(h.runtime, harness().encode), /does not belong/);
+  h.encode.effect = "io";
+  assert.throws(() => compileLibraryConstructor(h.runtime, h.encode), /pure opaque/);
+  constructed(h);
+  const operation = h.runtime.nativeConstructorOperations.get(computed.native.metadata.constructors[0]);
+  assert.throws(() => operation([], "constructor"), /argument count/);
+  assert.equal(h.calls, 0);
 });
