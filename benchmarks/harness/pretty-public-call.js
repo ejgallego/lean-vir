@@ -16,7 +16,7 @@ export async function screenPrettyPublicCalls({
   const observations = [];
   const candidates = ["control", "candidate"].map(id => ({ id, program: programs[id] }));
   if (reverse) candidates.reverse();
-  const expected = corpus.map(c => c.result.segments.map(({ text, tags }) => ({ text, tags })));
+  const expected = corpus.map(c => c.result.segments.map(({ text, tags }) => ({ text, tags: tags.map(BigInt) })));
   const projected = segments => segments.map(({ text, tags }) => ({
     text,
     tags: tags.map(tag => {
@@ -24,14 +24,19 @@ export async function screenPrettyPublicCalls({
       return tag.toString();
     }),
   }));
-  function check(outputs) {
-    const actual = outputs.map(projected);
-    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+  function checkSegments(segments, index) {
+    const wanted = expected[index];
+    if (segments.length !== wanted.length || segments.some((segment, i) =>
+      segment.text !== wanted[i].text || segment.tags.length !== wanted[i].tags.length ||
+      segment.tags.some((tag, j) => tag !== wanted[i].tags[j]))) {
       const error = new Error("PrettyM output differs from the native oracle");
-      error.actual = actual;
+      error.actual = projected(segments);
       throw error;
     }
-    return actual;
+  }
+  function check(outputs) {
+    outputs.forEach(checkSegments);
+    return outputs.map(projected);
   }
   const callCorpus = program => corpus.map(c => format(program, c.format, c.width, c.indent));
   let checkedOutputs = {};
@@ -48,6 +53,7 @@ export async function screenPrettyPublicCalls({
           const segments = format(candidate.program, c.format, c.width, c.indent);
           outputs[i] = segments; // Only the last corpus is retained, not every result.
           record.calls++;
+          checkSegments(segments, i); // Exact comparison cost is inside the clock.
           for (const segment of segments) {
             checksum = (Math.imul(checksum, 31) + segment.text.length + segment.tags.length) >>> 0;
           }
@@ -56,8 +62,8 @@ export async function screenPrettyPublicCalls({
     } finally {
       record.elapsedMs = now() - started;
     }
-    // Full text/tag equality and serialization are outside the headline clock.
-    checkedOutputs[candidate.id] = check(outputs);
+    // Every result was checked above; reporting/serialization is outside the clock.
+    checkedOutputs[candidate.id] = outputs.map(projected);
     if (!(record.elapsedMs > 0)) throw new Error("timing resolution is insufficient");
     record.ok = true;
     record.checksum = checksum;
@@ -65,13 +71,18 @@ export async function screenPrettyPublicCalls({
   }
   let failure = null;
   let sampled = null;
+  let calibration = null;
   try {
     for (const candidate of candidates) checkedOutputs[candidate.id] = check(callCorpus(candidate.program));
     if (repeats === null) {
+      // Exercise both actual call paths before control-only batch calibration.
+      for (const candidate of candidates) batch(candidate, 1, "prewarmup");
       repeats = 1;
       for (let attempt = 0; attempt < 4; attempt++) {
         const observation = batch(candidates.find(c => c.id === "control"), repeats, "calibration");
-        if (observation.timings.totalMs >= targetMs || repeats === 512) break;
+        calibration = { repeats, elapsedMs: observation.timings.totalMs, targetMs,
+          targetMet: observation.timings.totalMs >= targetMs };
+        if (calibration.targetMet || repeats === 512 || attempt === 3) break;
         repeats = Math.min(512, Math.max(repeats + 1,
           Math.ceil(repeats * targetMs / observation.timings.totalMs)));
       }
@@ -95,8 +106,8 @@ export async function screenPrettyPublicCalls({
   }
   return {
     passed: failure === null && sampled?.scenarios[0].parity === true,
-    error: failure, repeats, callsPerPass: corpus.length, warmups, rounds,
+    error: failure, repeats, callsPerPass: corpus.length, warmups, rounds, calibration,
     order: candidates.map(c => c.id), observations, checkedOutputs,
-    scope: "A/A public formatting call screen; not startup, DOM or pure interpreter time",
+    scope: "A/A public formatting calls plus exact result checks; not startup, DOM or pure interpreter time",
   };
 }

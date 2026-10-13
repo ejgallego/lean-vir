@@ -153,15 +153,21 @@ temporary page excludes the deck's DOM, fonts and presentation. Two independent
 programs call the actual compact-format adapter and public `program.call` path.
 
 This is an unchanged-artifact **A/A screen**, not an optimization comparison.
-It checks exact native text segments and ordered BigInt tags, calibrates one
-fixed batch size using control, then retains two warmups and eight alternating
-measured rounds. The headline includes compact conversion, normal argument and
-result conversion, execution and lightweight result consumption. Acquisition,
-creation, full equality/serialization and disposal are outside that clock.
+Every call checks exact native text segments and ordered BigInt tags. Automatic
+calibration first exercises both programs, then uses control to choose one fixed
+batch size. Its final chosen count is observed and its achieved duration is
+recorded; the 20ms target is advisory, not a guarantee of stable JIT behavior.
+Two batch warmups and eight alternating measured rounds follow. The headline
+includes compact conversion, normal argument/result conversion, execution and
+exact result checking/consumption. Acquisition, creation, reporting/serialization
+and disposal are outside that clock. This checked-call metric is not directly
+comparable with older screens that timed only length/count consumption.
 Natural browser GC applies; elapsed time is neither pure IR nor startup/paint.
 
 `report.json` contains raw observations/order, checked outputs, payload/source
-hashes, browser/version/command, failures and absolute milliseconds per corpus.
+hashes, browser/version/command, failures, observed calibration and absolute
+milliseconds per corpus. Inspect actual measured batch durations too: warming
+can shorten batches even after calibration reaches its advisory target.
 The output directory must be new. Semantic failures invalidate a speed claim;
 failed runs are not filtered away. Timing thresholds are never correctness gates.
 For a reversed fresh-process screen, use `--reverse --repeats N` with the first

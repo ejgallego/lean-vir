@@ -74,17 +74,17 @@ try {
     : { warmups: 2, rounds: 8, repeats: options.repeats, reverse: options.reverse };
   phase = "public-creation-and-formatting";
   report.screen = await evaluate(cdp, `(async () => {
-    const {createProgram} = await import(${JSON.stringify(selected.runtimeModule)});
-    const {screenPrettyPublicCalls} = await import('./screen.js');
     const programs = {}, creationOrder = ${JSON.stringify(options.reverse ? ["candidate", "control"] : ["control", "candidate"])};
     let result, failure;
     try {
+      const {createProgram} = await import(${JSON.stringify(selected.runtimeModule)});
+      const {screenPrettyPublicCalls} = await import('./screen.js');
       for (const side of creationOrder) programs[side] = await createProgram({
         runtimeManifestUrl: new URL(${JSON.stringify(selected.runtimeManifest)}),
         programManifestUrl: new URL(${JSON.stringify(selected.programManifest)})});
       result = await screenPrettyPublicCalls({corpus: ${JSON.stringify(corpus)}, programs,
         format: formatCompactSegments, sample: runDifferentialSamples,
-        ${Object.entries(report.policy).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(",")}});
+        ...${JSON.stringify(report.policy)}});
     } catch (error) { failure = {name: error?.name, message: String(error?.message ?? error), stack: error?.stack,
       phase: error?.phase, cause: error?.cause?.stack ?? String(error?.cause)}; }
     const cleanupErrors = [];
@@ -128,7 +128,9 @@ if (report.status !== "passed") {
   console.log(`PrettyM public-loader/native-oracle smoke PASS; evidence: ${options.output}`);
 } else {
   const c = report.comparison;
-  console.log(`PrettyM A/A: ${report.inputs.caseCount} native cases, ${c.rounds.length} paired rounds`);
+  console.log(`PrettyM A/A calls + exact result checks: ${report.inputs.caseCount} native cases, ${c.rounds.length} paired rounds`);
+  const calibration = report.screen.result.calibration;
+  if (calibration) console.log(`Observed calibration: ${calibration.repeats} repeats, ${calibration.elapsedMs.toFixed(3)}ms; advisory target ${calibration.targetMs}ms ${calibration.targetMet ? "reached" : "not reached"}`);
   for (const r of c.rounds) console.log(`${r.round} ${r.sequence}: ${r.controlMs.toFixed(3)} / ${r.candidateMs.toFixed(3)} ms/corpus; ratio ${r.ratio.toFixed(3)}`);
   console.log(`Median paired ratio ${c.medianRatio.toFixed(3)}; unchanged-artifact variability, not a speed claim. Evidence: ${options.output}`);
 }
@@ -168,5 +170,8 @@ function parseArgs(args) {
     result[key.slice(2)] = key === "--repeats" ? Number(args[++i]) : resolve(args[++i]);
   }
   for (const key of ["site", "corpus", "adapter", "output"]) if (!result[key]) throw new Error(`--${key} is required`);
+  if (result.repeats !== null && (!Number.isInteger(result.repeats) || result.repeats < 1 || result.repeats > 512)) {
+    throw new Error("repeats must be 1..512");
+  }
   return result;
 }

@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { readFile, mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -70,6 +69,25 @@ test("native mismatch and lost tag representation prevent a timing claim", async
   }
 });
 
+for (const [field, wrong] of [["text", { text: "jello", tags: [7n] }],
+  ["tag", { text: "hello", tags: [8n] }]]) {
+  test(`an earlier same-size incorrect ${field} cannot hide behind the final pass`, async () => {
+    const { options } = fixture();
+    const original = options.format;
+    let candidateCalls = 0;
+    const result = await screenPrettyPublicCalls({ ...options, repeats: 2, warmups: 0, rounds: 2,
+      format: (program, ...args) => {
+        if (program.side === "candidate" && args[0] !== null && ++candidateCalls === 2) return [wrong];
+        return original(program, ...args);
+      },
+    });
+    assert.equal(result.passed, false);
+    assert.match(result.error.message, /native oracle/);
+    assert.equal(result.observations.at(-1).ok, false);
+    assert.ok(result.observations.at(-1).elapsedMs > 0);
+  });
+}
+
 test("a timed candidate failure survives with earlier successful observations", async () => {
   const { options } = fixture();
   const original = options.format;
@@ -87,12 +105,19 @@ test("a timed candidate failure survives with earlier successful observations", 
   assert.ok(result.observations.at(-1).elapsedMs > 0);
 });
 
-test("calibration is control-only and freezes one repeat count for both sides", async () => {
+test("calibration warms both sides first and observes the final frozen count", async () => {
   const { options } = fixture();
   const result = await screenPrettyPublicCalls({ ...options, repeats: null, targetMs: 4 });
   assert.equal(result.passed, true);
-  assert.ok(result.observations.filter(r => r.phase === "calibration").every(r => r.side === "control"));
-  assert.ok(result.observations.filter(r => r.phase !== "calibration").every(r => r.repeats === result.repeats));
+  assert.deepEqual(result.observations.slice(0, 2).map(r => [r.side, r.phase]),
+    [["control", "prewarmup"], ["candidate", "prewarmup"]]);
+  const calibration = result.observations.filter(r => r.phase === "calibration");
+  assert.ok(calibration.every(r => r.side === "control"));
+  assert.equal(calibration.at(-1).repeats, result.repeats);
+  assert.equal(result.calibration.elapsedMs, calibration.at(-1).elapsedMs);
+  assert.equal(result.calibration.targetMet, false); // Advisory, not a failure.
+  assert.ok(result.observations.filter(r => ["warmup", "measured"].includes(r.phase))
+    .every(r => r.repeats === result.repeats));
 });
 
 test("reject invalid protocol before calling either side", async () => {
@@ -129,4 +154,19 @@ test("CLI help is build-free and an existing output is never overwritten", async
     "--corpus", join(dir, "missing.json"), "--adapter", join(dir, "missing.js"), "--output", output]);
   assert.notEqual(run.status, 0);
   assert.equal(await readFile(join(output, "report.json"), "utf8"), '{"status":"passed"}\n');
+});
+
+test("invalid CLI repeat counts fail before creating output or starting the browser", async t => {
+  const driver = new URL("../../benchmarks/harness/bench-prettym-browser.mjs", import.meta.url);
+  const dir = await mkdtemp(join(tmpdir(), "vir-pretty-options-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  for (const repeats of ["0", "513", "1.5", "invalid"]) {
+    const output = join(dir, `output-${repeats}`);
+    const run = spawnSync(process.execPath, [driver.pathname, "--site", dir,
+      "--corpus", join(dir, "missing.json"), "--adapter", join(dir, "missing.js"),
+      "--output", output, "--repeats", repeats]);
+    assert.notEqual(run.status, 0);
+    assert.match(run.stderr.toString(), /repeats must be 1\.\.512/);
+    await assert.rejects(readFile(join(output, "report.json")), { code: "ENOENT" });
+  }
 });
