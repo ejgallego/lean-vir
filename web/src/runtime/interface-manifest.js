@@ -98,8 +98,8 @@ export function validateInterfaceManifest(
   ) {
     throw new Error("embedded interface manifest hostImports must be an array");
   }
-  if (manifest.constructorOperations !== undefined && !Array.isArray(manifest.constructorOperations))
-    throw new Error("embedded interface manifest constructorOperations must be an array");
+  if (manifest.codecOperations !== undefined && !Array.isArray(manifest.codecOperations))
+    throw new Error("embedded interface manifest codecOperations must be an array");
   validateManifestMetadata(
     manifest.metadata,
     manifest.version,
@@ -110,14 +110,11 @@ export function validateInterfaceManifest(
   manifest.interfaces.forEach((pair, index) =>
     validateInterfaceType(pair, `embedded interface manifest interfaces[${index}]`));
   const exports = validateManifestExports(manifest.exports, manifest.interfaces);
-  const constructorOperations = validateManifestExports(manifest.constructorOperations ?? [], manifest.interfaces, "constructorOperations");
+  const codecOperations = validateManifestExports(manifest.codecOperations ?? [], manifest.interfaces, "codecOperations");
   const operationByKey = new Map();
-  for (const entry of constructorOperations) {
-    const opaque = pair => pair.native.type?.tag === "leanObject" &&
-      pair.native.metadata === undefined && pair.value.tag === "leanReference";
-    if (entry.effect !== "pure" || entry.startup ||
-        !entry.args.every(arg => opaque(arg.type)) || !opaque(entry.result))
-      throw new Error("constructor operations require pure boxed-field -> opaque call contracts");
+  for (const entry of codecOperations) {
+    if (entry.effect !== "pure" || entry.startup)
+      throw new Error("codec operations require pure non-startup call contracts");
     if (exports.some(exp => exp.nameKey === entry.nameKey))
       throw new Error("constructor operation duplicates an application export");
     operationByKey.set(entry.nameKey, entry);
@@ -128,10 +125,10 @@ export function validateInterfaceManifest(
     manifest.metadata.packageSetMember,
     exports,
     hostImports,
-    constructorOperations,
+    codecOperations,
   );
   const { interfaces: _interfaces, ...rest } = manifest;
-  return { ...rest, exports, hostImports, constructorOperations };
+  return { ...rest, exports, hostImports, codecOperations };
 }
 
 function validateConstructorOperations(native, operations) {
@@ -142,16 +139,38 @@ function validateConstructorOperations(native, operations) {
     metadata.signature.args.forEach(arg => validateConstructorOperations(arg, operations));
     validateConstructorOperations(metadata.signature.result, operations);
   }
+  if (metadata.adapter !== undefined) {
+    const adapter = metadata.adapter;
+    requireNameKey(adapter.decode, "adapter decode reference");
+    requireNameKey(adapter.encode, "adapter encode reference");
+    const decode = operations.get(adapter.decode), encode = operations.get(adapter.encode);
+    const constructors = decode?.result.native.metadata?.constructors;
+    if (decode?.args.length !== 1 || encode?.args.length !== 1 ||
+        !opaqueInterface(decode.args[0].type) || !opaqueInterface(encode.result) ||
+        !opaqueInterface(encode.args[0].type) ||
+        decode.result.native.metadata?.declaration !== "Except" || constructors?.length !== 2 ||
+        constructors[0].name !== "Except.error" || constructors[1].name !== "Except.ok" ||
+        !constructors.every(ctor => ctor.representation === "object" && ctor.fields.length === 1 &&
+          ctor.fields[0].location.tag === "object" && ctor.fields[0].location.index === 0) ||
+        constructors[0].fields[0].type.type.tag !== "string" ||
+        !opaqueNative(constructors[1].fields[0].type))
+      throw new Error("library adapter requires opaque -> Except String opaque and opaque -> opaque operations");
+    validateConstructorOperations(adapter.wire, operations);
+  }
   for (const ctor of metadata.constructors ?? []) {
     if (ctor.operation !== undefined) {
       requireNameKey(ctor.operation, "constructor operation reference");
       const entry = operations.get(ctor.operation);
-      if (entry === undefined || entry.args.length !== ctor.fields.length)
+      if (entry === undefined || entry.args.length !== ctor.fields.length ||
+          !entry.args.every(arg => opaqueInterface(arg.type)) || !opaqueInterface(entry.result))
         throw new Error(`${ctor.name} requires its matching constructor operation`);
     }
     ctor.fields.forEach(field => validateConstructorOperations(field.type, operations));
   }
 }
+
+function opaqueNative(native) { return native.type?.tag === "leanObject" && native.metadata === undefined; }
+function opaqueInterface(pair) { return opaqueNative(pair.native) && pair.value.tag === "leanReference"; }
 
 function validateManifestMetadata(
   metadata,
@@ -256,9 +275,9 @@ function validatePackageSetMember(member, targets, metadataLabel) {
   }
 }
 
-function validatePackageSetSurface(member, exports, hostImports, constructorOperations) {
+function validatePackageSetSurface(member, exports, hostImports, codecOperations) {
   if (member?.role !== "dependency") return;
-  if (exports.length !== 0 || hostImports.length !== 0 || constructorOperations.length !== 0) {
+  if (exports.length !== 0 || hostImports.length !== 0 || codecOperations.length !== 0) {
     throw new Error(
       "embedded interface manifest dependency package-set members must not expose exports or host imports",
     );

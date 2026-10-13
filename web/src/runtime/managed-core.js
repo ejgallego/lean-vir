@@ -375,7 +375,7 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     if (cache === undefined) {
       let exportIndex = this.interfaceManifest?.exports?.indexOf(entry) ?? -1;
       if (exportIndex < 0) {
-        const operationIndex = this.interfaceManifest?.constructorOperations?.indexOf(entry) ?? -1;
+        const operationIndex = this.interfaceManifest?.codecOperations?.indexOf(entry) ?? -1;
         if (operationIndex >= 0) exportIndex = this.interfaceManifest.exports.length + operationIndex;
       }
       if (exportIndex < 0) {

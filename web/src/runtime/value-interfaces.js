@@ -50,13 +50,20 @@ function validateNative(native, owners, label) {
   } else if (native.type.width !== undefined) fail(`${label}.type.width`, "is not supported");
   const metadata = native.metadata;
   if (metadata === undefined) return;
-  object(metadata, ["declaration", "constructors", "arrayElement", "signature"], `${label}.metadata`);
+  object(metadata, ["declaration", "constructors", "arrayElement", "signature", "adapter"], `${label}.metadata`);
   if (metadata.declaration !== undefined) string(metadata.declaration, `${label}.metadata.declaration`);
-  if (tag !== "leanObject" && ["constructors", "arrayElement", "signature"].some(key => metadata[key] !== undefined))
+  if (tag !== "leanObject" && ["constructors", "arrayElement", "signature", "adapter"].some(key => metadata[key] !== undefined))
     fail(`${label}.metadata`, "requires a Lean-object type");
-  const storageForms = ["constructors", "arrayElement", "signature"].filter(key => metadata[key] !== undefined);
+  const storageForms = ["constructors", "arrayElement", "signature", "adapter"].filter(key => metadata[key] !== undefined);
   if (storageForms.length > 1) fail(`${label}.metadata`, "has conflicting storage facts");
   if (metadata.arrayElement !== undefined) validateNative(metadata.arrayElement, owners, `${label}.metadata.arrayElement`);
+  if (metadata.adapter !== undefined) {
+    const adapter = metadata.adapter, at = `${label}.metadata.adapter`;
+    object(adapter, ["wire", "decode", "encode"], at);
+    string(adapter.decode, `${at}.decode`); string(adapter.encode, `${at}.encode`);
+    // An adapter's helper ABI receives a complete closed wire type.
+    validateNative(adapter.wire, [], `${at}.wire`);
+  }
   if (metadata.signature !== undefined) {
     const signature = metadata.signature, at = `${label}.metadata.signature`;
     object(signature, ["args", "result", "effect"], at);
@@ -156,6 +163,11 @@ function validateView(native, view, label) {
   if (tag === "resource") { object(view, ["tag"], label); requireTag(["jsReference"]); return; }
   const constructors = metadata?.constructors;
   switch (view.tag) {
+    case "adapted":
+      object(view, ["tag", "wire"], label);
+      if (metadata?.adapter === undefined) fail(label, "requires library adapter metadata");
+      validateView(metadata.adapter.wire, view.wire, `${label}.wire`);
+      return;
     case "leanReference": object(view, ["tag"], label); return;
     case "expr":
       object(view, ["tag"], label);

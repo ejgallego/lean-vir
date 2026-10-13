@@ -8,6 +8,7 @@ module
 
 public import Vir.Compiler.Interface.Classify.Error
 public import Vir.Compiler.Interface.Model
+public import Vir.Compiler.Interface.LibraryAdapters
 import Vir.Compiler.Interface.Classify.Basic
 import Vir.Compiler.Interface.Classify.Reduce
 
@@ -119,6 +120,18 @@ private def implementationLayout (name : Name) : ClassifyM (Lean.Compiler.LCNF.C
     throwThe InterfaceClassifierError (.constructorOperationUnsupported name "computed storage on a fieldless constructor unsupported")
   return ({ layout with fieldInfo := layout.fieldInfo.extract offset layout.fieldInfo.size },
     if source.numFields == 0 then none else some implementation)
+
+private def libraryAdapterOutcome : ClassifyM InterfaceType := do
+  let constructors ← #[(`Except.error, InterfaceType.string), (`Except.ok, InterfaceType.leanObject)].mapM fun (name, type) => do
+    let layout ← constructorLayout name (.constructorLayoutUnavailable name)
+    let some location := fieldLayout? layout.fieldInfo[0]!
+      | throwThe InterfaceClassifierError (.constructorLayoutUnavailable name)
+    pure ({
+      constructorName := name
+      storage := constructorStorage layout
+      fields := #[{ name := "a", type, layout := location }]
+    } : InductiveConstructor)
+  pure (.customInductive `Except "Except String opaque" constructors)
 
 /-- A closure invocation cannot carry an enclosing aggregate's recursive owner.
 Complete structures/inductives establish their own owner when marshalled. -/
@@ -321,6 +334,16 @@ private partial def classifyType (e : Lean.Expr) (seenTypes : RecursiveSeen) :
       return .leanObject
   | _ =>
       let env ← getEnv
+      if let some adapter := closedLibraryAdapter? env e then
+        let key : ExprStructEq := ⟨e⟩
+        if seenTypes.contains key then
+          throwThe InterfaceClassifierError (.libraryAdapterUnsupported e "recursive adapter wire domains are not supported")
+        -- Wire domains are closed: they cannot borrow an enclosing descriptor's
+        -- recursive owner or use a package-local fragment as their type identity.
+        let wire ← classifyType adapter.wireType #[key]
+        return .libraryAdapter e.getAppFn.constName (exprTypeLabel e) {
+          wire, decode := adapter.decode, encode := adapter.encode,
+          outcome := ← libraryAdapterOutcome }
       match simpleInterfaceType? e <|> resourceInterfaceType? e with
       | some ty => return ty
       | none =>

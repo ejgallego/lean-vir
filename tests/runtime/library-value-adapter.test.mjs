@@ -7,6 +7,8 @@ import test from "node:test";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { compileLibraryValueAdapter, compileLibraryConstructor } from "../../web/src/runtime/native-value-codecs.js";
 import { validateBoundaryInterface } from "../../web/src/runtime/value-interfaces.js";
+import { validateInterfaceManifest, INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
+import { encodeInterfaceManifest } from "../../scripts/packages/irpkg-format.mjs";
 import { ConstructorScratch } from "../../web/src/runtime/constructor-scratch.js";
 import {
   arrayBoundary, nativeDescriptor, nativeField, objectBoundary,
@@ -56,6 +58,8 @@ function harness() {
       inc(field); return field;
     },
     vir_obj_array: (ptr, count) => allocate({ fields: pointers(ptr, count) }),
+    vir_obj_ctor_layout: (tag, ptr, count) => allocate({ tag, fields: pointers(ptr, count) }),
+    vir_obj_ctor: (tag, ptr, count) => allocate({ tag, fields: pointers(ptr, count) }),
     vir_obj_array_size: obj => heap.get(obj).fields.length,
     vir_obj_array_get(obj, index) { const child = heap.get(obj).fields[index]; inc(child); return child; },
     vir_alloc_bytes(size) {
@@ -93,8 +97,8 @@ function harness() {
     if (failLift) throw new Error("wire lift failed");
     return heap.get(obj).value;
   };
-  const decode = { entry: "Map.decode", args: [{ name: "entries", type: wire }], result: outcome, effect: "pure" };
-  const encode = { entry: "Map.encode", args: [{ name: "value", type: opaque }], result: wire, effect: "pure" };
+  const decode = { entry: "Map.decode", args: [{ name: "entries", type: opaque }], result: outcome, effect: "pure" };
+  const encode = { entry: "Map.encode", args: [{ name: "value", type: opaque }], result: opaque, effect: "pure" };
   runtime.interfaceManifest = { exports: [decode, encode] };
   const bind = runtime.nativeValueCodec;
   runtime.nativeValueCodec = function (pair, options = {}) {
@@ -103,7 +107,7 @@ function harness() {
     return bind.call(this, pair, options);
   };
   return { runtime, decode, encode, heap, buffers, dec,
-    bind: (options = {}) => compileLibraryValueAdapter(runtime, { decode, encode }, options),
+    bind: (options = {}) => compileLibraryValueAdapter(runtime, { decode, encode }, runtime.nativeValueCodec(wire, options)),
     lower(codec, value) {
       const scratch = new ConstructorScratch(runtime);
       try { return codec.lower(value, "properties", scratch); }
@@ -148,6 +152,52 @@ test("adapter errors and malformed native outcomes release inputs and recover", 
   assert.equal(unresolved.heap.size, 0); assert.equal(unresolved.buffers.size, 0);
 });
 
+function admittedAdapter(h) {
+  h.decode.nameKey = "s4d6170/s6465636f6465/"; h.decode.startup = false;
+  h.encode.nameKey = "s4d6170/s656e636f6465/"; h.encode.startup = false;
+  const pair = { native: { type: { tag: "leanObject" }, metadata: {
+    declaration: "Map", adapter: { wire: wire.native, decode: h.decode.nameKey, encode: h.encode.nameKey },
+  } }, value: { tag: "adapted", wire: wire.value } };
+  const input = encodeInterfaceManifest({ version: INTERFACE_MANIFEST_VERSION, metadata: {}, exports: [],
+    codecOperations: [h.decode, h.encode] });
+  input.interfaces.push(pair);
+  h.runtime.interfaceManifest = validateInterfaceManifest(input);
+  return { pair, input };
+}
+
+test("admitted adapters compose inside records without opaque JS handles or manual registration", () => {
+  for (const representation of ["native", "json-safe-v1"]) {
+    const h = harness(), { pair } = admittedAdapter(h);
+    const record = validateBoundaryInterface(objectBoundary("Bundle", [objectConstructor("Bundle.mk", storage,
+      [nativeField("properties", pair.native, { tag: "object", index: 0 })])], {
+      tag: "record", fields: [{ key: "properties", path: [0], value: pair.value }],
+    }));
+    const codec = h.runtime.nativeValueCodec(record, { representation });
+    for (let i = 0; i < 20; i++) {
+      const value = { properties: ["a.b", "", "λ🦀"] }, obj = h.lower(codec, value);
+      assert.deepEqual(codec.lift(obj, "bundle"), value);
+      h.dec(obj);
+    }
+    assert.equal(h.resolved, 2); assert.equal(h.compiled, 1);
+    assert.equal(h.heap.size, 0); assert.equal(h.buffers.size, 0);
+  }
+});
+
+test("adapter admission rejects missing/mismatched helper contracts and open wire references", () => {
+  const h = harness(), { input } = admittedAdapter(h);
+  for (const mutate of [
+    m => { m.codecOperations.pop(); },
+    m => { m.codecOperations[0].args = []; },
+    m => { m.codecOperations[1].effect = "io"; },
+    m => { m.interfaces[m.codecOperations[1].result] = string; },
+    m => { m.codecOperations[0].result = m.codecOperations[0].args[0].type; },
+    m => { m.interfaces.at(-1).native.metadata.adapter.wire = { ref: 0 }; },
+  ]) {
+    const copy = structuredClone(input); mutate(copy);
+    assert.throws(() => validateInterfaceManifest(copy), /library adapter|codec operations|enclosing recursive/);
+  }
+});
+
 test("argv allocation and output lifting failures preserve the caller's map", () => {
   const h = harness(), codec = h.bind();
   h.failAllocation = true;
@@ -166,16 +216,10 @@ test("argv allocation and output lifting failures preserve the caller's map", ()
   h.dec(obj); assert.equal(h.heap.size, 0);
 });
 
-test("helper plans reject foreign entries, effects, incompatible domains and disposed runtimes", () => {
+test("helper plans reject foreign entries and disposed runtimes", () => {
   const first = harness(), second = harness();
   assert.throws(() => compileLibraryValueAdapter(first.runtime,
     { decode: second.decode, encode: first.encode }), /does not belong/);
-  first.decode.effect = "io";
-  assert.throws(() => first.bind(), /pure wire/);
-  first.decode.effect = "pure";
-  first.encode.result = string;
-  assert.throws(() => first.bind(), /domains disagree/);
-  first.encode.result = wire;
   const codec = first.bind();
   first.runtime.dispose();
   assert.throws(() => first.lower(codec, []), /disposed/);
@@ -196,7 +240,7 @@ computed.native.metadata.constructors[0].operation = "s436f6d7075746564/s6d6b/";
 function constructed(h) {
   const entry = { entry: "Computed.mk", nameKey: computed.native.metadata.constructors[0].operation,
     args: [{ type: opaque }, { type: opaque }], result: opaque, effect: "pure" };
-  h.runtime.interfaceManifest.constructorOperations = [entry];
+  h.runtime.interfaceManifest.codecOperations = [entry];
   return h.runtime.nativeValueCodec(computed);
 }
 
@@ -230,11 +274,9 @@ test("constructor operation failures respect the native transfer point", () => {
   }
 });
 
-test("constructor operations require this runtime's pure opaque helper and correct arity", () => {
+test("constructor operations require this runtime's helper and correct arity", () => {
   const h = harness();
   assert.throws(() => compileLibraryConstructor(h.runtime, harness().encode), /does not belong/);
-  h.encode.effect = "io";
-  assert.throws(() => compileLibraryConstructor(h.runtime, h.encode), /pure opaque/);
   constructed(h);
   const operation = h.runtime.nativeConstructorOperations.get(computed.native.metadata.constructors[0]);
   assert.throws(() => operation([], "constructor"), /argument count/);

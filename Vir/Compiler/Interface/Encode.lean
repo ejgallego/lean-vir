@@ -111,6 +111,14 @@ private partial def nativeMetadataFields (type : InterfaceType) : Array (String 
         ("declaration", jsonName name),
         ("constructors", jsonArray #[structureConstructorJson descriptor])
       ]
+  | .libraryAdapter name _ descriptor => #[
+      ("declaration", jsonName name),
+      ("adapter", jsonObject #[
+        ("wire", descriptorRefJson descriptor.wire),
+        ("decode", jsonString (Vir.nameKey descriptor.decode)),
+        ("encode", jsonString (Vir.nameKey descriptor.encode))
+      ])
+    ]
   | .resource name _ => #[("declaration", jsonName name)]
   | .function args result effect =>
       let signature := jsonObject #[
@@ -270,6 +278,10 @@ private partial def valueInterfaceJson (type : InterfaceType) : String :=
   | .structure _ _ descriptor => jsonObject #[
       ("tag", jsonString "record"),
       ("fields", jsonArray (inheritedRecordFieldsJson descriptor.fields))
+    ]
+  | .libraryAdapter _ _ descriptor => jsonObject #[
+      ("tag", jsonString "adapted"),
+      ("wire", valueInterfaceJson descriptor.wire)
     ]
   | .resource .. => jsonObject #[("tag", jsonString "jsReference")]
   | .function args result _ =>

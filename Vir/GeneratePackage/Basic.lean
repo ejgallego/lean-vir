@@ -180,9 +180,9 @@ structure PackageMetadata where
 structure InterfaceManifest where
   metadata : PackageMetadata
   exports : Array InterfaceExport := #[]
-  /-- Required compiler operations share the consuming boxed call ABI, but are
+  /-- Required constructor and library codec operations share the consuming boxed call ABI, but are
   not application exports or startup entries. -/
-  constructorOperations : Array InterfaceExport := #[]
+  codecOperations : Array InterfaceExport := #[]
   hostImports : Array HostImport := #[]
   diagnostics : Array PackageDiagnostic := #[]
 

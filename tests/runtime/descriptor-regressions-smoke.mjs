@@ -36,8 +36,8 @@ public section
     const call = (name, ...values) => runtime.call(`DescriptorRegressions.${name}`, ...values);
     let callback;
     try {
-      assert.equal(runtime.interfaceManifest.constructorOperations.length, 3);
-      for (const entry of runtime.interfaceManifest.constructorOperations)
+      assert.equal(runtime.interfaceManifest.codecOperations.length, 3);
+      for (const entry of runtime.interfaceManifest.codecOperations)
         assert.equal(runtime.findManifestEntry(entry.entry), null);
       const anonymous = { kind: "anonymous" };
       const stringName = { kind: "str", fields: { pre: { kind: "str", fields: { pre: anonymous, str: "" } }, str: "λ🦀" } };
@@ -45,7 +45,7 @@ public section
       const identityRuntime = await createVirRuntimeFactory({ wasmBytes: await readFile(new URL(`../../web/public/${profile}`, import.meta.url)) }).createRuntime({ irPackageSet: [identityBytes] });
       try {
         assert.equal(identityRuntime.interfaceManifest.exports.length, 1);
-        assert.equal(identityRuntime.interfaceManifest.constructorOperations.length, 2);
+        assert.equal(identityRuntime.interfaceManifest.codecOperations.length, 2);
         assert.deepEqual(identityRuntime.call("identityNameOnly", numberName), numberName,
           "a signature-only constructor dependency must retain its executable operation");
       } finally { identityRuntime.dispose(); }

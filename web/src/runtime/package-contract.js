@@ -21,7 +21,7 @@ export function encodePackageContract(manifest) {
     writer.u32(bytes.length);
     for (const byte of bytes) writer.u8(byte);
   };
-  const calls = [...manifest.exports, ...(manifest.constructorOperations ?? [])];
+  const calls = [...manifest.exports, ...(manifest.codecOperations ?? [])];
   writer.u32(calls.length);
   for (const entry of calls) {
     string(entry.nameKey);

@@ -89,6 +89,7 @@ inductive InterfaceType where
   | customInductive (name : Name) (label : String)
       (constructors : Array InductiveConstructor)
   | structure (name : Name) (label : String) (descriptor : StructureDescriptor)
+  | libraryAdapter (name : Name) (label : String) (descriptor : LibraryAdapterDescriptor)
   | resource (name : Name) (label : String)
   | function (args : Array InterfaceArg) (result : InterfaceType) (effect : InterfaceEffect)
   | expr
@@ -135,20 +136,39 @@ structure InterfaceArg where
   type : InterfaceType
   deriving BEq, Repr
 
+/-- An explicit library construction rule over a closed generated wire domain.
+The target stays opaque; helpers own its invariant and physical representation. -/
+structure LibraryAdapterDescriptor where
+  wire : InterfaceType
+  decode : Name
+  encode : Name
+  outcome : InterfaceType
+  deriving BEq, Repr
+
 end
 
-/-- Required closed constructor operations, deduplicated by declaration identity.
+/-- A required private consuming call used by a bound codec. -/
+structure CodecOperation where
+  name : Name
+  args : Array InterfaceType
+  result : InterfaceType
+
+/-- Required closed codec operations, deduplicated by declaration identity.
 Recursive references already name an enclosing description and need no traversal. -/
-partial def InterfaceType.constructorOperations : InterfaceType → Array (Name × Nat)
-  | .array element => element.constructorOperations
+partial def InterfaceType.codecOperations : InterfaceType → Array CodecOperation
+  | .array element => element.codecOperations
   | .customInductive _ _ constructors => constructors.flatMap fun ctor =>
-      (ctor.operation?.toArray.map (·, ctor.fields.size)) ++
-      ctor.fields.flatMap (·.type.constructorOperations)
+      (ctor.operation?.toArray.map fun name => { name, args := Array.replicate ctor.fields.size .leanObject, result := .leanObject }) ++
+      ctor.fields.flatMap (·.type.codecOperations)
   | .structure _ _ descriptor =>
-      (descriptor.operation?.toArray.map (·, descriptor.fields.size)) ++
-      descriptor.fields.flatMap (·.type.constructorOperations)
+      (descriptor.operation?.toArray.map fun name => { name, args := Array.replicate descriptor.fields.size .leanObject, result := .leanObject }) ++
+      descriptor.fields.flatMap (·.type.codecOperations)
   | .function args result _ =>
-      args.flatMap (·.type.constructorOperations) ++ result.constructorOperations
+      args.flatMap (·.type.codecOperations) ++ result.codecOperations
+  | .libraryAdapter _ _ descriptor => #[
+      { name := descriptor.decode, args := #[.leanObject], result := descriptor.outcome },
+      { name := descriptor.encode, args := #[.leanObject], result := .leanObject }
+    ] ++ descriptor.wire.codecOperations
   | _ => #[]
 
 def InterfaceType.label : InterfaceType → String
@@ -170,6 +190,7 @@ def InterfaceType.label : InterfaceType → String
   | .recursiveRef _ label _ => label
   | .customInductive _ label _ => label
   | .structure _ label .. => label
+  | .libraryAdapter _ label .. => label
   | .resource _ label => label
   | .function .. => "Function"
   | .expr => "Lean.Expr"

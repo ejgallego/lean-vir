@@ -77,7 +77,7 @@ private def collectInterfaceClosure (targets : Array Target) (index : DeclIndex)
     let closure := collectClosure targets index roots
     let (imports, diagnostics) ← collectHostImports index closure
     let manifest ← collectInterfaceManifest (collectPackageMetadata targets index) targets index imports diagnostics
-    let required := manifest.constructorOperations.map (·.entry)
+    let required := manifest.codecOperations.map (·.entry)
     if required.all roots.contains then return (closure, manifest)
     roots := required.foldl (fun roots name => if roots.contains name then roots else roots.push name) roots
 
@@ -86,7 +86,7 @@ returns its input and its IR never constructs the type itself. -/
 unsafe def resolveInterfaceModuleClosure (targets : Array Target) (index : DeclIndex) : IO DeclIndex := do
   let index ← resolveImportedModuleClosure targets index
   let (_, manifest) ← collectInterfaceClosure targets index
-  resolveImportedModuleClosure targets index (manifest.constructorOperations.map (·.entry))
+  resolveImportedModuleClosure targets index (manifest.codecOperations.map (·.entry))
 
 private unsafe def loadRunDeclIndex (targets : Array Target)
     (importArts : NameMap ImportArtifacts) : IO DeclIndex := do

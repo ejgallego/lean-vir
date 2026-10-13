@@ -13,6 +13,8 @@ function supported(native, view, result, owners) {
   if (native.ref !== undefined) return native.ref < owners.length;
   if (native.type.tag !== "leanObject") return true;
   if (view.tag === "function") return result;
+  if (view.tag === "adapted") return supported(native.metadata.adapter.wire, view.wire, false, []) &&
+    supported(native.metadata.adapter.wire, view.wire, true, []);
   if (["unit", "boolean", "enum", "expr", "leanReference"].includes(view.tag)) return true;
   const constructors = native.metadata?.constructors, scope = [native, ...owners];
   if (view.tag === "sequence") {

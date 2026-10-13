@@ -76,6 +76,7 @@ public inductive InterfaceClassifierError where
   | constructorImplicitFields (constructor : Lean.Name)
   | constructorLayoutUnavailable (constructor : Lean.Name)
   | constructorOperationUnsupported (constructor : Lean.Name) (reason : String)
+  | libraryAdapterUnsupported (type : Lean.Expr) (reason : String)
   | constructorLayoutFieldCountMismatch (constructor : Lean.Name)
       (expected actual : Nat)
   | constructorFieldErasedRuntimeLayout (field : String) (constructor : Lean.Name)
@@ -136,6 +137,8 @@ public def InterfaceClassifierError.toMessageData : InterfaceClassifierError →
       m!"could not compute runtime layout for constructor `{constructor}`"
   | .constructorOperationUnsupported constructor reason =>
       m!"unsupported constructor operation for `{constructor}`: {reason}"
+  | .libraryAdapterUnsupported type reason =>
+      m!"unsupported library adapter for {quotedExpr type}: {reason}"
   | .constructorLayoutFieldCountMismatch constructor _ _ =>
       m!"runtime layout for constructor `{constructor}` does not match its field count"
   | .constructorFieldErasedRuntimeLayout field constructor =>

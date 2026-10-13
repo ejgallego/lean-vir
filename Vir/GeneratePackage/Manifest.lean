@@ -73,13 +73,13 @@ def collectInterfaceManifest
   let signatures := manifest.exports.map (fun entry => (entry.args, entry.result)) ++
     hostImports.map (fun entry => (entry.args, entry.result))
   for (args, result) in signatures do
-    let operations := args.flatMap (·.type.constructorOperations) ++ result.constructorOperations
-    for (operation, arity) in operations do
-      if !manifest.constructorOperations.any (·.entry == operation) then
-        manifest := { manifest with constructorOperations := manifest.constructorOperations.push {
-          entry := operation, source := "compiler constructor operation",
-          args := (Array.range arity).map fun i => { name := s!"field{i}", type := .leanObject },
-          result := .leanObject } }
+    let operations := args.flatMap (·.type.codecOperations) ++ result.codecOperations
+    for operation in operations do
+      if !manifest.codecOperations.any (·.entry == operation.name) then
+        manifest := { manifest with codecOperations := manifest.codecOperations.push {
+          entry := operation.name, source := "compiler codec operation",
+          args := operation.args.mapIdx fun i type => { name := s!"argument{i}", type },
+          result := operation.result } }
   return manifest
 
 end Vir.GeneratePackage

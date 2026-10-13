@@ -116,7 +116,7 @@ def PackageMetadata.toJson (metadata : PackageMetadata) : String :=
 def InterfaceManifest.toJson (manifest : InterfaceManifest) : String :=
   let encode : StateM BoundaryTable (Array String × Array String × Array String) := do
     let exports ← manifest.exports.mapM exportJson
-    let operations ← manifest.constructorOperations.mapM exportJson
+    let operations ← manifest.codecOperations.mapM exportJson
     let hostImports ← manifest.hostImports.mapM hostImportJson
     return (exports, hostImports, operations)
   let ((exports, hostImports, operations), table) := encode.run {}
@@ -126,7 +126,7 @@ def InterfaceManifest.toJson (manifest : InterfaceManifest) : String :=
     ("metadata", manifest.metadata.toJson),
     ("interfaces", jsonArray table.pairs),
     ("exports", jsonArray exports),
-    ("constructorOperations", jsonArray operations),
+    ("codecOperations", jsonArray operations),
     ("hostImports", jsonArray hostImports),
     ("diagnostics", jsonArray (manifest.diagnostics.map PackageDiagnostic.toJson))
   ]

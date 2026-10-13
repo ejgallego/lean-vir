@@ -46,7 +46,7 @@ function computedWire() {
     tag: "record", fields: [{ key: "value", path: [0], value: nat.value }],
   });
   const manifest = wire([pair, { native: nativeDescriptor("leanObject"), value: { tag: "leanReference" } }]);
-  manifest.constructorOperations = [{ entry: "Cached.mk", nameKey: "s436163686564/s6d6b/",
+  manifest.codecOperations = [{ entry: "Cached.mk", nameKey: "s436163686564/s6d6b/",
     args: [{ name: "value", type: 1 }], result: 1, effect: "pure", startup: false }];
   return manifest;
 }
@@ -54,22 +54,22 @@ function computedWire() {
 test("construction operations resolve privately against admitted boxed helper contracts", () => {
   const admitted = validateInterfaceManifest(computedWire());
   assert.equal(admitted.exports.length, 1);
-  assert.equal(admitted.constructorOperations.length, 1);
-  assert.equal(admitted.constructorOperations[0].args[0].type.value.tag, "leanReference");
+  assert.equal(admitted.codecOperations.length, 1);
+  assert.equal(admitted.codecOperations[0].args[0].type.value.tag, "leanReference");
   const again = validateInterfaceManifest(encodeInterfaceManifest(admitted));
   assert.deepEqual(again, admitted);
 });
 
 test("required operations cannot be omitted, mismatched, effectful or exposed as ordinary exports", () => {
   for (const mutate of [
-    m => { delete m.constructorOperations; },
-    m => { m.constructorOperations[0].args = []; },
-    m => { m.constructorOperations[0].effect = "io"; },
-    m => { m.constructorOperations[0].result = 0; },
-    m => { m.exports.push(m.constructorOperations[0]); },
+    m => { delete m.codecOperations; },
+    m => { m.codecOperations[0].args = []; },
+    m => { m.codecOperations[0].effect = "io"; },
+    m => { m.codecOperations[0].result = 0; },
+    m => { m.exports.push(m.codecOperations[0]); },
   ]) {
     const input = computedWire(); mutate(input);
-    assert.throws(() => validateInterfaceManifest(input), /constructor operation|constructor operations/i);
+    assert.throws(() => validateInterfaceManifest(input), /constructor operation|codec operations/i);
   }
 });
 

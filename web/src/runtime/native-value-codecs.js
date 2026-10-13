@@ -8,7 +8,6 @@ import { compileConstructorValueInterface } from "./constructor-value-interface.
 import { compilePrimitiveValueCodec } from "./primitive-values.js";
 import { objectArgumentSupported, objectResultSupported } from "./object-abi.js";
 import { normalizeBoundedUnsignedBigInt } from "./primitive-value-normalizers.js";
-import { boundaryInterfaceShape } from "./value-interfaces.js";
 
 // Precondition: immutable admitted compiler facts and a supported selected view.
 // Bind those facts to the selected JS representation.
@@ -26,46 +25,21 @@ export function compileNativeValueCodec(runtime, pair, { representation = "nativ
   return compileValueCodec(runtime, pair.native, pair.value, [], jsonSafe);
 }
 
-// Local prototype seam, not a manifest-selected or public call API. Both helper
-// entries must already belong to this runtime's admitted package. A producer
-// still needs to retain and describe the closed typed helpers before adoption.
-// decode: wire -> Except String opaque; encode: opaque -> wire, both pure.
-export function compileLibraryValueAdapter(runtime, { decode, encode }, options = {}) {
+// Internal helper protocol. The generated wire codec handles values directly;
+// typed Lean helpers receive/return owned opaque objects through the same bridge.
+// Registration validates source/wire types; admission validates these call facts.
+export function compileLibraryValueAdapter(runtime, { decode, encode }, wireCodec) {
   runtime.requireLiveRuntime();
   const decodeCache = runtime.callCacheFor(decode);
   const encodeCache = runtime.callCacheFor(encode);
-  const constructors = decode.result.native.metadata?.constructors;
-  const errorType = constructors?.[0]?.fields[0]?.type;
-  const opaqueType = constructors?.[1]?.fields[0]?.type;
-  // These are helper protocol/capability checks, not descriptor admission.
-  if (decode.effect !== "pure" || encode.effect !== "pure" ||
-      decode.args.length !== 1 || encode.args.length !== 1 ||
-      decode.result.native.metadata?.declaration !== "Except" ||
-      constructors?.length !== 2 || constructors[0].name !== "Except.error" ||
-      constructors[1].name !== "Except.ok" ||
-      errorType?.type?.tag !== "string" ||
-      opaqueType?.type?.tag !== "leanObject" || opaqueType.metadata !== undefined ||
-      encode.args[0].type.value.tag !== "leanReference")
-    throw new Error("library adapter requires pure wire -> Except String opaque and opaque -> wire helpers");
-  for (const ctor of constructors) {
-    if (ctor.representation !== "object" || ctor.fields.length !== 1 ||
-        ctor.fields[0].location.tag !== "object" || ctor.fields[0].location.index !== 0)
-      throw new Error("library adapter requires object-backed Except payloads");
-  }
-  if (JSON.stringify(boundaryInterfaceShape(decode.args[0].type)) !==
-      JSON.stringify(boundaryInterfaceShape(encode.result)) ||
-      JSON.stringify(boundaryInterfaceShape({ native: opaqueType, value: encode.args[0].type.value })) !==
-      JSON.stringify(boundaryInterfaceShape(encode.args[0].type)))
-    throw new Error("library adapter helper domains disagree");
-  const input = runtime.nativeValueCodec(decode.args[0].type, options);
-  const output = runtime.nativeValueCodec(encode.result, options);
+  // Precondition: helper protocols and wire facts have been admitted.
 
   return Object.freeze({
     lower(value, label, scratch) {
       runtime.requireLiveRuntime();
       const owned = [];
       try {
-        owned.push(input.lower(value, label, scratch));
+        owned.push(wireCodec.lower(value, label, scratch));
         return runtime.callResolvedObjects(decode, decodeCache, owned, result => {
           const tag = runtime.exports.vir_obj_tag(result);
           if (tag !== 0 && tag !== 1)
@@ -88,7 +62,7 @@ export function compileLibraryValueAdapter(runtime, { decode, encode }, options 
         runtime.exports.vir_obj_inc(obj);
         owned.push(obj);
         return runtime.callResolvedObjects(encode, encodeCache, owned,
-          result => output.lift(result, label));
+          result => wireCodec.lift(result, label));
       } finally { runtime.releaseOwnedObjects(owned); }
     },
   });
@@ -99,9 +73,6 @@ export function compileLibraryValueAdapter(runtime, { decode, encode }, options 
 export function compileLibraryConstructor(runtime, entry) {
   runtime.requireLiveRuntime();
   const cache = runtime.callCacheFor(entry);
-  if (entry.effect !== "pure" || entry.result.native.type.tag !== "leanObject" ||
-      entry.result.native.metadata !== undefined || entry.result.value.tag !== "leanReference")
-    throw new Error("constructor operation requires a pure opaque-result helper");
   return (owned, label) => {
     runtime.requireLiveRuntime();
     if (owned.length !== entry.args.length)
@@ -118,7 +89,7 @@ function constructorOperation(runtime, ctor) {
   runtime.nativeConstructorOperations ??= new WeakMap();
   let operation = runtime.nativeConstructorOperations.get(ctor);
   if (operation === undefined) {
-    const entry = runtime.interfaceManifest?.constructorOperations?.find(entry => entry.nameKey === ctor.operation);
+    const entry = runtime.interfaceManifest?.codecOperations?.find(entry => entry.nameKey === ctor.operation);
     if (entry === undefined) throw new Error(`${ctor.name} requires its constructor operation`);
     operation = compileLibraryConstructor(runtime, entry);
     runtime.nativeConstructorOperations.set(ctor, operation);
@@ -133,6 +104,7 @@ function requireJsonSafeDomain(native, view, label) {
     if (["jsReference", "leanReference", "function", "expr"].includes(value.tag))
       throw new Error(`${path}: ${value.tag} is unsupported by json-safe-v1`);
     if (value.element) valueDomain(value.element, `${path}[]`);
+    if (value.wire) valueDomain(value.wire, `${path}.wire`);
     for (const entry of value.fields ?? []) valueDomain(entry.value, `${path}.${entry.key}`);
     for (const entry of value.cases ?? []) {
       if (typeof entry === "string") continue;
@@ -145,6 +117,7 @@ function requireJsonSafeDomain(native, view, label) {
     if (["float", "resource"].includes(type.type.tag))
       throw new Error(`${path}: ${type.type.tag} is unsupported by json-safe-v1`);
     if (type.metadata?.arrayElement) nativeDomain(type.metadata.arrayElement, `${path}[]`);
+    if (type.metadata?.adapter) nativeDomain(type.metadata.adapter.wire, `${path}.wire`);
     for (const ctor of type.metadata?.constructors ?? [])
       for (const field of ctor.fields) nativeDomain(field.type, `${path}.${ctor.name}.${field.name}`);
   }
@@ -164,6 +137,16 @@ function compileValueCodec(runtime, native, view, bindings = [], jsonSafe = fals
     compileValueCodec(runtime, type, value, scope, jsonSafe);
   switch (type.tag) {
     case "leanObject": {
+      if (view.tag === "adapted") {
+        const adapter = native.metadata.adapter;
+        const entries = runtime.interfaceManifest?.codecOperations ?? [];
+        const decode = entries.find(entry => entry.nameKey === adapter.decode);
+        const encode = entries.find(entry => entry.nameKey === adapter.encode);
+        if (decode === undefined || encode === undefined)
+          throw new Error("library adapter requires its decode/encode operations");
+        const wire = compile(adapter.wire, view.wire, []);
+        return compileLibraryValueAdapter(runtime, { decode, encode }, wire);
+      }
       if (view.tag === "expr") {
         codec.lower = (value, label) => runtime.makeObjectExpr(value, label);
         codec.lift = (obj, label) => runtime.liftObjectExpr(obj, label);
