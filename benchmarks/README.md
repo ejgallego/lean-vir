@@ -16,3 +16,9 @@ build helpers remain under `scripts/`, while shared package models live under
 The focused [native codec comparison](NATIVE_CODECS.md) keeps public-call timing,
 fresh-runtime observations, and directional conversion cases separate. It consumes
 frozen SDKs and packages; preparing packages is an explicit command.
+
+The [public PrettyM A/A screen](../docs/development/PERFORMANCE.md#one-client-operation-public-prettym-calls)
+consumes an existing client site, adapter and native corpus. It measures the
+ordinary browser call with conversions and exact native-result checks, using
+the existing browser sampler; it neither prepares a runtime nor treats
+unchanged-artifact variability as speed.
