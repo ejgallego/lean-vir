@@ -14,6 +14,7 @@ import { build } from "esbuild";
 import { prepareVirIrpkgSync } from "../../scripts/packages/irpkg-generator.mjs";
 import { describeError, withCleanup } from "./rpc-test-support.js";
 import { runRpcBrowserAcceptance } from "./rpc-browser-harness.mjs";
+import { checkJsonValueCodec } from "./json-value-codec.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const temp = await mkdtemp(join(tmpdir(), "vir-rpc-browser-"));
@@ -22,7 +23,7 @@ await withCleanup(async () => {
   const packagePath = join(temp, "rpc.irpkg");
   const generator = prepareVirIrpkgSync({
     lakeTargets: ["VirInfoview"],
-    modules: ["tutorials.RpcReferenceWidget"],
+    modules: ["tutorials.RpcReferenceWidget", "JsonValueCodec", "Vir.Infoview.JsonRpc.Server"],
   });
   assert.equal(
     generator.ok,
@@ -45,6 +46,9 @@ await withCleanup(async () => {
         "View",
         "render",
       ].map((n) => `RpcReferenceWidget.${n}`),
+      "--target-module", "JsonValueCodec",
+      ...["copy", "sampleWire", "nestedWire", "roundtripFoo", "integerWire", "leanHandle", "call",
+        "resultSummary"].map((n) => `JsonValueCodec.${n}`),
     ],
     { cwd: root, env: generator.env, encoding: "utf8", timeout: 120000 },
   );
@@ -63,13 +67,15 @@ await withCleanup(async () => {
       define: { "process.env.NODE_ENV": '"development"' },
     }),
   ]);
-  return runRpcBrowserAcceptance({
+  const codec = await checkJsonValueCodec(wasm, irPackage);
+  const browser = await runRpcBrowserAcceptance({
     assets: new Map([
       ["/probe.js", ["text/javascript", bundle.outputFiles[0].contents]],
       ["/runtime.wasm", ["application/wasm", wasm]],
       ["/rpc.irpkg", ["application/octet-stream", irPackage]],
     ]),
   });
+  return { ...browser, codec };
 }, [["temporary files", () => rm(temp, { recursive: true, force: true })]])
   .then((result) => {
     console.log("real infoview RPC browser acceptance ok", result);
