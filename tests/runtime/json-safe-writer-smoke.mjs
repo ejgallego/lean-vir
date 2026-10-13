@@ -1,0 +1,68 @@
+/*
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+*/
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { generateIrPackage } from "./shared.mjs";
+
+const directory = await mkdtemp(join(tmpdir(), "vir-json-safe-writer-"));
+try {
+  const path = join(directory, "writer.irpkg");
+  await generateIrPackage("JsonSafeWriterValues", new URL("../../fixtures/runtime/JsonSafeWriterValues.lean", import.meta.url), path, "marked");
+  const bytes = await readFile(path);
+  const expected = {
+    text: "λ\n🦀\"\\", natural: "900719925474099312345",
+    integer: "-12345678901234567890123456789000", unsigned: "18446744073709551615",
+    bytes: [0, 127, 255], unit: null, hidden: { value: "42" }, foo_bar: "preserved",
+    tree: { kind: "branch", value: [{ kind: "none" },
+      { kind: "some", value: { kind: "leaf", value: "900719925474099312345" } },
+      { kind: "some", value: { kind: "branch", value: [] } }] },
+    store: [{ fst: "1", snd: "α" }, { fst: "900719925474099312345", snd: "last" }],
+  };
+  for (const wasm of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
+    for (const representation of ["native", "json-safe-v1"]) {
+      const runtime = await createVirRuntimeFactory({ wasmBytes: await readFile(new URL(`../../web/public/${wasm}`, import.meta.url)) }).createRuntime({ irPackageSet: [bytes] });
+      try {
+        if (representation !== "native") {
+          const bind = runtime.nativeValueCodec;
+          runtime.nativeValueCodec = function (pair) { return bind.call(this, pair, { representation }); };
+        }
+        const call = (name, ...args) => runtime.call(`JsonSafeWriterValues.${name}`, ...args);
+        assert.equal(runtime.interfaceManifest.exports.length, 3);
+        assert.equal(runtime.interfaceManifest.codecOperations.length, 2);
+        assert.ok(runtime.interfaceManifest.exports.every(entry => !entry.entry.includes("_codec")));
+        for (const entry of runtime.interfaceManifest.codecOperations)
+          assert.equal(runtime.findManifestEntry(entry.entry), null);
+        const text = call("fixtureText");
+        assert.deepEqual(JSON.parse(text), expected);
+        assert.equal(JSON.parse(JSON.stringify({ jsonrpc: "2.0", id: 1, result: text })).result, text);
+        const input = structuredClone(expected);
+        if (representation === "native") {
+          for (const key of ["natural", "integer", "unsigned"]) input[key] = BigInt(input[key]);
+          input.hidden.value = 42n;
+          input.tree.value[1].value.value = 900719925474099312345n;
+          input.store = input.store.map(entry => ({ ...entry, fst: BigInt(entry.fst) }));
+          input.unit = undefined;
+          input.bytes = new Uint8Array(input.bytes);
+        }
+        assert.equal(call("agrees", input), true);
+        assert.deepEqual(JSON.parse(call("write", input)), expected);
+        const changed = structuredClone(input);
+        changed.foo_bar = "different";
+        assert.equal(call("agrees", changed), false);
+        assert.equal(JSON.parse(call("write", changed)).foo_bar, "different");
+        const invalid = structuredClone(input);
+        invalid.natural = "not-a-number";
+        assert.throws(() => call("write", invalid));
+        assert.equal(call("agrees", input), true);
+        assert.equal(runtime.exports.vir_resource_roots_active(), 0);
+        assert.equal(runtime.hostState.leanObjectHandleCells.size, 0);
+      } finally { runtime.dispose(); }
+    }
+  }
+} finally { await rm(directory, { recursive: true, force: true }); }
+console.log("generated typed JSON-safe writers, private constructors and recursive/adapted values: both-profile PASS");
