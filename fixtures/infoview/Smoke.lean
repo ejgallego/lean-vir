@@ -47,12 +47,12 @@ def expectAuthoringPackage (package : Lean.Vir.Infoview.IRPackage) : IO Unit := 
     package.entry == "ReactTamagotchiWidget.createComponent"
 
 def smokeVar : Lean.IR.VarId :=
-  { idx := 0 }
+  { idx := 1 }
 
 def smokeDecl (value : String) : Lean.IR.Decl :=
   .fdecl `SmokeInfoviewLean.helper #[] .object
     (.vdecl smokeVar .object (.lit (.str value)) (.ret (.var smokeVar)))
-    {}
+    { maxJp := 0, maxVar := 1 }
 
 def smokeHostDecl (marker : Vir.HostMetadata.HostImportMarker) : Lean.IR.Decl :=
   .extern `SmokeInfoviewLean.host #[] .object {
@@ -269,6 +269,14 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
   expect "IR decl hash tracks body literals" <|
     Lean.Vir.Infoview.irDeclHash (smokeDecl "before") !=
       Lean.Vir.Infoview.irDeclHash (smokeDecl "after")
+  let baseline := smokeDecl "before"
+  let .fdecl name params resultType body _ := baseline
+    | throw <| IO.userError "missing frame-bound control declaration"
+  for info in #[({ maxJp := 1, maxVar := 1 } : Lean.IR.DeclInfo),
+      { maxJp := 0, maxVar := 2 }] do
+    expect "IR decl hash tracks frame bounds" <|
+      Lean.Vir.Infoview.irDeclHash baseline !=
+        Lean.Vir.Infoview.irDeclHash (.fdecl name params resultType body info)
   expect "IR decl hash tracks host import markers" <|
     Lean.Vir.Infoview.irDeclHash (smokeHostDecl .hostImport) !=
       Lean.Vir.Infoview.irDeclHash (smokeHostDecl .explicitConversion)
