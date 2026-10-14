@@ -231,7 +231,7 @@ invoke(
   descriptorPath,
   payloadRoot,
   output,
-  /NONCANONICAL_DESCRIPTOR/,
+  /DESCRIPTOR_JSON/,
 );
 writeDescriptor(descriptorBytes);
 altered({

@@ -176,6 +176,8 @@ private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
         let mut fields : Array InductiveField := #[]
         for h : idx in *...fieldExprs.size do
           let (fieldName, fieldExpr) := fieldExprs[idx]
+          if let .spilled .. := layout.fieldInfo[idx]! then
+            throwThe InterfaceClassifierError (.spilledRuntimeLayout fieldName ctorName)
           let some fieldLayout := fieldLayout? layout.fieldInfo[idx]!
             | throwThe InterfaceClassifierError (.constructorFieldErasedRuntimeLayout fieldName ctorName)
           let fieldType ← withContext (.constructorField fieldName ctorName fieldExpr)
@@ -224,6 +226,8 @@ private partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
       for h : idx in *...structInfo.fieldNames.size do
         let fieldName := structInfo.fieldNames[idx]
         let isSubobject := (isSubobjectField? env name fieldName).isSome
+        if let .spilled .. := layout.fieldInfo[idx]! then
+          throwThe InterfaceClassifierError (.spilledRuntimeLayout fieldName.toString ctorName)
         let some fieldLayout := fieldLayout? layout.fieldInfo[idx]!
           | throwThe InterfaceClassifierError (.structureFieldErasedRuntimeLayout fieldName name)
         let some projName := structInfo.getProjFn? idx

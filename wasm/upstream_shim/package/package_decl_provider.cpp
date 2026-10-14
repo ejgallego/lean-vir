@@ -10,6 +10,7 @@ Author: Emilio J. Gallego Arias
 #include "package_binary_reader.h"
 #include "package_decl_provider_types.h"
 #include "runtime/name_identity.h"
+#include "runtime/name_utils.h"
 #include "runtime/io_error.h"
 #include "runtime/native_symbol_lookup.h"
 
@@ -66,7 +67,7 @@ static package_state g_package;
 
 static std::string lean_name_string(object * value) {
     name n(value, true);
-    return n.to_string();
+    return lean::name_to_string(n);
 }
 
 static bool build_decl_indices() {
@@ -294,8 +295,8 @@ static bool run_init_global(init_global_entry const & entry) {
     name init_name(entry.init_name, true);
     std::string detail = io_result_error_message(result);
     g_package.last_error =
-        "initializer failed for `" + global_name.to_string() +
-        "` via `" + init_name.to_string() + "`";
+        "initializer failed for `" + lean::name_to_string(global_name) +
+        "` via `" + lean::name_to_string(init_name) + "`";
     if (!detail.empty()) {
         g_package.last_error += ": ";
         g_package.last_error += detail;

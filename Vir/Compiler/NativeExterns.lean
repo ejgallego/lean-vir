@@ -68,12 +68,14 @@ private def boxedExternSpecs (baseName : Name) (members : Array String) : Array 
   }
 
 private def stringCompletionExternSpecs : Array NativeExternSpec :=
+  -- String.data has no IR in this compiler; String.toList is now implemented
+  -- through csimp and ordinary IR rather than a native extern.
   boxedExternSpecs `String.Internal #[
     "any", "capitalize", "drop", "dropRight", "front", "intercalate", "nextWhile"
   ] ++ boxedExternSpecs `String.Pos.Raw.Internal #["min", "sub"] ++
   boxedExternSpecs `String.Pos.Raw #["get!", "get?"] ++
   boxedExternSpecs `String.Slice #["hash", "instDecidableLt"] ++ boxedExternSpecs `String #[
-    "atEnd", "data", "get", "get!", "get?", "mk", "next", "prev", "toByteArray", "toList"
+    "atEnd", "get", "get!", "get?", "mk", "next", "prev", "toByteArray"
   ] ++ boxedExternSpecs `Substring.Raw.Internal #[
     "all", "drop", "extract", "front", "get", "isEmpty", "prev", "takeWhile", "toString"
   ]
@@ -203,6 +205,10 @@ private def byteArrayRuntimeFrontierExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `ByteArray #["emptyWithCapacity", "decEq", "uget", "set", "data", "hash"]
 
 def nativeExternSpecs : Array NativeExternSpec := #[
+  {
+    name := `getObjTagNat,
+    generateBoxedWrapper := true
+  },
   {
     name := `Nat.add,
     generateBoxedWrapper := true
