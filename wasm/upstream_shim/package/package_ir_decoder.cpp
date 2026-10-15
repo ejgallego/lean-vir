@@ -102,7 +102,7 @@ public:
         }
         switch (static_cast<tags::arg_tag>(tag)) {
         case tags::arg_tag::Var: {
-            uint32_t var = u32();
+            uint32_t var = variable();
             return mk_arg_var(var);
         }
         case tags::arg_tag::Erased:
@@ -153,11 +153,11 @@ public:
         }
         case tags::expr_tag::Reset: {
             uint32_t n = u32();
-            uint32_t var = u32();
+            uint32_t var = variable();
             return mk_reset(n, var);
         }
         case tags::expr_tag::Reuse: {
-            uint32_t var = u32();
+            uint32_t var = variable();
             object * info = ir_ctor_info();
             bool update_header = boolean();
             object * ctor_args = mk_array(ir_args());
@@ -165,18 +165,18 @@ public:
         }
         case tags::expr_tag::Proj: {
             uint32_t idx = u32();
-            uint32_t var = u32();
+            uint32_t var = variable();
             return mk_proj(idx, var);
         }
         case tags::expr_tag::UProj: {
             uint32_t idx = u32();
-            uint32_t var = u32();
+            uint32_t var = variable();
             return mk_uproj(idx, var);
         }
         case tags::expr_tag::SProj: {
             uint32_t idx = u32();
             uint32_t offset = u32();
-            uint32_t var = u32();
+            uint32_t var = variable();
             return mk_sproj(idx, offset, var);
         }
         case tags::expr_tag::Fap: {
@@ -190,23 +190,23 @@ public:
             return mk_pap(fn, fn_args);
         }
         case tags::expr_tag::Ap: {
-            uint32_t var = u32();
+            uint32_t var = variable();
             object * fn_args = mk_array(ir_args());
             return mk_ap(var, fn_args);
         }
         case tags::expr_tag::Box: {
             type t = ir_type();
-            uint32_t var = u32();
+            uint32_t var = variable();
             return mk_box(t, var);
         }
         case tags::expr_tag::Unbox: {
-            uint32_t var = u32();
+            uint32_t var = variable();
             return mk_unbox(var);
         }
         case tags::expr_tag::Lit:
             return ir_lit_expr();
         case tags::expr_tag::IsShared: {
-            uint32_t var = u32();
+            uint32_t var = variable();
             return mk_is_shared(var);
         }
         default:
@@ -216,7 +216,7 @@ public:
     }
 
     object * ir_param() {
-        uint32_t var = u32();
+        uint32_t var = variable();
         bool borrow = boolean();
         type t = ir_type();
         return mk_param(var, t, borrow);
@@ -257,50 +257,50 @@ public:
         }
         switch (static_cast<tags::body_tag>(tag)) {
         case tags::body_tag::VDecl: {
-            uint32_t var = u32();
+            uint32_t var = variable();
             type t = ir_type();
             object * value = ir_expr();
             object * cont = ir_body();
             return mk_vdecl(var, t, value, cont);
         }
         case tags::body_tag::JDecl: {
-            uint32_t jp = u32();
+            uint32_t jp = join_point();
             object * ps = mk_array(ir_params());
             object * value = ir_body();
             object * cont = ir_body();
             return mk_jdecl(jp, ps, value, cont);
         }
         case tags::body_tag::Set: {
-            uint32_t var = u32();
+            uint32_t var = variable();
             uint32_t idx = u32();
             object * value = ir_arg();
             object * cont = ir_body();
             return mk_set(var, idx, value, cont);
         }
         case tags::body_tag::SetTag: {
-            uint32_t var = u32();
+            uint32_t var = variable();
             uint32_t cidx = u32();
             object * cont = ir_body();
             return mk_set_tag(var, cidx, cont);
         }
         case tags::body_tag::USet: {
-            uint32_t target = u32();
+            uint32_t target = variable();
             uint32_t idx = u32();
-            uint32_t source = u32();
+            uint32_t source = variable();
             object * cont = ir_body();
             return mk_uset(target, idx, source, cont);
         }
         case tags::body_tag::SSet: {
-            uint32_t target = u32();
+            uint32_t target = variable();
             uint32_t idx = u32();
             uint32_t offset = u32();
-            uint32_t source = u32();
+            uint32_t source = variable();
             type t = ir_type();
             object * cont = ir_body();
             return mk_sset(target, idx, offset, source, t, cont);
         }
         case tags::body_tag::Inc: {
-            uint32_t var = u32();
+            uint32_t var = variable();
             uint32_t amount = u32();
             bool maybe_scalar = boolean();
             bool persistent = boolean();
@@ -308,7 +308,7 @@ public:
             return mk_inc(var, amount, maybe_scalar, persistent, cont);
         }
         case tags::body_tag::Dec: {
-            uint32_t var = u32();
+            uint32_t var = variable();
             uint32_t amount = u32();
             bool maybe_scalar = boolean();
             bool persistent = boolean();
@@ -316,13 +316,13 @@ public:
             return mk_dec(var, amount, maybe_scalar, persistent, cont);
         }
         case tags::body_tag::Del: {
-            uint32_t var = u32();
+            uint32_t var = variable();
             object * cont = ir_body();
             return mk_del(var, cont);
         }
         case tags::body_tag::Case: {
             object * tid = name();
-            uint32_t var = u32();
+            uint32_t var = variable();
             type t = ir_type();
             object * case_alts = mk_array(ir_alts());
             return mk_case(tid, var, t, case_alts);
@@ -332,7 +332,7 @@ public:
             return mk_ret(value);
         }
         case tags::body_tag::Jmp: {
-            uint32_t jp = u32();
+            uint32_t jp = join_point();
             object * jmp_args = mk_array(ir_args());
             return mk_jmp(jp, jmp_args);
         }
@@ -345,13 +345,15 @@ public:
     }
 
     object * ir_decl(object * fn) {
+        max_var = 0;
+        max_jp = 0;
         uint8_t tag = u8();
         object * ps = mk_array(ir_params());
         type result_type = ir_type();
         switch (static_cast<tags::decl_tag>(tag)) {
         case tags::decl_tag::Fun: {
             object * fn_body = ir_body();
-            return mk_fun_decl(fn, ps, result_type, fn_body);
+            return mk_fun_decl(fn, ps, result_type, fn_body, max_jp, max_var);
         }
         case tags::decl_tag::Extern:
             return mk_extern_decl(fn, ps, result_type);
@@ -379,6 +381,21 @@ public:
     }
 
 private:
+    uint32_t max_var = 0;
+    uint32_t max_jp = 0;
+
+    // IR identifiers are one-based stack indices. Track every occurrence,
+    // including join-point parameters and references in alternative bodies.
+    uint32_t frame_index(uint32_t & maximum) {
+        uint32_t index = u32();
+        if (ok && index == 0) fail("IR frame index must be positive");
+        if (index > maximum) maximum = index;
+        return index;
+    }
+
+    uint32_t variable() { return frame_index(max_var); }
+    uint32_t join_point() { return frame_index(max_jp); }
+
     template <typename F>
     std::vector<object *> object_array(char const * label, size_t min_item_bytes, F read_one) {
         uint32_t count = bounded_count(label, min_item_bytes);

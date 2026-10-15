@@ -435,6 +435,10 @@ an enclosing record. These layouts are admitted, while automatic conversion of
 the packed wrapper fields remains unsupported. Supported sibling exports in the
 same package remain callable.
 
+Constructor fields stored in spill chains are rejected during interface
+generation with a specific diagnostic. The current schema describes inline
+object, usize and scalar storage only.
+
 Implemented interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
 `Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,
 recursive `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α`

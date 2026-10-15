@@ -202,7 +202,8 @@ meta partial def altHash : Alt → UInt64
 end
 
 meta def declInfoHash (info : DeclInfo) : UInt64 :=
-  hashOption (hash "DeclInfo") info.sorryDep? hash
+  mixHash (mixHash (hashOption (hash "DeclInfo") info.sorryDep? hash)
+    (hash info.maxJp)) (hash info.maxVar)
 
 private meta def hostImportMetadataHash (metadata : Vir.HostMetadata.HostImportMetadata) : UInt64 :=
   mixHash (hash metadata.marker.attributeName) (hash metadata.target)

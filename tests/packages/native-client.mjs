@@ -158,6 +158,8 @@ assert.ok(report.includes("NativeClient.greet") && report.includes("NativeClient
 // Expectations were computed from declarations before this manifest existed.
 // Check admission against the real generated root, including negative ABI cases.
 const manifest = readIrPackageInfo(readFileSync(join(evidence, "client.irpkg"))).manifest;
+assert.equal(manifest.metadata.leanToolchain, readFileSync(join(client, "lean-toolchain"), "utf8").trim());
+assert.equal(manifest.metadata.leanGithash, run(["lean", "--githash"], "compiler-revision").trim());
 assert.equal(resolveProgramExports(manifest.exports, signatures).size, 6);
 for (const [declaration, changed] of [
   ["NativeClient.multiple", { ...expectedExports["NativeClient.multiple"], args: [nat, string] }],

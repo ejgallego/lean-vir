@@ -15,14 +15,14 @@ Author: Emilio J. Gallego Arias
 static std::string g_obj_name_string_result;
 
 extern "C" lean::object * lean_level_mk_succ(lean::object *);
-extern "C" lean::object * lean_level_mk_mvar(lean::object *);
+extern "C" lean::object * l_Lean_mkLevelMVar(lean::object *);
 extern "C" lean::object * lean_level_mk_param(lean::object *);
 extern "C" lean::object * lean_level_mk_max(lean::object *, lean::object *);
 extern "C" lean::object * lean_level_mk_imax(lean::object *, lean::object *);
 
 extern "C" lean::object * lean_expr_mk_bvar(lean::object *);
 extern "C" lean::object * lean_expr_mk_fvar(lean::object *);
-extern "C" lean::object * lean_expr_mk_mvar(lean::object *);
+extern "C" lean::object * l_Lean_mkMVar(lean::object *);
 extern "C" lean::object * lean_expr_mk_sort(lean::object *);
 extern "C" lean::object * lean_expr_mk_const(lean::object *, lean::object *);
 extern "C" lean::object * lean_expr_mk_app(lean::object *, lean::object *);
@@ -106,7 +106,7 @@ extern "C" lean::object * vir_obj_level_param(char const * text, uint32_t len) {
 extern "C" lean::object * vir_obj_level_mvar(char const * text, uint32_t len) {
     lean::object * name = mk_name_from_dotted_string(text, len);
     if (name == nullptr) return nullptr;
-    return lean_level_mk_mvar(name);
+    return l_Lean_mkLevelMVar(name);
 }
 
 extern "C" lean::object * vir_obj_literal_nat(char const * text, uint32_t len) {
@@ -138,7 +138,7 @@ extern "C" lean::object * vir_obj_expr_fvar(char const * text, uint32_t len) {
 extern "C" lean::object * vir_obj_expr_mvar(char const * text, uint32_t len) {
     lean::object * name = mk_name_from_dotted_string(text, len);
     if (name == nullptr) return nullptr;
-    return lean_expr_mk_mvar(name);
+    return l_Lean_mkMVar(name);
 }
 
 extern "C" lean::object * vir_obj_expr_sort(lean::object * level) {
@@ -232,7 +232,7 @@ extern "C" char const * vir_obj_name_string(lean::object * value) {
         g_obj_name_string_result.clear();
         return nullptr;
     } else {
-        g_obj_name_string_result = lean::name(value, true).to_string();
+        g_obj_name_string_result = lean::name_to_string(lean::name(value, true));
     }
     return g_obj_name_string_result.c_str();
 }

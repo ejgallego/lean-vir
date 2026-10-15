@@ -8,6 +8,7 @@ Author: Emilio J. Gallego Arias
 
 #include <stdint.h>
 
+#include <sstream>
 #include <string>
 
 #include "runtime/utf8.h"
@@ -73,6 +74,12 @@ bool valid_identifier_component(char const * text, size_t len) {
 }
 
 } // namespace
+
+std::string name_to_string(name const & value) {
+    std::ostringstream out;
+    out << value;
+    return out.str();
+}
 
 bool is_supported_dotted_name(char const * text, size_t len) {
     if (text == nullptr) {
