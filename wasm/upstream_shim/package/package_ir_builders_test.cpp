@@ -48,8 +48,15 @@ int main() {
         lean_box(0),
         lean_alloc_array(0, 0),
         type::Object,
-        mk_unreachable());
-    bool ok = has_erased_none_field(fdecl, 4, "DeclInfo.sorryDep?");
+        mk_unreachable(), 3, 7);
+    lean::object * info = lean_ctor_get(fdecl, 4);
+    bool ok = !lean_is_scalar(info) && lean_ctor_num_objs(info) == 3;
+    if (ok) {
+        ok = has_erased_none_field(info, 0, "DeclInfo.sorryDep?") &&
+            lean_unbox(lean_ctor_get(info, 1)) == 3 &&
+            lean_unbox(lean_ctor_get(info, 2)) == 7;
+    }
+    if (!ok) fputs("DeclInfo must retain sorryDep?, maxJp and maxVar in upstream field order\n", stderr);
     lean_dec(fdecl);
 
     lean::object * extern_decl = mk_extern_decl(
@@ -62,6 +69,6 @@ int main() {
     if (!ok) {
         return 1;
     }
-    puts("package IR one-field structure layout ok");
+    puts("package IR declaration/frame-bound and extern layout ok");
     return 0;
 }

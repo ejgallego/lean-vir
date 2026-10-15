@@ -18,6 +18,12 @@ npm run doctor
 `third_party/lean4-src/`. `doctor` fails for missing required commands/artifacts
 and warns when Chromium is unavailable for browser checks.
 
+Dated nightly pins use `leanprover/lean4-nightly:nightly-YYYY-MM-DD`.
+`fetch:lean` selects that distribution's source tag and verifies it against the
+installed compiler revision. Nightly SDK releases use the same dated tag and
+remain prereleases without becoming latest; an eventual rc requires a new
+matching source/runtime qualification.
+
 **After updating VIR, users must refresh their build setup and deployed assets.**
 Rerun setup for the current checkout, then `npm run build:site` when serving the
 site or producing its SDK archives. JavaScript runtime modules and both Wasm
@@ -450,13 +456,13 @@ own explicit maintainer selection.
 
 Release tags follow the pinned Lean toolchain: `4.35-rc4` for
 `leanprover/lean4:v4.35.0-rc4`, `4.35` for `v4.35.0`, and `4.35.1` for
-`v4.35.1`. Milestone numbers and the internal SDK manifest version are independent
+`v4.35.1`. Dated nightly pins select `nightly-YYYY-MM-DD`. Milestone numbers and the internal SDK manifest version are independent
 of these tags. `node scripts/release-tag.mjs` prints the current release tag.
 
-Numeric tags trigger [release-sdk.yml](../.github/workflows/release-sdk.yml),
+Numeric and dated nightly tags trigger [release-sdk.yml](../.github/workflows/release-sdk.yml),
 which rejects tags that do not match `lean-toolchain`, checks ABI versions,
 builds/imports the SDK and uploads the archive plus a content-named runtime pack.
-RC tags produce prereleases; content-addressed `resource-…` releases remain
+RC and nightly tags produce non-latest prereleases; content-addressed `resource-…` releases remain
 separate. Runtime pack
 publication uploads absent assets, verifies and reuses byte-identical assets on
 reruns, and rejects different bytes without replacing them. The SDK archive

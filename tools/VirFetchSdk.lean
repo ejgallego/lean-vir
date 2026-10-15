@@ -15,12 +15,16 @@ namespace Vir.FetchSdk
 
 def sdkVersion : String := "0.1.0"
 
-/-- Lean-aligned release names omit a zero patch component, retaining rc suffixes. -/
+/-- Lean-aligned release names omit a zero patch component. Dated nightlies use
+their upstream release name, without claiming an rc or stable version. -/
 def releaseTagForVersion (version : String) : String :=
   let parts := version.splitOn "-"
-  let core := parts.headD version
-  let core := if core.endsWith ".0" then (core.dropEnd 2).toString else core
-  String.intercalate "-" (core :: parts.tail)
+  if parts[1]? == some "nightly" then
+    String.intercalate "-" parts.tail
+  else
+    let core := parts.headD version
+    let core := if core.endsWith ".0" then (core.dropEnd 2).toString else core
+    String.intercalate "-" (core :: parts.tail)
 
 def sdkReleaseTag : String := releaseTagForVersion Lean.versionString
 

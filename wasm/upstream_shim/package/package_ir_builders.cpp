@@ -219,10 +219,12 @@ object * mk_unreachable() {
     return lean_box(12);
 }
 
-object * mk_fun_decl(object * fn, object * params, type result_type, object * body) {
-    // One-field Lean structures are erased. `DeclInfo` is represented directly
-    // by its `sorryDep?` field; packages materialize `none`.
-    object * info = lean_box(0);
+object * mk_fun_decl(object * fn, object * params, type result_type, object * body,
+                    size_t max_jp, size_t max_var) {
+    // DeclInfo now carries interpreter frame bounds as well as sorryDep?.
+    // The decoder derives bounds from the declaration's parameters and body,
+    // so packages need not transmit or trust a second copy of those facts.
+    object * info = mk_ctor(0, { lean_box(0), mk_nat(max_jp), mk_nat(max_var) });
     return mk_ctor(0, { fn, params, lean_box(static_cast<unsigned>(result_type)), body, info });
 }
 

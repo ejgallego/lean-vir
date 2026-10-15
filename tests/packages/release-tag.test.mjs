@@ -15,9 +15,10 @@ for (const [toolchain, expected] of [
   ["leanprover/lean4:v4.35.0", "4.35"],
   ["leanprover/lean4:v4.35.1", "4.35.1"],
   ["leanprover/lean4:v4.36.0-rc1", "4.36-rc1"],
+  ["leanprover/lean4-nightly:nightly-2026-10-13", "nightly-2026-10-13"],
 ]) test(`Lean release tag: ${expected}`, () => assert.equal(releaseTagFromToolchain(toolchain), expected));
 
-for (const toolchain of ["leanprover/lean4:nightly", "custom-lean", "leanprover/lean4:v4.35", "leanprover/lean4:v4.35.0-rc4-extra"])
+for (const toolchain of ["leanprover/lean4:nightly", "leanprover/lean4-nightly:nightly", "leanprover/lean4-nightly:nightly-2026-10-13-extra", "custom-lean", "leanprover/lean4:v4.35", "leanprover/lean4:v4.35.0-rc4-extra"])
   test(`unsupported release toolchain: ${toolchain}`, () => assert.throws(() => releaseTagFromToolchain(toolchain), /unsupported release toolchain/));
 
 test("milestone and mismatched Lean tags cannot publish", () => {
@@ -37,7 +38,7 @@ test("workflow command checks the pinned toolchain from outside the checkout", a
   assert.match(wrong.stderr, /does not match lean-toolchain/);
 });
 
-for (const [tag, exists] of [["4.35-rc4", false], ["4.35", false], ["4.35-rc4", true]]) {
+for (const [tag, exists] of [["4.35-rc4", false], ["4.35", false], ["nightly-2026-10-13", false], ["4.35-rc4", true]]) {
   test(`publishing metadata: ${tag}, existing=${exists}`, async () => {
     const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
     const { tmpdir } = await import("node:os");
@@ -69,8 +70,8 @@ for (const [tag, exists] of [["4.35-rc4", false], ["4.35", false], ["4.35-rc4", 
       if (exists) assert.equal(creation, undefined, "existing release is reused");
       else {
         assert.equal(creation.args[2], tag);
-        assert.equal(creation.args.includes("--prerelease"), tag.includes("-rc"));
-        assert.equal(creation.args.includes("--latest=false"), tag.includes("-rc"));
+        assert.equal(creation.args.includes("--prerelease"), (tag.includes("-rc") || tag.startsWith("nightly-")));
+        assert.equal(creation.args.includes("--latest=false"), (tag.includes("-rc") || tag.startsWith("nightly-")));
         assert.ok(creation.args.includes("--verify-tag"));
       }
       assert.ok(commands.some(item => item.command === "node" &&

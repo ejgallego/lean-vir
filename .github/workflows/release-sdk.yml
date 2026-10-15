@@ -7,6 +7,7 @@ on:
   push:
     tags:
       - "[0-9]*"
+      - "nightly-*"
 
 permissions:
   contents: write
@@ -52,7 +53,7 @@ jobs:
         run: |
           if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             release_args=(--verify-tag --generate-notes)
-            if [[ "$GITHUB_REF_NAME" == *-rc* ]]; then
+            if [[ "$GITHUB_REF_NAME" == *-rc* || "$GITHUB_REF_NAME" == nightly-* ]]; then
               release_args+=(--prerelease --latest=false)
             fi
             gh release create "$GITHUB_REF_NAME" "${release_args[@]}"

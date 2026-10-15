@@ -30,7 +30,9 @@ def collectPackageMetadata (targets : Array Target) (index : DeclIndex) : Packag
     packageFormatVersion := currentPackageFormatVersion
     manifestVersion := currentInterfaceManifestVersion
     leanVersion := Lean.versionString
-    leanToolchain := Lean.toolchain
+    -- Lean.toolchain uses the stable repository even for dated nightlies.
+    leanToolchain := if Lean.version.specialDesc.startsWith "nightly-" then
+      s!"leanprover/lean4-nightly:{Lean.version.specialDesc}" else Lean.toolchain
     leanGithash := Lean.githash
     targets := targets.map (targetMetadataFor index)
   }

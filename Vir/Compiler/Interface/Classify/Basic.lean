@@ -160,7 +160,7 @@ def fieldLayout? : Lean.Compiler.LCNF.CtorFieldInfo → Option FieldLayout
   | .object index _ => some (.object index)
   | .usize index => some (.usize index)
   | .scalar size offset _ => some (.scalar size offset)
-  | .erased | .void => none
+  | .spilled .. | .erased | .void => none
 
 def binderArgName (fallback : Nat) (name : Name) : String :=
   let candidate := name.toString

@@ -22,13 +22,14 @@ private def expectUrl (args : List String) (expected : String) : IO Unit := do
 #eval do
   for (version, expected) in [
     ("4.35.0-rc4", "4.35-rc4"), ("4.35.0", "4.35"),
-    ("4.35.1", "4.35.1"), ("4.36.0-rc1", "4.36-rc1")] do
+    ("4.35.1", "4.35.1"), ("4.36.0-rc1", "4.36-rc1"),
+    ("4.36.0-nightly-2026-10-13", "nightly-2026-10-13")] do
     unless releaseTagForVersion version == expected do
       throw <| IO.userError s!"wrong release tag for {version}"
-  unless sdkReleaseTag == "4.35" do
+  unless sdkReleaseTag == "nightly-2026-10-13" do
     throw <| IO.userError s!"wrong pinned Lean SDK release: {sdkReleaseTag}"
-  expectUrl [] "https://github.com/ejgallego/lean-vir/releases/download/4.35/lean-vir-sdk.tar.gz"
-  expectUrl ["--repo", "owner/custom"] "https://github.com/owner/custom/releases/download/4.35/lean-vir-sdk.tar.gz"
+  expectUrl [] "https://github.com/ejgallego/lean-vir/releases/download/nightly-2026-10-13/lean-vir-sdk.tar.gz"
+  expectUrl ["--repo", "owner/custom"] "https://github.com/owner/custom/releases/download/nightly-2026-10-13/lean-vir-sdk.tar.gz"
   expectUrl ["--tag", "selected-release"] "https://github.com/ejgallego/lean-vir/releases/download/selected-release/lean-vir-sdk.tar.gz"
   expectUrl ["--url", "https://example.test/sdk.tar.gz"] "https://example.test/sdk.tar.gz"
   match ← select ["--archive", "/tmp/selected-sdk.tar.gz"] with
@@ -37,4 +38,4 @@ private def expectUrl (args : List String) (expected : String) : IO Unit := do
   match ← select ["--commit", "selected-commit"] with
   | .commit actual => unless actual == "selected-commit" do throw <| IO.userError "commit override changed"
   | _ => throw <| IO.userError "commit override ignored"
-  IO.println "11 SDK release-tag/source controls passed (no download)"
+  IO.println "12 SDK release-tag/source controls passed (no download)"
