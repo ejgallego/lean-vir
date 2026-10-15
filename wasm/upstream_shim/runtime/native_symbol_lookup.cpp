@@ -14,6 +14,7 @@ Author: Emilio J. Gallego Arias
 
 #include "runtime/object.h"
 #include "runtime/name_identity.h"
+#include "runtime/name_utils.h"
 #include "runtime/native_symbol_lookup.h"
 #include "util/name.h"
 
@@ -99,7 +100,7 @@ extern "C" lean::obj_res lean_get_symbol_stem(lean::obj_arg env, lean::obj_arg f
     if (char const * stem = known_symbol_stem(n)) {
         return lean_mk_string(stem);
     }
-    std::string fallback = n.to_string();
+    std::string fallback = lean::name_to_string(n);
     return lean_mk_string(fallback.c_str());
 }
 

@@ -57,7 +57,8 @@ object * mk_case(object * type_name, size_t var, type var_type, object * alts);
 object * mk_ret(object * arg);
 object * mk_jmp(size_t jp, object * args);
 object * mk_unreachable();
-object * mk_fun_decl(object * fn, object * params, type result_type, object * body);
+object * mk_fun_decl(object * fn, object * params, type result_type, object * body,
+                    size_t max_jp, size_t max_var);
 object * mk_extern_decl(object * fn, object * params, type result_type);
 
 }

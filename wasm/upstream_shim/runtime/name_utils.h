@@ -26,6 +26,9 @@ bool is_supported_dotted_name(char const * text, size_t len);
 
 bool is_supported_name(name const & value);
 
+// Use the upstream stream printer; its former name::to_string method is gone.
+std::string name_to_string(name const & value);
+
 // The caller must first check is_supported_dotted_name. Invalid input is not
 // normalized here because empty and numeric components have distinct Name
 // identities that this string-only adapter cannot preserve.

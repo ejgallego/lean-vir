@@ -443,6 +443,10 @@ an enclosing record. Their converters retain the wrapped field's scalar/USize
 operations and reconstruct the selected wrapper shape. Flattened mappings that
 cross packed wrappers remain unsupported; supported sibling exports stay callable.
 
+Constructor fields stored in spill chains are rejected during interface
+generation with a specific diagnostic. The current schema describes inline
+object, usize and scalar storage only.
+
 Implemented interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
 `Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,
 recursive `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α`

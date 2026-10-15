@@ -80,6 +80,7 @@ public inductive InterfaceClassifierError where
   | constructorLayoutFieldCountMismatch (constructor : Lean.Name)
       (expected actual : Nat)
   | constructorFieldErasedRuntimeLayout (field : String) (constructor : Lean.Name)
+  | spilledRuntimeLayout (field : String) (constructor : Lean.Name)
   | structureConstructorCount (name : Lean.Name) (actual : Nat)
   | emptyStructure (name : Lean.Name)
   | recursiveInheritedStructure (name : Lean.Name)
@@ -143,6 +144,8 @@ public def InterfaceClassifierError.toMessageData : InterfaceClassifierError →
       m!"runtime layout for constructor `{constructor}` does not match its field count"
   | .constructorFieldErasedRuntimeLayout field constructor =>
       m!"field `{field}` of constructor `{constructor}` has erased or void runtime layout"
+  | .spilledRuntimeLayout field constructor =>
+      m!"field `{field}` of constructor `{constructor}` has spilled runtime layout, which VIR does not support"
   | .structureConstructorCount name _ =>
       m!"structure `{name}` must have exactly one constructor"
   | .emptyStructure name => m!"empty structure `{name}` is not supported"

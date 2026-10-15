@@ -264,9 +264,11 @@ private def unitTests : IO Unit := do
   failure "NONCANONICAL_DESCRIPTOR" (Pack.decode (rawPack
     (json.replace "\"fileEntries\"" "\"exports\":[],\"fileEntries\"") "abc".toUTF8))
   for bad in #[json ++ "\n", json.replace "\"schemaVersion\":2" "\"schemaVersion\":2,\"unknown\":0",
-      json.replace "\"virVersion\":1" "\"virVersion\":1,\"runtimeAbi\":\"4\"",
-      json.replace "\"schemaVersion\":2" "\"schemaVersion\":2,\"schemaVersion\":2"] do
+      json.replace "\"virVersion\":1" "\"virVersion\":1,\"runtimeAbi\":\"4\""] do
     failure "NONCANONICAL_DESCRIPTOR" (Pack.decode (rawPack bad "abc".toUTF8))
+  -- The pinned JSON parser rejects duplicate keys before canonical validation.
+  failure "DESCRIPTOR_JSON" (Pack.decode (rawPack
+    (json.replace "\"schemaVersion\":2" "\"schemaVersion\":2,\"schemaVersion\":2") "abc".toUTF8))
   failure "DESCRIPTOR_JSON" (Pack.decode (rawPack
     (json.replace "\"schemaVersion\":2" "\"schemaVersion\":2.0") "abc".toUTF8))
   failure "DESCRIPTOR_JSON" (Pack.decode (rawPack

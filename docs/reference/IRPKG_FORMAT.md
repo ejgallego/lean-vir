@@ -165,6 +165,13 @@ Shared tags do not eliminate field-order or object-layout coupling: the Lean
 encoder and native decoder must agree on both. The decoder's constructors and
 reference-counting behavior must also match the pinned upstream IR layouts.
 
+The native decoder reconstructs `DeclInfo` frame bounds from every variable and
+join-point identifier in a declaration's parameters and body, including nested
+alternatives and join-point parameters. Identifiers are positive, one-based
+indices. Bounds reset for each declaration and are not duplicated in the wire
+format; the interpreter receives `sorryDep? = none`, `maxJp` and `maxVar` in the
+pinned compiler's field order.
+
 ## Embedded manifest
 
 The generator embeds the manifest and its complete interface-pair table in section 5. Its
