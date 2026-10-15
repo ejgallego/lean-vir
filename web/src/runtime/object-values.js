@@ -181,14 +181,14 @@ export function withObjectValues(Base) {
       return codec;
     }
 
-    makeObjectValue(type, value, label) {
+    makeObjectValue(type, value, label, options) {
       const scratch = new ConstructorScratch(this);
-      try { return this.nativeValueCodec(type).lower(value, label, scratch); }
+      try { return this.nativeValueCodec(type, options).lower(value, label, scratch); }
       finally { scratch.dispose(); }
     }
 
-    liftObjectValue(type, obj, label) {
-      return this.nativeValueCodec(type).lift(obj, label);
+    liftObjectValue(type, obj, label, options) {
+      return this.nativeValueCodec(type, options).lift(obj, label);
     }
 
     makeObjectExpr(value, label) {

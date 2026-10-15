@@ -313,7 +313,11 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     }
   }
 
-  callEntry(entry, args, timing = null) {
+  // Internal selection seam. Arguments may arrive as a JSON-safe wire value
+  // while the result remains an ordinary JS value or owned Lean reference.
+  callEntry(entry, args, timing = null, {
+    argumentRepresentation = "native", resultRepresentation = "native",
+  } = {}) {
     this.requireLiveRuntime();
     this.requireFunction("vir_resolve_call_export");
     if (args.length !== entry.args.length) {
@@ -332,6 +336,18 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
         `object ABI does not support interface entry ${entry.entry}`,
       );
     }
+    for (const representation of [argumentRepresentation, resultRepresentation]) {
+      if (representation !== "native" && representation !== "json-safe-v1")
+        throw new Error(`unsupported value representation ${representation}`);
+    }
+    const argumentOptions = { representation: argumentRepresentation };
+    const resultOptions = { representation: resultRepresentation };
+    if (argumentRepresentation !== "native" || resultRepresentation !== "native") {
+      // Reject an unsupported selected domain before allocation or an effectful
+      // call. Existing runtime-local pair caches retain the compiled plans.
+      for (const arg of entry.args) this.nativeValueCodec(arg.type, argumentOptions);
+      this.nativeValueCodec(entry.result, resultOptions);
+    }
     const argObjs = [];
     try {
       const marshalStarted = timing?.beginPhase();
@@ -343,6 +359,7 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
               arg.type,
               args[index],
               `${entry.entry} argument ${arg.name}`,
+              argumentOptions,
             ),
           );
         }
@@ -358,6 +375,7 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
             entry.result,
             resultObj,
             `${entry.entry} result`,
+            resultOptions,
           ),
         timing,
       );

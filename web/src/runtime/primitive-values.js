@@ -24,7 +24,9 @@ const primitiveViews = new Set(["bigint", "number", "string", "bytes", "unit", "
 export class PrimitiveObjectRuntime extends ObjectRuntime {
   objectArgumentSupported(pair) { return primitiveViews.has(pair?.value?.tag); }
   objectResultSupported(pair) { return primitiveViews.has(pair?.value?.tag); }
-  nativeValueCodec(pair) {
+  nativeValueCodec(pair, { representation = "native" } = {}) {
+    if (representation !== "native")
+      throw new Error("selected value representation requires optional object conversion");
     this.nativeValueCodecs ??= new WeakMap();
     let codec = this.nativeValueCodecs.get(pair);
     if (codec === undefined) {
@@ -34,8 +36,8 @@ export class PrimitiveObjectRuntime extends ObjectRuntime {
     }
     return codec;
   }
-  makeObjectValue(pair, value, label) { return this.nativeValueCodec(pair).lower(value, label); }
-  liftObjectValue(pair, obj, label) { return this.nativeValueCodec(pair).lift(obj, label); }
+  makeObjectValue(pair, value, label, options) { return this.nativeValueCodec(pair, options).lower(value, label); }
+  liftObjectValue(pair, obj, label, options) { return this.nativeValueCodec(pair, options).lift(obj, label); }
 
   readObjectNat(obj) {
     if (this.targetPointerBytes() === 4 && this.exports.vir_obj_is_scalar(obj) !== 0)

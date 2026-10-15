@@ -4,11 +4,13 @@ Released under Apache 2.0 license as described in the file LICENSE.
 -/
 module
 public import Std.Data.TreeMap
+public import Vir.Js
 public import Vir.Package.JsonSafeWriter
 public meta import Vir.Attributes
 meta import Vir.Compiler.Interface.JsonSafeWriter
 meta import Vir.Compiler.Interface.LibraryAdapters
 public section
+open Lean.Vir
 namespace JsonSafeWriterValues
 
 abbrev Store := Std.TreeMap Nat String compare
@@ -59,6 +61,9 @@ private def fixture : Document := {
 }
 
 @[vir_export] def fixtureText : String := encode fixture
+@[vir_export] def retain (value : Document) : RuntimeM (JSL Document) := LeanRef.toJSL value
+@[vir_export] def retainedNatural (value : JSL Document) : RuntimeM Nat := do
+  return (← LeanRef.fromJSL value).natural
 @[vir_export] def write (value : Document) : String := encode value
 @[vir_export] def agrees (value : Document) : Bool :=
   value.text == fixture.text && value.natural == fixture.natural &&

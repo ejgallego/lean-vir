@@ -270,3 +270,11 @@ test("field-check admission rejects incompatible storage domains and inexact bou
   for (const bound of [100, "01", "-1", "100\n", "1e2"])
     assert.throws(() => validateBoundaryInterface(checkedWrapper(nat, { tag: "natLt", bound })), /canonical natural bound/);
 });
+
+test("primitive composition rejects an unavailable representation instead of ignoring it", () => {
+  const runtime = Object.create(PrimitiveObjectRuntime.prototype);
+  const pair = validateBoundaryInterface(unitBoundary());
+  assert.throws(() => runtime.nativeValueCodec(pair, jsonSafe), /requires optional object conversion/);
+  assert.throws(() => runtime.makeObjectValue(pair, null, "argument", jsonSafe), /requires optional object conversion/);
+  assert.throws(() => runtime.liftObjectValue(pair, 1, "result", jsonSafe), /requires optional object conversion/);
+});
