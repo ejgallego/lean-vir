@@ -31,6 +31,14 @@ test("admission shares complete pair identity and leaves the wire input unchange
     interfaceSignatureKey({ args: [nat], result: nat, effect: "pure" }));
 });
 
+test("the extended codec contract rejects manifest 12 before using its pairs", () => {
+  const input = wire([nat]);
+  input.version = 12;
+  assert.throws(() => validateInterfaceManifest(input), /regenerate packages with the matching SDK/);
+  assert.equal(input.exports[0].result, 0, "rejected wire input stays unexpanded");
+  assert.equal(validateInterfaceManifest(wire([nat])).exports[0].result, nat);
+});
+
 test("table indices are local to each package", () => {
   const string = primitiveBoundary("string", "string");
   const first = validateInterfaceManifest(wire([nat]));

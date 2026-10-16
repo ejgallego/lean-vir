@@ -13,7 +13,7 @@ import { validatePackageTargets } from "./package-targets.js";
 import { requireModuleIdentity } from "./module-name.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 12;
+export const INTERFACE_MANIFEST_VERSION = 13;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",
   EXPLICIT_CONVERSION: "explicitConversion",

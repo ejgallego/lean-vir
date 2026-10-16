@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-// Type grammar, including the pending JSON-safe codec format extension.
-// The published manifest-12/runtime-6 pair does not support these additions.
+// Type grammar for manifest 13 / resource compatibility 7.
+// Earlier manifest-12/runtime-6 clients must regenerate with the matching SDK.
 // Normative constraints: docs/reference/IRPKG_FORMAT.md#interface-descriptors.
 // This is neither a runtime module nor a public descriptor-construction API.
 // NativeType is the core boundary. Compiler metadata feeds optional codecs;

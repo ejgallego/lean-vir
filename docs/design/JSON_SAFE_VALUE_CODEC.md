@@ -5,10 +5,10 @@ constructor layouts, recursive scopes and value mappings used by `call`.
 It changes the leaves that ordinary JSON cannot preserve. It is an explicit
 application boundary: ordinary calls retain their native JavaScript values.
 
-This implementation is experimental. Its descriptor additions still require a
-format/compatibility revision and a matching published runtime and SDK before
-applications can acquire it through the standard resource workflow. The current
-published manifest-12/runtime-6 pair does not support these additions.
+This implementation is experimental. It uses manifest 13 and resource compatibility 7. A matching
+published runtime and SDK are required before applications can acquire it
+through the standard resource workflow. The earlier published
+manifest-12/runtime-6 pair does not support these additions.
 
 ## Encode in Lean, construct typed values in VIR
 
