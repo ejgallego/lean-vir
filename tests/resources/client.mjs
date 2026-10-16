@@ -8,6 +8,7 @@ Author: Emilio J. Gallego Arias
 // application's only command and dependency are the normal client ones.
 import assert from "node:assert/strict";
 import { replaceFixture } from "./fixture-edit.mjs";
+import { runCommand } from "./run-command.mjs";
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
@@ -68,21 +69,9 @@ let config = replaceFixture(readFileSync(join(client, "lakefile.lean"), "utf8"),
 config = replaceFixture(config, 'buildDir := "build with spaces"',
   'buildDir := "build with spaces"\n  leanLibDir := "library output"');
 writeFileSync(join(client, "lakefile.lean"), config);
-function run(cwd, label, cmd, args, error = null) {
-  const result = spawnSync(cmd, args, {
-    cwd,
-    encoding: "utf8",
-    timeout: 240000,
-  });
-  const log = `${result.stdout ?? ""}${result.stderr ?? ""}`;
-  writeFileSync(join(evidence, `${label}.log`), log);
-  if (result.error) throw result.error;
-  if (error) {
-    assert.notEqual(result.status, 0, label);
-    assert.match(log, error, label);
-  } else assert.equal(result.status, 0, `${label}: ${log}`);
-  return log;
-}
+const run = (cwd, label, cmd, args, error = null) =>
+  runCommand(cwd, join(evidence, `${label}.log`), cmd, args, { error });
+
 const lock = JSON.parse(readFileSync(join(root, "vir-resources/runtime.json")));
 if (published) assert.match(lock.source, /^https:\/\//);
 const runtimeCache = join(
