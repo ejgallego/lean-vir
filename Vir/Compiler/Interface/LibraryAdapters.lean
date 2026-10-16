@@ -11,8 +11,8 @@ public section
 open Lean
 namespace Vir.Interface
 
-/-- Internal experimental registration, not a public codec-selection API.
-Each rule binds a complete closed source type to typed library helpers. -/
+/-- Experimental library construction rule for one closed source type.
+Registration is compiler-environment-wide, not a per-call representation choice. -/
 structure ClosedLibraryAdapter where
   sourceType : Expr
   wireType : Expr
@@ -26,15 +26,26 @@ initialize libraryAdapters : SimplePersistentEnvExtension ClosedLibraryAdapter (
     addImportedFn := fun entries => entries.foldl (· ++ ·) #[]
   }
 
-def closedLibraryAdapter? (env : Environment) (type : Expr) : Option ClosedLibraryAdapter :=
-  (libraryAdapters.getState env).find? fun rule =>
-    (⟨rule.sourceType⟩ : ExprStructEq) == ⟨type.consumeMData⟩
+private def sameCodec (a b : ClosedLibraryAdapter) : Bool :=
+  (⟨a.wireType⟩ : ExprStructEq) == ⟨b.wireType⟩ && a.decode == b.decode && a.encode == b.encode
+
+/-- Imported modules can register independently. Select only a unique mapping;
+identical repetitions agree, but import order must never choose between codecs. -/
+def closedLibraryAdapter? (env : Environment) (type : Expr) : Except String (Option ClosedLibraryAdapter) := do
+  let mut selected := none
+  for rule in libraryAdapters.getState env do
+    if (⟨rule.sourceType⟩ : ExprStructEq) == ⟨type.consumeMData⟩ then
+      if let some previous := selected then
+        unless sameCodec previous rule do
+          throw s!"conflicting library adapters for {type}"
+      selected := some rule
+  return selected
 
 def isLibraryAdapterOperation (env : Environment) (name : Name) : Bool :=
   (libraryAdapters.getState env).any fun rule => rule.decode == name || rule.encode == name
 
 /-- Validate real helper types before registering a construction rule.
-The first prototype supports closed Type-0 domains and monomorphic safe helpers;
+Rules support closed Type-0 domains and monomorphic safe helpers;
 unsupported instantiations fail rather than acquiring erased ABI parameters. -/
 def registerClosedLibraryAdapter (sourceType wireType : Expr) (decode encode : Name) : MetaM Unit := do
   let source ← Meta.whnf sourceType
@@ -57,8 +68,9 @@ def registerClosedLibraryAdapter (sourceType wireType : Expr) (decode encode : N
     let expected := mkForall `value .default domain result
     unless ← Meta.isDefEq info.type expected do
       throwError "library adapter helper {name} has the wrong domain/result type"
-  if let some previous := closedLibraryAdapter? (← getEnv) sourceType then
-    unless (⟨previous.wireType⟩ : ExprStructEq) == ⟨wireType⟩ && previous.decode == decode && previous.encode == encode do
+  let previous? ← ofExcept (closedLibraryAdapter? (← getEnv) sourceType)
+  if let some previous := previous? then
+    unless sameCodec previous {sourceType, wireType, decode, encode} do
       throwError "conflicting library adapter for {sourceType}"
     return
   modifyEnv fun env => libraryAdapters.addEntry env { sourceType := sourceType.consumeMData, wireType, decode, encode }

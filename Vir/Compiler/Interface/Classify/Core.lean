@@ -147,34 +147,14 @@ private partial def enclosingRecursiveOwner? (bound : Nat := 0) : InterfaceType 
       args.findSome? (fun arg => enclosingRecursiveOwner? bound arg.type) <|> enclosingRecursiveOwner? bound result
   | _ => none
 
-private def constructorFieldTypes? (type : Lean.Expr) (allowImplicitFields : Bool := false) : Option (Array (String × Lean.Expr)) :=
-  let rec go (type : Lean.Expr) (fields : Array (String × Lean.Expr)) : Option (Array (String × Lean.Expr)) :=
-    match type with
-    | .mdata _ body => go body fields
-    | .forallE name domain body binderInfo =>
-        if !allowImplicitFields && binderInfo != .default then
-          none
-        else
-          go body (fields.push (binderArgName (fields.size + 1) name, domain))
-    | _ => some fields
-  go type #[]
-
-/-- Constructor metadata is the source of field types for structures too.
-Private projections need not be present in an importing module. -/
+/-- Classification rejects implicit inductive fields; records explicitly opt in.
+Proof erasure remains a separate checked policy in structure classification. -/
 private def constructorFields (type : Lean.Expr) (ctorName : Name)
     (allowImplicitFields : Bool := false) : ClassifyM (Array (String × Lean.Expr)) := do
-  let env ← getEnv
-  let some (.ctorInfo info) := env.find? ctorName
-    | throwThe InterfaceClassifierError (.constructorMissingDeclaration ctorName)
-  let owner := type.getAppFn.constName
-  if info.induct != owner then
-    throwThe InterfaceClassifierError (.constructorOwnerMismatch ctorName owner info.induct)
-  let ctorType := info.toConstantVal.instantiateTypeLevelParams type.getAppFn.constLevels!
-  let some instantiated := instantiateForallPrefix? ctorType type.getAppArgs
-    | throwThe InterfaceClassifierError (.constructorInvalidType ctorName info.type)
-  let some fields := constructorFieldTypes? instantiated allowImplicitFields
-    | throwThe InterfaceClassifierError (.constructorImplicitFields ctorName)
-  return fields
+  let fields ← ExceptT.mk (pure (instantiateConstructorFields (← getEnv) type ctorName))
+  unless allowImplicitFields || fields.all (·.binderInfo == .default) do
+    throwThe InterfaceClassifierError (.constructorImplicitFields ctorName)
+  return fields.mapIdx fun index field => (binderArgName (index + 1) field.name, field.type)
 
 mutual
 
@@ -334,7 +314,10 @@ private partial def classifyType (e : Lean.Expr) (seenTypes : RecursiveSeen) :
       return .leanObject
   | _ =>
       let env ← getEnv
-      if let some adapter := closedLibraryAdapter? env e then
+      let adapter? ← match closedLibraryAdapter? env e with
+        | .ok adapter => pure adapter
+        | .error reason => throwThe InterfaceClassifierError (.libraryAdapterUnsupported e reason)
+      if let some adapter := adapter? then
         let key : ExprStructEq := ⟨e⟩
         if seenTypes.contains key then
           throwThe InterfaceClassifierError (.libraryAdapterUnsupported e "recursive adapter wire domains are not supported")

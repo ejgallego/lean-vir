@@ -57,6 +57,8 @@ root-export restriction. Options contain only `argumentRepresentation` and
 `resultRepresentation`. Both default to `"native"`; the argument setting applies
 to all arguments. Select `resultRepresentation: "json-safe-v1"` when the returned
 JS value must itself be JSON-safe. A reference result must keep `"native"`.
+The native profile is the ordinary JavaScript representation: BigInt integers,
+undefined Unit, Uint8Array bytes and instance-bound references.
 
 The complete selected domains are checked before argument construction or
 invocation, even when the actual collection is empty. Conversion then uses the
@@ -122,9 +124,12 @@ run_meta do
 
 Registration is persistent across imports and selects the exact closed source
 type. Source and wire must be object-backed Type-0 domains. Rules cannot replace
-primitive, resource, reference or callable boundaries. Conflicting registrations
-fail. Recursive adapter wire domains are currently rejected; each wire domain
-starts a fresh closed recursive scope.
+primitive, resource, reference or callable boundaries. The rule applies to that
+closed type throughout the compiled boundary, in both native and JSON-safe calls.
+Conflicting imported rules fail when the source type is classified or registered;
+identical repeated rules are accepted. Import order never selects a winner.
+Recursive adapter wire domains are currently rejected; each wire domain starts
+a fresh closed recursive scope.
 
 A map rule should use the library's public insertion and iteration operations.
 That establishes ordering, balance and size rather than accepting unchecked raw

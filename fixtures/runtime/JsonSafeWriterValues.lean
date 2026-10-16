@@ -26,6 +26,7 @@ run_meta do
 inductive Tree where
   | leaf (value : Nat)
   | branch (children : List (Option Tree))
+  | fork (left right : Tree)
   deriving BEq
 
 structure Hidden where
@@ -55,7 +56,7 @@ private def fixture : Document := {
   unit := ()
   hidden := ⟨42⟩
   foo_bar := "preserved"
-  tree := .branch [none, some (.leaf 900719925474099312345), some (.branch [])]
+  tree := .branch [none, some (.leaf 900719925474099312345), some (.fork (.leaf 7) (.branch []))]
   store := Std.TreeMap.ofArray #[(900719925474099312345, "first"), (1, "α"),
     (900719925474099312345, "last")]
 }

@@ -203,6 +203,31 @@ def constructorLabel (inductiveName ctorName : Name) : String :=
   else
     (ctorName.replacePrefix inductiveName .anonymous).toString
 
+/-- Public payload shape is selected from logical arity, never storage slots. -/
+inductive ConstructorPayload (α : Type) where
+  | none
+  | value (field : α)
+  | fields (fields : Array α)
+
+def constructorPayload (fields : Array α) : ConstructorPayload α :=
+  match fields.toList with
+  | [] => .none
+  | [field] => .value field
+  | _ => .fields fields
+
+/-- The pinned compiler's List uses one iterative sequence view. All other
+inductives use variants; invalid List metadata is an internal invariant failure. -/
+def linkedListElement? (name : Name) (constructors : Array InductiveConstructor) : Option InterfaceType :=
+  if name != `List then none
+  else
+    let shape : List (Name × List InductiveField) :=
+      constructors.toList.map (fun ctor => (ctor.constructorName, ctor.fields.toList))
+    match shape with
+    | [(`List.nil, []), (`List.cons, [
+        { name := "head", type := element, .. },
+        { name := "tail", type := .recursiveRef _ _ 0, .. }])] => some element
+    | _ => panic! "interface: unexpected compiler-owned List constructor shape"
+
 /-- A JavaScript-boundary signature after interface type classification. -/
 structure ClassifiedSignature where
   args : Array InterfaceArg

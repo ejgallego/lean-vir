@@ -6,7 +6,6 @@ module
 public import Vir.Compiler.Interface.Classify.Core
 import Vir.Compiler.Interface.Classify.Reduce
 import Vir.Compiler.Interface.Classify.Basic
-import Vir.Compiler.Interface.Encode
 public import Vir.Package.JsonSafeWriter
 public import Lean
 public section
@@ -33,16 +32,10 @@ private def invoke (name : Name) (value out : Term) : BuildM Term :=
 remain Exprs until elaboration; no pretty-printing or reparsing is involved. -/
 private def ctorFields (type : Expr) (name : Name) : MetaM (Array (String × Expr)) := do
   let type ← reduceTypeAliases type
-  let .ctorInfo ctor ← getConstInfo name | throwError "missing constructor {name}"
-  let mut ctorType := ctor.toConstantVal.instantiateTypeLevelParams type.getAppFn.constLevels!
-  for parameter in type.getAppArgs do
-    let .forallE _ _ body _ := ctorType | throwError "constructor parameter mismatch"
-    ctorType := body.instantiate1 parameter
-  let mut fields := #[]
-  while let .forallE name domain body _ := ctorType do
-    fields := fields.push (name.toString, domain)
-    ctorType := body
-  return fields
+  let fields ← match instantiateConstructorFields (← getEnv) type name with
+    | .ok fields => pure fields
+    | .error error => throwError error.toMessageData
+  return fields.map fun field => (field.name.toString, field.type)
 
 private def fieldInfo (fields : Array (String × Expr)) (name : String) : MetaM (Nat × Expr) := do
   for h : index in [:fields.size] do
@@ -118,35 +111,26 @@ private partial def bodyFor (type : Expr) (model : InterfaceType) (owners : Arra
       let .forallE _ _ actualWire _ := encode.type | throwError "unexpected adapter encoder"
       let fn ← plan actualWire descriptor.wire #[]
       invoke fn (← `($(mkCIdent descriptor.encode) $value)) out
-  | .customInductive _ _ constructors =>
-      -- Reuse the producer's selected view instead of assigning another payload
-      -- shape or another policy for a linked List representation.
-      let .ok pair := Json.parse model.toJson | throwError "invalid emitted pair"
-      let view ← ofExcept (pair.getObjVal? "value")
-      if (← ofExcept (view.getObjValAs? String "tag")) == "sequence" then
-        let some ctor := constructors[1]? | throwError "missing linked constructor"
-        let fields ← ctorFields type ctor.constructorName
-        let some head := ctor.fields[0]? | throwError "missing linked element"
-        let fn ← plan fields[0]!.2 head.type owners
+  | .customInductive name _ constructors =>
+      if let some element := linkedListElement? name constructors then
+        let fields ← ctorFields type `List.cons
+        let fn ← plan fields[0]!.2 element owners
         return ← `(Vir.JsonSafeWriter.list $(mkIdent fn) $value $out)
-      let cases ← ofExcept (← ofExcept (view.getObjVal? "cases")).getArr?
       let mut alternatives := #[]
       for h : index in [:constructors.size] do
         let ctor := constructors[index]
-        let case := cases[index]!
-        let kind ← ofExcept (case.getObjValAs? String "kind")
-        let payload ← ofExcept (case.getObjValAs? String "payload")
+        let kind := constructorLabel name ctor.constructorName
+        let payload := constructorPayload ctor.fields
         let fields ← ctorFields type ctor.constructorName
         let mut output ← append out ("{\"kind\":" ++ Json.renderString kind)
-        if payload == "value" then
-          let some field := ctor.fields[0]? | throwError "missing variant value field"
+        if let .value field := payload then
           let (actualIndex, actualType) ← fieldInfo fields field.name
           let fn ← plan actualType field.type owners
           output ← invoke fn (fieldVar actualIndex) (← append output ",\"value\":")
-        else if payload == "fields" then
+        else if let .fields payloadFields := payload then
           output ← append output ",\"fields\":{"
-          for h : fieldIndex in [:ctor.fields.size] do
-            let field := ctor.fields[fieldIndex]
+          for h : fieldIndex in [:payloadFields.size] do
+            let field := payloadFields[fieldIndex]
             let (actualIndex, actualType) ← fieldInfo fields field.name
             let fn ← plan actualType field.type owners
             let fieldPrefix := (if fieldIndex == 0 then "" else ",") ++ Json.renderString field.name ++ ":"

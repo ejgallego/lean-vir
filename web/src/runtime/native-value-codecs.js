@@ -68,7 +68,7 @@ export function compileLibraryValueAdapter(runtime, { decode, encode }, wireCode
   });
 }
 
-// Prototype construction operation over already lowered, owned fields. The
+// Private construction operation over already lowered, owned fields. The
 // package's typed pure helper computes runtime-only fields; no JS graph rebuild.
 export function compileLibraryConstructor(runtime, entry) {
   runtime.requireLiveRuntime();

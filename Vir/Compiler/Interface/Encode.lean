@@ -185,17 +185,17 @@ private partial def recordFieldJson
 
 private partial def variantCaseJson
     (kind : String) (fields : Array (String × InterfaceType)) : String :=
-  match fields.toList with
-  | [] => jsonObject #[
+  match constructorPayload fields with
+  | .none => jsonObject #[
       ("kind", jsonString kind),
       ("payload", jsonString "none")
     ]
-  | [(_, valueType)] => jsonObject #[
+  | .value (_, valueType) => jsonObject #[
       ("kind", jsonString kind),
       ("payload", jsonString "value"),
       ("value", valueInterfaceJson valueType)
     ]
-  | _ =>
+  | .fields fields =>
       let encodedFields := fields.mapIdx fun index field =>
         recordFieldJson field.1 #[index] field.2
       jsonObject #[
@@ -232,26 +232,16 @@ private partial def inheritedRecordFieldsJson
 
 private partial def customInductiveValueJson
     (name : Name) (constructors : Array InductiveConstructor) : String :=
-  if name == `List then
-    -- This is the pinned compiler's List declaration, not a user-selected
-    -- linked representation. Layouts still come from the constructor metadata.
-    let shape : List (Name × List InductiveField) :=
-      constructors.toList.map (fun ctor => (ctor.constructorName, ctor.fields.toList))
-    match shape with
-    | [(`List.nil, []), (`List.cons, [
-        { name := "head", type := element, .. },
-        { name := "tail", type := .recursiveRef _ _ 0, .. }])] =>
-        jsonObject #[
-          ("tag", jsonString "sequence"),
-          ("element", valueInterfaceJson element),
-          ("chain", jsonObject #[
-            ("nil", jsonNat 0), ("cons", jsonNat 1),
-            ("head", jsonNat 0), ("tail", jsonNat 1)
-          ])
-        ]
-    | _ => panic! "interface encoder: unexpected compiler-owned List constructor shape"
-  else
-    inductiveVariantValueJson name constructors
+  match linkedListElement? name constructors with
+  | some element => jsonObject #[
+      ("tag", jsonString "sequence"),
+      ("element", valueInterfaceJson element),
+      ("chain", jsonObject #[
+        ("nil", jsonNat 0), ("cons", jsonNat 1),
+        ("head", jsonNat 0), ("tail", jsonNat 1)
+      ])
+    ]
+  | none => inductiveVariantValueJson name constructors
 
 private partial def valueInterfaceJson (type : InterfaceType) : String :=
   match type with

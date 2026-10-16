@@ -161,6 +161,7 @@ export const runtimeTests = Object.freeze(
     { id: "json-safe-values", file: "json-safe-values-smoke.mjs", group: "lean" },
     { id: "descriptor-regressions", file: "descriptor-regressions-smoke.mjs", group: "lean" },
     { id: "adapter-values", file: "adapter-values-smoke.mjs", group: "lean" },
+    { id: "library-adapter-imports", file: "library-adapter-imports-smoke.mjs", group: "lean" },
     { id: "json-safe-writer", file: "json-safe-writer-smoke.mjs", group: "lean" },
     { id: "manifest-sharing", file: "manifest-sharing-smoke.mjs", group: "lean" },
     { id: "json-codecs", file: "json-codecs-smoke.mjs", group: "lean" },

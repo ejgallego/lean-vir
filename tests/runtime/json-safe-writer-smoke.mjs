@@ -20,7 +20,9 @@ try {
     bytes: [0, 127, 255], unit: null, hidden: { value: "42" }, foo_bar: "preserved",
     tree: { kind: "branch", value: [{ kind: "none" },
       { kind: "some", value: { kind: "leaf", value: "900719925474099312345" } },
-      { kind: "some", value: { kind: "branch", value: [] } }] },
+      { kind: "some", value: { kind: "fork", fields: {
+        left: { kind: "leaf", value: "7" }, right: { kind: "branch", value: [] },
+      } } }] },
     store: [{ fst: "1", snd: "α" }, { fst: "900719925474099312345", snd: "last" }],
   };
   for (const wasm of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
