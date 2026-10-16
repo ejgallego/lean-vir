@@ -1,106 +1,160 @@
-# JSON-safe value codec prototype
+# JSON-safe generated value codecs
 
-This is a local implementation checkpoint for the selected JSON-safe codec
-direction. It is not a public call/factory option or a published wire format.
-The standard manifest-12 native/value contract and default call behavior remain
-the basis of conversion. The compiler supplies all constructor, field, storage
-and recursive-owner facts.
+The JSON-safe representation reuses the compiler-owned native descriptors,
+constructor layouts, recursive scopes and value mappings used by `call`.
+It changes the leaves that ordinary JSON cannot preserve. It is an explicit
+application boundary: ordinary calls retain their native JavaScript values.
 
-The internal optional object binder accepts:
+This implementation is experimental. Its descriptor additions still require a
+format/compatibility revision and a matching published runtime and SDK before
+applications can acquire it through the standard resource workflow. The current
+published manifest-12/runtime-6 pair does not support these additions.
 
-```js
-runtime.nativeValueCodec(admittedPair, { representation: "json-safe-v1" });
+## Encode in Lean, construct typed values in VIR
+
+Import the generator as a meta dependency and its pure support as a runtime
+dependency. Generate a named typed writer from a closed source type:
+
+```lean
+module
+public import Vir.Package.JsonSafeWriter
+meta import Vir.Compiler.Interface.JsonSafeWriter
+public meta import Vir.Attributes
+public section
+
+namespace Preview
+structure Document where
+  title : String
+  count : Nat
+  bytes : ByteArray
+
+run_elab Vir.Interface.JsonSafeWriter.generate `Preview.encode (Lean.mkConst ``Document)
+
+@[vir_export] def accept (document : Document) : Nat := document.count
+end Preview
 ```
 
-The selected plan has the existing `lower`/`lift` operations. Lowering uses a
-`ConstructorScratch` for one operation; binding does not own values or replace
-the call's transfer/disposal rules. Normal and JSON-safe plans are cached
-separately by pair identity within each runtime. This is a prototype selection
-seam, not a supported standalone pointer API for applications.
+`Preview.encode : Document → String` can run on the native server. It traverses
+the typed value directly and builds JSON text without a `Lean.Json` graph or a
+`ToJson` instance. The generator shares the normal classifier and selected
+constructor shapes; it does not infer a wire schema from JSON instances.
+Generated traversal helpers are private and are not application exports.
 
-Records, constructor variants, tagged Options, enums, booleans and sequences
-use the same shape and structural construction plans. Changes are at leaves:
+The existing JSON-RPC String envelope can carry this text unchanged. On the
+client, parse it once and select JSON-safe arguments on the normal typed call:
 
-| Value | JSON-safe representation |
+```js
+const document = JSON.parse(response.result);
+const count = runtime.callWith(
+  { argumentRepresentation: "json-safe-v1" },
+  "Preview.accept",
+  document,
+); // bigint, because the result uses the default native representation
+```
+
+`createProgram` returns a facade with the same `callWith` method and its usual
+root-export restriction. Options contain only `argumentRepresentation` and
+`resultRepresentation`. Both default to `"native"`; the argument setting applies
+to all arguments. Select `resultRepresentation: "json-safe-v1"` when the returned
+JS value must itself be JSON-safe. A reference result must keep `"native"`.
+
+The complete selected domains are checked before argument construction or
+invocation, even when the actual collection is empty. Conversion then uses the
+existing consuming call ABI, rollback on lowering failure and handle lifetimes.
+Each runtime caches native and JSON-safe plans separately by immutable admitted
+pair identity. There is no application pointer API or whole-value adaptation
+pass before the normal constructor plan.
+
+## Wire values
+
+Records, variants, tagged Options, enums, booleans and sequences keep their
+compiler-selected shape. Only the following leaves change:
+
+| Lean value | JSON-safe value |
 | --- | --- |
-| Nat, Int, UInt64 | Canonical decimal string |
-| UInt8/16/32, wasm32 USize | Integer Number in the native range |
+| Nat, Int, UInt64 | Canonical decimal String |
+| UInt8/16/32 | Integer Number in range |
 | Unit | Exactly `null` |
-| ByteArray | Array of integer Numbers from 0 through 255 |
+| ByteArray | Array of integer Numbers in 0..255 |
 | String | String |
 
 Canonical decimals have no whitespace, plus sign, exponent, leading zeros or
-negative zero. Only Int accepts a negative sign. Large integers are never routed
-through Number. Packed UInt64/Unit/USize fields use the same selected operations
-as boxed fields. Byte adaptation is local to the byte leaf's native input buffer.
-No complete intermediate BigInt/undefined/Uint8Array value graph is constructed.
+negative zero. Only Int accepts a negative sign. Large integers never pass
+through Number. Byte conversion uses the native leaf buffer directly; it does
+not materialize a complete BigInt/undefined/Uint8Array graph.
 
-For example, `none`, `some none`, and `some ()` retain these distinct values:
+For example, these constructor distinctions survive ordinary JSON:
 
 ```js
 { kind: "none" }
 { kind: "some", value: { kind: "none" } }
-{ kind: "some", value: null }
+{ kind: "some", value: null } // some ()
 ```
 
-Float, resource, opaque-reference, callback and specialized Expr views are
-excluded from this prototype. Profile eligibility is checked over the complete
-admitted type before binding, even for an empty collection. The error identifies
-the excluded domain's path. Existing unsupported packed conversions are also
-rejected. There is no ToJson fallback or inference from the actual value.
+The selected codec supports wasm32 USize Numbers, but the Lean writer currently
+rejects USize: a native-server value needs an explicit checked wasm32 range rule.
+Floats, resources, opaque references, callbacks and specialized Expr views are
+excluded from the JSON-safe domain. Inherited record flattening is not yet
+supported by the writer. Unsupported domains fail generation or binding; there
+is no silent `ToJson` fallback. Ordinary native calls keep their existing scope.
 
-## Qualification and limits
+## Validated library construction
 
-Focused unit tests exercise the production binder, scratch and primitive code
-against modeled native allocation/reference counting. The smoke fixture uses
-generated descriptors and actual Lean functions to observe Option constructors,
-payload amounts, packed fields and recursive structures independently of lifting.
-It passes both Wasm profiles with ordinary JSON serialization/parsing in the test.
-Failure/recovery cases accompany the successful calls.
+Some types require more than filling their stored fields. The compiler retains
+recognized computed constructor operations, including Name's cached hash, as
+private pure call-table entries. Construction invokes those operations through
+the existing owned-object ABI instead of copying a raw representation with
+missing invariants. These entries cannot be called through the application
+export map.
 
-Structure field types now come from the instantiated constructor, shared with
-inductive classification. An importing module need not contain private projection
-declarations. The imported-private-field fixture qualifies generated conversion
-and independent Lean observations on both Wasm profiles. Source field names and
-compiler storage layouts still determine the same record mappings.
+Library authors can register a closed construction rule using
+`Vir.Interface.registerClosedLibraryAdapter` from
+`Vir.Compiler.Interface.LibraryAdapters`:
 
-The local constraint prototype recognizes Char and Fin with a closed natural
-literal bound. It keeps their data field and emits an explicit optional field
-check in the selected value mapping:
-
-```js
-{ key: "val", path: [0], value: { tag: "number" }, check: { tag: "unicodeScalar" } }
-{ key: "val", path: [0], value: { tag: "bigint" }, check: { tag: "natLt", bound: "100" } }
+```lean
+-- Both helpers must be compiled safe, monomorphic definitions.
+-- decode : Wire → Except String Source
+-- encode : Source → Wire
+run_meta do
+  Vir.Interface.registerClosedLibraryAdapter
+    (Lean.mkConst ``Source) (Lean.mkConst ``Wire) ``decode ``encode
 ```
 
-Char accepts every Unicode scalar, including NUL, astral values and noncharacters,
-and rejects surrogates and values at/above0x110000 before UInt32 coercion. Fin100
-accepts exactly0..99; no modulo/clamp. Constraints run in both regular and JSON-safe
-plans, including scalar packing and lifted results. Arbitrary erased-proof types
-remain a generation error. This is an explicit rule for the pinned declarations,
-not inference of a proposition from a void slot or a general proof validator.
+Registration is persistent across imports and selects the exact closed source
+type. Source and wire must be object-backed Type-0 domains. Rules cannot replace
+primitive, resource, reference or callable boundaries. Conflicting registrations
+fail. Recursive adapter wire domains are currently rejected; each wire domain
+starts a fresh closed recursive scope.
 
-Identity wrappers now retain their child's scalar/usize operations and reconstruct
-their selected record/variant shape on lifting. This also supports existing simple
-packed UInt32/Bool/USize wrappers and returned callbacks. Flattened mappings that
-cross packed wrappers remain a capability limit.
+A map rule should use the library's public insertion and iteration operations.
+That establishes ordering, balance and size rather than accepting unchecked raw
+tree nodes. The application/library owns the rule's semantic choices, including
+key validity and duplicate handling. VIR checks helper types and the emitted
+private ABI; it does not prove that encode and decode are inverse functions.
 
-**Format gate:** optional field checks extend the current descriptor grammar.
-No shared manifest/resource revision or runtime lock has been changed in this
-local experiment. A deliberate format revision and matching source/runtime
-qualification are required before publication. Experimental packages here are
-local qualification inputs, not a claim that the published manifest-12/runtime6
-SDK supports these checks.
+The current producer also recognizes Char and literal-bound Fin fields. Explicit
+mapping checks preserve Unicode scalar validity and exact natural bounds despite
+proof erasure. Char permits NUL, astral scalars and noncharacters, but rejects
+surrogates and values at or above 0x110000. Fin100 accepts exactly 0..99. These
+checks apply to native and JSON-safe conversion, including packed fields.
+Arbitrary proof-bearing domains remain unsupported; erased storage is not a
+proof of a value invariant.
 
-The smoke test temporarily selects the prototype plans inside its own runtime's
-internal lowering/lifting methods. No public call configuration or independent
-consumer-expectation format is introduced. A future public selection must agree
-at both endpoints and participate in the relevant contract checks.
+## Qualification and performance scope
 
-Matching native-server encoding is not implemented. Full Part Manual now passes
-InternalId, Char and Fin100 metadata, then stops at content -> Block.other.container
--> properties -> Verso.NameMap String, an unsupported ordinary type-definition
-head. A reusable library-provided validated map/leaf rule remains to be designed;
-no complete Part descriptor is emitted.
-Neither full-document browser acceptance nor performance has been qualified.
-Infoview JSON-RPC, consumer rendering/retention, pins and publication are unchanged.
+Maintained fixtures exercise generated writers, recursive and private fields,
+large integers, bytes, library adapters, unsupported-domain rejection, recovery
+and ownership on both Wasm profiles. Lean observations independently check the
+constructed values; a round trip alone is insufficient.
+
+A local full `Verso.Doc.Part Verso.Genre.Manual` exercise additionally covered
+all 15 current metadata fields and extension payloads with a library-provided
+NameMap rule. It is an eligibility test, not a published consumer integration.
+The normal descriptor and registered rules determine the accepted domain; this
+is not the existing Verso `ToJson` schema.
+
+The controlled comparison used one 33-section fixture and both encoders/decoders
+in VIR/Wasm. Its paired elapsed ratio was 0.216 while the JSON-safe payload was
+2.19 times larger. This is evidence of avoided conversion work, not native-server,
+network, browser-rendering or complete application latency. The next useful
+measurement is the actual consumer operation with server and client separated.

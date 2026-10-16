@@ -4,7 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-// Type grammar for the current manifest-12 contract.
+// Type grammar, including the pending JSON-safe codec format extension.
+// The published manifest-12/runtime-6 pair does not support these additions.
 // Normative constraints: docs/reference/IRPKG_FORMAT.md#interface-descriptors.
 // This is neither a runtime module nor a public descriptor-construction API.
 // NativeType is the core boundary. Compiler metadata feeds optional codecs;
@@ -52,6 +53,8 @@ export type ConstructorDescriptor = ConstructorIdentity & (
       readonly representation: "object";
       readonly storage: ConstructorStorage;
       readonly fields: readonly StoredField[];
+      // Private pure codec operation nameKey for computed constructor storage.
+      readonly operation?: string;
     }
   | {
       readonly representation: "identity";
@@ -103,6 +106,7 @@ type IdentityMetadata = DeclarationMetadata & {
   readonly constructors?: never;
   readonly arrayElement?: never;
   readonly signature?: never;
+  readonly adapter?: never;
 };
 export type CompilerMetadata = DeclarationMetadata & (
   | IdentityMetadata
@@ -110,16 +114,30 @@ export type CompilerMetadata = DeclarationMetadata & (
       readonly constructors: readonly [ConstructorDescriptor, ...ConstructorDescriptor[]];
       readonly arrayElement?: never;
       readonly signature?: never;
+      readonly adapter?: never;
     }
   | {
       readonly constructors?: never;
       readonly arrayElement: DescriptorRef;
       readonly signature?: never;
+      readonly adapter?: never;
     }
   | {
       readonly constructors?: never;
       readonly arrayElement?: never;
       readonly signature: NativeSignature;
+      readonly adapter?: never;
+    }
+  | {
+      readonly constructors?: never;
+      readonly arrayElement?: never;
+      readonly signature?: never;
+      readonly adapter: {
+        // A complete closed domain; it cannot capture enclosing recursive owners.
+        readonly wire: NativeDescriptor;
+        readonly decode: string; // private operation nameKey
+        readonly encode: string; // private operation nameKey
+      };
     }
 );
 
@@ -139,6 +157,9 @@ export interface RecordFieldInterface {
   readonly key: string;
   readonly path: readonly [number, ...number[]];
   readonly value: ValueInterface;
+  readonly check?:
+    | { readonly tag: "unicodeScalar" }
+    | { readonly tag: "natLt"; readonly bound: string };
 }
 
 export type ConstructorInterface = {
@@ -180,6 +201,7 @@ export type ValueInterface =
       readonly chain?: ChainTraversal;
     }
   | { readonly tag: "recursive" }
+  | { readonly tag: "adapted"; readonly wire: ValueInterface }
   | { readonly tag: "jsReference" }
   | { readonly tag: "leanReference" }
   | {

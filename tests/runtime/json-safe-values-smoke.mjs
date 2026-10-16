@@ -8,7 +8,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
-import { ConstructorScratch } from "../../web/src/runtime/constructor-scratch.js";
 import { createRuntimeModuleProject } from "./shared.mjs";
 
 const directory = await mkdtemp(join(tmpdir(), "vir-json-safe-values-"));
@@ -30,7 +29,9 @@ try {
   for (const profile of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
     const runtime = await createVirRuntimeFactory({ wasmBytes: await readFile(new URL(profile, wasmDirectory)) })
       .createRuntime({ irPackageSet: [packageBytes] });
-    const call = (name, value) => runtime.call(`JsonSafeValues.${name}`, JSON.parse(JSON.stringify(value)));
+    const call = (name, value) => runtime.callWith({
+      argumentRepresentation: "json-safe-v1", resultRepresentation: "json-safe-v1",
+    }, `JsonSafeValues.${name}`, JSON.parse(JSON.stringify(value)));
     try {
       const huge = "900719925474099312345678901234567890";
       const regularPrivate = { amount: BigInt(huge) };
@@ -40,16 +41,6 @@ try {
       assert.throws(() => runtime.call("JsonSafeValues.charIdentity", { val: 0xd800 }), /Unicode scalar/);
       assert.equal(runtime.call("JsonSafeValues.finAmount", { val: 99n }), 99n);
       assert.throws(() => runtime.call("JsonSafeValues.finIdentity", { val: 100n }), /Fin 100/);
-      // Local prototype selection seam, not a new public factory/call option.
-      // The production call/ownership path receives the selected bound codecs.
-      runtime.makeObjectValue = function (pair, value, label) {
-        const scratch = new ConstructorScratch(this);
-        try { return this.nativeValueCodec(pair, { representation: "json-safe-v1" }).lower(value, label, scratch); }
-        finally { scratch.dispose(); }
-      };
-      runtime.liftObjectValue = function (pair, obj, label) {
-        return this.nativeValueCodec(pair, { representation: "json-safe-v1" }).lift(obj, label);
-      };
       for (const [index, value] of [{ kind: "none" }, { kind: "some", value: { kind: "none" } },
         { kind: "some", value: { kind: "some", value: huge } }].entries()) {
         assert.equal(call("nestedKind", value), index, "independent Lean constructor observation");

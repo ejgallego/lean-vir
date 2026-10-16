@@ -330,6 +330,29 @@ caching plans. The binder consumes these facts; actual values and conversion
 capabilities are checked separately. Input own-property and numeric coercion
 rules belong to the [JS API](../guides/JS_API.md#calls-and-manifest).
 
+### Pending generated-codec extension
+
+The JSON-safe codec work extends this grammar with optional record-field `check`
+rules (`unicodeScalar` and `natLt` with a canonical decimal natural `bound`),
+object-constructor `operation` references, and a fourth exclusive Lean-object
+metadata form: `adapter: { wire, decode, encode }`. Its selected value interface
+is `{ tag: "adapted", wire: <ValueInterface> }`. The adapter's wire descriptor
+starts a fresh closed recursive scope.
+
+Operation references are canonical `nameKey` strings selecting pure, non-startup
+entries in the optional manifest `codecOperations` array. That array uses the
+same callable records and package-local interface indices as `exports`, but
+does not expose application calls. Admission checks the operation references,
+arity and opaque-object ABI. Computed constructors consume opaque arguments and
+return an opaque object; library decoders return the admitted `Except String`
+object protocol, and encoders return an opaque wire object.
+
+These additions require a deliberate format/compatibility revision and matching
+publication; the published manifest-12/runtime-6 pair does not support them.
+The [JSON-safe contract](../design/JSON_SAFE_VALUE_CODEC.md) describes the value
+representation, generator and current limits. Value validation and helper ABI
+agreement do not prove application invariants or codec inverse laws.
+
 ### Native types and compiler metadata
 
 `native.type` selects a core operation and ownership class. It does not have

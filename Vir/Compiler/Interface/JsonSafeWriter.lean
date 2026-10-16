@@ -159,10 +159,11 @@ private partial def bodyFor (type : Expr) (model : InterfaceType) (owners : Arra
   | _ => throwError "unsupported JSON-safe writer domain: {model.label}"
 end
 
-/-- Internal experimental producer entry point. Generate a typed String writer
+/-- Generate a typed JSON-safe String writer
 from the ordinary classified boundary. Traversal helpers are private; the named
-root can be used by an application wrapper. This is not a public view-selection
-syntax or a published JSON wire contract. -/
+root can be used by an application wrapper. Call from `run_elab` with a fully
+qualified declaration name and a closed source type. Unsupported domains fail
+generation instead of selecting a `ToJson` fallback. -/
 def generate (name : Name) (type : Expr) : TermElabM Unit := do
   if (← getEnv).contains name then throwError "writer declaration already exists: {name}"
   let model ← match ← interfaceType type with

@@ -18,12 +18,10 @@ try {
     for (const representation of ["native", "json-safe-v1"]) {
       const runtime = await createVirRuntimeFactory({ wasmBytes: await readFile(new URL(`../../web/public/${wasm}`, import.meta.url)) }).createRuntime({ irPackageSet: [bytes] });
       try {
-        if (representation !== "native") {
-          const bind = runtime.nativeValueCodec;
-          runtime.nativeValueCodec = function (pair) { return bind.call(this, pair, { representation }); };
-        }
         const nat = value => representation === "native" ? BigInt(value) : String(value);
-        const call = (name, ...args) => runtime.call(`AdapterValues.${name}`, ...args);
+        const call = (name, ...args) => runtime.callWith({
+          argumentRepresentation: representation, resultRepresentation: representation,
+        }, `AdapterValues.${name}`, ...args);
         const large = nat("900719925474099312345"), small = nat(1);
         const input = [{ fst: large, snd: "first" }, { fst: small, snd: "α🦀" }, { fst: large, snd: "last" }];
         const expected = [{ fst: small, snd: "α🦀" }, { fst: large, snd: "last" }];

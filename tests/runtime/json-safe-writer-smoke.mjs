@@ -27,11 +27,9 @@ try {
     for (const representation of ["native", "json-safe-v1"]) {
       const runtime = await createVirRuntimeFactory({ wasmBytes: await readFile(new URL(`../../web/public/${wasm}`, import.meta.url)) }).createRuntime({ irPackageSet: [bytes] });
       try {
-        if (representation !== "native") {
-          const bind = runtime.nativeValueCodec;
-          runtime.nativeValueCodec = function (pair) { return bind.call(this, pair, { representation }); };
-        }
-        const call = (name, ...args) => runtime.call(`JsonSafeWriterValues.${name}`, ...args);
+        const call = (name, ...args) => runtime.callWith({
+          argumentRepresentation: representation, resultRepresentation: representation,
+        }, `JsonSafeWriterValues.${name}`, ...args);
         assert.equal(runtime.interfaceManifest.exports.length, 5);
         assert.equal(runtime.interfaceManifest.codecOperations.length, 2);
         assert.ok(runtime.interfaceManifest.exports.every(entry => !entry.entry.includes("_codec")));
@@ -51,10 +49,10 @@ try {
         }
         assert.equal(call("agrees", input), true);
         assert.deepEqual(JSON.parse(call("write", input)), expected);
-        // Per-call internal selection keeps ordinary reference results usable
+        // Per-call selection keeps ordinary reference results usable
         // while consuming JSON-safe input, including byte number arrays.
-        const selected = (name, args, options) => runtime.callEntry(
-          runtime.findManifestEntry(`JsonSafeWriterValues.${name}`), args, null, options);
+        const selected = (name, args, options) => runtime.callWith(
+          options, `JsonSafeWriterValues.${name}`, ...args);
         if (representation === "native") {
           const wireArgs = { argumentRepresentation: "json-safe-v1" };
           assert.equal(selected("agrees", [expected], wireArgs), true);
@@ -70,6 +68,10 @@ try {
             }), /unsupported by json-safe-v1/);
             assert.equal(entered, 0, "selected result rejects before effects or adapter construction");
             assert.throws(() => selected("fixtureText", [], { argumentRepresentation: "unknown" }), /unsupported value representation/);
+            for (const options of [null, [], { representation: "json-safe-v1" },
+              { [Symbol("representation")]: "json-safe-v1" }])
+              assert.throws(() => selected("fixtureText", [], options), /callWith options/);
+            assert.equal(entered, 0);
           } finally { runtime.callResolvedObjects = enter; }
           assert.equal(selected("agrees", [expected], wireArgs), true);
         }

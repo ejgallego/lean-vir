@@ -358,6 +358,15 @@ application ownership: VIR does not dispose supplied maps when runtimes shut dow
   `Duplicate.entry` and `Duplicate_entry` are distinct callable declarations.
 - `vir.callTimed(entry, ...args)` performs the same call and returns
   `{ value, timings }` for opt-in phase attribution.
+- `vir.callWith(options, entry, ...args)` explicitly selects `argumentRepresentation`
+  and `resultRepresentation`, each `"native"` (the default) or `"json-safe-v1"`.
+  The argument choice applies to every argument in that call. The resource-program
+  facade exposes the same method and restricts it to the root program's exports.
+  JSON-safe arguments can return ordinary values or owned references by leaving
+  the result choice at its default. The selected domains are checked before any
+  lowering or invocation; an unsupported domain throws without invoking the entry.
+  See the [JSON-safe contract](../design/JSON_SAFE_VALUE_CODEC.md) for the generated
+  Lean writer, precise encodings and current generation limits.
 - Export `id`, export `jsName`, and `exportsByName` were removed in manifest11 /
   resource compatibility5. Replace generated methods and alias calls with
   `call` using the full `entry`; regenerate programs with the matching SDK.

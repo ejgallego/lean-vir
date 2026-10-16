@@ -274,6 +274,20 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     return this.callEntry(entry, args);
   }
 
+  callWith(options, name, ...args) {
+    this.requireLiveRuntime();
+    const entry = this.findManifestEntry(name);
+    if (entry === null) {
+      throw new Error(`interface entry not found: ${name}`);
+    }
+    if (options === null || typeof options !== "object" || Array.isArray(options) ||
+        Reflect.ownKeys(options).some(key =>
+          key !== "argumentRepresentation" && key !== "resultRepresentation")) {
+      throw new TypeError("callWith options must contain only argumentRepresentation and resultRepresentation");
+    }
+    return this.callEntry(entry, args, null, options);
+  }
+
   callTimed(name, ...args) {
     this.requireLiveRuntime();
     const timing = new RuntimeCallTiming();
