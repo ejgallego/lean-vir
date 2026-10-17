@@ -18,6 +18,7 @@ try {
     text: "λ\n🦀\"\\", natural: "900719925474099312345",
     integer: "-12345678901234567890123456789000", unsigned: "18446744073709551615",
     bytes: [0, 127, 255], unit: null, hidden: { value: "42" }, foo_bar: "preserved",
+    names: { foo_bar: "9", arg1: "17" }, letter: { val: 0x1f980 }, priority: { val: "99" },
     tree: { kind: "branch", value: [{ kind: "none" },
       { kind: "some", value: { kind: "leaf", value: "900719925474099312345" } },
       { kind: "some", value: { kind: "fork", fields: {
@@ -44,6 +45,8 @@ try {
         if (representation === "native") {
           for (const key of ["natural", "integer", "unsigned"]) input[key] = BigInt(input[key]);
           input.hidden.value = 42n;
+          input.names = { foo_bar: 9n, arg1: 17n };
+          input.priority.val = 99n;
           input.tree.value[1].value.value = 900719925474099312345n;
           input.store = input.store.map(entry => ({ ...entry, fst: BigInt(entry.fst) }));
           input.unit = undefined;
@@ -81,6 +84,11 @@ try {
         changed.foo_bar = "different";
         assert.equal(call("agrees", changed), false);
         assert.equal(JSON.parse(call("write", changed)).foo_bar, "different");
+        const changedField = structuredClone(input);
+        changedField.names.arg1 = representation === "native" ? 99n : "99";
+        assert.equal(call("agrees", changedField), false);
+        assert.deepEqual(JSON.parse(call("write", changedField)).names,
+          { foo_bar: "9", arg1: "99" });
         const invalid = structuredClone(input);
         invalid.natural = "not-a-number";
         assert.throws(() => call("write", invalid));

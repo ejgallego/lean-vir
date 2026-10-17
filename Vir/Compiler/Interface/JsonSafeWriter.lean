@@ -30,19 +30,12 @@ private def invoke (name : Name) (value out : Term) : BuildM Term :=
 
 /-- Use the constructor's instantiated type, including private fields. Types
 remain Exprs until elaboration; no pretty-printing or reparsing is involved. -/
-private def ctorFields (type : Expr) (name : Name) : MetaM (Array (String × Expr)) := do
+private def ctorFields (type : Expr) (name : Name) : MetaM (Array Expr) := do
   let type ← reduceTypeAliases type
   let fields ← match instantiateConstructorFields (← getEnv) type name with
     | .ok fields => pure fields
     | .error error => throwError error.toMessageData
-  return fields.map fun field => (field.name.toString, field.type)
-
-private def fieldInfo (fields : Array (String × Expr)) (name : String) : MetaM (Nat × Expr) := do
-  for h : index in [:fields.size] do
-    let (rawName, type) := fields[index]
-    if rawName == name || binderArgName (index + 1) (.str .anonymous rawName) == name then
-      return (index, type)
-  throwError "writer field {name} is not a constructor argument"
+  return fields.map (·.type)
 
 private def fieldVar (index : Nat) : Term := ⟨mkIdent (.str .anonymous s!"field{index}")⟩
 
@@ -99,10 +92,11 @@ private partial def bodyFor (type : Expr) (model : InterfaceType) (owners : Arra
         let field := descriptor.fields[index]
         if field.isSubobject then
           throwError "inherited record fields are not yet supported by this writer"
-        let (actualIndex, actualType) ← fieldInfo fields field.name
-        let fn ← plan actualType field.type owners
+        -- Classification preserves constructor order; only the trailing
+        -- Char/Fin proof field is omitted from supported record descriptors.
+        let fn ← plan fields[index]! field.type owners
         let fieldPrefix := (if index == 0 then "" else ",") ++ Json.renderString field.name ++ ":"
-        output ← invoke fn (fieldVar actualIndex) (← append output fieldPrefix)
+        output ← invoke fn (fieldVar index) (← append output fieldPrefix)
       output ← append output "}"
       let pat ← pattern descriptor.constructorName fields.size
       `(match ($value) with | $pat => $output)
@@ -114,7 +108,7 @@ private partial def bodyFor (type : Expr) (model : InterfaceType) (owners : Arra
   | .customInductive name _ constructors =>
       if let some element := linkedListElement? name constructors then
         let fields ← ctorFields type `List.cons
-        let fn ← plan fields[0]!.2 element owners
+        let fn ← plan fields[0]! element owners
         return ← `(Vir.JsonSafeWriter.list $(mkIdent fn) $value $out)
       let mut alternatives := #[]
       for h : index in [:constructors.size] do
@@ -124,17 +118,15 @@ private partial def bodyFor (type : Expr) (model : InterfaceType) (owners : Arra
         let fields ← ctorFields type ctor.constructorName
         let mut output ← append out ("{\"kind\":" ++ Json.renderString kind)
         if let .value field := payload then
-          let (actualIndex, actualType) ← fieldInfo fields field.name
-          let fn ← plan actualType field.type owners
-          output ← invoke fn (fieldVar actualIndex) (← append output ",\"value\":")
+          let fn ← plan fields[0]! field.type owners
+          output ← invoke fn (fieldVar 0) (← append output ",\"value\":")
         else if let .fields payloadFields := payload then
           output ← append output ",\"fields\":{"
           for h : fieldIndex in [:payloadFields.size] do
             let field := payloadFields[fieldIndex]
-            let (actualIndex, actualType) ← fieldInfo fields field.name
-            let fn ← plan actualType field.type owners
+            let fn ← plan fields[fieldIndex]! field.type owners
             let fieldPrefix := (if fieldIndex == 0 then "" else ",") ++ Json.renderString field.name ++ ":"
-            output ← invoke fn (fieldVar actualIndex) (← append output fieldPrefix)
+            output ← invoke fn (fieldVar fieldIndex) (← append output fieldPrefix)
           output ← append output "}"
         output ← append output "}"
         let pat ← pattern ctor.constructorName fields.size
