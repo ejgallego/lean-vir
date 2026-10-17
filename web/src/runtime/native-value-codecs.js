@@ -6,30 +6,147 @@ Author: Emilio J. Gallego Arias
 
 import { compileConstructorValueInterface } from "./constructor-value-interface.js";
 import { compilePrimitiveValueCodec } from "./primitive-values.js";
-import {
-  normalizeBoundedUnsignedBigInt,
-} from "./primitive-value-normalizers.js";
+import { objectArgumentSupported, objectResultSupported } from "./object-abi.js";
+import { normalizeBoundedUnsignedBigInt } from "./primitive-value-normalizers.js";
 
 // Precondition: immutable admitted compiler facts and a supported selected view.
 // Bind those facts to the selected JS representation.
 // Plans reuse managed allocation/ownership and construct values directly.
 // No intermediate normalized tree or second descriptor interpretation is needed.
-export function compileNativeValueCodec(runtime, pair) {
-  return compileValueCodec(runtime, pair.native, pair.value);
+export function compileNativeValueCodec(runtime, pair, { representation = "native" } = {}) {
+  if (representation !== "native" && representation !== "json-safe-v1")
+    throw new Error(`unsupported value representation ${representation}`);
+  const jsonSafe = representation === "json-safe-v1";
+  if (jsonSafe) {
+    requireJsonSafeDomain(pair.native, pair.value, "interface");
+    if (!objectArgumentSupported(pair) || !objectResultSupported(pair))
+      throw new Error("interface has unsupported packed conversion for json-safe-v1");
+  }
+  return compileValueCodec(runtime, pair.native, pair.value, [], jsonSafe);
 }
 
-function compileValueCodec(runtime, native, view, bindings = []) {
+// Internal helper protocol. The generated wire codec handles values directly;
+// typed Lean helpers receive/return owned opaque objects through the same bridge.
+// Registration validates source/wire types; admission validates these call facts.
+export function compileLibraryValueAdapter(runtime, { decode, encode }, wireCodec) {
+  runtime.requireLiveRuntime();
+  const decodeCache = runtime.callCacheFor(decode);
+  const encodeCache = runtime.callCacheFor(encode);
+  // Precondition: helper protocols and wire facts have been admitted.
+
+  return Object.freeze({
+    lower(value, label, scratch) {
+      runtime.requireLiveRuntime();
+      const owned = [];
+      try {
+        owned.push(wireCodec.lower(value, label, scratch));
+        return runtime.callResolvedObjects(decode, decodeCache, owned, result => {
+          const tag = runtime.exports.vir_obj_tag(result);
+          if (tag !== 0 && tag !== 1)
+            throw new Error(`${label}: adapter returned an invalid Except constructor`);
+          const payload = runtime.ownedObjectField(result, 0, label);
+          if (tag === 1) return payload; // Acquired ref survives outer Except cleanup.
+          try { throw new Error(`${label}: ${runtime.readObjectString(payload)}`); }
+          finally { runtime.exports.vir_obj_dec(payload); }
+        });
+      } finally {
+        // Also covers failures before callResolvedObjects enters its consuming ABI.
+        runtime.releaseOwnedObjects(owned);
+      }
+    },
+    lift(obj, label) {
+      runtime.requireLiveRuntime();
+      const owned = [];
+      try {
+        // The enclosing converter owns obj. Give the consuming helper its own ref.
+        runtime.exports.vir_obj_inc(obj);
+        owned.push(obj);
+        return runtime.callResolvedObjects(encode, encodeCache, owned,
+          result => wireCodec.lift(result, label));
+      } finally { runtime.releaseOwnedObjects(owned); }
+    },
+  });
+}
+
+// Private construction operation over already lowered, owned fields. The
+// package's typed pure helper computes runtime-only fields; no JS graph rebuild.
+export function compileLibraryConstructor(runtime, entry) {
+  runtime.requireLiveRuntime();
+  const cache = runtime.callCacheFor(entry);
+  return (owned, label) => {
+    runtime.requireLiveRuntime();
+    if (owned.length !== entry.args.length)
+      throw new Error(`${label}: constructor operation argument count disagrees`);
+    return runtime.callResolvedObjects(entry, cache, owned, result => {
+      runtime.exports.vir_obj_inc(result);
+      return result; // Retained result survives the call's result cleanup.
+    });
+  };
+}
+
+function constructorOperation(runtime, ctor) {
+  if (ctor.operation === undefined) return undefined;
+  runtime.nativeConstructorOperations ??= new WeakMap();
+  let operation = runtime.nativeConstructorOperations.get(ctor);
+  if (operation === undefined) {
+    const entry = runtime.interfaceManifest?.codecOperations?.find(entry => entry.nameKey === ctor.operation);
+    if (entry === undefined) throw new Error(`${ctor.name} requires its constructor operation`);
+    operation = compileLibraryConstructor(runtime, entry);
+    runtime.nativeConstructorOperations.set(ctor, operation);
+  }
+  return operation;
+}
+
+// This checks profile eligibility, not descriptor grammar (already admitted).
+// Reject the complete domain before binding, rather than only visited values.
+function requireJsonSafeDomain(native, view, label) {
+  function valueDomain(value, path) {
+    if (["jsReference", "leanReference", "function", "expr"].includes(value.tag))
+      throw new Error(`${path}: ${value.tag} is unsupported by json-safe-v1`);
+    if (value.element) valueDomain(value.element, `${path}[]`);
+    if (value.wire) valueDomain(value.wire, `${path}.wire`);
+    for (const entry of value.fields ?? []) valueDomain(entry.value, `${path}.${entry.key}`);
+    for (const entry of value.cases ?? []) {
+      if (typeof entry === "string") continue;
+      if (entry.value) valueDomain(entry.value, `${path}.${entry.kind}.value`);
+      for (const field of entry.fields ?? []) valueDomain(field.value, `${path}.${entry.kind}.${field.key}`);
+    }
+  }
+  function nativeDomain(type, path) {
+    if (type.ref !== undefined) return;
+    if (["float", "resource"].includes(type.type.tag))
+      throw new Error(`${path}: ${type.type.tag} is unsupported by json-safe-v1`);
+    if (type.metadata?.arrayElement) nativeDomain(type.metadata.arrayElement, `${path}[]`);
+    if (type.metadata?.adapter) nativeDomain(type.metadata.adapter.wire, `${path}.wire`);
+    for (const ctor of type.metadata?.constructors ?? [])
+      for (const field of ctor.fields) nativeDomain(field.type, `${path}.${ctor.name}.${field.name}`);
+  }
+  valueDomain(view, label);
+  nativeDomain(native, label);
+}
+
+function compileValueCodec(runtime, native, view, bindings = [], jsonSafe = false) {
   if ("ref" in native) {
     return bindings[native.ref];
   }
-  const primitive = compilePrimitiveValueCodec(runtime, native, view);
+  const primitive = compilePrimitiveValueCodec(runtime, native, view, { jsonSafe });
   if (primitive !== null) return primitive;
   const type = native.type;
   const codec = {};
   const compile = (type, value, scope = bindings) =>
-    compileValueCodec(runtime, type, value, scope);
+    compileValueCodec(runtime, type, value, scope, jsonSafe);
   switch (type.tag) {
     case "leanObject": {
+      if (view.tag === "adapted") {
+        const adapter = native.metadata.adapter;
+        const entries = runtime.interfaceManifest?.codecOperations ?? [];
+        const decode = entries.find(entry => entry.nameKey === adapter.decode);
+        const encode = entries.find(entry => entry.nameKey === adapter.encode);
+        if (decode === undefined || encode === undefined)
+          throw new Error("library adapter requires its decode/encode operations");
+        const wire = compile(adapter.wire, view.wire, []);
+        return compileLibraryValueAdapter(runtime, { decode, encode }, wire);
+      }
       if (view.tag === "expr") {
         codec.lower = (value, label) => runtime.makeObjectExpr(value, label);
         codec.lift = (obj, label) => runtime.liftObjectExpr(obj, label);
@@ -90,6 +207,10 @@ function compileValueCodec(runtime, native, view, bindings = []) {
             throw new Error(`${label} constructor is out of range`);
           return plans[index].lift(obj, label);
         };
+        if (identity) preservePackedOperations(codec, plans[0], (value, label) => {
+          shape.select(value, label);
+          return shape.cases[0].read(value, label);
+        });
       } else if (view.tag === "record") {
         const fieldKeys = view.fields.map(field => field.key);
         const keys = new Set(fieldKeys);
@@ -100,6 +221,10 @@ function compileValueCodec(runtime, native, view, bindings = []) {
           return ctor.lower(0, value, label, scratch);
         };
         codec.lift = (obj, label) => ctor.lift(obj, label);
+        preservePackedOperations(codec, ctor, (value, label) => {
+          requireRecord(value, keys, label);
+          return value;
+        });
       } else throw new Error(`unsupported constructor view ${view.tag}`);
       break;
     }
@@ -120,7 +245,7 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
     const group = groups.get(index);
     if (group.length === 1 && group[0].path.length === 1) {
       const mapping = group[0];
-      return { field, codec: compile(field.type, mapping.value, scope),
+      return { field, codec: checkedFieldCodec(compile(field.type, mapping.value, scope), mapping.check),
         read: reader(mapping.key), key: mapping.key, keys: [mapping.key], nested: false };
     }
     const nested = group.map(mapping => ({ ...mapping, path: mapping.path.slice(1) }));
@@ -139,15 +264,40 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
     lower: (index, _value, label) => runtime.makeObjectScalar(index, label),
     lift: () => build(undefined),
   };
-  if (ctor.representation === "identity") return {
-    lower: (_index, value, label, scratch) => fields[0].codec.lower(fields[0].read(value), label, scratch),
-    lift(obj, label) {
-      const value = fields[0].codec.lift(obj, label);
+  if (ctor.representation === "identity") {
+    const entry = fields[0];
+    function rebuild(value) {
       if (single) return build(value);
-      const output = { ...outputTemplate }; append(output, fields[0], value); return build(output);
-    },
-  };
+      const output = { ...outputTemplate }; append(output, entry, value); return build(output);
+    }
+    const result = {
+      lower: (_index, value, label, scratch) => entry.codec.lower(entry.read(value), label, scratch),
+      lift: (obj, label) => rebuild(entry.codec.lift(obj, label)),
+    };
+    if (entry.codec.scalar) result.scalar = {
+      write: (bytes, offset, size, value, label) => entry.codec.scalar.write(bytes, offset, size, entry.read(value), label),
+      read: (bytes, offset, size, label) => rebuild(entry.codec.scalar.read(bytes, offset, size, label)),
+    };
+    if (entry.codec.usize) result.usize = {
+      write: (value, label) => entry.codec.usize.write(entry.read(value), label),
+      read: value => rebuild(entry.codec.usize.read(value)),
+    };
+    return result;
+  }
   const storage = ctor.storage, objectOnly = storage.usizeFieldCount === 0 && storage.scalarByteSize === 0;
+  // Admission requires the operation; binding reuses its consuming call plan.
+  // Weak keys are this runtime's descriptors, not global type names.
+  const construct = constructorOperation(runtime, ctor);
+  const lowerConstructed = construct === undefined ? undefined : (_index, value, label, scratch) => {
+    const owned = [];
+    try {
+      // Helpers take logical arguments in source order, each boxed by its codec.
+      // Physical storage (including computed fields) belongs to the helper.
+      for (const entry of fields)
+        owned.push(entry.codec.lower(entry.read(value), `${label}.${entry.field.name}`, scratch));
+      return construct(owned, label);
+    } finally { runtime.releaseOwnedObjects(owned); }
+  };
   // Physical slots are admitted facts. Bind the common small object layouts
   // once instead of branching on every field's location at every value.
   const objectFields = objectOnly ? [...fields].sort((a, b) => a.field.location.index - b.field.location.index) : null;
@@ -185,7 +335,7 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
     }
     const ptr = runtime.exports.vir_obj_ctor_scalar_data(obj, at.tag === "usize" ? 0 : storage.usizeFieldCount);
     if (ptr === 0) throw new Error(`${label} scalar field is unavailable`);
-    if (at.tag === "usize") return new DataView(runtime.exports.memory.buffer, ptr, storage.usizeFieldCount * 4).getUint32(at.index * 4, true);
+    if (at.tag === "usize") return codec.usize.read(new DataView(runtime.exports.memory.buffer, ptr, storage.usizeFieldCount * 4).getUint32(at.index * 4, true));
     return codec.scalar.read(new DataView(runtime.exports.memory.buffer, ptr, storage.scalarByteSize), at.offset, at.size, label);
   }
   let liftObjects;
@@ -221,7 +371,7 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
     }
   }
   return {
-    lower: lowerObjects ?? ((index, value, label, scratch) => {
+    lower: lowerConstructed ?? lowerObjects ?? ((index, value, label, scratch) => {
       const objects = Array(storage.objectFieldCount).fill(0);
       const usize = objectOnly ? null : Array(storage.usizeFieldCount).fill(0n);
       const bytes = objectOnly ? null : new Uint8Array(storage.scalarByteSize);
@@ -231,7 +381,7 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
           const at = entry.field.location, child = entry.read(value);
           const fieldLabel = `${label}.${entry.field.name}`;
           if (at.tag === "object") objects[at.index] = entry.codec.lower(child, fieldLabel, scratch);
-          else if (at.tag === "usize") usize[at.index] = normalizeBoundedUnsignedBigInt(child, fieldLabel, 0xffffffffn, "USize");
+          else if (at.tag === "usize") usize[at.index] = entry.codec.usize.write(child, fieldLabel);
           else entry.codec.scalar.write(scalars, at.offset, at.size, child, fieldLabel);
         }
         return objectOnly ? scratch.createObjects(index, objects, label)
@@ -248,9 +398,42 @@ function constructorKernel(runtime, ctor, mappings, scope, compile, reader, sing
   };
 }
 
+function preservePackedOperations(target, source, read) {
+  if (source.scalar) target.scalar = {
+    write: (bytes, offset, size, value, label) => source.scalar.write(bytes, offset, size, read(value, label), label),
+    read: source.scalar.read,
+  };
+  if (source.usize) target.usize = {
+    write: (value, label) => source.usize.write(read(value, label), label),
+    read: source.usize.read,
+  };
+}
+
+function checkedFieldCodec(codec, check) {
+  if (check === undefined) return codec;
+  const max = check.tag === "natLt" ? BigInt(check.bound) - 1n : null;
+  function validate(value, label) {
+    if (check.tag === "unicodeScalar") {
+      if (!Number.isInteger(value) || value < 0 || value >= 0x110000 || (value >= 0xd800 && value <= 0xdfff))
+        throw new Error(`${label} must be a Unicode scalar value`);
+    } else normalizeBoundedUnsignedBigInt(value, label, max, `Fin ${check.bound}`);
+    return value;
+  }
+  const result = {
+    lower: (value, label, scratch) => codec.lower(validate(value, label), label, scratch),
+    lift: (obj, label) => validate(codec.lift(obj, label), label),
+  };
+  if (codec.scalar) result.scalar = {
+    write: (bytes, offset, size, value, label) => codec.scalar.write(bytes, offset, size, validate(value, label), label),
+    read: (bytes, offset, size, label) => validate(codec.scalar.read(bytes, offset, size, label), label),
+  };
+  return Object.freeze(result);
+}
+
 function compileChain(runtime, constructors, view, scope, compile) {
   const { nil, cons, head, tail } = view.chain;
   const cell = constructors[cons];
+  const construct = constructorOperation(runtime, cell);
   const element = compile(cell.fields[head].type, view.element, scope);
   const headIndex = cell.fields[head].location.index, tailIndex = cell.fields[tail].location.index;
   return {
@@ -261,9 +444,9 @@ function compileChain(runtime, constructors, view, scope, compile) {
         for (let i = value.length - 1; i >= 0; i--) {
           const objects = [0, 0];
           try {
-            objects[headIndex] = element.lower(value[i], `${label}[${i}]`, scratch);
-            objects[tailIndex] = cursor; cursor = 0;
-            cursor = scratch.createObjects(cons, objects, label);
+            objects[construct === undefined ? headIndex : head] = element.lower(value[i], `${label}[${i}]`, scratch);
+            objects[construct === undefined ? tailIndex : tail] = cursor; cursor = 0;
+            cursor = construct === undefined ? scratch.createObjects(cons, objects, label) : construct(objects, label);
           } finally { runtime.releaseOwnedObjects(objects); }
         }
         const result = cursor; cursor = 0; return result;

@@ -390,6 +390,28 @@ for (const [name, change] of [
       assert.ok(s.requests.some((r) => r.path === "/program/set.json"));
     }));
 
+test("selected calls keep the program export boundary and disposal checks", async () =>
+  fixture(async (s) => {
+    const options = { argumentRepresentation: "json-safe-v1" };
+    const input = { amount: "9007199254740993" };
+    let calls = 0;
+    s.runtime.callWith = (selected, declaration, ...args) => {
+      calls++;
+      assert.equal(selected, options);
+      assert.equal(declaration, "Root.run");
+      assert.deepEqual(args, [input]);
+      return 42n;
+    };
+    s.creation.resolve(s.runtime);
+    const program = await createProgram(s.options);
+    assert.equal(program.callWith(options, "Root.run", input), 42n);
+    assert.throws(() => program.callWith(options, "Dependency.hidden", input), /unknown program export/);
+    assert.equal(calls, 1);
+    program.dispose();
+    assert.throws(() => program.callWith(options, "Root.run", input), /program has been disposed/);
+    assert.equal(calls, 1);
+  }));
+
 test("expected full name and signature snapshot survive caller mutation", async () =>
   fixture(async (s) => {
     const exports = expected(),

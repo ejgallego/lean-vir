@@ -10,11 +10,24 @@ import test from "node:test";
 import {
   constructorTemplate,
   defaultValueForType,
+  inputDefault,
   interfaceInputTag,
   isJsonInput,
 } from "../../web/app/pages/interface-inputs.js";
 
 const nat = { type: { tag: "nat" } };
+
+test("runner adapter templates follow their generated wire view", () => {
+  const pair = { native: { type: { tag: "leanObject" }, metadata: { adapter: {
+    wire: { type: { tag: "leanObject" }, metadata: { arrayElement: nat } },
+  } } }, value: { tag: "adapted", wire: { tag: "sequence", element: { tag: "bigint" } } } };
+  assert.deepEqual(defaultValueForType(pair), []);
+  assert.equal(interfaceInputTag(pair), "TEXTAREA");
+  assert.equal(isJsonInput(pair), true);
+  const text = { native: { type: { tag: "leanObject" }, metadata: { adapter: { wire: { type: { tag: "string" } } } } },
+    value: { tag: "adapted", wire: { tag: "string" } } };
+  assert.equal(inputDefault({ type: text }), '""');
+});
 
 test("runner templates follow the selected value cases and native field paths", () => {
   const option = {

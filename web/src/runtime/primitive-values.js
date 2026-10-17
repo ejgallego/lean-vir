@@ -24,7 +24,9 @@ const primitiveViews = new Set(["bigint", "number", "string", "bytes", "unit", "
 export class PrimitiveObjectRuntime extends ObjectRuntime {
   objectArgumentSupported(pair) { return primitiveViews.has(pair?.value?.tag); }
   objectResultSupported(pair) { return primitiveViews.has(pair?.value?.tag); }
-  nativeValueCodec(pair) {
+  nativeValueCodec(pair, { representation = "native" } = {}) {
+    if (representation !== "native")
+      throw new Error("selected value representation requires optional object conversion");
     this.nativeValueCodecs ??= new WeakMap();
     let codec = this.nativeValueCodecs.get(pair);
     if (codec === undefined) {
@@ -34,8 +36,8 @@ export class PrimitiveObjectRuntime extends ObjectRuntime {
     }
     return codec;
   }
-  makeObjectValue(pair, value, label) { return this.nativeValueCodec(pair).lower(value, label); }
-  liftObjectValue(pair, obj, label) { return this.nativeValueCodec(pair).lift(obj, label); }
+  makeObjectValue(pair, value, label, options) { return this.nativeValueCodec(pair, options).lower(value, label); }
+  liftObjectValue(pair, obj, label, options) { return this.nativeValueCodec(pair, options).lift(obj, label); }
 
   readObjectNat(obj) {
     if (this.targetPointerBytes() === 4 && this.exports.vir_obj_is_scalar(obj) !== 0)
@@ -147,7 +149,7 @@ export class PrimitiveObjectRuntime extends ObjectRuntime {
 
 // Scalar operations and exact resource/reference passage belong to the managed
 // composition too. Structural traversal remains in optional object conversion.
-export function compilePrimitiveValueCodec(runtime, native, view) {
+export function compilePrimitiveValueCodec(runtime, native, view, { jsonSafe = false } = {}) {
   if (native.ref !== undefined) return null;
   const type = native.type, codec = {};
   switch (type.tag) {
@@ -155,6 +157,10 @@ export function compilePrimitiveValueCodec(runtime, native, view) {
     case "int": {
       const signed = type.tag === "int";
       codec.lower = (value, label) => {
+        if (jsonSafe) {
+          requireCanonicalDecimal(value, label, signed);
+          return runtime.makeObjectDecimal(signed ? "vir_obj_int" : "vir_obj_nat", value, label);
+        }
         // Use the native scalar operation for exactly representable wasm32 Nats.
         // Heap naturals and textual inputs keep arbitrary-precision conversion.
         if (!signed && runtime.targetPointerBytes() === 4 && (
@@ -164,8 +170,12 @@ export function compilePrimitiveValueCodec(runtime, native, view) {
         return runtime.makeObjectDecimal(signed ? "vir_obj_int" : "vir_obj_nat",
           normalizeDecimal(value, label, { signed }), label);
       };
-      codec.lift = obj => signed ? BigInt(runtime.readObjectDecimal(obj, "vir_obj_int_decimal"))
-        : runtime.readObjectNat(obj);
+      if (jsonSafe) codec.lift = obj => {
+        if (!signed && runtime.targetPointerBytes() === 4 && runtime.exports.vir_obj_is_scalar(obj) !== 0)
+          return String(runtime.exports.vir_obj_scalar_value(obj) >>> 0);
+        return runtime.readObjectDecimal(obj, signed ? "vir_obj_int_decimal" : "vir_obj_nat_decimal");
+      };
+      else codec.lift = obj => signed ? BigInt(runtime.readObjectDecimal(obj, "vir_obj_int_decimal")) : runtime.readObjectNat(obj);
       break;
     }
     case "string":
@@ -173,8 +183,8 @@ export function compilePrimitiveValueCodec(runtime, native, view) {
       codec.lift = obj => runtime.readObjectString(obj);
       break;
     case "byteArray":
-      codec.lower = (value, label) => runtime.makeObjectByteArray(value, label);
-      codec.lift = obj => runtime.readObjectByteArray(obj);
+      codec.lower = (value, label) => runtime.makeObjectByteArray(jsonSafe ? jsonBytes(value, label) : value, label);
+      codec.lift = obj => jsonSafe ? Array.from(runtime.readObjectByteArray(obj)) : runtime.readObjectByteArray(obj);
       break;
     case "resource":
       codec.lower = (value, label) => runtime.makeObjectResource(value, label);
@@ -194,7 +204,23 @@ export function compilePrimitiveValueCodec(runtime, native, view) {
           : runtime.exports[width === "usize" ? "vir_obj_usize_value" : "vir_obj_uint32_value"](obj) >>> 0;
       }
       // Packed scalar storage uses the same validation as an object boundary.
-      codec.scalar = unsignedScalar(width === "usize" ? 32 : width);
+      if (jsonSafe) {
+        const lower = codec.lower;
+        codec.lower = (value, label) => {
+          if (width === 64) requireCanonicalDecimal(value, label, false);
+          else normalizeInteger(value, label, 0, width === "usize" ? 0xffffffff : 2 ** width - 1);
+          return lower(value, label);
+        };
+        if (width === 64) codec.lift = obj => BigInt.asUintN(64, runtime.exports.vir_obj_uint64_value(obj)).toString();
+      }
+      codec.scalar = unsignedScalar(width === "usize" ? 32 : width, jsonSafe);
+      if (width === "usize") codec.usize = {
+        write(value, label) {
+          if (jsonSafe) normalizeInteger(value, label, 0, 0xffffffff);
+          return normalizeBoundedUnsignedBigInt(value, label, MAX_WASM32_USIZE, "USize");
+        },
+        read: value => value,
+      };
       break;
     }
     case "float": {
@@ -218,7 +244,7 @@ export function compilePrimitiveValueCodec(runtime, native, view) {
         codec.lift = (obj, label) => runtime.makeLeanObjectHandleResource(obj, label);
       } else if (["unit", "boolean", "enum"].includes(view.tag)) {
         const constructors = native.metadata.constructors;
-        const scalar = immediateView(constructors, view);
+        const scalar = immediateView(constructors, view, jsonSafe);
         const objects = constructors.map((_ctor, index) => runtime.makeObjectScalar(index, "immediate constructor binding"));
         const ordinals = new Map(objects.map((obj, index) => [obj, index]));
         codec.lower = (value, label) => objects[scalar.encode(value, label)];
@@ -239,12 +265,12 @@ export function compilePrimitiveValueCodec(runtime, native, view) {
   return Object.freeze(codec);
 }
 
-function immediateView(constructors, view) {
+function immediateView(constructors, view, jsonSafe) {
   const count = constructors.length;
   let encode, decode;
   if (view.tag === "unit") {
-    encode = (value, label) => { if (value !== undefined && value !== null) throw new Error(`${label} must be Unit`); return 0; };
-    decode = () => undefined;
+    encode = (value, label) => { if (jsonSafe ? value !== null : value !== undefined && value !== null) throw new Error(`${label} must be Unit${jsonSafe ? " (null)" : ""}`); return 0; };
+    decode = () => jsonSafe ? null : undefined;
   } else if (view.tag === "boolean") {
     const no = view.false, yes = view.true;
     encode = (value, label) => { if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`); return value ? yes : no; };
@@ -260,17 +286,34 @@ function immediateView(constructors, view) {
   } };
 }
 
-function unsignedScalar(width) {
+function unsignedScalar(width, jsonSafe) {
   const max = width === 64 ? 0xffffffffffffffffn : 2 ** width - 1;
   return {
     write(bytes, offset, _size, value, label) {
       if (width === 64) {
+        if (jsonSafe) requireCanonicalDecimal(value, label, false);
         const n = normalizeBoundedUnsignedBigInt(value, label, max, "UInt64");
         bytes.setBigUint64(offset, n, true);
       } else bytes[`setUint${width}`](offset, normalizeInteger(value, label, 0, max), true);
     },
-    read: (bytes, offset) => bytes[width === 64 ? "getBigUint64" : `getUint${width}`](offset, true),
+    read(bytes, offset) {
+      const value = bytes[width === 64 ? "getBigUint64" : `getUint${width}`](offset, true);
+      return jsonSafe && width === 64 ? value.toString() : value;
+    },
   };
+}
+function requireCanonicalDecimal(value, label, signed) {
+  const pattern = signed ? /^(?:0|-?[1-9][0-9]*)$/ : /^(?:0|[1-9][0-9]*)$/;
+  // JS's $ anchor also matches before a final line terminator.
+  if (typeof value !== "string" || !pattern.test(value) || value.trim() !== value)
+    throw new Error(`${label} must be a canonical ${signed ? "signed" : "unsigned"} decimal string`);
+}
+function jsonBytes(value, label) {
+  if (!Array.isArray(value)) throw new Error(`${label} must be a byte array`);
+  const bytes = new Uint8Array(value.length);
+  for (let index = 0; index < value.length; index++)
+    bytes[index] = normalizeInteger(value[index], `${label}[${index}]`, 0, 255);
+  return bytes;
 }
 function writeOrdinal(bytes, offset, size, value) {
   if (size === 8) bytes.setBigUint64(offset, BigInt(value), true);

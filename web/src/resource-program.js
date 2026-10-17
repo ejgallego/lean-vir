@@ -423,6 +423,12 @@ export async function createProgram(options) {
           throw new Error(`unknown program export ${declaration}`);
         return runtime.callEntry(entry, args);
       },
+      callWith(options, declaration, ...args) {
+        if (disposed) throw new Error("program has been disposed");
+        if (!declarations.has(declaration))
+          throw new Error(`unknown program export ${declaration}`);
+        return runtime.callWith(options, declaration, ...args);
+      },
       dispose() {
         if (disposed) return;
         disposed = true;

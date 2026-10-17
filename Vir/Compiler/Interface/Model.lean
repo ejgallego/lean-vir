@@ -59,6 +59,13 @@ structure ConstructorStorage where
   scalarByteSize : Nat
   deriving BEq, Repr
 
+/-- Explicit value-domain facts for selected validated structure fields.
+Storage erasure alone does not establish these constraints. -/
+inductive FieldCheck where
+  | unicodeScalar
+  | natLt (bound : Nat)
+  deriving BEq, Repr
+
 mutual
 
 /-- A Lean type classified for VIR's JavaScript interface. -/
@@ -82,6 +89,7 @@ inductive InterfaceType where
   | customInductive (name : Name) (label : String)
       (constructors : Array InductiveConstructor)
   | structure (name : Name) (label : String) (descriptor : StructureDescriptor)
+  | libraryAdapter (name : Name) (label : String) (descriptor : LibraryAdapterDescriptor)
   | resource (name : Name) (label : String)
   | function (args : Array InterfaceArg) (result : InterfaceType) (effect : InterfaceEffect)
   | expr
@@ -96,6 +104,9 @@ structure InductiveField where
 
 structure InductiveConstructor where
   constructorName : Name
+  /-- Required compiler operation for computed-field construction. Its arguments
+  are the logical fields in declaration order; it returns an owned boxed value. -/
+  operation? : Option Name := none
   storage : ConstructorStorage
   fields : Array InductiveField
   deriving BEq, Repr
@@ -106,10 +117,12 @@ structure StructureField where
   layout : FieldLayout
   /-- An inherited parent retains its own layout; host object keys are flattened. -/
   isSubobject : Bool
+  check? : Option FieldCheck := none
   deriving BEq, Repr
 
 structure StructureDescriptor where
   constructorName : Name
+  operation? : Option Name := none
   /-- Index into fields of the value representing Lean's trivial wrapper.
   This is a declaration/projection-order index, not a runtime storage slot. -/
   trivialField? : Option Nat
@@ -123,7 +136,40 @@ structure InterfaceArg where
   type : InterfaceType
   deriving BEq, Repr
 
+/-- An explicit library construction rule over a closed generated wire domain.
+The target stays opaque; helpers own its invariant and physical representation. -/
+structure LibraryAdapterDescriptor where
+  wire : InterfaceType
+  decode : Name
+  encode : Name
+  outcome : InterfaceType
+  deriving BEq, Repr
+
 end
+
+/-- A required private consuming call used by a bound codec. -/
+structure CodecOperation where
+  name : Name
+  args : Array InterfaceType
+  result : InterfaceType
+
+/-- Required closed codec operations, deduplicated by declaration identity.
+Recursive references already name an enclosing description and need no traversal. -/
+partial def InterfaceType.codecOperations : InterfaceType → Array CodecOperation
+  | .array element => element.codecOperations
+  | .customInductive _ _ constructors => constructors.flatMap fun ctor =>
+      (ctor.operation?.toArray.map fun name => { name, args := Array.replicate ctor.fields.size .leanObject, result := .leanObject }) ++
+      ctor.fields.flatMap (·.type.codecOperations)
+  | .structure _ _ descriptor =>
+      (descriptor.operation?.toArray.map fun name => { name, args := Array.replicate descriptor.fields.size .leanObject, result := .leanObject }) ++
+      descriptor.fields.flatMap (·.type.codecOperations)
+  | .function args result _ =>
+      args.flatMap (·.type.codecOperations) ++ result.codecOperations
+  | .libraryAdapter _ _ descriptor => #[
+      { name := descriptor.decode, args := #[.leanObject], result := descriptor.outcome },
+      { name := descriptor.encode, args := #[.leanObject], result := .leanObject }
+    ] ++ descriptor.wire.codecOperations
+  | _ => #[]
 
 def InterfaceType.label : InterfaceType → String
   | .unit => "Unit"
@@ -144,6 +190,7 @@ def InterfaceType.label : InterfaceType → String
   | .recursiveRef _ label _ => label
   | .customInductive _ label _ => label
   | .structure _ label .. => label
+  | .libraryAdapter _ label .. => label
   | .resource _ label => label
   | .function .. => "Function"
   | .expr => "Lean.Expr"
@@ -155,6 +202,31 @@ def constructorLabel (inductiveName ctorName : Name) : String :=
     ctorName.toString
   else
     (ctorName.replacePrefix inductiveName .anonymous).toString
+
+/-- Public payload shape is selected from logical arity, never storage slots. -/
+inductive ConstructorPayload (α : Type) where
+  | none
+  | value (field : α)
+  | fields (fields : Array α)
+
+def constructorPayload (fields : Array α) : ConstructorPayload α :=
+  match fields.toList with
+  | [] => .none
+  | [field] => .value field
+  | _ => .fields fields
+
+/-- The pinned compiler's List uses one iterative sequence view. All other
+inductives use variants; invalid List metadata is an internal invariant failure. -/
+def linkedListElement? (name : Name) (constructors : Array InductiveConstructor) : Option InterfaceType :=
+  if name != `List then none
+  else
+    let shape : List (Name × List InductiveField) :=
+      constructors.toList.map (fun ctor => (ctor.constructorName, ctor.fields.toList))
+    match shape with
+    | [(`List.nil, []), (`List.cons, [
+        { name := "head", type := element, .. },
+        { name := "tail", type := .recursiveRef _ _ 0, .. }])] => some element
+    | _ => panic! "interface: unexpected compiler-owned List constructor shape"
 
 /-- A JavaScript-boundary signature after interface type classification. -/
 structure ClassifiedSignature where

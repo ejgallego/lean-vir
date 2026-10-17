@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-const JSON_VALUE_TAGS = new Set(["expr", "record", "sequence", "variant"]);
+const JSON_VALUE_TAGS = new Set(["expr", "record", "sequence", "variant", "adapted"]);
 
 export function interfaceInputTag(pair) {
   if (pair?.value?.tag === "enum") return "SELECT";
@@ -14,7 +14,7 @@ export function interfaceInputTag(pair) {
 
 export function inputDefault(input) {
   const value = defaultValueForType(input.type);
-  return typeof value === "string" ? value : JSON.stringify(value);
+  return typeof value === "string" && !isJsonInput(input.type) ? value : JSON.stringify(value);
 }
 
 export function parseBoolText(text) {
@@ -63,6 +63,8 @@ export function defaultValueForType(pair, bindings = [], depth = 0) {
         : constructorTemplate(resolved, 0, bindings, depth);
     case "sequence":
       return [];
+    case "adapted":
+      return defaultValueForType({ native: resolved.native.metadata.adapter.wire, value: view.wire }, [], depth + 1);
     case "recursive":
     case "function":
     case "jsReference":

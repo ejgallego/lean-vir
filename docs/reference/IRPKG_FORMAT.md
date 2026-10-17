@@ -172,7 +172,7 @@ The generator embeds the manifest and its complete interface-pair table in secti
 
 | Record | Fields |
 | --- | --- |
-| Manifest | `version`, `artifact: "lean-vir-ir-package"`, `metadata`, required `interfaces`, `exports`, `hostImports`, `diagnostics`. |
+| Manifest | `version`, `artifact: "lean-vir-ir-package"`, `metadata`, required `interfaces`, `exports`, optional private `codecOperations`, `hostImports`, `diagnostics`. |
 | Metadata | `generator`, `packageFormatVersion`, `manifestVersion`, `leanVersion`, `leanToolchain`, `leanGithash`, `targets`, optional `packageSetMember: { module, role }`. |
 | Target | Exactly one origin field: compiled `module` or live-snapshot `source`; plus `mode`, `roots`, `resolvedRoots`. Source is document provenance, not a source-loading request. |
 | Export | full Lean call key `entry`, structural `nameKey`, diagnostic `source`, `args`, `result` interface index, `effect`, Boolean `startup`. Each argument is `{ name, type: <interface index> }`. |
@@ -183,7 +183,7 @@ Interface indices are package-local u32 positions in `interfaces`. Admission
 resolves them to complete pairs in the runtime manifest; see
 [interface descriptors](#interface-descriptors) for that distinction.
 
-The current manifest version is 12 and every generated package must use it.
+The current manifest version is 13 and every generated package must use it.
 Every export carries an explicit Boolean `startup` field. Volatile generation
 time is omitted from embedded metadata; only the adjacent Markdown report
 records wall-clock generation time.
@@ -217,9 +217,9 @@ Wasm. The pinned Wasm decoder derives the canonical key from its decoded Lean
 `Name`; the contract succeeds only when those structural identities agree.
 These checks use structural keys rather than parsing display names.
 
-Manifest 12 is the only supported schema. The current SDK contract is runtime
+Manifest 13 is the only supported schema. The current SDK contract is runtime
 ABI 4 with package format 11, so regenerate `.irpkg` members and descriptors
-with the manifest-12 generator and install the matching JavaScript and Wasm SDK
+with the manifest-13 generator and install the matching JavaScript and Wasm SDK
 artifacts together when the generator or runtime revision changes.
 
 The modes are `explicit`, `packageOnly`, `all`, `marked` and `markedModule`.
@@ -329,6 +329,30 @@ The compiler selects the mappings and the runtime freezes admitted pairs before
 caching plans. The binder consumes these facts; actual values and conversion
 capabilities are checked separately. Input own-property and numeric coercion
 rules belong to the [JS API](../guides/JS_API.md#calls-and-manifest).
+
+### Generated-codec metadata
+
+Manifest 13 extends this grammar with optional record-field `check`
+rules (`unicodeScalar` and `natLt` with a canonical decimal natural `bound`),
+object-constructor `operation` references, and a fourth exclusive Lean-object
+metadata form: `adapter: { wire, decode, encode }`. Its selected value interface
+is `{ tag: "adapted", wire: <ValueInterface> }`. The adapter's wire descriptor
+starts a fresh closed recursive scope.
+
+Operation references are canonical `nameKey` strings selecting pure, non-startup
+entries in the optional manifest `codecOperations` array. That array uses the
+same callable records and package-local interface indices as `exports`, but
+does not expose application calls. Admission checks the operation references,
+arity and opaque-object ABI. Computed constructors consume opaque arguments and
+return an opaque object; library decoders return the admitted `Except String`
+object protocol, and encoders return an opaque wire object.
+
+Manifest 13 requires resource compatibility 7 and matching JavaScript/Wasm SDK
+publication. The earlier published manifest-12/runtime-6 pair does not support
+these additions.
+The [JSON-safe contract](../design/JSON_SAFE_VALUE_CODEC.md) describes the value
+representation, generator and current limits. Value validation and helper ABI
+agreement do not prove application invariants or codec inverse laws.
 
 ### Native types and compiler metadata
 
