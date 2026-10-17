@@ -4,6 +4,13 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import {
+  parseByteArrayInput,
+  parseFloatText,
+  parseIntText,
+  parseNatText,
+} from "./input-parsers.js";
+
 const JSON_VALUE_TAGS = new Set(["expr", "record", "sequence", "variant", "adapted"]);
 
 export function interfaceInputTag(pair) {
@@ -15,6 +22,81 @@ export function interfaceInputTag(pair) {
 export function inputDefault(input) {
   const value = defaultValueForType(input.type);
   return typeof value === "string" && !isJsonInput(input.type) ? value : JSON.stringify(value);
+}
+
+export function parseInputValue(input, field) {
+  const text = field?.value ?? inputDefault(input);
+  const nativeType = input.type?.native?.type;
+  switch (input.type?.value?.tag) {
+    case "bigint":
+      return nativeType?.tag === "int" ? parseIntText(text) : parseNatText(text);
+    case "number":
+      return nativeType?.tag === "float"
+        ? parseFloatText(text)
+        : Number(parseNatText(text));
+    case "boolean":
+      if (field?.type === "checkbox") return Boolean(field.checked);
+      if (String(text).trim() === "true") return true;
+      if (String(text).trim() === "false") return false;
+      throw new Error(`invalid Bool literal: ${text}`);
+    case "string":
+      return text;
+    case "bytes":
+      return parseByteArrayInput(text);
+    case "enum":
+      return text.trim();
+    case "expr":
+    case "record":
+    case "sequence":
+    case "variant":
+    case "adapted":
+      return prepareJsonInput(input.type, JSON.parse(text));
+    case "unit":
+      return undefined;
+    default:
+      throw new Error(`unsupported input value interface: ${input.type?.value?.tag ?? "?"}`);
+  }
+}
+
+// JSON editing uses the admitted wire view. Materialize byte leaves for native
+// calls; leave constructor/key/range validation to the ordinary value codec.
+function prepareJsonInput(pair, value, bindings = []) {
+  if (pair.native.ref !== undefined)
+    return prepareJsonInput(bindings[pair.native.ref], value, bindings.slice(pair.native.ref + 1));
+  const view = pair.value;
+  if (view.tag === "adapted")
+    return prepareJsonInput({ native: pair.native.metadata.adapter.wire, value: view.wire }, value);
+  if (view.tag === "bytes") {
+    if (!Array.isArray(value) || value.some(byte => !Number.isInteger(byte) || byte < 0 || byte > 255))
+      throw new Error("ByteArray JSON must be an array of bytes in 0..255");
+    return new Uint8Array(value);
+  }
+  const scope = [pair, ...bindings];
+  if (view.tag === "sequence" && Array.isArray(value)) {
+    const native = view.chain === undefined ? pair.native.metadata.arrayElement
+      : pair.native.metadata.constructors[view.chain.cons].fields[view.chain.head].type;
+    return value.map(child => prepareJsonInput({ native, value: view.element }, child,
+      view.chain === undefined ? bindings : scope));
+  }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+  function childAt(path, childView, child, constructor) {
+    const resolved = nativeFieldAtPath(pair.native, path, constructor, scope);
+    return prepareJsonInput({ native: resolved.native, value: childView }, child, resolved.bindings);
+  }
+  function fields(mappings, output, constructor) {
+    if (output === null || typeof output !== "object" || Array.isArray(output)) return;
+    for (const field of mappings) if (Object.hasOwn(output, field.key))
+      output[field.key] = childAt(field.path, field.value, output[field.key], constructor);
+  }
+  if (view.tag === "record") fields(view.fields, value, 0);
+  else if (view.tag === "variant") {
+    const index = view.cases.findIndex(entry => entry.kind === value.kind);
+    const entry = view.cases[index];
+    if (entry?.payload === "value" && Object.hasOwn(value, "value"))
+      value.value = childAt([0], entry.value, value.value, index);
+    else if (entry?.payload === "fields") fields(entry.fields, value.fields, index);
+  }
+  return value;
 }
 
 export function parseBoolText(text) {

@@ -7,6 +7,15 @@ public import Lean.Data.Json.Printer
 public section
 namespace Vir.JsonSafeWriter
 
+/-- Canonical protocol formatting, independent of application display instances. -/
+def nat (value : Nat) (out : String) : String :=
+  out ++ Lean.Json.renderString (Nat.repr value)
+
+def int (value : Int) (out : String) : String :=
+  out ++ Lean.Json.renderString (Int.repr value)
+
+def unsigned (value : Nat) (out : String) : String := out ++ Nat.repr value
+
 /-- Internal runtime support for generated writers. This streams one sequence
 into the output accumulator without constructing a Lean.Json value graph. -/
 def array (write : α → String → String) (values : Array α) (out : String) : String := Id.run do
@@ -33,7 +42,7 @@ def bytes (values : ByteArray) (out : String) : String := Id.run do
   let mut out := out ++ "["
   for index in [:values.size] do
     if index != 0 then out := out ++ ","
-    out := out ++ toString values[index]!.toNat
+    out := unsigned values[index]!.toNat out
   return out ++ "]"
 
 end Vir.JsonSafeWriter

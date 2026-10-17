@@ -273,7 +273,7 @@ run_elab do
   let .ok aliasDeeper ← interfaceType (← argumentType ``deeperAlias)
     | throwError "deeper abbreviated Lists must be supported"
   expect "nested abbreviations preserve finite descent" (aliasDeeper.toJson == explicitDeeper.toJson)
-  let .error growingError ← (classifyType (lists (lists nat)) #[⟨lists nat⟩]).run
+  let .error growingError ← (classifyType (lists (lists nat)) { owners := #[⟨lists nat⟩] }).run
     | throwError "a growing applied recursion context must stay rejected"
   expect "growing applied recursion reason"
     (errorCause growingError == .nonUniformRecursive .inductive ``List)
@@ -312,15 +312,15 @@ run_elab do
   let universeTree := mkConst ``UniverseTree [.zero]
   let .ok (.customInductive _ _ _) ← interfaceType universeTree
     | throwError "universe-polymorphic parameter-free recursion failed"
-  let .ok (.recursiveRef _ _ 0) ← (classifyType (.mdata {} universeTree) #[⟨universeTree⟩]).run
+  let .ok (.recursiveRef _ _ 0) ← (classifyType (.mdata {} universeTree) { owners := #[⟨universeTree⟩] }).run
     | throwError "outer metadata must not alter recursion identity"
-  let .error universeError ← (classifyType (mkConst ``UniverseTree [.succ .zero]) #[⟨universeTree⟩]).run
+  let .error universeError ← (classifyType (mkConst ``UniverseTree [.succ .zero]) { owners := #[⟨universeTree⟩] }).run
     | throwError "different universe instances must not share recursion identity"
   expect "universe identity reason" (errorCause universeError == .nonUniformRecursive .inductive ``UniverseTree)
   -- Existing metadata values, rather than their debug spelling, determine identity.
   let annotated (id : Nat) := mkApp (mkConst ``PolyTree [.zero])
     (.mdata (({} : MData).setNat `origin id) nat)
-  let .error metadataError ← (classifyType (annotated 2) #[⟨annotated 1⟩]).run
+  let .error metadataError ← (classifyType (annotated 2) { owners := #[⟨annotated 1⟩] }).run
     | throwError "distinct nested metadata must have distinct recursion keys"
   expect "nested metadata identity reason" (errorCause metadataError == .nonUniformRecursive .inductive ``PolyTree)
   let family (name : Name) (binder : BinderInfo) :=
@@ -329,13 +329,13 @@ run_elab do
       (family `left .default, family `right .default),
       (family `left .default, family `left .implicit)] do
     expect "alpha equality is broader than recursion identity" (original == changed)
-    let .error binderError ← (classifyType changed #[⟨original⟩]).run
+    let .error binderError ← (classifyType changed { owners := #[⟨original⟩] }).run
       | throwError "binder syntax must remain part of structural identity"
     expect "binder identity reason" (errorCause binderError == .nonUniformRecursive .inductive ``FamilyTree)
 
   -- Declaration resolution precedes layout lookup in the selected producer path.
   let missingInductive := mkConst `MissingInductive
-  let .error missingInductiveError ← (inductiveType #[] missingInductive).run
+  let .error missingInductiveError ← (inductiveType {} missingInductive).run
     | throwError "an absent inductive declaration must fail before layout lookup"
   expect "missing inductive declaration reason"
     (errorCause missingInductiveError == .unsupportedType missingInductive)
@@ -352,7 +352,7 @@ run_elab do
     | throwError "recursive callback aggregate must be rejected"
   expect "recursive callback result reason"
     (errorCause nodeError == .recursiveCallback ``CallbackNode)
-  let context : RecursiveSeen := #[⟨node⟩]
+  let context : ClassifyContext := { owners := #[⟨node⟩] }
   for type in #[
       .forallE `_arg node (mkConst ``Unit) .default,
       mkApp (mkConst ``IO) node,
@@ -374,7 +374,7 @@ run_elab do
   let natInstance := mkApp (mkConst ``CallbackParam [.zero]) (mkConst ``Nat)
   let stringInstance := mkApp (mkConst ``CallbackParam [.zero]) string
   let .error nonuniformError ← (classifyType (.forallE `_arg (mkConst ``Unit) stringInstance .default)
-      #[⟨natInstance⟩]).run
+      { owners := #[⟨natInstance⟩] }).run
     | throwError "nonuniform recursive callback context must be rejected"
   expect "nonuniform callback recursion reason"
     (errorCause nonuniformError == .nonUniformRecursive .inductive ``CallbackParam)

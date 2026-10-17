@@ -35,4 +35,21 @@ structure Wrapper where
 
 @[vir_export] def wrapperIdentity (value : Wrapper) : Wrapper := value
 
+structure TextBox where
+  text : String
+structure BytesBox where
+  bytes : ByteArray
+def decodeText (value : String) : Except String TextBox := .ok ⟨value⟩
+def encodeText (value : TextBox) : String := value.text
+def decodeBytes (value : ByteArray) : Except String BytesBox := .ok ⟨value⟩
+def encodeBytes (value : BytesBox) : ByteArray := value.bytes
+run_meta do
+  Vir.Interface.registerClosedLibraryAdapter (Lean.mkConst ``TextBox)
+    (Lean.mkConst ``String) ``decodeText ``encodeText
+  Vir.Interface.registerClosedLibraryAdapter (Lean.mkConst ``BytesBox)
+    (Lean.mkConst ``ByteArray) ``decodeBytes ``encodeBytes
+@[vir_export] def textLength (value : TextBox) : Nat := value.text.length
+@[vir_export] def bytesLength (value : BytesBox) : Nat := value.bytes.size
+@[vir_export] def byteAt (value : BytesBox) (index : Nat) : Nat := value.bytes[index]!.toNat
+
 end AdapterValues

@@ -39,6 +39,9 @@ the typed value directly and builds JSON text without a `Lean.Json` graph or a
 `ToJson` instance. The generator shares the normal classifier and selected
 constructor shapes; it does not infer a wire schema from JSON instances.
 Generated traversal helpers are private and are not application exports.
+Their types are closed using the classifier's permitted reductions; unresolved
+field dependencies fail before helper emission. Numeric formatting is fixed by
+the codec implementation and does not use application `ToString` instances.
 
 The existing JSON-RPC String envelope can carry this text unchanged. On the
 client, parse it once and select JSON-safe arguments on the normal typed call:
@@ -129,7 +132,8 @@ closed type throughout the compiled boundary, in both native and JSON-safe calls
 Conflicting imported rules fail when the source type is classified or registered;
 identical repeated rules are accepted. Import order never selects a winner.
 Recursive adapter wire domains are currently rejected; each wire domain starts
-a fresh closed recursive scope.
+a fresh closed recursive scope, while the active adapter path is retained to
+detect cycles across multiple rules.
 
 A map rule should use the library's public insertion and iteration operations.
 That establishes ordering, balance and size rather than accepting unchecked raw

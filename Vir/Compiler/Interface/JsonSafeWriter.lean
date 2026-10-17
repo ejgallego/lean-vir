@@ -24,7 +24,7 @@ private structure State where
 private abbrev BuildM := StateT State TermElabM
 
 private def append (out : Term) (text : String) : BuildM Term :=
-  `($out ++ $(quote text))
+  `(String.append $out $(quote text))
 private def invoke (name : Name) (value out : Term) : BuildM Term :=
   `($(mkIdent name) $value $out)
 
@@ -47,6 +47,11 @@ private def pattern (name : Name) (count : Nat) : BuildM Term := do
 
 mutual
 private partial def plan (type : Expr) (model : InterfaceType) (owners : Array Nat) : BuildM Name := do
+  -- Constructor domains may mention preceding binders even when beta/alias
+  -- reduction exposes a closed type. Standalone helpers cannot retain them.
+  let type ← reduceTypeAliases type
+  if type.hasLooseBVars || type.hasFVar || type.hasMVar then
+    throwError "JSON-safe writer requires a closed helper type; unresolved constructor-field dependency"
   if let .recursiveRef _ _ depth := model then
     if depth >= owners.size then throwError "unbound writer recursive owner"
     let some owner := owners[owners.size - depth - 1]? | throwError "unbound writer recursive owner"
@@ -70,10 +75,12 @@ private partial def bodyFor (type : Expr) (model : InterfaceType) (owners : Arra
     (value out : Term) : BuildM Term := do
   match model with
   | .unit => append out "null"
-  | .nat | .int | .uint64 => `($out ++ Lean.Json.renderString (toString $value))
-  | .string => `($out ++ Lean.Json.renderString $value)
-  | .bool => `($out ++ (if $value then "true" else "false"))
-  | .uint8 | .uint16 | .uint32 => `($out ++ toString ($value).toNat)
+  | .nat => `(Vir.JsonSafeWriter.nat $value $out)
+  | .int => `(Vir.JsonSafeWriter.int $value $out)
+  | .uint64 => `(Vir.JsonSafeWriter.nat ($value).toNat $out)
+  | .string => `(String.append $out (Lean.Json.renderString $value))
+  | .bool => `(String.append $out (if $value then "true" else "false"))
+  | .uint8 | .uint16 | .uint32 => `(Vir.JsonSafeWriter.unsigned ($value).toNat $out)
   | .byteArray => `(Vir.JsonSafeWriter.bytes $value $out)
   | .array element =>
       let type ← reduceTypeAliases type
@@ -101,8 +108,8 @@ private partial def bodyFor (type : Expr) (model : InterfaceType) (owners : Arra
       let pat ← pattern descriptor.constructorName fields.size
       `(match ($value) with | $pat => $output)
   | .libraryAdapter _ _ descriptor =>
-      let encode ← getConstInfo descriptor.encode
-      let .forallE _ _ actualWire _ := encode.type | throwError "unexpected adapter encoder"
+      let signature ← Meta.whnf (← getConstInfo descriptor.encode).type
+      let .forallE _ _ actualWire _ := signature | throwError "unexpected adapter encoder"
       let fn ← plan actualWire descriptor.wire #[]
       invoke fn (← `($(mkCIdent descriptor.encode) $value)) out
   | .customInductive name _ constructors =>

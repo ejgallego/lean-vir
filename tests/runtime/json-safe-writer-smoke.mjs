@@ -19,6 +19,8 @@ try {
     integer: "-12345678901234567890123456789000", unsigned: "18446744073709551615",
     bytes: [0, 127, 255], unit: null, hidden: { value: "42" }, foo_bar: "preserved",
     names: { foo_bar: "9", arg1: "17" }, letter: { val: 0x1f980 }, priority: { val: "99" },
+    constantRecord: { key: "3", value: "record" },
+    constantCtor: { kind: "mk", fields: { key: "4", value: "ctor" } },
     tree: { kind: "branch", value: [{ kind: "none" },
       { kind: "some", value: { kind: "leaf", value: "900719925474099312345" } },
       { kind: "some", value: { kind: "fork", fields: {
@@ -33,13 +35,17 @@ try {
         const call = (name, ...args) => runtime.callWith({
           argumentRepresentation: representation, resultRepresentation: representation,
         }, `JsonSafeWriterValues.${name}`, ...args);
-        assert.equal(runtime.interfaceManifest.exports.length, 5);
+        assert.equal(runtime.interfaceManifest.exports.length, 6);
         assert.equal(runtime.interfaceManifest.codecOperations.length, 2);
         assert.ok(runtime.interfaceManifest.exports.every(entry => !entry.entry.includes("_codec")));
         for (const entry of runtime.interfaceManifest.codecOperations)
           assert.equal(runtime.findManifestEntry(entry.entry), null);
         const text = call("fixtureText");
         assert.deepEqual(JSON.parse(text), expected);
+        assert.deepEqual(JSON.parse(call("numericText")), {
+          natural: "3", integer: "-4", large: "18446744073709551615",
+          small8: 255, small16: 65535, small32: 4294967295,
+        });
         assert.equal(JSON.parse(JSON.stringify({ jsonrpc: "2.0", id: 1, result: text })).result, text);
         const input = structuredClone(expected);
         if (representation === "native") {
@@ -47,6 +53,8 @@ try {
           input.hidden.value = 42n;
           input.names = { foo_bar: 9n, arg1: 17n };
           input.priority.val = 99n;
+          input.constantRecord.key = 3n;
+          input.constantCtor.fields.key = 4n;
           input.tree.value[1].value.value = 900719925474099312345n;
           input.store = input.store.map(entry => ({ ...entry, fst: BigInt(entry.fst) }));
           input.unit = undefined;

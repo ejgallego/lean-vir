@@ -58,6 +58,43 @@ end AdapterImportDomain
     AdapterIdenticalAB: check(["AdapterRuleA", "AdapterRepeatA"], false),
     AdapterIdenticalBA: check(["AdapterRepeatA", "AdapterRuleA"], false),
     JsonSafeWriterGuide: blocks[0],
+    AdapterTraversal: `module
+public import Vir.Package.JsonSafeWriter
+meta import Vir.Compiler.Interface.JsonSafeWriter
+meta import Vir.Compiler.Interface.LibraryAdapters
+public section
+namespace AdapterTraversal
+structure A where
+  n : Nat
+structure B where
+  n : Nat
+structure C where
+  n : Nat
+def decodeA (values : Array B) : Except String A :=
+  .ok ⟨(values[0]?.map (·.n)).getD 0⟩
+def encodeA (value : A) : Array B := #[⟨value.n⟩]
+def decodeB (value : C) : Except String B := .ok ⟨value.n⟩
+def encodeB (value : B) : C := ⟨value.n⟩
+def decodeC (value : B) : Except String C := .ok ⟨value.n⟩
+def encodeC (value : C) : B := ⟨value.n⟩
+run_meta do
+  Vir.Interface.registerClosedLibraryAdapter (Lean.mkConst \`\`A)
+    (Lean.mkApp (Lean.mkConst \`\`Array [.zero]) (Lean.mkConst \`\`B)) \`\`decodeA \`\`encodeA
+  Vir.Interface.registerClosedLibraryAdapter (Lean.mkConst \`\`B)
+    (Lean.mkConst \`\`C) \`\`decodeB \`\`encodeB
+run_elab Vir.Interface.JsonSafeWriter.generate \`AdapterTraversal.writeA (Lean.mkConst \`\`A)
+#guard writeA ⟨7⟩ == "[{\\\"n\\\":\\\"7\\\"}]"
+run_meta do
+  Vir.Interface.registerClosedLibraryAdapter (Lean.mkConst \`\`C)
+    (Lean.mkConst \`\`B) \`\`decodeC \`\`encodeC
+  for type in #[\`\`A, \`\`B] do
+    match ← Vir.Interface.interfaceType (Lean.mkConst type) with
+    | .error error =>
+      unless ((← error.toMessageData.toString).splitOn "recursive adapter wire domains").length > 1 do
+        Lean.throwError "unexpected cycle diagnostic: {error.toMessageData}"
+    | .ok _ => Lean.throwError "adapter cycle was accepted"
+end AdapterTraversal
+`,
     JsonSafeRegistrationGuide: `module
 public import Lean
 meta import Vir.Compiler.Interface.LibraryAdapters
@@ -73,4 +110,4 @@ ${blocks[1]}
   const result = project.build();
   assert.equal(result.status, 0, result.stderr + result.stdout);
 } finally { await rm(directory, { recursive: true, force: true }); }
-console.log("conflicting/identical imported adapters in both orders and executable JSON-safe guide: PASS");
+console.log("imported adapter conflicts, acyclic chains, cycle rejection and executable JSON-safe guide: PASS");

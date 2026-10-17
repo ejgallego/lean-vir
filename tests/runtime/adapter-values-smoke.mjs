@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import { generateIrPackage } from "./shared.mjs";
+import { inputDefault, parseInputValue } from "../../web/app/pages/interface-inputs.js";
 
 const directory = await mkdtemp(join(tmpdir(), "vir-adapter-values-"));
 try {
@@ -25,7 +26,7 @@ try {
         const large = nat("900719925474099312345"), small = nat(1);
         const input = [{ fst: large, snd: "first" }, { fst: small, snd: "α🦀" }, { fst: large, snd: "last" }];
         const expected = [{ fst: small, snd: "α🦀" }, { fst: large, snd: "last" }];
-        assert.equal(runtime.interfaceManifest.codecOperations.length, 2);
+        assert.equal(runtime.interfaceManifest.codecOperations.length, 6);
         for (const entry of runtime.interfaceManifest.codecOperations)
           assert.equal(runtime.findManifestEntry(entry.entry), null);
         assert.equal(call("count", []), nat(0));
@@ -38,6 +39,25 @@ try {
         }
         assert.throws(() => call("identity", [{ fst: small }]));
         assert.deepEqual(call("identity", input), expected);
+        if (representation === "native") {
+          // Exercise the same parser used by the development runner, then the
+          // public runtime call. Inputs come from admitted generated descriptors.
+          const parse = (name, text) => {
+            const arg = runtime.findManifestEntry(`AdapterValues.${name}`).args[0];
+            return parseInputValue(arg, { value: text ?? inputDefault(arg) });
+          };
+          assert.equal(runtime.call("AdapterValues.count", parse("count")), 0n);
+          assert.equal(runtime.call("AdapterValues.count", parse("count", '[{"fst":1,"snd":"one"}]')), 1n);
+          assert.equal(runtime.call("AdapterValues.textLength", parse("textLength")), 0n);
+          assert.equal(runtime.call("AdapterValues.textLength", parse("textLength", '"λ🦀"')), 2n);
+          assert.equal(runtime.call("AdapterValues.bytesLength", parse("bytesLength")), 0n);
+          const parsedBytes = parse("bytesLength", "[0,127,255]");
+          assert.ok(parsedBytes instanceof Uint8Array);
+          assert.equal(runtime.call("AdapterValues.bytesLength", parsedBytes), 3n);
+          assert.equal(runtime.call("AdapterValues.byteAt", parsedBytes, 2n), 255n);
+          for (const text of ["[-1]", "[256]", '["1"]'])
+            assert.throws(() => parse("bytesLength", text), /byte/);
+        }
         assert.equal(runtime.exports.vir_resource_roots_active(), 0);
         assert.equal(runtime.hostState.leanObjectHandleCells.size, 0);
       } finally { runtime.dispose(); }

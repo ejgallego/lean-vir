@@ -13,6 +13,7 @@ import {
   inputDefault,
   interfaceInputTag,
   isJsonInput,
+  parseInputValue,
 } from "../../web/app/pages/interface-inputs.js";
 
 const nat = { type: { tag: "nat" } };
@@ -24,9 +25,22 @@ test("runner adapter templates follow their generated wire view", () => {
   assert.deepEqual(defaultValueForType(pair), []);
   assert.equal(interfaceInputTag(pair), "TEXTAREA");
   assert.equal(isJsonInput(pair), true);
+  assert.deepEqual(parseInputValue({ type: pair }, { value: "[1,2]" }), [1, 2]);
   const text = { native: { type: { tag: "leanObject" }, metadata: { adapter: { wire: { type: { tag: "string" } } } } },
     value: { tag: "adapted", wire: { tag: "string" } } };
   assert.equal(inputDefault({ type: text }), '""');
+  assert.equal(parseInputValue({ type: text }, { value: '"λ🦀"' }), "λ🦀");
+  const bytes = { native: { type: { tag: "leanObject" }, metadata: { adapter: {
+    wire: { type: { tag: "byteArray" } },
+  } } }, value: { tag: "adapted", wire: { tag: "bytes" } } };
+  assert.deepEqual(parseInputValue({ type: bytes }, { value: inputDefault({ type: bytes }) }), new Uint8Array());
+  assert.deepEqual(parseInputValue({ type: bytes }, { value: "[0,127,255]" }), new Uint8Array([0, 127, 255]));
+  for (const value of ["[-1]", "[256]", '["1"]'])
+    assert.throws(() => parseInputValue({ type: bytes }, { value }), /byte/);
+  const sequence = { native: { type: { tag: "leanObject" }, metadata: { arrayElement: bytes.native } },
+    value: { tag: "sequence", element: bytes.value } };
+  assert.deepEqual(parseInputValue({ type: sequence }, { value: "[[0,255],[]]" }),
+    [new Uint8Array([0, 255]), new Uint8Array()]);
 });
 
 test("runner templates follow the selected value cases and native field paths", () => {
@@ -181,4 +195,10 @@ test("recursive templates resolve lexical references and stop at a finite depth"
     kind: "node",
     fields: { left: { kind: "leaf" }, right: { kind: "leaf" } },
   });
+  const input = { kind: "node", fields: {
+    left: { kind: "leaf" }, right: { kind: "node", fields: {
+      left: { kind: "leaf" }, right: { kind: "leaf" },
+    } },
+  } };
+  assert.deepEqual(parseInputValue({ type: tree }, { value: JSON.stringify(input) }), input);
 });
