@@ -158,8 +158,7 @@ NameMap rule. It is an eligibility test, not a published consumer integration.
 The normal descriptor and registered rules determine the accepted domain; this
 is not the existing Verso `ToJson` schema.
 
-The controlled comparison used one 33-section fixture and both encoders/decoders
-in VIR/Wasm. Its paired elapsed ratio was 0.216 while the JSON-safe payload was
-2.19 times larger. This is evidence of avoided conversion work, not native-server,
-network, browser-rendering or complete application latency. The next useful
-measurement is the actual consumer operation with server and client separated.
+This path avoids an intermediate Lean.Json graph and whole-value JavaScript
+adaptation. That does not imply a smaller payload or lower end-to-end latency.
+Measure server encoding, payload size, client parsing and construction, and
+rendering separately using the actual consumer operation.
