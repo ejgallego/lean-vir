@@ -21,6 +21,9 @@ try {
     names: { foo_bar: "9", arg1: "17" }, letter: { val: 0x1f980 }, priority: { val: "99" },
     constantRecord: { key: "3", value: "record" },
     constantCtor: { kind: "mk", fields: { key: "4", value: "ctor" } },
+    nested: { key: "5", values: ["nested"], items: [
+      { kind: "some", value: "item" }, { kind: "none" },
+    ], pair: { fst: "left", snd: "right" } },
     tree: { kind: "branch", value: [{ kind: "none" },
       { kind: "some", value: { kind: "leaf", value: "900719925474099312345" } },
       { kind: "some", value: { kind: "fork", fields: {
@@ -55,6 +58,7 @@ try {
           input.priority.val = 99n;
           input.constantRecord.key = 3n;
           input.constantCtor.fields.key = 4n;
+          input.nested.key = 5n;
           input.tree.value[1].value.value = 900719925474099312345n;
           input.store = input.store.map(entry => ({ ...entry, fst: BigInt(entry.fst) }));
           input.unit = undefined;

@@ -70,4 +70,18 @@ with
 @[vir_export] def scalarIdentity (value : CachedScalar) : CachedScalar := value
 @[vir_export] def scalarComputed (value : CachedScalar) : UInt64 := value.fingerprint
 
+structure Base where
+  label : String
+  next : Option Base
+structure Child extends Base where
+  extra : String
+structure Grandchild extends Child where
+  note : String
+@[vir_export] def childIdentity (value : Child) : Child := value
+@[vir_export] def grandchildIdentity (value : Grandchild) : Grandchild := value
+@[vir_export] def childTailLabel (value : Child) : String :=
+  match value.next with
+  | none => ""
+  | some parent => parent.label
+
 end DescriptorRegressions

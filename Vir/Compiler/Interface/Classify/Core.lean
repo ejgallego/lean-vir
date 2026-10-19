@@ -160,7 +160,8 @@ private def constructorFields (type : Lean.Expr) (ctorName : Name)
   let fields ← ExceptT.mk (pure (instantiateConstructorFields (← getEnv) type ctorName))
   unless allowImplicitFields || fields.all (·.binderInfo == .default) do
     throwThe InterfaceClassifierError (.constructorImplicitFields ctorName)
-  return fields.mapIdx fun index field => (binderArgName (index + 1) field.name, field.type)
+  fields.mapIdxM fun index field => do
+    return (binderArgName (index + 1) field.name, ← reduceConstructorFieldType field.type)
 
 mutual
 

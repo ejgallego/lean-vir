@@ -35,7 +35,7 @@ private def ctorFields (type : Expr) (name : Name) : MetaM (Array Expr) := do
   let fields ← match instantiateConstructorFields (← getEnv) type name with
     | .ok fields => pure fields
     | .error error => throwError error.toMessageData
-  return fields.map (·.type)
+  fields.mapM fun field => reduceConstructorFieldType field.type
 
 private def fieldVar (index : Nat) : Term := ⟨mkIdent (.str .anonymous s!"field{index}")⟩
 
@@ -111,7 +111,7 @@ private partial def bodyFor (type : Expr) (model : InterfaceType) (owners : Arra
       let signature ← Meta.whnf (← getConstInfo descriptor.encode).type
       let .forallE _ _ actualWire _ := signature | throwError "unexpected adapter encoder"
       let fn ← plan actualWire descriptor.wire #[]
-      invoke fn (← `($(mkCIdent descriptor.encode) $value)) out
+      invoke fn (← `(@$(mkCIdent descriptor.encode) $value)) out
   | .customInductive name _ constructors =>
       if let some element := linkedListElement? name constructors then
         let fields ← ctorFields type `List.cons

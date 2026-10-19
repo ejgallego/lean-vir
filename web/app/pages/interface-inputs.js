@@ -80,7 +80,7 @@ function prepareJsonInput(pair, value, bindings = []) {
   }
   if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
   function childAt(path, childView, child, constructor) {
-    const resolved = nativeFieldAtPath(pair.native, path, constructor, scope);
+    const resolved = nativeFieldAtPath(pair, path, constructor, scope);
     return prepareJsonInput({ native: resolved.native, value: childView }, child, resolved.bindings);
   }
   function fields(mappings, output, constructor) {
@@ -161,7 +161,7 @@ function defaultRecordValue(pair, bindings, depth) {
   const result = {};
   for (const field of fields) {
     const resolvedField = nativeFieldAtPath(
-      pair.native,
+      pair,
       field.path,
       0,
       [pair, ...bindings],
@@ -187,7 +187,7 @@ export function constructorTemplate(pair, caseIndex, bindings = [], depth = 0) {
   const localBindings = [resolved, ...bindings];
   if (view.payload === "value") {
     const resolvedField = nativeFieldAtPath(
-      resolved.native,
+      resolved,
       [0],
       caseIndex,
       localBindings,
@@ -205,7 +205,7 @@ export function constructorTemplate(pair, caseIndex, bindings = [], depth = 0) {
   const fields = {};
   for (const field of view.fields) {
     const resolvedField = nativeFieldAtPath(
-      resolved.native,
+      resolved,
       field.path,
       caseIndex,
       localBindings,
@@ -237,18 +237,25 @@ function resolveNative(native, bindings) {
   return native;
 }
 
-function nativeFieldAtPath(native, path, firstConstructor, bindings) {
-  let current = resolveNative(native, bindings);
+function nativeFieldAtPath(pair, path, firstConstructor, bindings) {
+  let current = pair;
   let owners = bindings;
   for (const [position, fieldIndex] of path.entries()) {
     const constructorIndex = position === 0 ? firstConstructor : 0;
-    const ctor = current?.metadata?.constructors?.[constructorIndex];
+    const ctor = current.native?.metadata?.constructors?.[constructorIndex];
     const field = ctor?.fields?.[fieldIndex];
     if (field === undefined) return null;
     if (position === path.length - 1) return { native: field.type, bindings: owners };
-    current = resolveNative(field.type, owners);
-    if (current === null) return null;
+    const native = resolveNative(field.type, owners);
+    if (native === null) return null;
+    // Flattened mappings describe a parent record in the child's public view.
+    // Keep that view with its native owner so recursive refs can recover both.
+    const mappings = current.value.tag === "record" ? current.value.fields
+      : current.value.cases[constructorIndex].fields;
+    current = { native, value: { tag: "record", fields: mappings
+      .filter(mapping => mapping.path[0] === fieldIndex)
+      .map(mapping => ({ ...mapping, path: mapping.path.slice(1) })) } };
     owners = [current, ...owners];
   }
-  return path.length === 0 ? { native: current, bindings: owners } : null;
+  return path.length === 0 ? { native: current.native, bindings: owners } : null;
 }

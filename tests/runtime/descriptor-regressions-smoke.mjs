@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import { readIrPackageInfo } from "../../web/src/runtime/ir-package.js";
 import { generateIrPackage } from "./shared.mjs";
+import { inputDefault, parseInputValue } from "../../web/app/pages/interface-inputs.js";
 
 const directory = await mkdtemp(join(tmpdir(), "vir-descriptor-regressions-"));
 try {
@@ -58,6 +59,22 @@ public section
       assert.deepEqual(call("scalarIdentity", cached), cached);
       assert.equal(call("scalarComputed", cached), cached.value + 1n);
       assert.equal(call("ordinaryEntry", 41n), 42n, "valid packed metadata must not block sibling exports");
+      const childArg = runtime.findManifestEntry("DescriptorRegressions.childIdentity").args[0];
+      const child = { label: "root", next: { kind: "some", value: {
+        label: "leaf", next: { kind: "none" },
+      } }, extra: "child" };
+      const parsedChild = parseInputValue(childArg, { value: JSON.stringify(child) });
+      assert.deepEqual(parsedChild, child);
+      assert.deepEqual(call("childIdentity", parsedChild), child);
+      assert.equal(call("childTailLabel", parsedChild), "leaf");
+      const emptyChild = parseInputValue(childArg, { value: inputDefault(childArg) });
+      assert.deepEqual(emptyChild, { label: "", next: { kind: "none" }, extra: "" });
+      assert.deepEqual(call("childIdentity", emptyChild), emptyChild);
+      const grandchild = { ...child, note: "grandchild" };
+      const grandchildArg = runtime.findManifestEntry("DescriptorRegressions.grandchildIdentity").args[0];
+      const parsedGrandchild = parseInputValue(grandchildArg, { value: JSON.stringify(grandchild) });
+      assert.deepEqual(parsedGrandchild, grandchild);
+      assert.deepEqual(call("grandchildIdentity", parsedGrandchild), grandchild);
       for (const [name, value] of [["wrapperEntry", 42], ["boolWrapperEntry", true], ["usizeWrapperEntry", 42]]) {
         const entry = runtime.findManifestEntry(`DescriptorRegressions.${name}`);
         assert.equal(runtime.objectArgumentSupported(entry.args[0].type), true);

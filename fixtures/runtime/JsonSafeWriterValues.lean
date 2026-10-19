@@ -16,8 +16,8 @@ namespace JsonSafeWriterValues
 abbrev Store := Std.TreeMap Nat String compare
 def decodeStore (entries : Array (Nat × String)) : Except String Store :=
   .ok (Std.TreeMap.ofArray entries)
-abbrev StoreEncoder := Store → Array (Nat × String)
-def encodeStore : StoreEncoder := fun store => store.toArray
+abbrev StoreEncoder := {store : Store} → Array (Nat × String)
+def encodeStore : StoreEncoder := fun {store} => store.toArray
 run_meta do
   let .forallE _ wire outcome _ := (← Lean.getConstInfo ``decodeStore).type
     | Lean.throwError "unexpected helper type"
@@ -50,10 +50,19 @@ inductive ConstantCtor (β : Nat → Type) where
   | mk (key : Nat) (value : β key)
 abbrev ClosedRecord := ConstantField (fun _ => String)
 abbrev ClosedCtor := ConstantCtor (fun _ => String)
+structure NestedField (β : Nat → Type) where
+  key : Nat
+  values : Array (β key)
+  items : List (Option (β key))
+  pair : β key × β key
+abbrev ClosedNested := NestedField (fun _ => String)
 run_elab Vir.Interface.JsonSafeWriter.generate `JsonSafeWriterValues.encodeClosedRecord (Lean.mkConst ``ClosedRecord)
 run_elab Vir.Interface.JsonSafeWriter.generate `JsonSafeWriterValues.encodeClosedCtor (Lean.mkConst ``ClosedCtor)
+run_elab Vir.Interface.JsonSafeWriter.generate `JsonSafeWriterValues.encodeClosedNested (Lean.mkConst ``ClosedNested)
 #guard encodeClosedRecord ⟨3, "record"⟩ == "{\"key\":\"3\",\"value\":\"record\"}"
 #guard encodeClosedCtor (.mk 4 "ctor") == "{\"kind\":\"mk\",\"fields\":{\"key\":\"4\",\"value\":\"ctor\"}}"
+#guard encodeClosedNested ⟨5, #["nested"], [some "item", none], ("left", "right")⟩ ==
+  "{\"key\":\"5\",\"values\":[\"nested\"],\"items\":[{\"kind\":\"some\",\"value\":\"item\"},{\"kind\":\"none\"}],\"pair\":{\"fst\":\"left\",\"snd\":\"right\"}}"
 
 structure Numbers where
   natural : Nat
@@ -85,6 +94,7 @@ structure Document where
   priority : Fin 100
   constantRecord : ClosedRecord
   constantCtor : ClosedCtor
+  nested : ClosedNested
   foo_bar : String
   tree : Tree
   store : Store
@@ -104,6 +114,7 @@ private def fixture : Document := {
   priority := ⟨99, by decide⟩
   constantRecord := ⟨3, "record"⟩
   constantCtor := .mk 4 "ctor"
+  nested := ⟨5, #["nested"], [some "item", none], ("left", "right")⟩
   foo_bar := "preserved"
   tree := .branch [none, some (.leaf 900719925474099312345), some (.fork (.leaf 7) (.branch []))]
   store := Std.TreeMap.ofArray #[(900719925474099312345, "first"), (1, "α"),
@@ -125,6 +136,8 @@ private def fixture : Document := {
   value.letter.toNat == 0x1f980 && value.priority.val == 99 &&
   value.constantRecord.key == 3 && value.constantRecord.value == "record" &&
   (match value.constantCtor with | .mk key text => key == 4 && text == "ctor") &&
+  value.nested.key == 5 && value.nested.values == #["nested"] &&
+  value.nested.items == [some "item", none] && value.nested.pair == ("left", "right") &&
   (match value.hidden with | ⟨n⟩ => n == 42) && value.tree == fixture.tree &&
   value.store.size == 2 && value.store.get? 900719925474099312345 == some "last"
 
