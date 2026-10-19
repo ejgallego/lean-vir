@@ -276,18 +276,23 @@ depend on one runtime's queue to be understood. Batch independent status into
 one coordinator digest; notify the human when review/decision is needed or a
 material blocker changes the plan.
 
-An owner that can be woken records `x-runtime` (`codex` or `claude-code`) and
-`x-session-uuid` in its claim or opener, and repeats both in later messages
-after a restart, model switch or handoff; the owner's most recent message
-carries the current values. Never fork, stop or otherwise disturb another
+An owner that can be woken records `x-runtime`, `x-session-uuid` and, when its
+runtime needs it, `x-session-cwd` in its claim or opener, and repeats them in
+later messages after a restart, model switch or handoff. These fields describe
+the sender's own session: wake the current owner using the most recent message
+whose `from` is that owner. A message without `x-runtime` predates this
+convention and denotes `codex`. Never fork, stop or otherwise disturb another
 agent's running session to wake it; when a mechanism cannot reach a running
-session, ask the owner or the maintainer to relay the handoff. Known mechanisms:
+session, ask the owner or the maintainer to relay the handoff. Known runtimes
+and mechanisms include:
 
 - `codex`: `codex queue --thread <uuid> --message '<handoff>'`.
-- `claude-code`: from the owner's recorded worktree (sessions are stored per
-  directory), `claude --bg --resume <uuid> '<handoff>'` continues a stopped
-  session under the same ID. If `claude agents --json` shows the session still
-  running, this would start a copy instead, so relay the handoff.
+- `claude-code`: from `x-session-cwd`, the directory where the session was
+  launched (which may differ from its worktree), run
+  `claude --bg --resume <uuid> '<handoff>'` to continue a stopped session under
+  the same ID. If `claude agents --json` shows the session still running, relay
+  the handoff instead. If the command reports that it started a copy, stop that
+  copy at once.
 
 Consult only owners affected by overlapping edits or shared-contract changes.
 Do not seek unrelated owners' agreement or repeat permission already granted.
