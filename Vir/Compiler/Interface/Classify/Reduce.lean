@@ -68,7 +68,7 @@ def reduceTypeAliases (e : Lean.Expr) : CoreM Lean.Expr := do
   -- family, but may not turn a dependent field into the generic bvar ABI lane.
   return if isClosedTypeExpr reduced then reduced else aliased
 
-/-- Resolve discarded constructor-field dependencies beneath type applications.
+/-- Resolve discarded constructor-field dependencies beneath applications and lambdas.
 Closed expressions retain their identity for adapter selection and recursion.
 Classification and standalone writer helpers use the same reduction policy. -/
 partial def reduceConstructorFieldType (e : Lean.Expr) : CoreM Lean.Expr := do
@@ -77,6 +77,8 @@ partial def reduceConstructorFieldType (e : Lean.Expr) : CoreM Lean.Expr := do
   if !e.hasLooseBVars then return e
   match e with
   | .app fn arg => return mkApp (← reduceConstructorFieldType fn) (← reduceConstructorFieldType arg)
+  | .lam name domain body info =>
+      return mkLambda name info (← reduceConstructorFieldType domain) (← reduceConstructorFieldType body)
   | _ => return e
 
 def effectResult? (e : Lean.Expr) : CoreM (Option (InterfaceEffect × Lean.Expr)) := do

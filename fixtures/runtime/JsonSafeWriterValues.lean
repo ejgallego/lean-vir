@@ -64,6 +64,17 @@ run_elab Vir.Interface.JsonSafeWriter.generate `JsonSafeWriterValues.encodeClose
 #guard encodeClosedNested ⟨5, #["nested"], [some "item", none], ("left", "right")⟩ ==
   "{\"key\":\"5\",\"values\":[\"nested\"],\"items\":[{\"kind\":\"some\",\"value\":\"item\"},{\"kind\":\"none\"}],\"pair\":{\"fst\":\"left\",\"snd\":\"right\"}}"
 
+structure FamilyCell (β : Nat → Type) where
+  index : Nat
+  value : β index
+structure Outer (β : Nat → Type) where
+  key : Nat
+  cell : FamilyCell (fun _ => β key)
+abbrev ClosedLambda := Outer (fun _ => String)
+run_elab Vir.Interface.JsonSafeWriter.generate `JsonSafeWriterValues.encodeClosedLambda (Lean.mkConst ``ClosedLambda)
+#guard encodeClosedLambda ⟨1, ⟨2, "value"⟩⟩ ==
+  "{\"key\":\"1\",\"cell\":{\"index\":\"2\",\"value\":\"value\"}}"
+
 structure Numbers where
   natural : Nat
   integer : Int
@@ -95,6 +106,7 @@ structure Document where
   constantRecord : ClosedRecord
   constantCtor : ClosedCtor
   nested : ClosedNested
+  lambdaFamily : ClosedLambda
   foo_bar : String
   tree : Tree
   store : Store
@@ -115,6 +127,7 @@ private def fixture : Document := {
   constantRecord := ⟨3, "record"⟩
   constantCtor := .mk 4 "ctor"
   nested := ⟨5, #["nested"], [some "item", none], ("left", "right")⟩
+  lambdaFamily := ⟨1, ⟨2, "value"⟩⟩
   foo_bar := "preserved"
   tree := .branch [none, some (.leaf 900719925474099312345), some (.fork (.leaf 7) (.branch []))]
   store := Std.TreeMap.ofArray #[(900719925474099312345, "first"), (1, "α"),
@@ -138,6 +151,8 @@ private def fixture : Document := {
   (match value.constantCtor with | .mk key text => key == 4 && text == "ctor") &&
   value.nested.key == 5 && value.nested.values == #["nested"] &&
   value.nested.items == [some "item", none] && value.nested.pair == ("left", "right") &&
+  value.lambdaFamily.key == 1 && value.lambdaFamily.cell.index == 2 &&
+  value.lambdaFamily.cell.value == "value" &&
   (match value.hidden with | ⟨n⟩ => n == 42) && value.tree == fixture.tree &&
   value.store.size == 2 && value.store.get? 900719925474099312345 == some "last"
 

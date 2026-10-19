@@ -246,6 +246,20 @@ run_elab do
       (mkAppN (mkConst ``ParameterizedCarrier.mk) #[mkConst ``Nat, string, mkNatLit 0])) .string
   let family := Expr.lam `key (mkConst ``Nat) string .default
   expectType "constant family with bound key" (mkApp family (.bvar 0)) .string
+  let product := mkConst ``Prod [.zero, .zero]
+  let domain := Expr.sort (.succ .zero)
+  let underLambda := Expr.lam `element domain
+    (mkApp2 product (mkApp family (.bvar 1)) (.bvar 0)) .implicit
+  let expectedLambda := Expr.lam `element domain (mkApp2 product string (.bvar 0)) .implicit
+  expect "lambda reduction preserves local binder and binder info"
+    ((⟨← reduceConstructorFieldType underLambda⟩ : ExprStructEq) == ⟨expectedLambda⟩)
+  let closedLambda := Expr.mdata (({} : MData).setNat `origin 9) expectedLambda
+  expect "already closed lambda retains exact metadata and identity"
+    ((⟨← reduceConstructorFieldType closedLambda⟩ : ExprStructEq) == ⟨closedLambda⟩)
+  let dependent := mkApp (mkConst ``Fin) (.bvar 0)
+  expect "genuine dependency is not discarded"
+    ((⟨← reduceConstructorFieldType dependent⟩ : ExprStructEq) == ⟨dependent⟩ && dependent.hasLooseBVars)
+  rejected "dependent Fin field" dependent
   expectType "projection then beta"
     (mkApp (.proj ``FamilyCarrier 0 (mkApp (mkConst ``FamilyCarrier.mk) family)) (.bvar 0)) .string
   expectType "beta then projection"
