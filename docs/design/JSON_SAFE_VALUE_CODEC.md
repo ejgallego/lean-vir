@@ -154,6 +154,34 @@ proof of a value invariant.
 
 ## Qualification and performance scope
 
+Writer preparation is the compiler-private capability boundary. It pairs the
+classified field model with its instantiated Lean expression, removes discarded
+constructor dependencies under applications and lambda arguments, and requires
+closed helper types. Closed expressions keep their identities for adapter
+selection and recursion. Genuine dependencies remain unsupported. Preparation
+resolves recursive owners and explicit adapter application and completes every
+helper body before emission adds declarations. The runtime descriptor contains
+no elaborator expressions; native classification alone does not promise writer
+support.
+
+The bounded completion checks are:
+
+| Guarantee | Maintained checks |
+|---|---|
+| Closed helper preparation | Direct, container and lambda constant families in `JsonSafeWriterValues`; independently expected JSON text |
+| Identity and unsupported dependency policy | Closed aliases, recursive/metadata expressions, genuine `Fin key` in `InterfaceReduction` |
+| Accepted adapters remain callable | Explicit, implicit/aliased encoders and acyclic/cyclic adapter traversal |
+| Recursive input scopes | Compiler-generated inherited-parent and byte cases through the production runner parser and independent Lean observations |
+| End-to-end meaning and ownership | Writer → JSON parse → `callWith` → Lean observations on both Wasm profiles |
+
+`npm run test:interface`, `npm run test:writer:native` and
+`node tests/runtime/library-adapter-imports-smoke.mjs` need only pinned Lean and
+Node. The independent CI `contracts` job runs them and runtime unit tests even
+when published-runtime acquisition fails. The existing Wasm smoke tests remain
+dependent on built matching assets, and ordinary published acquisition remains
+a separate landing requirement. Passing native or JavaScript checks does not
+substitute for either integration obligation.
+
 Maintained fixtures exercise generated writers, recursive and private fields,
 large integers, bytes, library adapters, unsupported-domain rejection, recovery
 and ownership on both Wasm profiles. Lean observations independently check the

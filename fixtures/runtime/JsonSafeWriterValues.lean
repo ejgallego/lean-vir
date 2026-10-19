@@ -156,6 +156,12 @@ private def fixture : Document := {
   (match value.hidden with | ⟨n⟩ => n == 42) && value.tree == fixture.tree &&
   value.store.size == 2 && value.store.get? 900719925474099312345 == some "last"
 
+-- Unsupported children can fail after earlier helpers were planned. Preparation
+-- must still leave no declarations behind, including private traversal helpers.
+structure UnsupportedChild where
+  ordinary : Nat
+  unsupported : Float
+
 -- Generation failures remain local and precise, before any output declaration.
 run_elab do
   let name := `JsonSafeWriterValues.unclosed
@@ -171,7 +177,9 @@ run_elab do
 
 run_elab do
   for (name, type) in #[(`JsonSafeWriterValues.unsupportedFloat, Lean.mkConst ``Float),
-      (`JsonSafeWriterValues.unsupportedUSize, Lean.mkConst ``USize)] do
+      (`JsonSafeWriterValues.unsupportedUSize, Lean.mkConst ``USize),
+      (`JsonSafeWriterValues.unsupportedChild, Lean.mkConst ``UnsupportedChild)] do
+    let before := (← Lean.getEnv).constants.fold (init := 0) fun count _ _ => count + 1
     let failed ← try
       Vir.Interface.JsonSafeWriter.generate name type
       pure false
@@ -180,7 +188,8 @@ run_elab do
       unless (message.splitOn "unsupported JSON-safe writer domain").length > 1 do
         Lean.throwError "unexpected writer diagnostic: {message}"
       pure true
-    unless failed && !(← Lean.getEnv).contains name do
-      Lean.throwError "unsupported domain produced a writer"
+    let after := (← Lean.getEnv).constants.fold (init := 0) fun count _ _ => count + 1
+    unless failed && !(← Lean.getEnv).contains name && before == after do
+      Lean.throwError "unsupported domain emitted declarations"
 
 end JsonSafeWriterValues
