@@ -118,11 +118,12 @@ larger harness machinery out unless the maintainer requests them.
   for a notification.
 - Send one consolidated handoff only when a specific recipient needs to act:
   request review/decision, take a dependency, wake an idle owner, or resolve a
-  blocker. `codex queue` is targeted wake-up/assignment, not a broadcast or
-  receipt mechanism. Do not send acknowledgments, receipt echoes, duplicate
-  completion reports, or unchanged CI updates. For PR checks, record the final
-  exact-head result once; report an earlier failure only if it changes scope or
-  blocks the next action.
+  blocker. A targeted wake-up (whatever mechanism the owner's agent runtime
+  provides to resume or message a specific session) is for assignment and
+  handoff, not a broadcast or receipt mechanism. Do not send acknowledgments,
+  receipt echoes, duplicate completion reports, or unchanged CI updates. For PR
+  checks, record the final exact-head result once; report an earlier failure
+  only if it changes scope or blocks the next action.
 - Notify the human when their review/decision is needed, or promptly for a
   material blocker or scope/ownership conflict. Otherwise keep the board current
   and batch independent lane updates into one short digest when useful; do not

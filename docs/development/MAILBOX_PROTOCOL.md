@@ -268,11 +268,24 @@ changes scope remains worth an immediate message.
 
 The board is the current status surface; a board/mailbox update does not by
 itself require a separate notification. Work quietly between action boundaries:
-do not announce routine claims, build/CI starts, or unchanged progress. Use
-`codex queue` only to wake or assign a specific owner, or to deliver a handoff
-that needs that owner's action. Batch independent status into one coordinator
-digest; notify the human when review/decision is needed or a material blocker
-changes the plan.
+do not announce routine claims, build/CI starts, or unchanged progress. Use a
+targeted wake-up, through whatever mechanism the owner's agent runtime provides,
+only to wake or assign a specific owner, or to deliver a handoff that needs that
+owner's action. The mailbox and board stay tool-neutral; a thread must not
+depend on one runtime's queue to be understood. Batch independent status into
+one coordinator digest; notify the human when review/decision is needed or a
+material blocker changes the plan.
+
+An owner that can be woken records its runtime and session in its claim or
+opener, for example `x-runtime: claude-code` and `x-session-uuid: <uuid>`, so
+any agent can choose the matching mechanism. Known mechanisms:
+
+- Codex: `codex queue --thread <uuid> --message "<handoff>"`.
+- Claude Code: `claude --bg --resume <uuid> "<handoff>"` continues a stopped
+  session under the same ID. If `claude agents --json` shows that session
+  still running, the command would start a copy instead. Do not resume or
+  stop a running session automatically; ask the owner or the maintainer to
+  relay the handoff or to stop the session first.
 
 Consult only owners affected by overlapping edits or shared-contract changes.
 Do not seek unrelated owners' agreement or repeat permission already granted.
