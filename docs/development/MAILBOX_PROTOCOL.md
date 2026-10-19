@@ -276,16 +276,18 @@ depend on one runtime's queue to be understood. Batch independent status into
 one coordinator digest; notify the human when review/decision is needed or a
 material blocker changes the plan.
 
-An owner that can be woken records its runtime and session in its claim or
-opener, for example `x-runtime: claude-code` and `x-session-uuid: <uuid>`, so
-any agent can choose the matching mechanism. Known mechanisms:
+An owner that can be woken records `x-runtime` (`codex` or `claude-code`) and
+`x-session-uuid` in its claim or opener, and repeats both in later messages
+after a restart, model switch or handoff; the owner's most recent message
+carries the current values. Never fork, stop or otherwise disturb another
+agent's running session to wake it; when a mechanism cannot reach a running
+session, ask the owner or the maintainer to relay the handoff. Known mechanisms:
 
-- Codex: `codex queue --thread <uuid> --message "<handoff>"`.
-- Claude Code: `claude --bg --resume <uuid> "<handoff>"` continues a stopped
-  session under the same ID. If `claude agents --json` shows that session
-  still running, the command would start a copy instead. Do not resume or
-  stop a running session automatically; ask the owner or the maintainer to
-  relay the handoff or to stop the session first.
+- `codex`: `codex queue --thread <uuid> --message '<handoff>'`.
+- `claude-code`: from the owner's recorded worktree (sessions are stored per
+  directory), `claude --bg --resume <uuid> '<handoff>'` continues a stopped
+  session under the same ID. If `claude agents --json` shows the session still
+  running, this would start a copy instead, so relay the handoff.
 
 Consult only owners affected by overlapping edits or shared-contract changes.
 Do not seek unrelated owners' agreement or repeat permission already granted.
