@@ -192,7 +192,7 @@ as `js#[← jsx%{<span key="first">First</span>}, ← jsx%{<span key="second">Se
 Each `jsx%{...}` literal has one root element; nested tags need no extra
 delimiter. It can be the final action in a `do` block without `return ←`.
 This notation adopts part of [PR197](https://github.com/ejgallego/lean-vir/pull/197).
-VIR retains its parser on Lean 4.35; adopting Lean 4.36's upstream HTML parser
+VIR retains its own parser; adopting Lean 4.36's upstream HTML parser
 is separate work.
 
 The [HTML fixture](../../fixtures/ProofWidgetsHtml.lean) and
