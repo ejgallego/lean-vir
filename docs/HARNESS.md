@@ -448,12 +448,14 @@ own explicit maintainer selection.
 
 ## Runtime Releases
 
-Release tags follow the pinned Lean toolchain: `4.35-rc4` for
-`leanprover/lean4:v4.35.0-rc4`, `4.35` for `v4.35.0`, and `4.35.1` for
-`v4.35.1`. Milestone numbers and the internal SDK manifest version are independent
+Release tags match Lean and Verso exactly: `v4.36.0-rc1` for
+`leanprover/lean4:v4.36.0-rc1`, `v4.36.0` for `v4.36.0`, and `v4.36.1` for
+`v4.36.1`. Milestone numbers and the internal SDK manifest version are independent
 of these tags. `node scripts/release-tag.mjs` prints the current release tag.
+Existing releases retain their published tag names.
 
-Numeric tags trigger [release-sdk.yml](../.github/workflows/release-sdk.yml),
+Version tags beginning with `v` trigger
+[release-sdk.yml](../.github/workflows/release-sdk.yml),
 which rejects tags that do not match `lean-toolchain`, checks ABI versions,
 builds/imports the SDK and uploads the archive plus a content-named runtime pack.
 RC tags produce prereleases; content-addressed `resource-…` releases remain

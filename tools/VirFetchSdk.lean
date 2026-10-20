@@ -15,12 +15,9 @@ namespace Vir.FetchSdk
 
 def sdkVersion : String := "0.1.0"
 
-/-- Lean-aligned release names omit a zero patch component, retaining rc suffixes. -/
+/-- Use Lean's full release tag, including the `v` prefix and patch component. -/
 def releaseTagForVersion (version : String) : String :=
-  let parts := version.splitOn "-"
-  let core := parts.headD version
-  let core := if core.endsWith ".0" then (core.dropEnd 2).toString else core
-  String.intercalate "-" (core :: parts.tail)
+  "v" ++ version
 
 def sdkReleaseTag : String := releaseTagForVersion Lean.versionString
 
