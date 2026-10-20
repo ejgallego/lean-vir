@@ -4,7 +4,7 @@ The [manifest format reference](../reference/IRPKG_FORMAT.md#interface-descripto
 is authoritative for the current encoding and admission constraints. Its
 [typed grammar](native-value-interfaces.ts) provides the compact field definitions.
 This document explains the design choices; it is not another specification or a
-public API for constructing descriptors or selecting alternate views.
+public API for handwriting descriptors or replacing their value mappings.
 
 ## Compiler facts and value representations
 
@@ -17,7 +17,9 @@ field paths. It contains no second copy of field types or physical locations.
 The runtime binds admitted pairs into cached codecs. Core scalar operations and
 opaque reference passage remain available in the managed composition; structural
 materialization belongs to optional object conversion. The public runtime consumes
-the producer's emitted pair and does not expose a view-selection mechanism.
+the producer's emitted pair. `callWith` explicitly selects ordinary JavaScript
+values or the fixed [JSON-safe representation](JSON_SAFE_VALUE_CODEC.md), reusing
+that pair's constructor mappings and storage facts.
 
 This split lets Option, Prod, Sum, Except, records and user-defined inductives use
 one constructor kernel. Native arrays keep their efficient allocation/indexing
@@ -30,9 +32,9 @@ Every Option uses `{ kind: "none" }` or `{ kind: "some", value }`. This preserve
 `none`, `some none`, and `some ()` without type-dependent nullable shorthand.
 `Js.Nullable` and `Js.UndefinedOr` retain exact JavaScript resource values.
 
-Integer outputs use the producer's BigInt representation for Nat, Int and UInt64.
-Safe integer Number inputs and decimal-string inputs remain convenient coercions;
-there is no separate Number-result adapter for unbounded integers. Concrete input
+Default integer outputs use BigInt for Nat, Int and UInt64; JSON-safe outputs
+use canonical decimal Strings. Default input conversion accepts safe integer
+Numbers and decimal Strings; there is no separate Number-result adapter for unbounded integers. Concrete input
 and output rules belong to the [JS API](../guides/JS_API.md#calls-and-manifest).
 
 ## Recursion and local sharing
@@ -66,8 +68,8 @@ recursive-child views remain separate design questions with concrete caller need
 Manifest admission establishes the grammar, physical layouts, lexical scopes and
 native/view mapping consistency. Binding consumes those immutable facts; it does
 not repeat descriptor validation. A physically valid layout can still require a
-conversion the optional codec does not support, such as an enclosing packed
-identity-wrapper field. Capability checks preserve that distinction and allow
+conversion the optional codec does not support, such as flattened mappings
+that cross packed identity-wrapper storage. Capability checks preserve that distinction and allow
 supported sibling exports to remain callable.
 
 Conversion checks actual values, payloads, numeric ranges, returned discriminants,
@@ -94,7 +96,9 @@ Applications choose whether to materialize Lean state, retain opaque JSL values,
 or pass exact JS resources. A native descriptor does not imply automatic JSON
 conversion. Explicit application codecs own persistence/wire mappings, defaults,
 custom leaves and error rules; those semantics cannot be inferred from layouts.
-The public opaque construction seam remains a separate API decision.
+Closed typed library rules supply private construction operations through the
+existing call ABI. The library owns the rule's semantic invariants and inverse
+laws; helper type checks do not establish those properties.
 
 [Native codec measurements](../../benchmarks/NATIVE_CODECS.md) retain the methodology,
 cost model and experiment evidence. Raw manifest reduction, compressed transfer,

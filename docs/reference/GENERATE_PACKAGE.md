@@ -245,7 +245,7 @@ Runtime ABI is SDK metadata, not embedded package metadata. The same artifact
 metadata records exact build-time React/ReactDOM versions from
 `package-lock.json` for the optional React host. ABI 4 is the current SDK
 contract: loader success status and declaration counts remain separate,
-including for successful empty packages. It requires manifest 12, package
+including for successful empty packages. It requires manifest 13, package
 format 11, and matching JavaScript/Wasm artifacts. Installed manifest metadata
 remains deeply frozen; installers reject older ABIs before replacing an SDK.
 When the generator or runtime revision changes, regenerate the package set and

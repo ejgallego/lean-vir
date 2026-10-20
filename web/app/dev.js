@@ -11,6 +11,7 @@ import {
   interfaceInputTag,
   isJsonInput,
   parseBoolText,
+  parseInputValue,
 } from "./pages/interface-inputs.js";
 import { formatInterfaceEffectPrefix } from "../src/runtime/interface-effects.js";
 import {
@@ -23,12 +24,6 @@ import {
   packagePresets,
   wasmPublicFile,
 } from "./pages/browser-packages.js";
-import {
-  parseByteArrayInput,
-  parseFloatText,
-  parseIntText,
-  parseNatText,
-} from "./pages/input-parsers.js";
 import {
   assetPathFor,
   errorMessage,
@@ -377,38 +372,6 @@ function renderPackageMetadata(metadata, packageInfo) {
     metadata?.leanToolchain ?? metadata?.leanVersion ?? "unknown";
 }
 
-function parseInputValue(input, field) {
-  const text = field?.value ?? inputDefault(input);
-  const nativeType = input.type?.native?.type;
-  switch (input.type?.value?.tag) {
-    case "bigint":
-      return nativeType?.tag === "int" ? parseIntText(text) : parseNatText(text);
-    case "number":
-      return nativeType?.tag === "float"
-        ? parseFloatText(text)
-        : Number(parseNatText(text));
-    case "boolean":
-      if (field?.type === "checkbox") return Boolean(field.checked);
-      if (String(text).trim() === "true") return true;
-      if (String(text).trim() === "false") return false;
-      throw new Error(`invalid Bool literal: ${text}`);
-    case "string":
-      return text;
-    case "bytes":
-      return parseByteArrayInput(text);
-    case "enum":
-      return text.trim();
-    case "expr":
-    case "record":
-    case "sequence":
-    case "variant":
-      return JSON.parse(text);
-    case "unit":
-      return undefined;
-    default:
-      throw new Error(`unsupported input value interface: ${input.type?.value?.tag ?? "?"}`);
-  }
-}
 
 function renderResult(value) {
   const text = formatResult(value);

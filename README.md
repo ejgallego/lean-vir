@@ -7,8 +7,8 @@ It packages compiled module IR; it is not a general Lean-to-Wasm compiler.
 VIR officially supports the runtime, package workflow, low-level object API and
 minimal two-way JS/Lean interop. DOM, React/JSX and editor/widget integrations are
 experimental conveniences, including when available through default imports.
-See [support scope](docs/SUPPORT.md) for the boundary and the planned 0.1.1 JSON
-converters.
+See [support scope](docs/SUPPORT.md) for the boundary, including the experimental
+[JSON-safe codecs](docs/design/JSON_SAFE_VALUE_CODEC.md).
 
 ## Try it
 

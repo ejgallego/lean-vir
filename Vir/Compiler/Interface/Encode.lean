@@ -8,6 +8,7 @@ module
 
 public import Vir.Compiler.Interface.Model
 import Vir.Package.Json
+import Vir.Package.Name
 
 public section
 
@@ -68,6 +69,10 @@ private def immediateConstructorJson (name : Name) : String :=
     ("fields", jsonArray #[])
   ]
 
+private def FieldCheck.toJson : FieldCheck → String
+  | .unicodeScalar => jsonObject #[("tag", jsonString "unicodeScalar")]
+  | .natLt bound => jsonObject #[("tag", jsonString "natLt"), ("bound", jsonString (toString bound))]
+
 mutual
 
 private partial def nativeDescriptorJson (type : InterfaceType) : String :=
@@ -106,6 +111,14 @@ private partial def nativeMetadataFields (type : InterfaceType) : Array (String 
         ("declaration", jsonName name),
         ("constructors", jsonArray #[structureConstructorJson descriptor])
       ]
+  | .libraryAdapter name _ descriptor => #[
+      ("declaration", jsonName name),
+      ("adapter", jsonObject #[
+        ("wire", descriptorRefJson descriptor.wire),
+        ("decode", jsonString (Vir.nameKey descriptor.decode)),
+        ("encode", jsonString (Vir.nameKey descriptor.encode))
+      ])
+    ]
   | .resource name _ => #[("declaration", jsonName name)]
   | .function args result effect =>
       let signature := jsonObject #[
@@ -137,12 +150,12 @@ private partial def inductiveConstructorJson (constructor : InductiveConstructor
   else
     let fields := constructor.fields.map fun field =>
       storedFieldJson constructor.storage field.name field.type field.layout
-    jsonObject #[
+    jsonObject (#[
       ("name", jsonName constructor.constructorName),
       ("representation", jsonString "object"),
       ("storage", constructor.storage.toJson),
       ("fields", jsonArray fields)
-    ]
+    ] ++ (constructor.operation?.toArray.map fun name => ("operation", jsonString (Vir.nameKey name))))
 
 private partial def structureConstructorJson (descriptor : StructureDescriptor) : String :=
   match descriptor.trivialField?, descriptor.fields.toList with
@@ -155,34 +168,34 @@ private partial def structureConstructorJson (descriptor : StructureDescriptor) 
   | _, _ =>
       let fields := descriptor.fields.map fun field =>
         storedFieldJson descriptor.storage field.name field.type field.layout
-      jsonObject #[
+      jsonObject (#[
         ("name", jsonName descriptor.constructorName),
         ("representation", jsonString "object"),
         ("storage", descriptor.storage.toJson),
         ("fields", jsonArray fields)
-      ]
+      ] ++ (descriptor.operation?.toArray.map fun name => ("operation", jsonString (Vir.nameKey name))))
 
 private partial def recordFieldJson
-    (key : String) (path : Array Nat) (type : InterfaceType) : String :=
-  jsonObject #[
+    (key : String) (path : Array Nat) (type : InterfaceType) (check? : Option FieldCheck := none) : String :=
+  jsonObject (#[
     ("key", jsonString key),
     ("path", jsonArray (path.map jsonNat)),
     ("value", valueInterfaceJson type)
-  ]
+  ] ++ (match check? with | none => #[] | some check => #[("check", check.toJson)]))
 
 private partial def variantCaseJson
     (kind : String) (fields : Array (String × InterfaceType)) : String :=
-  match fields.toList with
-  | [] => jsonObject #[
+  match constructorPayload fields with
+  | .none => jsonObject #[
       ("kind", jsonString kind),
       ("payload", jsonString "none")
     ]
-  | [(_, valueType)] => jsonObject #[
+  | .value (_, valueType) => jsonObject #[
       ("kind", jsonString kind),
       ("payload", jsonString "value"),
       ("value", valueInterfaceJson valueType)
     ]
-  | _ =>
+  | .fields fields =>
       let encodedFields := fields.mapIdx fun index field =>
         recordFieldJson field.1 #[index] field.2
       jsonObject #[
@@ -212,33 +225,23 @@ private partial def inheritedRecordFieldsJson
       | .structure _ _ parent =>
           result := result ++ inheritedRecordFieldsJson parent.fields path
       | _ =>
-          result := result.push (recordFieldJson field.name path field.type)
+          result := result.push (recordFieldJson field.name path field.type field.check?)
     else
-      result := result.push (recordFieldJson field.name path field.type)
+      result := result.push (recordFieldJson field.name path field.type field.check?)
   return result
 
 private partial def customInductiveValueJson
     (name : Name) (constructors : Array InductiveConstructor) : String :=
-  if name == `List then
-    -- This is the pinned compiler's List declaration, not a user-selected
-    -- linked representation. Layouts still come from the constructor metadata.
-    let shape : List (Name × List InductiveField) :=
-      constructors.toList.map (fun ctor => (ctor.constructorName, ctor.fields.toList))
-    match shape with
-    | [(`List.nil, []), (`List.cons, [
-        { name := "head", type := element, .. },
-        { name := "tail", type := .recursiveRef _ _ 0, .. }])] =>
-        jsonObject #[
-          ("tag", jsonString "sequence"),
-          ("element", valueInterfaceJson element),
-          ("chain", jsonObject #[
-            ("nil", jsonNat 0), ("cons", jsonNat 1),
-            ("head", jsonNat 0), ("tail", jsonNat 1)
-          ])
-        ]
-    | _ => panic! "interface encoder: unexpected compiler-owned List constructor shape"
-  else
-    inductiveVariantValueJson name constructors
+  match linkedListElement? name constructors with
+  | some element => jsonObject #[
+      ("tag", jsonString "sequence"),
+      ("element", valueInterfaceJson element),
+      ("chain", jsonObject #[
+        ("nil", jsonNat 0), ("cons", jsonNat 1),
+        ("head", jsonNat 0), ("tail", jsonNat 1)
+      ])
+    ]
+  | none => inductiveVariantValueJson name constructors
 
 private partial def valueInterfaceJson (type : InterfaceType) : String :=
   match type with
@@ -265,6 +268,10 @@ private partial def valueInterfaceJson (type : InterfaceType) : String :=
   | .structure _ _ descriptor => jsonObject #[
       ("tag", jsonString "record"),
       ("fields", jsonArray (inheritedRecordFieldsJson descriptor.fields))
+    ]
+  | .libraryAdapter _ _ descriptor => jsonObject #[
+      ("tag", jsonString "adapted"),
+      ("wire", valueInterfaceJson descriptor.wire)
     ]
   | .resource .. => jsonObject #[("tag", jsonString "jsReference")]
   | .function args result _ =>

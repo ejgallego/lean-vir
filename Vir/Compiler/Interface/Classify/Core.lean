@@ -8,6 +8,7 @@ module
 
 public import Vir.Compiler.Interface.Classify.Error
 public import Vir.Compiler.Interface.Model
+public import Vir.Compiler.Interface.LibraryAdapters
 import Vir.Compiler.Interface.Classify.Basic
 import Vir.Compiler.Interface.Classify.Reduce
 
@@ -24,6 +25,12 @@ open Vir.InterfaceValidation
 outer metadata. Lean's structural equality includes binder names/annotations,
 nested metadata and universe levels; no alpha or definitional reduction is used. -/
 private abbrev RecursiveSeen := Array ExprStructEq
+
+/-- Aggregate owners determine lexical reference depths. Adapter expansion has
+its own active path, preserved when a wire domain starts a fresh owner scope. -/
+private structure ClassifyContext where
+  owners : RecursiveSeen := #[]
+  adapters : Array ExprStructEq := #[]
 
 private inductive RecursiveStep where
   | reference (depth : Nat)
@@ -81,6 +88,57 @@ private def constructorStorage (layout : Lean.Compiler.LCNF.CtorLayout) : Constr
   usizeFieldCount := layout.ctorInfo.usize
   scalarByteSize := layout.ctorInfo.ssize }
 
+/-- Follow the compiler's registered implementation, rather than allocating from
+the source constructor's layout. The pinned computed-field transform preserves
+logical arguments and prepends computed storage. Retain its typed operation;
+recognize only closed, scalar-cache cases until other shapes are supported. -/
+private def implementationLayout (name : Name) : ClassifyM (Lean.Compiler.LCNF.CtorLayout × Option Name) := do
+  let env ← getEnv
+  let some implementation := Lean.Compiler.getImplementedBy? env name
+    | return (← constructorLayout name (.constructorLayoutUnavailable name), none)
+  let some (.ctorInfo source) := env.find? name | throwThe InterfaceClassifierError (.constructorOperationUnsupported name "missing constructor")
+  if source.numParams != 0 then throwThe InterfaceClassifierError (.constructorOperationUnsupported name "parameterized constructor operation unsupported")
+  let some (.defnInfo info) := env.find? implementation | throwThe InterfaceClassifierError (.constructorOperationUnsupported name "missing implementation")
+  let mut body := info.value.consumeMData
+  let mut binders := 0
+  while let .lam _ _ next _ := body do
+    body := next.consumeMData
+    binders := binders + 1
+  unless binders == source.numFields do throwThe InterfaceClassifierError (.constructorOperationUnsupported name "unexpected operation binders")
+  let arguments := body.getAppArgs
+  unless body.getAppFn.constName == ``unsafeCast && arguments.size == 3 do
+    throwThe InterfaceClassifierError (.constructorOperationUnsupported name "unsupported operation body")
+  let value := arguments[2]!
+  let some (.ctorInfo actual) := env.find? value.getAppFn.constName
+    | throwThe InterfaceClassifierError (.constructorOperationUnsupported name "operation is not a constructor application")
+  unless actual.cidx == source.cidx && actual.numParams == 0 &&
+      actual.numFields >= source.numFields && value.getAppArgs.size == actual.numFields do
+    throwThe InterfaceClassifierError (.constructorOperationUnsupported name "operation changes constructor identity")
+  let offset := actual.numFields - source.numFields
+  for i in [:source.numFields] do
+    unless value.getAppArgs[offset + i]? == some (.bvar (source.numFields - i - 1)) do
+      throwThe InterfaceClassifierError (.constructorOperationUnsupported name "operation changes logical field")
+  let layout ← constructorLayout actual.name (.constructorLayoutUnavailable name)
+  for i in [:offset] do
+    unless (fieldLayout? layout.fieldInfo[i]!).any (fun l => match l with | .scalar .. => true | _ => false) do
+      throwThe InterfaceClassifierError (.constructorOperationUnsupported name "computed object/usize fields unsupported")
+  if source.numFields == 0 && (layout.ctorInfo.size != 0 || layout.ctorInfo.usize != 0 || layout.ctorInfo.ssize != 0) then
+    throwThe InterfaceClassifierError (.constructorOperationUnsupported name "computed storage on a fieldless constructor unsupported")
+  return ({ layout with fieldInfo := layout.fieldInfo.extract offset layout.fieldInfo.size },
+    if source.numFields == 0 then none else some implementation)
+
+private def libraryAdapterOutcome : ClassifyM InterfaceType := do
+  let constructors ← #[(`Except.error, InterfaceType.string), (`Except.ok, InterfaceType.leanObject)].mapM fun (name, type) => do
+    let layout ← constructorLayout name (.constructorLayoutUnavailable name)
+    let some location := fieldLayout? layout.fieldInfo[0]!
+      | throwThe InterfaceClassifierError (.constructorLayoutUnavailable name)
+    pure ({
+      constructorName := name
+      storage := constructorStorage layout
+      fields := #[{ name := "a", type, layout := location }]
+    } : InductiveConstructor)
+  pure (.customInductive `Except "Except String opaque" constructors)
+
 /-- A closure invocation cannot carry an enclosing aggregate's recursive owner.
 Complete structures/inductives establish their own owner when marshalled. -/
 private partial def enclosingRecursiveOwner? (bound : Nat := 0) : InterfaceType → Option Name
@@ -95,21 +153,19 @@ private partial def enclosingRecursiveOwner? (bound : Nat := 0) : InterfaceType 
       args.findSome? (fun arg => enclosingRecursiveOwner? bound arg.type) <|> enclosingRecursiveOwner? bound result
   | _ => none
 
-private def constructorFieldTypes? (type : Lean.Expr) : Option (Array (String × Lean.Expr)) :=
-  let rec go (type : Lean.Expr) (fields : Array (String × Lean.Expr)) : Option (Array (String × Lean.Expr)) :=
-    match type with
-    | .mdata _ body => go body fields
-    | .forallE name domain body binderInfo =>
-        if binderInfo != .default then
-          none
-        else
-          go body (fields.push (binderArgName (fields.size + 1) name, domain))
-    | _ => some fields
-  go type #[]
+/-- Classification rejects implicit inductive fields; records explicitly opt in.
+Proof erasure remains a separate checked policy in structure classification. -/
+private def constructorFields (type : Lean.Expr) (ctorName : Name)
+    (allowImplicitFields : Bool := false) : ClassifyM (Array (String × Lean.Expr)) := do
+  let fields ← ExceptT.mk (pure (instantiateConstructorFields (← getEnv) type ctorName))
+  unless allowImplicitFields || fields.all (·.binderInfo == .default) do
+    throwThe InterfaceClassifierError (.constructorImplicitFields ctorName)
+  fields.mapIdxM fun index field => do
+    return (binderArgName (index + 1) field.name, ← reduceConstructorFieldType field.type)
 
 mutual
 
-private partial def functionType (type : Lean.Expr) (seenTypes : RecursiveSeen)
+private partial def functionType (type : Lean.Expr) (context : ClassifyContext)
     (args : Array InterfaceArg := #[]) :
     ClassifyM InterfaceType := do
   let type := type.consumeMData
@@ -121,23 +177,23 @@ private partial def functionType (type : Lean.Expr) (seenTypes : RecursiveSeen)
         throwThe InterfaceClassifierError (.implicitCallbackArgument name)
       else
         let argType ← withContext (.callbackArgument domain) do
-          let argType ← classifyType domain seenTypes
+          let argType ← classifyType domain context
           if let some owner := enclosingRecursiveOwner? 0 argType then
             throwThe InterfaceClassifierError (.recursiveCallback owner)
           return argType
-        functionType body seenTypes (args.push {
+        functionType body context (args.push {
           name := binderArgName (args.size + 1) name, type := argType })
   | result =>
       let effectResult ← effectResult? result
       let (effect, result) := effectResult.getD (.pure, result)
       let resultType ← withContext (.callbackResult result) do
-        let resultType ← classifyType result seenTypes
+        let resultType ← classifyType result context
         if let some owner := enclosingRecursiveOwner? 0 resultType then
           throwThe InterfaceClassifierError (.recursiveCallback owner)
         return resultType
       return (.function args resultType effect)
 
-private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
+private partial def inductiveType (context : ClassifyContext) (e : Lean.Expr) :
     ClassifyM InterfaceType := do
   let e := e.consumeMData
   let (name, args) := e.getAppFnArgs
@@ -146,10 +202,11 @@ private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
   let env ← getEnv
   let some (.inductInfo indInfo) := env.find? name
     | throwThe InterfaceClassifierError (.unsupportedType e)
-  match ← ExceptT.mk (recursiveVisit seenTypes .inductive e indInfo.isRec indInfo.all) with
+  match ← ExceptT.mk (recursiveVisit context.owners .inductive e indInfo.isRec indInfo.all) with
   | .reference depth =>
       return (.recursiveRef name (exprTypeLabel e) depth)
   | .descend nextSeen =>
+    let context := { context with owners := nextSeen }
     if indInfo.numIndices != 0 then
       throwThe InterfaceClassifierError (.indexedInductive name)
     else if args.size != indInfo.numParams then
@@ -159,17 +216,8 @@ private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
     else
       let mut constructors : Array InductiveConstructor := #[]
       for ctorName in indInfo.ctors do
-        let some (.ctorInfo ctorInfo) := env.find? ctorName
-          | throwThe InterfaceClassifierError (.constructorMissingDeclaration ctorName)
-        if ctorInfo.induct != name then
-          throwThe InterfaceClassifierError (.constructorOwnerMismatch ctorName name ctorInfo.induct)
-        -- Recursive fields must use the applied aggregate's universe instance.
-        let ctorType := ctorInfo.toConstantVal.instantiateTypeLevelParams e.getAppFn.constLevels!
-        let some instantiated := instantiateForallPrefix? ctorType args
-          | throwThe InterfaceClassifierError (.constructorInvalidType ctorName ctorInfo.type)
-        let some fieldExprs := constructorFieldTypes? instantiated
-          | throwThe InterfaceClassifierError (.constructorImplicitFields ctorName)
-        let layout ← constructorLayout ctorName (.constructorLayoutUnavailable ctorName)
+        let fieldExprs ← constructorFields e ctorName
+        let (layout, operation?) ← implementationLayout ctorName
         if layout.fieldInfo.size != fieldExprs.size then
           throwThe InterfaceClassifierError (
             .constructorLayoutFieldCountMismatch ctorName fieldExprs.size layout.fieldInfo.size)
@@ -179,15 +227,16 @@ private partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
           let some fieldLayout := fieldLayout? layout.fieldInfo[idx]!
             | throwThe InterfaceClassifierError (.constructorFieldErasedRuntimeLayout fieldName ctorName)
           let fieldType ← withContext (.constructorField fieldName ctorName fieldExpr)
-            (classifyType fieldExpr nextSeen)
+            (classifyType fieldExpr context)
           fields := fields.push { name := fieldName, type := fieldType, layout := fieldLayout }
         constructors := constructors.push {
           constructorName := ctorName
+          operation?
           storage := constructorStorage layout
           fields }
       return (.customInductive name (exprTypeLabel e) constructors)
 
-private partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
+private partial def structureType (context : ClassifyContext) (e : Lean.Expr) :
     ClassifyM InterfaceType := do
   let e := e.consumeMData
   let (name, args) := e.getAppFnArgs
@@ -198,10 +247,11 @@ private partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
     | throwThe InterfaceClassifierError (.unsupportedType e)
   let some structInfo := getStructureInfo? env name
     | throwThe InterfaceClassifierError (.unsupportedType e)
-  match ← ExceptT.mk (recursiveVisit seenTypes .structure e indInfo.isRec indInfo.all) with
+  match ← ExceptT.mk (recursiveVisit context.owners .structure e indInfo.isRec indInfo.all) with
   | .reference depth =>
       return (.recursiveRef name (exprTypeLabel e) depth)
   | .descend nextSeen =>
+    let context := { context with owners := nextSeen }
     if indInfo.numIndices != 0 then
       throwThe InterfaceClassifierError (.indexedStructure name)
     else if args.size != indInfo.numParams then
@@ -214,57 +264,89 @@ private partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
       throwThe InterfaceClassifierError (.recursiveInheritedStructure name)
     else
       let ctorName := indInfo.ctors.head!
-      let layout ← constructorLayout ctorName (.structureLayoutUnavailable name)
-      let trivialField? :=
-        (← Lean.Compiler.LCNF.hasTrivialImpureStructure? name).map (·.fieldIdx)
+      -- Record fields may be implicit constructor binders; their object keys
+      -- are still explicit and required by the record value interface.
+      let fieldExprs ← constructorFields e ctorName (allowImplicitFields := true)
+      let (layout, operation?) ← implementationLayout ctorName
+      let trivialField? ←
+        if operation?.isSome then pure none
+        else do
+          pure ((← Lean.Compiler.LCNF.hasTrivialImpureStructure? name).map (·.fieldIdx))
       if layout.fieldInfo.size != structInfo.fieldNames.size then
         throwThe InterfaceClassifierError (
           .structureLayoutFieldCountMismatch name structInfo.fieldNames.size layout.fieldInfo.size)
+      if fieldExprs.size != structInfo.fieldNames.size then
+        throwThe InterfaceClassifierError (.constructorInvalidType ctorName e)
+      let check? ← if name == ``Char then
+        pure (some FieldCheck.unicodeScalar)
+      else if name == ``Fin then do
+        let bound ← reduceTypeAliases args[0]!
+        let .lit (.natVal bound) := bound
+          | throwThe InterfaceClassifierError (.nonLiteralFinBound bound)
+        pure (some (FieldCheck.natLt bound))
+      else pure none
+      -- Only the pinned Char/Fin declarations have a selected validating rule.
+      -- Never skip proof fields merely because the compiler erased their storage.
+      if check?.isSome && (structInfo.fieldNames.size != 2 || structInfo.fieldNames[0]! != `val ||
+          structInfo.fieldNames[1]! != (if name == ``Char then `valid else `isLt)) then
+        throwThe InterfaceClassifierError (.constructorInvalidType ctorName e)
       let mut fields : Array StructureField := #[]
       for h : idx in *...structInfo.fieldNames.size do
         let fieldName := structInfo.fieldNames[idx]
         let isSubobject := (isSubobjectField? env name fieldName).isSome
-        let some fieldLayout := fieldLayout? layout.fieldInfo[idx]!
-          | throwThe InterfaceClassifierError (.structureFieldErasedRuntimeLayout fieldName name)
-        let some projName := structInfo.getProjFn? idx
-          | throwThe InterfaceClassifierError (.structureFieldMissingProjection fieldName name)
-        let some info := env.find? projName
-          | throwThe InterfaceClassifierError (.structureFieldMissingProjectionDeclaration fieldName name)
-        let projType := info.instantiateTypeLevelParams e.getAppFn.constLevels!
-        let some fieldExpr := projectionFieldType? indInfo.numParams args projType
-          | throwThe InterfaceClassifierError (.structureFieldInvalidProjectionType fieldName name info.type)
-        let fieldType ← withContext (.structureField fieldName name fieldExpr) (classifyType fieldExpr nextSeen)
+        let fieldLayout ← match fieldLayout? layout.fieldInfo[idx]! with
+          | some layout => pure layout
+          | none =>
+              if check?.isSome && idx == 1 then continue
+              else throwThe InterfaceClassifierError (.structureFieldErasedRuntimeLayout fieldName name)
+        let fieldExpr := fieldExprs[idx]!.2
+        let fieldType ← withContext (.structureField fieldName name fieldExpr) (classifyType fieldExpr context)
         fields := fields.push {
-          name := fieldName.toString, type := fieldType, layout := fieldLayout, isSubobject }
+          name := fieldName.toString, type := fieldType, layout := fieldLayout, isSubobject
+          check? := if idx == 0 then check? else none }
       return (.structure name (exprTypeLabel e) {
         constructorName := ctorName
+        operation?
         trivialField?
         storage := constructorStorage layout
         fields })
 
-private partial def classifyType (e : Lean.Expr) (seenTypes : RecursiveSeen) :
+private partial def classifyType (e : Lean.Expr) (context : ClassifyContext) :
     ClassifyM InterfaceType := do
   let e := e.consumeMData
   if let some e := optParamType? e then
-    classifyType e seenTypes
+    classifyType e context
   else match e with
   | .forallE .. =>
-      functionType e seenTypes
+      functionType e context
   | .bvar _ =>
       return .leanObject
   | _ =>
       let env ← getEnv
+      let adapter? ← match closedLibraryAdapter? env e with
+        | .ok adapter => pure adapter
+        | .error reason => throwThe InterfaceClassifierError (.libraryAdapterUnsupported e reason)
+      if let some adapter := adapter? then
+        let key : ExprStructEq := ⟨e⟩
+        if context.adapters.contains key then
+          throwThe InterfaceClassifierError (.libraryAdapterUnsupported e "recursive adapter wire domains are not supported")
+        -- Wire domains are closed: they cannot borrow an enclosing descriptor's
+        -- recursive owner or use a package-local fragment as their type identity.
+        let wire ← classifyType adapter.wireType { adapters := context.adapters.push key }
+        return .libraryAdapter e.getAppFn.constName (exprTypeLabel e) {
+          wire, decode := adapter.decode, encode := adapter.encode,
+          outcome := ← libraryAdapterOutcome }
       match simpleInterfaceType? e <|> resourceInterfaceType? e with
       | some ty => return ty
       | none =>
           tryCatchThe InterfaceClassifierError (do
             if (← effectResult? e).isSome then
-              functionType e seenTypes
+              functionType e context
             else
               let (fn, args) := e.getAppFnArgs
               match fn, Array.toList args with
               | `Array, [arg] =>
-                  return .array (← withContext .arrayElement (classifyType arg seenTypes))
+                  return .array (← withContext .arrayElement (classifyType arg context))
               | _, _ =>
                   match simpleEnumType? env e with
                   | some ty => return ty
@@ -272,20 +354,20 @@ private partial def classifyType (e : Lean.Expr) (seenTypes : RecursiveSeen) :
                       if let some (markerName, _) := jsResourceMarker? e then
                         throwThe InterfaceClassifierError (.jsMarkerOutsideResource markerName)
                       else if (getStructureInfo? env fn).isSome then
-                        structureType seenTypes e
+                        structureType context e
                       else
-                        inductiveType seenTypes e
+                        inductiveType context e
           ) fun error => do
             let reduced ← reduceTypeAliases e
             if reduced == e then
               throwThe InterfaceClassifierError error
             else
-              classifyType reduced seenTypes
+              classifyType reduced context
 
 end
 
 /-- Classify a complete Lean type with a fresh, branch-local recursion context. -/
 def interfaceType (type : Lean.Expr) : CoreM (Except InterfaceClassifierError InterfaceType) :=
-  (classifyType type #[]).run
+  (classifyType type {}).run
 
 end Vir.Interface

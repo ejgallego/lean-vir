@@ -11,6 +11,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Compiler/Node contracts do not require published runtime bytes or demo artifacts.
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install Lean
+        run: |
+          curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:runtime:unit
+      - run: npm run test:interface
+      - run: npm run test:writer:native
+      - run: node tests/runtime/library-adapter-imports-smoke.mjs
+
   build-demo:
     runs-on: ubuntu-latest
     steps:
@@ -119,7 +141,6 @@ jobs:
         with:
           name: vir-demo-artifacts
           path: web/public
-      - run: npm run test:runtime:unit
       - run: npm run test:runtime:pure
 
   runtime-lean:
@@ -179,7 +200,6 @@ jobs:
             build/resource-client-*/*.log
             build/quickstart-*/*.log
           if-no-files-found: ignore
-      - run: npm run test:interface
       - run: npm run test:generator:memory
       - name: Download demo artifacts
         uses: actions/download-artifact@v4

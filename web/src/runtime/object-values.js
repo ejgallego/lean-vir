@@ -168,24 +168,27 @@ export function withObjectValues(Base) {
     objectResultSupported(type) {
       return objectResultSupported(type);
     }
-    nativeValueCodec(type) {
-      this.nativeValueCodecs ??= new WeakMap();
-      let codec = this.nativeValueCodecs.get(type);
+    nativeValueCodec(type, { representation = "native" } = {}) {
+      if (representation !== "native" && representation !== "json-safe-v1")
+        throw new Error(`unsupported value representation ${representation}`);
+      const cache = representation === "native" ? (this.nativeValueCodecs ??= new WeakMap())
+        : (this.jsonSafeValueCodecs ??= new WeakMap());
+      let codec = cache.get(type);
       if (codec === undefined) {
-        codec = compileNativeValueCodec(this, type);
-        this.nativeValueCodecs.set(type, codec);
+        codec = compileNativeValueCodec(this, type, { representation });
+        cache.set(type, codec);
       }
       return codec;
     }
 
-    makeObjectValue(type, value, label) {
+    makeObjectValue(type, value, label, options) {
       const scratch = new ConstructorScratch(this);
-      try { return this.nativeValueCodec(type).lower(value, label, scratch); }
+      try { return this.nativeValueCodec(type, options).lower(value, label, scratch); }
       finally { scratch.dispose(); }
     }
 
-    liftObjectValue(type, obj, label) {
-      return this.nativeValueCodec(type).lift(obj, label);
+    liftObjectValue(type, obj, label, options) {
+      return this.nativeValueCodec(type, options).lift(obj, label);
     }
 
     makeObjectExpr(value, label) {

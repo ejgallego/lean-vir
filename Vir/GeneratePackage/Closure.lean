@@ -102,10 +102,16 @@ def resolvedRootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
         else
           roots) #[]
 
-def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
-  targets.foldl (fun state target =>
+def collectClosure (targets : Array Target) (index : DeclIndex)
+    (constructorRoots : Array Name := #[]) : Closure :=
+  let closure := targets.foldl (fun state target =>
     (resolvedRootsForTarget index target).foldl
       (fun state root => collectName index root #[root] state) state) {}
+  constructorRoots.foldl (fun state root =>
+    let state := collectName index root #[root] state
+    if (index.find? (boxedName root)).isSome then
+      collectName index (boxedName root) #[root] state
+    else state) closure
 
 private def DeclIndex.opaqueImportedModuleForDecl?
     (index : DeclIndex) (name : Name) : Option Name :=
@@ -124,8 +130,8 @@ target-selection mode: every target kind has the same ownership semantics.
 -/
 unsafe def resolveImportedModuleClosure
     (targets : Array Target)
-    (index : DeclIndex) : IO DeclIndex := do
-  let closure := collectClosure targets index
+    (index : DeclIndex) (constructorRoots : Array Name := #[]) : IO DeclIndex := do
+  let closure := collectClosure targets index constructorRoots
   let deferred := closure.missingDecls ++ closure.missingExterns
   let modules := deferred.foldl (init := #[]) fun modules dependency =>
     match index.opaqueImportedModuleForDecl? dependency.name with
@@ -138,7 +144,7 @@ unsafe def resolveImportedModuleClosure
   if modules.isEmpty then
     return index
   let next ← modules.foldlM (fun index moduleName => index.loadImportedModule moduleName) index
-  resolveImportedModuleClosure targets next
+  resolveImportedModuleClosure targets next constructorRoots
 
 def Closure.moduleNames (closure : Closure) : Array Name :=
   closure.decls.foldl (init := #[]) fun modules loaded =>

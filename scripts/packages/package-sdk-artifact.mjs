@@ -101,16 +101,20 @@ for the matching lean_vir package revision.
 
 It exposes the direct runtime API for custom hosts and existing integrations.
 The application resource workflow uses a separately prepared runtime.js loader
-with createProgram; that facade exposes status, call and dispose. Start ordinary
-applications with the complete resource example:
+with createProgram; that facade exposes status, call, callWith and dispose.
+Start ordinary applications with the complete resource example:
 https://github.com/ejgallego/lean-vir/blob/main/docs/guides/EMBEDDED_RESOURCES.md
 
 Official support covers the runtime, packages, object API and minimal JS/Lean
 interop. DOM, React/JSX, widgets, broad generated bindings and automatic conversion
 of records and custom inductives are experimental, including when shipped in this
 archive. Arrays inherit the support status of their element representations.
-See the support scope for details and the planned 0.1.1 JSON converter API:
+See the support scope for details:
 https://github.com/ejgallego/lean-vir/blob/main/docs/SUPPORT.md
+
+Generated Lean JSON writers and explicit json-safe-v1 selection through callWith
+are experimental. Their supported domains and limitations are documented here:
+https://github.com/ejgallego/lean-vir/blob/main/docs/design/JSON_SAFE_VALUE_CODEC.md
 
 The JavaScript files are ES modules. The generic runtime and host-binding
 modules do not import React; js/vir-react-host-bindings.js imports react and

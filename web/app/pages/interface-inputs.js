@@ -4,7 +4,14 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-const JSON_VALUE_TAGS = new Set(["expr", "record", "sequence", "variant"]);
+import {
+  parseByteArrayInput,
+  parseFloatText,
+  parseIntText,
+  parseNatText,
+} from "./input-parsers.js";
+
+const JSON_VALUE_TAGS = new Set(["expr", "record", "sequence", "variant", "adapted"]);
 
 export function interfaceInputTag(pair) {
   if (pair?.value?.tag === "enum") return "SELECT";
@@ -14,7 +21,82 @@ export function interfaceInputTag(pair) {
 
 export function inputDefault(input) {
   const value = defaultValueForType(input.type);
-  return typeof value === "string" ? value : JSON.stringify(value);
+  return typeof value === "string" && !isJsonInput(input.type) ? value : JSON.stringify(value);
+}
+
+export function parseInputValue(input, field) {
+  const text = field?.value ?? inputDefault(input);
+  const nativeType = input.type?.native?.type;
+  switch (input.type?.value?.tag) {
+    case "bigint":
+      return nativeType?.tag === "int" ? parseIntText(text) : parseNatText(text);
+    case "number":
+      return nativeType?.tag === "float"
+        ? parseFloatText(text)
+        : Number(parseNatText(text));
+    case "boolean":
+      if (field?.type === "checkbox") return Boolean(field.checked);
+      if (String(text).trim() === "true") return true;
+      if (String(text).trim() === "false") return false;
+      throw new Error(`invalid Bool literal: ${text}`);
+    case "string":
+      return text;
+    case "bytes":
+      return parseByteArrayInput(text);
+    case "enum":
+      return text.trim();
+    case "expr":
+    case "record":
+    case "sequence":
+    case "variant":
+    case "adapted":
+      return prepareJsonInput(input.type, JSON.parse(text));
+    case "unit":
+      return undefined;
+    default:
+      throw new Error(`unsupported input value interface: ${input.type?.value?.tag ?? "?"}`);
+  }
+}
+
+// JSON editing uses the admitted wire view. Materialize byte leaves for native
+// calls; leave constructor/key/range validation to the ordinary value codec.
+function prepareJsonInput(pair, value, bindings = []) {
+  if (pair.native.ref !== undefined)
+    return prepareJsonInput(bindings[pair.native.ref], value, bindings.slice(pair.native.ref + 1));
+  const view = pair.value;
+  if (view.tag === "adapted")
+    return prepareJsonInput({ native: pair.native.metadata.adapter.wire, value: view.wire }, value);
+  if (view.tag === "bytes") {
+    if (!Array.isArray(value) || value.some(byte => !Number.isInteger(byte) || byte < 0 || byte > 255))
+      throw new Error("ByteArray JSON must be an array of bytes in 0..255");
+    return new Uint8Array(value);
+  }
+  const scope = [pair, ...bindings];
+  if (view.tag === "sequence" && Array.isArray(value)) {
+    const native = view.chain === undefined ? pair.native.metadata.arrayElement
+      : pair.native.metadata.constructors[view.chain.cons].fields[view.chain.head].type;
+    return value.map(child => prepareJsonInput({ native, value: view.element }, child,
+      view.chain === undefined ? bindings : scope));
+  }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+  function childAt(path, childView, child, constructor) {
+    const resolved = nativeFieldAtPath(pair, path, constructor, scope);
+    return prepareJsonInput({ native: resolved.native, value: childView }, child, resolved.bindings);
+  }
+  function fields(mappings, output, constructor) {
+    if (output === null || typeof output !== "object" || Array.isArray(output)) return;
+    for (const field of mappings) if (Object.hasOwn(output, field.key))
+      output[field.key] = childAt(field.path, field.value, output[field.key], constructor);
+  }
+  if (view.tag === "record") fields(view.fields, value, 0);
+  else if (view.tag === "variant") {
+    const index = view.cases.findIndex(entry => entry.kind === value.kind);
+    const entry = view.cases[index];
+    if (entry?.payload === "value" && Object.hasOwn(value, "value"))
+      value.value = childAt([0], entry.value, value.value, index);
+    else if (entry?.payload === "fields") fields(entry.fields, value.fields, index);
+  }
+  return value;
 }
 
 export function parseBoolText(text) {
@@ -63,6 +145,8 @@ export function defaultValueForType(pair, bindings = [], depth = 0) {
         : constructorTemplate(resolved, 0, bindings, depth);
     case "sequence":
       return [];
+    case "adapted":
+      return defaultValueForType({ native: resolved.native.metadata.adapter.wire, value: view.wire }, [], depth + 1);
     case "recursive":
     case "function":
     case "jsReference":
@@ -77,7 +161,7 @@ function defaultRecordValue(pair, bindings, depth) {
   const result = {};
   for (const field of fields) {
     const resolvedField = nativeFieldAtPath(
-      pair.native,
+      pair,
       field.path,
       0,
       [pair, ...bindings],
@@ -103,7 +187,7 @@ export function constructorTemplate(pair, caseIndex, bindings = [], depth = 0) {
   const localBindings = [resolved, ...bindings];
   if (view.payload === "value") {
     const resolvedField = nativeFieldAtPath(
-      resolved.native,
+      resolved,
       [0],
       caseIndex,
       localBindings,
@@ -121,7 +205,7 @@ export function constructorTemplate(pair, caseIndex, bindings = [], depth = 0) {
   const fields = {};
   for (const field of view.fields) {
     const resolvedField = nativeFieldAtPath(
-      resolved.native,
+      resolved,
       field.path,
       caseIndex,
       localBindings,
@@ -153,18 +237,25 @@ function resolveNative(native, bindings) {
   return native;
 }
 
-function nativeFieldAtPath(native, path, firstConstructor, bindings) {
-  let current = resolveNative(native, bindings);
+function nativeFieldAtPath(pair, path, firstConstructor, bindings) {
+  let current = pair;
   let owners = bindings;
   for (const [position, fieldIndex] of path.entries()) {
     const constructorIndex = position === 0 ? firstConstructor : 0;
-    const ctor = current?.metadata?.constructors?.[constructorIndex];
+    const ctor = current.native?.metadata?.constructors?.[constructorIndex];
     const field = ctor?.fields?.[fieldIndex];
     if (field === undefined) return null;
     if (position === path.length - 1) return { native: field.type, bindings: owners };
-    current = resolveNative(field.type, owners);
-    if (current === null) return null;
+    const native = resolveNative(field.type, owners);
+    if (native === null) return null;
+    // Flattened mappings describe a parent record in the child's public view.
+    // Keep that view with its native owner so recursive refs can recover both.
+    const mappings = current.value.tag === "record" ? current.value.fields
+      : current.value.cases[constructorIndex].fields;
+    current = { native, value: { tag: "record", fields: mappings
+      .filter(mapping => mapping.path[0] === fieldIndex)
+      .map(mapping => ({ ...mapping, path: mapping.path.slice(1) })) } };
     owners = [current, ...owners];
   }
-  return path.length === 0 ? { native: current, bindings: owners } : null;
+  return path.length === 0 ? { native: current.native, bindings: owners } : null;
 }
