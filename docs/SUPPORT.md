@@ -29,7 +29,7 @@ Contributors follow the [API change policy](../CONTRIBUTING.md#api-changes).
 Start with [application setup](guides/EMBEDDED_RESOURCES.md). The underlying
 [JavaScript API](guides/JS_API.md) documents custom host bindings and direct runtime
 access; the current `createProgram` resource facade exposes only
-`status`, `call` and `dispose`.
+`status`, `call`, `callWith` and `dispose`.
 
 For two-way interop, [choose a boundary representation](guides/LEAN_VIR_LIBRARY.md#choose-a-boundary-representation):
 exact JavaScript values, opaque Lean-owned values and callbacks have different
@@ -52,9 +52,14 @@ Build tools, pack encoding and cache handling can implement supported workflows
 without becoming public APIs themselves. A module's directory or namespace does
 not determine its support status.
 
-## Planned for 0.1.1
+## Experimental JSON-safe codecs
 
-Generated JSON converters, explicitly invoked by applications in both directions,
-are a planned 0.1.1 deliverable. They are not yet a qualified release feature.
-Existing automatic value conversion is not that API; basic calls and Js/JSL
-reference interop do not require JSON.
+Generated Lean JSON writers and explicit `callWith` selection of the
+`json-safe-v1` representation are implemented and experimental. The
+[JSON-safe contract](design/JSON_SAFE_VALUE_CODEC.md) defines the supported
+domains, encodings, adapter rules and writer limitations. This does not promise
+conversion of every Lean type or availability in an older runtime or SDK release;
+use matching assets containing this implementation.
+
+Ordinary calls use native value representations by default. Basic calls and
+`Js`/`JSL` reference interop do not require JSON.

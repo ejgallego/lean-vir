@@ -24,7 +24,7 @@ interpreter:
 
 | Distribution | JavaScript entry | Available interface |
 | --- | --- | --- |
-| Library-prepared application resources | The runtime bundle's `runtime.js` | `createProgram` loads runtime/program manifests and returns `status`, `call` and `dispose`. |
+| Library-prepared application resources | The runtime bundle's `runtime.js` | `createProgram` loads runtime/program manifests and returns `status`, `call`, `callWith` and `dispose`. |
 | SDK archive for custom hosts and existing integrations | `js/vir-runtime.js` or `js/vir-runtime-node.js` | `createVirRuntime` and `createVirRuntimeFactory`, with the direct call, host-binding and object APIs documented below. |
 
 The current `createProgram` facade does not expose the underlying runtime or
@@ -367,12 +367,11 @@ application ownership: VIR does not dispose supplied maps when runtimes shut dow
   lowering or invocation; an unsupported domain throws without invoking the entry.
   See the [JSON-safe contract](../design/JSON_SAFE_VALUE_CODEC.md) for the generated
   Lean writer, precise encodings and current generation limits.
-- Export `id`, export `jsName`, and `exportsByName` were removed in manifest11 /
-  resource compatibility5. Replace generated methods and alias calls with
-  `call` using the full `entry`; regenerate programs with the matching SDK.
-  Provider IDs and structural `nameKey` keep their separate responsibilities.
-  In manifest12 / resource compatibility6, constructor JavaScript spellings
-  live in the selected value interface; constructor metadata has no `jsName`.
+- Callable identity uses the full `entry`. Provider IDs identify native providers,
+  and structural `nameKey` records Lean names without relying on display spelling.
+  Constructor JavaScript spellings live in the selected value interface;
+  constructor metadata describes the compiled representation. See the
+  [manifest contract](../reference/IRPKG_FORMAT.md#interface-descriptors).
 - `vir.runStartupEntries()` invokes zero-argument exports whose manifest entry
   has `startup: true`, in manifest order, once per runtime. After success,
   repeated calls do nothing. Failure stops the sequence and throws the error;
@@ -456,8 +455,9 @@ object lane. DOM and React object markers such as `Lean.Vir.Browser.Element`
 and `Lean.Vir.React.Root` must therefore appear as `Lean.Vir.Js ...` at the
 boundary.
 
-The explicitly invoked [JSON converter API](../SUPPORT.md#planned-for-011) is
-planned for 0.1.1; it is separate from this automatic marshaling.
+The experimental [JSON-safe codecs](../design/JSON_SAFE_VALUE_CODEC.md) provide
+an explicitly selected representation through `callWith` and generated Lean
+writers. Ordinary calls retain their native value representations.
 
 This surface is the descriptor-guided object lowering
 surface for JavaScript-to-Lean export calls. Host imports are narrower than exports:

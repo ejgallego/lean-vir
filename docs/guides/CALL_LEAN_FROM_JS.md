@@ -139,8 +139,7 @@ console.log(validated); // { kind: "ok", value: "Hello, Lean" }
 
 `vir.call(entry, ...args)` uses the full Lean declaration name in the manifest's
 `entry` field. See [calls and manifest](JS_API.md#calls-and-manifest) for the
-manifest11 / resource compatibility5 migration from export aliases and generated
-methods. Constructor labels and provider identifiers are unchanged.
+call surface and explicit representation selection with `callWith`.
 
 For diagnostic phase attribution, `vir.callTimed(name, ...args)` performs the
 same synchronous call and returns `{ value, timings }`. See

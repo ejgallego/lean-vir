@@ -37,8 +37,10 @@ Automatic array conversion is supported when the element representation is
 supported, for example `Array Nat`. Automatic conversion of records and custom
 inductives remains experimental; see the
 [implemented call representations](JS_API.md#calls-and-manifest).
-Explicit host-value conversions and opaque carriers do not encode JSON. The
-[planned 0.1.1 JSON converters](../SUPPORT.md#planned-for-011) are a separate API.
+Explicit host-value conversions and opaque carriers do not encode JSON. For an
+application that needs JSON transport, the experimental
+[JSON-safe codecs](../design/JSON_SAFE_VALUE_CODEC.md) provide generated Lean
+writers and explicit call representation selection within their stated domains.
 
 Passing a DOM or React value through `Js` uses core reference interop; the DOM or
 React operation itself remains experimental. Choose focused imports below when
