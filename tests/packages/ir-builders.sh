@@ -13,17 +13,36 @@ fi
 test_dir="$(mktemp -d /tmp/vir-package-ir-builders.XXXXXX)"
 trap 'rm -rf "$test_dir"' EXIT
 
-"${CXX:-c++}" \
-  -std=c++20 \
-  -O2 \
-  -I"$lean_src/src" \
-  -I"$lean_prefix/include" \
-  -I"$repo_root/wasm/upstream_shim" \
+node "$repo_root/scripts/native/check-ir-codec-tags.mjs" --write
+
+compile_flags=(
+  -std=c++20
+  -O2
+  -I"$lean_src/src"
+  -I"$lean_prefix/include"
+  -I"$repo_root/wasm/upstream_shim"
+  -I"$repo_root/build/generated/wasm/package"
+)
+link_flags=(
+  -L"$lean_prefix/lib/lean"
+  "-Wl,-rpath,$lean_prefix/lib/lean"
+  -lleanshared
+)
+
+"${CXX:-c++}" "${compile_flags[@]}" \
   "$repo_root/wasm/upstream_shim/package/package_ir_builders.cpp" \
   "$repo_root/wasm/upstream_shim/package/package_ir_builders_test.cpp" \
-  -L"$lean_prefix/lib/lean" \
-  "-Wl,-rpath,$lean_prefix/lib/lean" \
-  -lleanshared \
+  "${link_flags[@]}" \
   -o "$test_dir/package-ir-builders-test"
 
 "$test_dir/package-ir-builders-test"
+
+"${CXX:-c++}" "${compile_flags[@]}" \
+  "$repo_root/wasm/upstream_shim/package/package_ir_builders.cpp" \
+  "$repo_root/wasm/upstream_shim/package/package_section_directory.cpp" \
+  "$repo_root/wasm/upstream_shim/package/package_ir_decoder.cpp" \
+  "$repo_root/wasm/upstream_shim/package/package_ir_decoder_test.cpp" \
+  "${link_flags[@]}" \
+  -o "$test_dir/package-ir-decoder-test"
+
+"$test_dir/package-ir-decoder-test"
