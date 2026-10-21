@@ -158,7 +158,10 @@ assert.ok(report.includes("NativeClient.greet") && report.includes("NativeClient
 // Expectations were computed from declarations before this manifest existed.
 // Check admission against the real generated root, including negative ABI cases.
 const manifest = readIrPackageInfo(readFileSync(join(evidence, "client.irpkg"))).manifest;
-assert.equal(manifest.metadata.leanToolchain, readFileSync(join(client, "lean-toolchain"), "utf8").trim());
+// Lean.toolchain uses the lean4 prefix for official nightly compilers too.
+const compilerToolchain = readFileSync(join(client, "lean-toolchain"), "utf8")
+  .trim().replace(/^leanprover\/lean4-nightly:/, "leanprover/lean4:");
+assert.equal(manifest.metadata.leanToolchain, compilerToolchain);
 assert.equal(manifest.metadata.leanGithash, run(["lean", "--githash"], "compiler-revision").trim());
 assert.equal(resolveProgramExports(manifest.exports, signatures).size, 6);
 for (const [declaration, changed] of [

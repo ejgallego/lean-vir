@@ -74,7 +74,10 @@ private def stringCompletionExternSpecs : Array NativeExternSpec :=
     "any", "capitalize", "drop", "dropRight", "front", "intercalate", "nextWhile"
   ] ++ boxedExternSpecs `String.Pos.Raw.Internal #["min", "sub"] ++
   boxedExternSpecs `String.Pos.Raw #["get!", "get?"] ++
-  boxedExternSpecs `String.Slice #["hash", "instDecidableLt"] ++ boxedExternSpecs `String #[
+  boxedExternSpecs `String.Slice #["hash"] ++
+  -- Slice ordering uses ordinary IR over these byte-comparison externs.
+  boxedExternSpecs `String.Slice.Pattern.Internal #["memcmpStrLt", "memcmpStrCompare"] ++
+  boxedExternSpecs `String #[
     "atEnd", "get", "get!", "get?", "mk", "next", "prev", "toByteArray"
   ] ++ boxedExternSpecs `Substring.Raw.Internal #[
     "all", "drop", "extract", "front", "get", "isEmpty", "prev", "takeWhile", "toString"

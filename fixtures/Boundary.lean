@@ -15,6 +15,7 @@ public import Init.Data.SInt.Basic
 public import Init.Data.String.Basic
 public import Init.Data.String.Modify
 public import Init.Data.String.Search
+public import Init.Data.String.Slice
 public import Init.Data.String.Substring
 public import Init.System.IO
 
@@ -86,6 +87,28 @@ def scalarPrimitiveFrontierScore : Nat :=
 
 def stringPrimitiveFrontierScore : Nat :=
   stringPrimitiveScore "Aé∀Z"
+
+@[noinline]
+private def stringSliceOrderCase (lhs rhs : String) (expected : Ordering) : Nat :=
+  let left := (("[" ++ lhs ++ "]").toSlice.drop 1).take lhs.length
+  let right := (("{" ++ rhs ++ "}").toSlice.drop 1).take rhs.length
+  if compare left right == expected &&
+      decide (left < right) == (expected == .lt) &&
+      decide (right < left) == (expected == .gt) &&
+      (left == right) == (expected == .eq) then 1 else 0
+
+/-- Slice ordering keeps nonzero offsets, UTF-8 and prefix lengths coherent. -/
+def stringSliceOrderScore : Nat :=
+  stringSliceOrderCase "" "" .eq +
+    stringSliceOrderCase "a" "a" .eq +
+    stringSliceOrderCase "a" "aa" .lt +
+    stringSliceOrderCase "aa" "a" .gt +
+    stringSliceOrderCase "é" "ê" .lt +
+    stringSliceOrderCase "ê" "é" .gt +
+    stringSliceOrderCase "∀" "é" .gt +
+    stringSliceOrderCase "éa" "éb" .lt
+
+#guard stringSliceOrderScore == 8
 
 def natPrimitiveFrontierScore : Nat :=
   (if Nat.gcd 84 30 == 6 then 1 else 0) +
