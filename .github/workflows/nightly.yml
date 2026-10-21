@@ -1,0 +1,121 @@
+name: Lean Nightly
+
+on:
+  schedule:
+    - cron: '37 12 * * *'
+  workflow_dispatch:
+    inputs:
+      toolchain:
+        description: 'Dated Lean nightly toolchain (empty resolves the latest published nightly)'
+        required: false
+        type: string
+  pull_request:
+    paths:
+      - 'Vir/**'
+      - 'tools/**'
+      - 'wasm/**'
+      - 'web/src/**'
+      - 'fixtures/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'Vir.lean'
+      - 'lean-toolchain'
+      - 'lakefile.lean'
+      - 'lake-manifest.json'
+      - 'package*.json'
+      - '.github/workflows/nightly.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lean-nightly-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nightly:
+    name: nightly runtime qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Select one dated nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TOOLCHAIN: ${{ inputs.toolchain || '' }}
+        run: |
+          node scripts/nightly-toolchain.mjs "$REQUESTED_TOOLCHAIN" build/nightly-selection
+          git rev-parse HEAD > build/nightly-selection/source.txt
+          cp lean-toolchain build/nightly-selection/original-toolchain.txt
+      - name: Install selected compiler and record its identity
+        run: |
+          unset ELAN_TOOLCHAIN LEAN_SYSROOT LAKE_CACHE_DIR
+          curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain none
+          export PATH="$HOME/.elan/bin:$PATH"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          elan toolchain install "$NIGHTLY_TOOLCHAIN"
+          printf '%s\n' "$NIGHTLY_TOOLCHAIN" > lean-toolchain
+          cp lean-toolchain fixtures/client-native-extern/lean-toolchain
+          lean --version | tee build/nightly-selection/compiler.txt
+          lean --githash > build/nightly-selection/compiler-revision.txt
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          const revision = (await readFile('build/nightly-selection/compiler-revision.txt', 'utf8')).trim();
+          if (!/^[0-9a-f]{40}$/.test(revision)) throw new Error('invalid compiler revision');
+          const version = await readFile('build/nightly-selection/compiler.txt', 'utf8');
+          if (!version.includes(process.env.NIGHTLY_TOOLCHAIN.split(':')[1]))
+            throw new Error('selected toolchain/compiler version mismatch');
+          const path = 'vir-resources/compatibility.json';
+          const profile = JSON.parse(await readFile(path, 'utf8'));
+          profile.leanRevision = revision;
+          await writeFile(path, JSON.stringify(profile, null, 2) + '\n');
+          NODE
+      - run: npm run fetch:lean
+      - run: npm run install:wasi
+      - run: npm run quiet -- --log build/logs/nightly-build.log -- npm run build:sdk-artifact
+      - run: lake build vir_resource_pack
+      - run: npm run package:runtime
+      - name: Use the run-local pack for ordinary client qualification
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          import { resolve } from 'node:path';
+          const { contentId } = JSON.parse(await readFile('build/artifacts/runtime/provenance.json', 'utf8'));
+          const pack = resolve('build/artifacts/runtime', `${contentId}.virres`);
+          await writeFile('vir-resources/runtime.json', JSON.stringify({ schemaVersion: 1, contentId, source: pack }, null, 2) + '\n');
+          NODE
+          pack="$(find build/artifacts/runtime -maxdepth 1 -name '*.virres' -print)"
+          npm run quiet -- --log build/logs/nightly-client.log -- node tests/resources/client.mjs "$pack"
+      - run: npm run quiet -- --log build/logs/nightly-constructors.log -- npm run test:constructor-providers
+      - run: npm run quiet -- --log build/logs/nightly-decoder.log -- npm run test:package-ir-builders
+      - run: npm run quiet -- --log build/logs/nightly-fixtures.log -- npm run test:fixtures:no-build
+      - run: npm run quiet -- --log build/logs/nightly-sdk.log -- npm run test:runtime -- sdk-import
+      - run: npm run quiet -- --log build/logs/nightly-browser.log -- npm run test:resources:browser
+      - name: Record the run-local toolchain and resource overrides
+        if: always()
+        run: |
+          mkdir -p build/nightly-selection
+          git diff --binary > build/nightly-selection/worktree.patch
+      - name: Retain nightly qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-runtime-qualification
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            build/nightly-selection/
+            build/logs/nightly-*.log
+            build/artifacts/runtime/
+            build/artifacts/lean-vir-sdk.tar.gz
+            build/fixtures/summary.json
+            build/resource-client-*/*.log
+            build/resources-browser/

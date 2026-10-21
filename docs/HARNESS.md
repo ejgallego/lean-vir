@@ -434,6 +434,24 @@ The [workflow files](../.github/workflows) own job definitions. Pages runs
 `npm run build:site`; [surface analysis](development/SURFACE_ANALYSIS.md) explains its
 deployed surface/size explorers.
 
+### Nightly qualification
+
+[Lean Nightly](../.github/workflows/nightly.yml) follows
+[lean-beam's nightly policy](https://github.com/leanprover/lean-beam/blob/72675b490f33944293fa6b40b254336b13b4bdba/.github/workflows/nightly.yml):
+one advisory Linux job daily at 12:37 UTC, on relevant PRs, and by manual dispatch.
+An empty `toolchain` input selects the latest published dated nightly once;
+an explicit `leanprover/lean4-nightly:nightly-YYYY-MM-DD` reproduces that date.
+
+The job records the source commit, selected release/compiler revision and its
+run-local toolchain/resource overrides. It uses the ordinary Wasm, SDK, fixture,
+resource-client and browser checks with a freshly built matching pack. Logs and
+artifacts are retained for 14 days, including failures. They are qualification
+evidence, not public runtime or SDK releases; no release or branch is published.
+The workflow has read-only repository permissions and uses the current checkout,
+so it does not depend on VIR's GitHub owner. Scheduled runs start only after the
+workflow reaches the default branch. Nightly failures report upstream
+compatibility separately from the normal pinned-toolchain landing gates.
+
 ## Repository Protection
 
 To enforce the [PR landing workflow](../CONTRIBUTING.md#landing-and-completion)
@@ -451,7 +469,8 @@ own explicit maintainer selection.
 Release tags match Lean and Verso exactly: `v4.36.0-rc1` for
 `leanprover/lean4:v4.36.0-rc1`, `v4.36.0` for `v4.36.0`, and `v4.36.1` for
 `v4.36.1`. Milestone numbers and the internal SDK manifest version are independent
-of these tags. `node scripts/release-tag.mjs` prints the current release tag.
+of these tags. On release-pinned checkouts, `node scripts/release-tag.mjs` prints
+the current release tag; nightly pins are rejected by this publication guard.
 Existing releases retain their published tag names.
 
 Version tags beginning with `v` trigger
