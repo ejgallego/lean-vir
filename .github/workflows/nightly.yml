@@ -98,6 +98,7 @@ jobs:
       - run: npm run quiet -- --log build/logs/nightly-decoder.log -- npm run test:package-ir-builders
       - run: npm run quiet -- --log build/logs/nightly-fixtures.log -- npm run test:fixtures:no-build
       - run: npm run quiet -- --log build/logs/nightly-sdk.log -- npm run test:runtime -- sdk-import
+      - run: npm run quiet -- --log build/logs/nightly-quickstart.log -- npm run test:quickstart:browser
       - run: npm run quiet -- --log build/logs/nightly-browser.log -- npm run test:resources:browser
       - name: Record the run-local toolchain and resource overrides
         if: always()
@@ -118,4 +119,5 @@ jobs:
             build/artifacts/lean-vir-sdk.tar.gz
             build/fixtures/summary.json
             build/resource-client-*/*.log
+            build/quickstart-*/*.log
             build/resources-browser/

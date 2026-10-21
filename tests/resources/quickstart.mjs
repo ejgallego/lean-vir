@@ -18,12 +18,13 @@ cpSync(join(root, "examples/tutorials/quickstart"), app, {
   recursive: true,
   filter: path => ![".lake", "_site", "lake-manifest.json"].includes(basename(path)),
 });
-// The copy-out project pins landed VIR. This one test-only substitution exercises
-// the candidate checkout with the exact same authored program/publisher/page.
+// Preserve the copy-out project's landed source/compiler pair. This test pairs
+// the candidate checkout with its compiler and the same authored program/page.
 const lakefile = join(app, "lakefile.lean");
 writeFileSync(lakefile, replaceFixture(readFileSync(lakefile, "utf8"),
   'require lean_vir from git "https://github.com/ejgallego/lean-vir.git" @\n  "aa465b873387a0bf46669031da1af99f59b0f3b9"',
   `require lean_vir from ${JSON.stringify(root)}`));
+cpSync(join(root, "lean-toolchain"), join(app, "lean-toolchain"));
 const site = join(evidence, "site");
 function publish(label) {
   const result = spawnSync("lake", ["exe", "publish", site], {
