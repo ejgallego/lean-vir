@@ -87,9 +87,9 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import { readFile, writeFile } from 'node:fs/promises';
-          import { resolve } from 'node:path';
+          import { posix } from 'node:path';
           const { contentId } = JSON.parse(await readFile('build/artifacts/runtime/provenance.json', 'utf8'));
-          const pack = resolve('build/artifacts/runtime', `${contentId}.virres`);
+          const pack = posix.join('build/artifacts/runtime', `${contentId}.virres`);
           await writeFile('vir-resources/runtime.json', JSON.stringify({ schemaVersion: 1, contentId, source: pack }, null, 2) + '\n');
           NODE
           pack="$(find build/artifacts/runtime -maxdepth 1 -name '*.virres' -print)"

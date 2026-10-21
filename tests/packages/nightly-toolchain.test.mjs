@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,5 +44,25 @@ test("an explicit dated selection records one toolchain without a release lookup
     assert.equal(result.status, 0, result.stderr);
     assert.equal(await readFile(join(directory, "toolchain.txt"), "utf8"), toolchain + "\n");
     assert.equal(await readFile(envFile, "utf8"), `NIGHTLY_TOOLCHAIN=${toolchain}\n`);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("the workflow creates a project-relative runtime lock for ordinary Lake clients", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "vir-nightly-lock-"));
+  try {
+    const workflow = await readFile(new URL("../../.github/workflows/nightly.yml", import.meta.url), "utf8");
+    const step = workflow.split("      - name: Use the run-local pack for ordinary client qualification\n")[1];
+    assert.ok(step);
+    const script = step.split("node --input-type=module <<'NODE'\n")[1]
+      .split("          NODE\n")[0].split("\n").map(line => line.replace(/^          /, "")).join("\n");
+    const contentId = "a".repeat(64);
+    await mkdir(join(directory, "build/artifacts/runtime"), { recursive: true });
+    await mkdir(join(directory, "vir-resources"));
+    await writeFile(join(directory, "build/artifacts/runtime/provenance.json"), JSON.stringify({ contentId }));
+    const result = spawnSync(process.execPath, ["--input-type=module"], { input: script, cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(await readFile(join(directory, "vir-resources/runtime.json"), "utf8")), {
+      schemaVersion: 1, contentId, source: `build/artifacts/runtime/${contentId}.virres`,
+    });
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
