@@ -25,10 +25,11 @@ private def expectUrl (args : List String) (expected : String) : IO Unit := do
     ("4.35.1", "v4.35.1"), ("4.36.0-rc1", "v4.36.0-rc1")] do
     unless releaseTagForVersion version == expected do
       throw <| IO.userError s!"wrong release tag for {version}"
-  unless sdkReleaseTag == "v4.36.0-rc1" do
+  let expectedTag := "v4.37.0-nightly-2026-10-20"
+  unless sdkReleaseTag == expectedTag do
     throw <| IO.userError s!"wrong pinned Lean SDK release: {sdkReleaseTag}"
-  expectUrl [] "https://github.com/ejgallego/lean-vir/releases/download/v4.36.0-rc1/lean-vir-sdk.tar.gz"
-  expectUrl ["--repo", "owner/custom"] "https://github.com/owner/custom/releases/download/v4.36.0-rc1/lean-vir-sdk.tar.gz"
+  expectUrl [] s!"https://github.com/ejgallego/lean-vir/releases/download/{expectedTag}/lean-vir-sdk.tar.gz"
+  expectUrl ["--repo", "owner/custom"] s!"https://github.com/owner/custom/releases/download/{expectedTag}/lean-vir-sdk.tar.gz"
   expectUrl ["--tag", "selected-release"] "https://github.com/ejgallego/lean-vir/releases/download/selected-release/lean-vir-sdk.tar.gz"
   expectUrl ["--url", "https://example.test/sdk.tar.gz"] "https://example.test/sdk.tar.gz"
   match ← select ["--archive", "/tmp/selected-sdk.tar.gz"] with

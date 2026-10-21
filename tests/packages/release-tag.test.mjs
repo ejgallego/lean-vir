@@ -17,7 +17,7 @@ for (const [toolchain, expected] of [
   ["leanprover/lean4:v4.36.0-rc1", "v4.36.0-rc1"],
 ]) test(`Lean release tag: ${expected}`, () => assert.equal(releaseTagFromToolchain(toolchain), expected));
 
-for (const toolchain of ["leanprover/lean4:nightly", "custom-lean", "leanprover/lean4:v4.35", "leanprover/lean4:v4.35.0-rc4-extra"])
+for (const toolchain of ["leanprover/lean4:nightly", "leanprover/lean4-nightly:nightly-2026-10-20", "custom-lean", "leanprover/lean4:v4.35", "leanprover/lean4:v4.35.0-rc4-extra"])
   test(`unsupported release toolchain: ${toolchain}`, () => assert.throws(() => releaseTagFromToolchain(toolchain), /unsupported release toolchain/));
 
 test("milestone and mismatched Lean tags cannot publish", () => {
@@ -29,6 +29,12 @@ test("milestone and mismatched Lean tags cannot publish", () => {
 test("workflow command checks the pinned toolchain from outside the checkout", async () => {
   const script = fileURLToPath(new URL("../../scripts/release-tag.mjs", import.meta.url));
   const toolchain = await readFile(new URL("../../lean-toolchain", import.meta.url), "utf8");
+  if (toolchain.trim().startsWith("leanprover/lean4-nightly:")) {
+    const result = spawnSync(process.execPath, [script, "--check", "v4.37.0"], { cwd: "/tmp", encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /unsupported release toolchain/);
+    return;
+  }
   const expected = releaseTagFromToolchain(toolchain);
   const result = spawnSync(process.execPath, [script, "--check", expected], { cwd: "/tmp", encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);

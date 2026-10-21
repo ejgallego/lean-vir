@@ -13,7 +13,7 @@ Data/String/Iterate.c
 Data/String/Modify.c
 Data/String/PosRaw.c
 Data/String/Search.c
-Data/String/Slice.c
+Data/String/Slice/Pattern.c
 Data/String/Substring.c
 Data/String/TakeDrop.c
 Meta/Defs.c
