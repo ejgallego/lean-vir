@@ -173,7 +173,7 @@ private def floatLogExternSpecs : Array NativeExternSpec :=
 private def floatMathCompletionExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `Float #[
     "exp", "log", "isNaN", "isFinite", "ceil", "toBits", "pow", "exp2",
-    "log10", "tan", "asin", "atan", "toFloat32", "fma"
+    "log10", "tan", "asin", "atan", "toFloat32", "fma", "minimum", "maximum"
   ] ++ boxedExternSpecs `Float32 #[
     "isNaN", "isFinite", "isInf", "toBits", "toFloat", "abs", "sqrt",
     "floor", "ceil", "round", "fma"
@@ -203,6 +203,17 @@ wrappers preserve Lean's ownership-aware call shapes.
 -/
 private def byteArrayRuntimeFrontierExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `ByteArray #["emptyWithCapacity", "decEq", "uget", "set", "data", "hash"]
+
+/-- Runtime operations reached by the LeanUI editor and effects packages. -/
+private def leanUiPrimitiveExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `ByteArray #["usize", "uset", "beq"] ++
+  boxedExternSpecs `Float #["toUInt8", "toInt64"] ++ #[{
+    name := `Char.ofNatAux
+    -- UInt32.ofNat shares the raw provider, but has no erased proof parameter.
+    -- Give the compiler-generated two-argument wrapper its own lookup stem.
+    symbolOverride? := some "l_Char_ofNatAux"
+    generateBoxedWrapper := true
+  }]
 
 def nativeExternSpecs : Array NativeExternSpec := #[
   {
@@ -1145,7 +1156,7 @@ def nativeExternSpecs : Array NativeExternSpec := #[
   floatFormattingExternSpecs ++ floatBasicCompletionExternSpecs ++
   floatGeometryMathExternSpecs ++ floatLogExternSpecs ++ floatMathCompletionExternSpecs ++
   stringByteAccessorExternSpecs ++
-  byteArrayCopySliceExternSpecs ++ byteArrayRuntimeFrontierExternSpecs
+  byteArrayCopySliceExternSpecs ++ byteArrayRuntimeFrontierExternSpecs ++ leanUiPrimitiveExternSpecs
 
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=
   nativeExternSpecs.mapM (·.resolve env)
