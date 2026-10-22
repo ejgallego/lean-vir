@@ -65,6 +65,7 @@ export const runtimeTests = Object.freeze(
     { id: "usize-fields", file: "usize-fields-smoke.mjs", group: "pure" },
     { id: "fixed-width-interop", file: "fixed-width-interop-smoke.mjs", group: "lean" },
     { id: "float-math", file: "float-math-smoke.mjs", group: "lean" },
+    { id: "primitives", file: "primitives-smoke.mjs", group: "lean" },
     {
       id: "object-abi-structural",
       file: "object-abi-structural-smoke.mjs",
