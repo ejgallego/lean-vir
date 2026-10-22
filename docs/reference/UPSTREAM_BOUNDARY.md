@@ -65,6 +65,11 @@ JavaScript's `Math.round` for negative halfway cases. See
 [numeric transport](../guides/JS_API.md#calls-and-manifest) for the
 JavaScript boundary.
 
+`Float.minimum` and `Float.maximum` use Lean's IEEE-754 providers, including
+NaN propagation from either operand. Minimum prefers negative zero; maximum
+prefers positive zero. The ordinary `min` and `max` instances use these same
+operations in Lean 4.36.
+
 ## Native boxed wrappers
 
 [`NativeExternSpec`](../../Vir/Compiler/NativeExterns.lean) stores VIR policy:

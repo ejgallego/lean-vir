@@ -173,7 +173,7 @@ private def floatLogExternSpecs : Array NativeExternSpec :=
 private def floatMathCompletionExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `Float #[
     "exp", "log", "isNaN", "isFinite", "ceil", "toBits", "pow", "exp2",
-    "log10", "tan", "asin", "atan", "toFloat32", "fma"
+    "log10", "tan", "asin", "atan", "toFloat32", "fma", "minimum", "maximum"
   ] ++ boxedExternSpecs `Float32 #[
     "isNaN", "isFinite", "isInf", "toBits", "toFloat", "abs", "sqrt",
     "floor", "ceil", "round", "fma"
