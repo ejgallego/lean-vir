@@ -87,6 +87,7 @@
     "render:target-surface-index": "node scripts/analysis/render-target-surface-index.mjs",
     "compare:surface": "node scripts/analysis/compare-surface-reports.mjs",
     "bench": "node benchmarks/harness/bench-vir.mjs",
+    "bench:prettym": "node benchmarks/harness/bench-prettym-browser.mjs",
     "bench:env-lookup": "node benchmarks/harness/bench-env-lookup.mjs",
     "bench:env-lookup:wasm-pair": "node --expose-gc benchmarks/harness/bench-env-lookup-wasm-pair.mjs",
     "bench:compare": "node benchmarks/harness/bench-compare.mjs",
