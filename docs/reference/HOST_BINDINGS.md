@@ -267,7 +267,8 @@ remains visible to lifecycle teardown.
 Each browser binding-factory invocation owns a fresh lifecycle unless the
 caller explicitly supplies one. A function-valued `defaultHostBindings` must
 return a fresh map for each runtime and transfers ownership of that result to
-VIR. Disposal and failed runtime creation invoke its `[VIR_HOST_DISPOSE]()` hook.
+VIR. Disposal, failed runtime creation and runtime failure invoke its
+`[VIR_HOST_DISPOSE]()` hook once; after a failure it runs in a microtask.
 The built-in defaults and Infoview/React integrations use this per-runtime form.
 
 Preconstructed `hostBindings` and `defaultHostBindings` maps remain

@@ -883,8 +883,14 @@ including ordinary Lean IO errors: initialization can publish persistent values
 and opaque handles before failing. The factory can reuse its compiled Wasm
 module while creating a fresh instance.
 
+A failure also disposes runtime-owned fresh host providers, in a microtask after
+the failing call returns, so their timers and animation frames stop invoking the
+retired runtime's callbacks. Supplied binding maps and DOM event listeners stay
+application-owned; remove listeners or dispose supplied services on failure with
+`runtime.onFailure`.
+
 `dispose()` remains idempotent after failure. It disposes runtime-owned fresh host
-providers, invalidates callbacks/handles, and terminally clears the Wasm-owned
+providers if the failure has not already done so, invalidates callbacks/handles, and terminally clears the Wasm-owned
 resource table through a narrow operation that does not enter the interpreter
 or inspect Lean heap objects. All ordinary execution and Lean heap cleanup stay
 blocked in a failed instance.
