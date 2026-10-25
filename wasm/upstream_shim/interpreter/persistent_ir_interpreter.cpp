@@ -102,6 +102,9 @@ object * run_package_interpreter_function(
     }
     name fn(fn_obj, true);
     session_entry entry;
+    // The browser build has no Wasm exception handling: a throw traps in
+    // runtime/trap_diagnostics.cpp and JS retires the instance. These handlers
+    // apply only to builds that can unwind.
     try {
         return g_package_interpreter->call(fn, argc, args);
     } catch (...) {

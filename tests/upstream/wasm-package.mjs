@@ -8,6 +8,9 @@ import { createVirImports } from "../../web/src/vir-runtime.js";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 
 const requiredFunctionExports = [
+  "_initialize",
+  "vir_last_trap_message",
+  "vir_last_trap_message_size",
   "vir_alloc_bytes",
   "vir_begin_ir_package_set",
   "vir_append_ir_package",
@@ -97,7 +100,7 @@ const invalidMagicPackage = Uint8Array.from([
 export async function instantiateVirModule(wasmModule) {
   const imports = createVirImports(wasmModule);
   const { exports } = await WebAssembly.instantiate(wasmModule, imports);
-  exports.__wasm_call_ctors?.();
+  exports._initialize();
   return exports;
 }
 
@@ -150,6 +153,7 @@ function assertRequiredExports(exports) {
     }
   }
   for (const name of [
+    "_start",
     "vir_obj_uint64", "vir_obj_uint64_decimal",
     "vir_obj_usize", "vir_obj_usize_decimal", "vir_obj_ctor_usize_decimal",
   ]) {

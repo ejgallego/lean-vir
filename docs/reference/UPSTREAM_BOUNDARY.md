@@ -184,7 +184,10 @@ selection remains unchanged.
 
 The session adapter includes the pinned interpreter implementation unchanged
 because its class is implementation-private. It discards the session on caught
-evaluation exceptions rather than reusing possibly unwound private stacks.
+evaluation exceptions rather than reusing possibly unwound private stacks. The
+browser build has no Wasm exception handling, so no exception is caught there:
+`runtime/trap_diagnostics.cpp` records the exception text in fixed storage and
+traps, and the SDK reports that text as the retired instance's failure.
 Beginning or clearing a package set destroys the session before releasing its
 package-owned declarations.
 
@@ -382,7 +385,8 @@ Disposal after a fatal failure runs JavaScript cleanup and invokes the narrow
 Wasm resource-table clear operation. Clearing uses table operations and fixed
 globals without entering the interpreter, touching Lean heap objects, allocating
 or calling host functions. It does not call decrements, frees, closure releases
-or package abort; the guard also permits the three resource-count diagnostics.
+or package abort; the guard also permits the three resource-count diagnostics
+and the two trap-message reads.
 Those allocations remain with the abandoned instance until it is collectible.
 This makes no claim that traps unwind C++ frames or release every Lean object.
 Recovery creates a fresh factory runtime. Raw Wasm callers must likewise discard
@@ -398,11 +402,11 @@ until disposal; they cannot invoke the failed instance.
 | Native thunk forcing | `Thunk.mk`/`Thunk.get` wrappers can link, but the native forcing path cannot apply an interpreter closure as a compiled function pointer. Supporting this requires a closure-aware design. |
 | Proof-bearing native calls | `Int.divExact`, `Nat.divExact`, `String.Internal.ugetUTF8Byte`, `String.get'`, `String.getUtf8Byte`, `String.next'`, `UInt16.ofNatLT` and `USize.ofNat32` remain unsupported pending independent calling-convention checks. |
 | Parser environment policy | `evalConstCore` delegates to upstream `lean_eval_const`; `isReservedName` delegates to packaged IR; the raw `evalCheckMeta` provider accepts the check. This is not full Lean environment-policy fidelity. |
-| Budget, tracing and options | System/heartbeat, stack-info, timing and trace hooks are inert. Boolean option lookup returns its default; option registration exposes no discovery. Do not infer cancellation, budget enforcement or trace-sensitive behavior. |
+| Budget, tracing and options | `check_system` enforces only the linear-memory stack limit; heartbeat, stack-info, timing and trace hooks are inert. Boolean option lookup returns its default; option registration exposes no discovery. Do not infer cancellation, budget enforcement or trace-sensitive behavior. |
 | Environment queries | Sorry-dependency and export-name lookup return `none`. Initializer-name queries are package-backed and aligned with the table run through `interpreter::run_init` in the persistent package session. |
 | Lazy constant providers | Pinned generated constants use eight local single-threaded `*_once_cold` providers implementing the [pinned `lean_once_cell_t` ABI](https://github.com/leanprover/lean4/blob/293d5d0c0c3f3dded4688b3ccd6a33939ac5102b/src/include/lean/lean.h#L3374). The upstream [`lean_obj_once_cold` implementation](https://github.com/leanprover/lean4/blob/293d5d0c0c3f3dded4688b3ccd6a33939ac5102b/src/runtime/object.cpp#L2896) waits on its atomic lock and marks object results persistent. VIR's replacement in [`runtime/once.cpp`](../../wasm/upstream_shim/runtime/once.cpp#L17) preserves exactly-once initialization and persistent object roots without atomic waits or WASI clocks. Nested initialization of a different cell remains valid; recursive initialization of the same cell traps by VIR policy, and the host must retire that instance. The build renames only the upstream definitions; pinned sources remain unchanged. |
 | Local IO/reference providers | `IO.initializing` is scoped true during package initializer execution and restored afterward. ST references implement single-threaded allocation, get, set and take. `lean_io_eprintln` consumes and discards its string; no stderr sink is installed. Call/initializer IO errors have separate detailed diagnostics. |
-| Native exceptions | Unsupported C++ exception throwing and assertion-violation paths trap; the SDK retires the instance. They do not provide ordinary native exception recovery. |
+| Native exceptions | C++ exception throwing and assertion-violation paths trap; the SDK retires the instance. A thrown Lean exception's `what()` text (or another type's name) is recorded first and becomes the failure message. They do not provide ordinary native exception recovery. |
 | Expression pretty printing | The fixture supports `Std.Format.pretty`. `Lean.PrettyPrinter.ppExpr` additionally needs Meta/Environment tasks/promises and parenthesizer/formatter support; see [the existing boundary analysis](../development/EXAMPLES_AND_FIXTURES.md#known-pretty-printer-boundary). |
 
 Use the resolved native catalog and [fixture coverage](../development/EXAMPLES_AND_FIXTURES.md) for
@@ -415,7 +419,7 @@ are fixed. They do not emulate a compiler session.
 
 | Provider | Live role | Supported limit |
 | --- | --- | --- |
-| `check_system`, `reset_heartbeat`, `save_stack_info` | Interpreter/kernel budget checkpoints | No cancellation, timeout or stack-budget enforcement. Clients needing interruption must own a worker/process boundary. |
+| `check_system`, `reset_heartbeat`, `save_stack_info` | Interpreter/kernel budget checkpoints | `check_system` raises a Lean exception ("deep recursion was detected …") when less than 64 KiB of the shadow stack remains (a quarter of a smaller stack), so deep recursion reports a message instead of an out-of-bounds trap. No cancellation, timeout or heartbeat enforcement. Clients needing interruption must own a worker/process boundary. |
 | `time_task`, `scope_trace_env` | Interpreter entry instrumentation | No timing/trace capture from these hooks; SDK call timing measures its own boundaries. |
 | `options::get_bool`, `register_option` | Interpreter's default policy and option setup | Returns the supplied Boolean default; no general option store or declaration discovery. |
 | `elab_environment::to_kernel_env` | Fixed environment reference plumbing | Retains the existing object; does not construct missing compiler metadata. |
