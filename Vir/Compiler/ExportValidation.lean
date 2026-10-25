@@ -143,9 +143,11 @@ private partial def collectVisibleClosure
         | some decl@(.extern ..) =>
             if isOpaqueExternDecl decl && (env.getModuleIdxFor? name).isSome then
               pushDeferred .opaqueImport name path state
-            else if isVirJsDecl decl || (env.getModuleIdxFor? name).isNone then
+            else if isVirJsDecl decl then
               state
-            else if isNativeExternCandidate name then
+            -- A local extern is no exception: without a catalog entry or a
+            -- fallback (both checked above) the runtime has no implementation.
+            else if isNativeExternCandidate name || (env.getModuleIdxFor? name).isNone then
               pushBlocker .missingExtern name path state
             else
               pushBlocker .missingDecl name path state

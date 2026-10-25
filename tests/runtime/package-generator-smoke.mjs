@@ -432,14 +432,8 @@ try {
     /extern `recursiveExtern` has a recursive reference body/,
   );
 
-  const spoofedExternFallbackPackage = join(
-    freshDir,
-    "spoofed-extern-fallback.irpkg",
-  );
-  const spoofedExternFallbackReport = join(
-    freshDir,
-    "spoofed-extern-fallback.report.md",
-  );
+  // A declaration under the reserved clone prefix is not a registered fallback,
+  // so the extern still has no implementation and the export is rejected.
   const spoofedProject = await createRuntimeModuleProject(
     join(freshDir, "spoofed"),
     {
@@ -461,22 +455,15 @@ try {
       ].join("\n"),
     },
   );
-  assertCompiled(spoofedProject.build());
-  const generatedSpoofedExternFallback = spoofedProject.runVirIrpkg([
-    spoofedExternFallbackPackage,
-    spoofedExternFallbackReport,
-    "--target-marked-module",
-    "SpoofedExternFallback",
-  ]);
-  assert.equal(
-    generatedSpoofedExternFallback.status,
+  const checkedSpoofedExternFallback = spoofedProject.build();
+  assert.notEqual(
+    checkedSpoofedExternFallback.status,
     0,
-    generatedSpoofedExternFallback.stderr ||
-      generatedSpoofedExternFallback.stdout,
+    "a spoofed extern fallback clone was unexpectedly accepted",
   );
   assert.match(
-    await readFile(spoofedExternFallbackReport, "utf8"),
-    /- `spoofedExtern` from/,
+    combinedOutput(checkedSpoofedExternFallback),
+    /invalid `@\[vir_export\]` declaration `callSpoofedExtern`: compiled closure reaches unsupported runtime dependency `spoofedExtern`: no native extern implementation is registered/,
   );
 
   const signatureProject = await createRuntimeModuleProject(

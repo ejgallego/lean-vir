@@ -315,6 +315,7 @@ shim_deps=(
   "wasm/upstream_shim/runtime/name_utils.h"
   "wasm/upstream_shim/runtime/io_error.h"
   "wasm/upstream_shim/runtime/name_identity.h"
+  "wasm/upstream_shim/runtime/native_symbol_lookup.h"
   "wasm/upstream_shim/abi/resource_abi.h"
 )
 
