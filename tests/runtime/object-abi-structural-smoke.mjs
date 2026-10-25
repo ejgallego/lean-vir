@@ -59,18 +59,17 @@ assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.unicodeNameExpr"), {
   kind: "fvar",
   name: "αβ₁",
 });
-for (const entry of [
-  "numeralNameExpr",
-  "largeNumeralNameExpr",
-  "dottedStringNameExpr",
-  "emptyComponentNameExpr",
-  "escapedNameExpr",
+// Names without a dotted spelling lift to components and lower back exactly.
+for (const [entry, name] of [
+  ["numeralNameExpr", ["Numeral", 1n]],
+  ["largeNumeralNameExpr", ["Large", 10n ** 200n]],
+  ["dottedStringNameExpr", ["Dotted", "part.with.dot"]],
+  ["emptyComponentNameExpr", ["Empty", ""]],
+  ["escapedNameExpr", ["Escaped", "part with space"]],
 ]) {
-  assert.throws(
-    () => leanRuntime.call(`Vir.Fixtures.ExprPrinter.${entry}`),
-    /unsupported numeric, escaped, empty, or non-identifier components/,
-    `expected ${entry} to be rejected by the raw Name getter`,
-  );
+  const lifted = leanRuntime.call(`Vir.Fixtures.ExprPrinter.${entry}`);
+  assert.deepEqual(lifted, { kind: "fvar", name }, entry);
+  assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.bumpBVar", lifted), lifted, entry);
 }
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.mvarExpr"), {
   kind: "mvar",
@@ -719,8 +718,30 @@ assert.throws(
 );
 assert.throws(
   () => leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", "Nat"),
-  /unsupported Lean\.Expr kind undefined/,
+  /exprKindScore argument arg1 must be a Lean\.Expr object/,
 );
+
+// Conversion is iterative and keeps sharing in both directions: a 40-level
+// DAG has 2^41 tree nodes, so it only completes if neither side expands it.
+{
+  const identity = (expr) => leanRuntime.call("Vir.Fixtures.ExprPrinter.bumpBVar", expr);
+  const leaf = { kind: "const", name: "f", levels: [] };
+  let spine = leaf;
+  for (let index = 0; index < 50000; index++) spine = { kind: "app", fn: spine, arg: leaf };
+  let depth = 0;
+  for (let node = identity(spine); node.kind === "app"; node = node.fn) depth++;
+  assert.equal(depth, 50000);
+
+  let shared = leaf;
+  for (let index = 0; index < 40; index++) shared = { kind: "app", fn: shared, arg: shared };
+  const lifted = identity(shared);
+  assert.equal(lifted.fn, lifted.arg, "a shared Lean subterm lifts to one JS object");
+
+  const cyclic = { kind: "app", fn: leaf, arg: null };
+  cyclic.arg = cyclic;
+  assert.throws(() => identity(cyclic), /cyclic Lean\.Expr value/);
+  assert.deepEqual(identity({ kind: "fvar", name: ["_uniq", 12n] }), { kind: "fvar", name: ["_uniq", 12n] });
+}
 
 runtime.dispose();
 leanRuntime.dispose();

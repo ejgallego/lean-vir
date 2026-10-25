@@ -191,9 +191,63 @@ export function withObjectValues(Base) {
       return this.nativeValueCodec(type, options).lift(obj, label);
     }
 
+    // Lower iteratively, memoized on JS object identity: a shared subterm
+    // becomes one shared Lean object, and depth is not bounded by the JS stack.
     makeObjectExpr(value, label) {
-      const expr = value;
-      switch (expr?.kind) {
+      const built = new Map();
+      const visiting = new Set();
+      const stack = [value];
+      try {
+        while (stack.length !== 0) {
+          const node = stack[stack.length - 1];
+          if (built.has(node)) {
+            stack.pop();
+            continue;
+          }
+          const pending = exprChildren(node, label).filter((child) => !built.has(child));
+          if (pending.length !== 0) {
+            if (visiting.has(node)) {
+              throw new Error(`${label} contains a cyclic Lean.Expr value`);
+            }
+            visiting.add(node);
+            for (let index = pending.length - 1; index >= 0; index--) stack.push(pending[index]);
+            continue;
+          }
+          stack.pop();
+          visiting.delete(node);
+          built.set(node, this.makeObjectExprNode(node, label, (child) => {
+            const obj = built.get(child);
+            this.exports.vir_obj_inc(obj);
+            return obj;
+          }));
+        }
+        const result = built.get(value);
+        this.exports.vir_obj_inc(result);
+        return result;
+      } finally {
+        this.releaseOwnedObjects([...built.values()]);
+      }
+    }
+
+    // `take` returns a fresh reference to an already lowered child. Every
+    // reference taken here is either consumed by a constructor or released.
+    makeObjectExprNode(expr, label, take) {
+      const construct = (children, call) => {
+        const objects = children.map(take);
+        try {
+          const obj = call(objects);
+          if (obj === 0) {
+            throw new Error(`${label} could not be lowered to a Lean.Expr ${expr.kind} object`);
+          }
+          objects.length = 0;
+          return obj;
+        } finally {
+          this.releaseOwnedObjects(objects);
+        }
+      };
+      const withName = (name, nameLabel, callback) => this.withWasmString(
+        encodeObjectName(name, nameLabel), nameLabel, callback);
+      switch (expr.kind) {
         case "bvar":
           return this.makeObjectDecimal(
             "vir_obj_expr_bvar",
@@ -206,16 +260,10 @@ export function withObjectValues(Base) {
             label,
           );
         case "fvar":
-          return this.makeObjectStringConstructor(
-            "vir_obj_expr_fvar",
-            requireObjectName(expr.name, `${label}.name`),
-            `${label}.name`,
-            label,
-          );
         case "mvar":
           return this.makeObjectStringConstructor(
-            "vir_obj_expr_mvar",
-            requireObjectName(expr.name, `${label}.name`),
+            expr.kind === "fvar" ? "vir_obj_expr_fvar" : "vir_obj_expr_mvar",
+            encodeObjectName(expr.name, `${label}.name`),
             `${label}.name`,
             label,
           );
@@ -224,9 +272,7 @@ export function withObjectValues(Base) {
           try {
             const obj = this.exports.vir_obj_expr_sort(level);
             if (obj === 0)
-              throw new Error(
-                `${label} could not be lowered to a Lean.Expr sort object`,
-              );
+              throw new Error(`${label} could not be lowered to a Lean.Expr sort object`);
             level = 0;
             return obj;
           } finally {
@@ -236,73 +282,38 @@ export function withObjectValues(Base) {
         case "const": {
           let levels = this.makeObjectLevelList(expr.levels, `${label}.levels`);
           try {
-            return this.withWasmString(
-              requireObjectName(expr.name, `${label}.name`),
-              `${label}.name`,
-              (namePtr, nameLen) => {
-                const obj = this.exports.vir_obj_expr_const(
-                  namePtr,
-                  nameLen,
-                  levels,
-                );
-                if (obj === 0)
-                  throw new Error(
-                    `${label} could not be lowered to a Lean.Expr const object`,
-                  );
-                levels = 0;
-                return obj;
-              },
-            );
+            return withName(expr.name, `${label}.name`, (namePtr, nameLen) => {
+              const obj = this.exports.vir_obj_expr_const(namePtr, nameLen, levels);
+              if (obj === 0)
+                throw new Error(`${label} could not be lowered to a Lean.Expr const object`);
+              levels = 0;
+              return obj;
+            });
           } finally {
             this.releaseOwnedObjects([levels]);
           }
         }
         case "app":
-          return this.makeObjectExprBinary(
-            "vir_obj_expr_app",
-            expr.fn,
-            `${label}.fn`,
-            expr.arg,
-            `${label}.arg`,
-            label,
-          );
+          return construct([expr.fn, expr.arg],
+            ([fn, arg]) => this.exports.vir_obj_expr_app(fn, arg));
         case "lam":
-          return this.makeObjectExprBinding(
-            "vir_obj_expr_lambda",
-            expr.name,
-            expr.type,
-            expr.body,
-            normalizeBinderInfo(
-              expr.binderInfo ?? "default",
-              `${label}.binderInfo`,
-            ),
-            label,
-          );
-        case "forall":
-          return this.makeObjectExprBinding(
-            "vir_obj_expr_forall",
-            expr.name,
-            expr.type,
-            expr.body,
-            normalizeBinderInfo(
-              expr.binderInfo ?? "default",
-              `${label}.binderInfo`,
-            ),
-            label,
-          );
+        case "forall": {
+          const binderInfo = normalizeBinderInfo(expr.binderInfo ?? "default", `${label}.binderInfo`);
+          const constructorName = expr.kind === "lam" ? "vir_obj_expr_lambda" : "vir_obj_expr_forall";
+          return withName(expr.name, `${label}.name`, (namePtr, nameLen) =>
+            construct([expr.type, expr.body], ([type, body]) =>
+              this.exports[constructorName](namePtr, nameLen, type, body, binderInfo)));
+        }
         case "let":
-          return this.makeObjectExprLet(expr, label);
+          return withName(expr.name, `${label}.name`, (namePtr, nameLen) =>
+            construct([expr.type, expr.value, expr.body], ([type, value, body]) =>
+              this.exports.vir_obj_expr_let(namePtr, nameLen, type, value, body, expr.nondep ? 1 : 0)));
         case "lit": {
-          let literal = this.makeObjectLiteral(
-            expr.literal,
-            `${label}.literal`,
-          );
+          let literal = this.makeObjectLiteral(expr.literal, `${label}.literal`);
           try {
             const obj = this.exports.vir_obj_expr_lit(literal);
             if (obj === 0)
-              throw new Error(
-                `${label} could not be lowered to a Lean.Expr literal object`,
-              );
+              throw new Error(`${label} could not be lowered to a Lean.Expr literal object`);
             literal = 0;
             return obj;
           } finally {
@@ -310,19 +321,23 @@ export function withObjectValues(Base) {
           }
         }
         case "mdata":
-          return this.makeObjectExpr(expr.expr, `${label}.expr`);
-        case "proj":
-          return this.makeObjectExprProj(expr, label);
+          // Metadata inputs lower to their inner expression.
+          return take(expr.expr);
+        case "proj": {
+          const index = normalizeDecimal(expr.index, `${label}.index`, { signed: false });
+          return withName(expr.typeName, `${label}.typeName`, (typeNamePtr, typeNameLen) =>
+            this.withWasmString(index, `${label}.index`, (indexPtr, indexLen) =>
+              construct([expr.struct], ([structure]) =>
+                this.exports.vir_obj_expr_proj(typeNamePtr, typeNameLen, indexPtr, indexLen, structure))));
+        }
         default:
-          throw new Error(
-            `${label} has unsupported Lean.Expr kind ${expr?.kind}`,
-          );
+          throw new Error(`${label} has unsupported Lean.Expr kind ${expr?.kind}`);
       }
     }
 
     makeObjectLevel(value, label) {
       const level = value;
-      switch (level.kind) {
+      switch (level?.kind) {
         case "zero": {
           const obj = this.exports.vir_obj_level_zero();
           if (obj === 0)
@@ -366,20 +381,20 @@ export function withObjectValues(Base) {
         case "param":
           return this.makeObjectStringConstructor(
             "vir_obj_level_param",
-            requireObjectName(level.name, `${label}.name`),
+            encodeObjectName(level.name, `${label}.name`),
             `${label}.name`,
             label,
           );
         case "mvar":
           return this.makeObjectStringConstructor(
             "vir_obj_level_mvar",
-            requireObjectName(level.name, `${label}.name`),
+            encodeObjectName(level.name, `${label}.name`),
             `${label}.name`,
             label,
           );
         default:
           throw new Error(
-            `${label} has unsupported Lean.Level kind ${level.kind}`,
+            `${label} has unsupported Lean.Level kind ${level?.kind}`,
           );
       }
     }
@@ -447,142 +462,6 @@ export function withObjectValues(Base) {
       }
     }
 
-    makeObjectExprBinary(
-      constructorName,
-      leftValue,
-      leftLabel,
-      rightValue,
-      rightLabel,
-      label,
-    ) {
-      let left = this.makeObjectExpr(leftValue, leftLabel);
-      let right = 0;
-      try {
-        right = this.makeObjectExpr(rightValue, rightLabel);
-        const obj = this.exports[constructorName](left, right);
-        if (obj === 0)
-          throw new Error(
-            `${label} could not be lowered to a Lean.Expr object`,
-          );
-        left = 0;
-        right = 0;
-        return obj;
-      } finally {
-        this.releaseOwnedObjects([left, right]);
-      }
-    }
-
-    makeObjectExprBinding(
-      constructorName,
-      name,
-      typeValue,
-      bodyValue,
-      binderInfo,
-      label,
-    ) {
-      const checkedName = requireObjectName(name, `${label}.name`);
-      let type = this.makeObjectExpr(typeValue, `${label}.type`);
-      let body = 0;
-      try {
-        body = this.makeObjectExpr(bodyValue, `${label}.body`);
-        return this.withWasmString(
-          checkedName,
-          `${label}.name`,
-          (namePtr, nameLen) => {
-            const obj = this.exports[constructorName](
-              namePtr,
-              nameLen,
-              type,
-              body,
-              binderInfo,
-            );
-            if (obj === 0)
-              throw new Error(
-                `${label} could not be lowered to a Lean.Expr binding object`,
-              );
-            type = 0;
-            body = 0;
-            return obj;
-          },
-        );
-      } finally {
-        this.releaseOwnedObjects([type, body]);
-      }
-    }
-
-    makeObjectExprLet(expr, label) {
-      const checkedName = requireObjectName(expr.name, `${label}.name`);
-      let type = this.makeObjectExpr(expr.type, `${label}.type`);
-      let value = 0;
-      let body = 0;
-      try {
-        value = this.makeObjectExpr(expr.value, `${label}.value`);
-        body = this.makeObjectExpr(expr.body, `${label}.body`);
-        return this.withWasmString(
-          checkedName,
-          `${label}.name`,
-          (namePtr, nameLen) => {
-            const obj = this.exports.vir_obj_expr_let(
-              namePtr,
-              nameLen,
-              type,
-              value,
-              body,
-              expr.nondep ? 1 : 0,
-            );
-            if (obj === 0)
-              throw new Error(
-                `${label} could not be lowered to a Lean.Expr let object`,
-              );
-            type = 0;
-            value = 0;
-            body = 0;
-            return obj;
-          },
-        );
-      } finally {
-        this.releaseOwnedObjects([type, value, body]);
-      }
-    }
-
-    makeObjectExprProj(expr, label) {
-      const checkedTypeName = requireObjectName(
-        expr.typeName,
-        `${label}.typeName`,
-      );
-      let structure = this.makeObjectExpr(expr.struct, `${label}.struct`);
-      try {
-        return this.withWasmString(
-          checkedTypeName,
-          `${label}.typeName`,
-          (typeNamePtr, typeNameLen) =>
-            this.withWasmString(
-              normalizeDecimal(expr.index, `${label}.index`, {
-                signed: false,
-              }),
-              `${label}.index`,
-              (indexPtr, indexLen) => {
-                const obj = this.exports.vir_obj_expr_proj(
-                  typeNamePtr,
-                  typeNameLen,
-                  indexPtr,
-                  indexLen,
-                  structure,
-                );
-                if (obj === 0)
-                  throw new Error(
-                    `${label} could not be lowered to a Lean.Expr proj object`,
-                  );
-                structure = 0;
-                return obj;
-              },
-            ),
-        );
-      } finally {
-        this.releaseOwnedObjects([structure]);
-      }
-    }
-
     makeObjectArrayFromOwnedElements(elementObjs, label) {
       let valuesPtr = 0;
       try {
@@ -636,135 +515,121 @@ export function withObjectValues(Base) {
       }
     }
 
+    // Dotted text when the Name has that spelling; otherwise its components.
     readObjectName(obj) {
       const data = this.exports.vir_obj_name_string(obj);
-      const len = this.exports.vir_obj_name_string_size();
-      if (data === 0 || data === null) {
-        throw new Error(
-          "Lean.Name result contains unsupported numeric, escaped, empty, or non-identifier components",
+      if (data !== 0 && data !== null) {
+        return requireObjectName(
+          this.readWasmString(data, this.exports.vir_obj_name_string_size()),
+          "Lean.Name result",
         );
       }
-      return requireObjectName(
-        this.readWasmString(data, len),
-        "Lean.Name result",
-      );
+      const key = this.exports.vir_obj_name_key?.(obj) ?? 0;
+      if (key === 0 || key === null) {
+        throw new Error("Lean.Name result could not be read");
+      }
+      return decodeNameKey(this.readWasmString(key, this.exports.vir_obj_name_string_size()));
     }
 
+    // Lift iteratively, memoized on the Lean object: a shared subterm becomes
+    // one shared JS object, and depth is not bounded by the JS stack. The
+    // caller's reference keeps every reached object alive during the lift.
     liftObjectExpr(obj, label) {
-      const kind = this.exports.vir_obj_tag(obj);
+      const lifted = new Map();
+      const childrenOf = new Map();
+      const levels = new Map();
+      const owned = [];
+      const field = (ptr, index) => {
+        const child = this.ownedObjectField(ptr, index, label);
+        owned.push(child);
+        return child;
+      };
+      try {
+        const stack = [obj >>> 0];
+        while (stack.length !== 0) {
+          const ptr = stack[stack.length - 1];
+          if (lifted.has(ptr)) {
+            stack.pop();
+            continue;
+          }
+          const kind = this.exports.vir_obj_tag(ptr);
+          let children = childrenOf.get(ptr);
+          if (children === undefined) {
+            const indexes = EXPR_CHILD_FIELDS[kind];
+            if (indexes === undefined) {
+              throw new Error(`${label} has unsupported Lean.Expr result kind ${kind}`);
+            }
+            children = indexes.map((index) => field(ptr, index) >>> 0);
+            childrenOf.set(ptr, children);
+            const pending = children.filter((child) => !lifted.has(child));
+            if (pending.length !== 0) {
+              for (let index = pending.length - 1; index >= 0; index--) stack.push(pending[index]);
+              continue;
+            }
+          }
+          stack.pop();
+          lifted.set(ptr, this.liftObjectExprNode(ptr, kind, children.map((child) => lifted.get(child)),
+            field, levels, label));
+        }
+        return lifted.get(obj >>> 0);
+      } finally {
+        this.releaseOwnedObjects(owned);
+      }
+    }
+
+    liftObjectExprNode(ptr, kind, children, field, levels, label) {
+      const level = (index) => {
+        const child = field(ptr, index) >>> 0;
+        if (!levels.has(child)) levels.set(child, this.liftObjectLevel(child, `${label}.level`));
+        return levels.get(child);
+      };
+      const name = (index) => this.readObjectName(field(ptr, index));
       switch (kind) {
         case 0:
-          return this.withOwnedObjectField(obj, 0, label, (index) => ({
-            kind: "bvar",
-            index: this.readObjectNat(index),
-          }));
+          return { kind: "bvar", index: this.readObjectNat(field(ptr, 0)) };
         case 1:
-          return this.withOwnedObjectField(obj, 0, label, (name) => ({
-            kind: "fvar",
-            name: this.readObjectName(name),
-          }));
+          return { kind: "fvar", name: name(0) };
         case 2:
-          return this.withOwnedObjectField(obj, 0, label, (name) => ({
-            kind: "mvar",
-            name: this.readObjectName(name),
-          }));
+          return { kind: "mvar", name: name(0) };
         case 3:
-          return this.withOwnedObjectField(obj, 0, label, (level) => ({
-            kind: "sort",
-            level: this.liftObjectLevel(level, `${label}.level`),
-          }));
+          return { kind: "sort", level: level(0) };
         case 4:
-          return this.withOwnedObjectFields(
-            obj,
-            [0, 1],
-            label,
-            ([name, levels]) => ({
-              kind: "const",
-              name: this.readObjectName(name),
-              levels: this.liftObjectLevelList(levels, `${label}.levels`),
-            }),
-          );
+          return {
+            kind: "const",
+            name: name(0),
+            levels: this.liftObjectLevelList(field(ptr, 1), `${label}.levels`),
+          };
         case 5:
-          return this.withOwnedObjectFields(
-            obj,
-            [0, 1],
-            label,
-            ([fn, arg]) => ({
-              kind: "app",
-              fn: this.liftObjectExpr(fn, `${label}.fn`),
-              arg: this.liftObjectExpr(arg, `${label}.arg`),
-            }),
-          );
+          return { kind: "app", fn: children[0], arg: children[1] };
         case 6:
-          return this.withOwnedObjectFields(
-            obj,
-            [0, 1, 2],
-            label,
-            ([name, type, body]) => ({
-              kind: "lam",
-              name: this.readObjectName(name),
-              type: this.liftObjectExpr(type, `${label}.type`),
-              body: this.liftObjectExpr(body, `${label}.body`),
-              binderInfo: decodeBinderInfo(
-                this.exports.vir_obj_expr_scalar_u8(obj, 3),
-              ),
-            }),
-          );
         case 7:
-          return this.withOwnedObjectFields(
-            obj,
-            [0, 1, 2],
-            label,
-            ([name, type, body]) => ({
-              kind: "forall",
-              name: this.readObjectName(name),
-              type: this.liftObjectExpr(type, `${label}.type`),
-              body: this.liftObjectExpr(body, `${label}.body`),
-              binderInfo: decodeBinderInfo(
-                this.exports.vir_obj_expr_scalar_u8(obj, 3),
-              ),
-            }),
-          );
+          return {
+            kind: kind === 6 ? "lam" : "forall",
+            name: name(0),
+            type: children[0],
+            body: children[1],
+            binderInfo: decodeBinderInfo(this.exports.vir_obj_expr_scalar_u8(ptr, 3)),
+          };
         case 8:
-          return this.withOwnedObjectFields(
-            obj,
-            [0, 1, 2, 3],
-            label,
-            ([name, type, value, body]) => ({
-              kind: "let",
-              name: this.readObjectName(name),
-              type: this.liftObjectExpr(type, `${label}.type`),
-              value: this.liftObjectExpr(value, `${label}.value`),
-              body: this.liftObjectExpr(body, `${label}.body`),
-              nondep: this.exports.vir_obj_expr_scalar_u8(obj, 4) !== 0,
-            }),
-          );
+          return {
+            kind: "let",
+            name: name(0),
+            type: children[0],
+            value: children[1],
+            body: children[2],
+            nondep: this.exports.vir_obj_expr_scalar_u8(ptr, 4) !== 0,
+          };
         case 9:
-          return this.withOwnedObjectField(obj, 0, label, (literal) => ({
-            kind: "lit",
-            literal: this.liftObjectLiteral(literal, `${label}.literal`),
-          }));
+          return { kind: "lit", literal: this.liftObjectLiteral(field(ptr, 0), `${label}.literal`) };
         case 10:
-          return this.withOwnedObjectField(obj, 1, label, (expr) => ({
-            kind: "mdata",
-            expr: this.liftObjectExpr(expr, `${label}.expr`),
-          }));
+          return { kind: "mdata", expr: children[0] };
         case 11:
-          return this.withOwnedObjectFields(
-            obj,
-            [0, 1, 2],
-            label,
-            ([typeName, index, structure]) => ({
-              kind: "proj",
-              typeName: this.readObjectName(typeName),
-              index: this.readObjectNat(index),
-              struct: this.liftObjectExpr(structure, `${label}.struct`),
-            }),
-          );
-        default:
-          throw new Error(
-            `${label} has unsupported Lean.Expr result kind ${kind}`,
-          );
+          return {
+            kind: "proj",
+            typeName: name(0),
+            index: this.readObjectNat(field(ptr, 1)),
+            struct: children[0],
+          };
       }
     }
 
@@ -909,6 +774,72 @@ export function withObjectValues(Base) {
   };
 }
 
+// Lean.Expr constructor tag -> object fields holding Expr children.
+const EXPR_CHILD_FIELDS = Object.freeze([
+  [], [], [], [], [], [0, 1], [1, 2], [1, 2], [1, 2, 3], [], [1], [2],
+]);
+
+function isRecordLike(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function exprChildren(expr, label) {
+  if (!isRecordLike(expr)) throw new Error(`${label} must be a Lean.Expr object`);
+  let children;
+  switch (expr.kind) {
+    case "app": children = [expr.fn, expr.arg]; break;
+    case "lam":
+    case "forall": children = [expr.type, expr.body]; break;
+    case "let": children = [expr.type, expr.value, expr.body]; break;
+    case "mdata": children = [expr.expr]; break;
+    case "proj": children = [expr.struct]; break;
+    case "bvar": case "fvar": case "mvar": case "sort": case "const": case "lit": return [];
+    default: throw new Error(`${label} has unsupported Lean.Expr kind ${expr.kind}`);
+  }
+  for (const child of children) {
+    if (!isRecordLike(child)) throw new Error(`${label} ${expr.kind} child must be a Lean.Expr object`);
+  }
+  return children;
+}
+
+const nameKeyEncoder = new TextEncoder();
+const nameKeyDecoder = new TextDecoder("utf-8", { fatal: true });
+
+// Text for the Name-taking Wasm constructors: dotted text as is, or the
+// canonical structural key (Vir.nameKey) for an array of components.
+function encodeObjectName(value, label) {
+  if (typeof value === "string") return requireObjectName(value, label);
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be a dotted name string or an array of name components`);
+  }
+  let key = "";
+  value.forEach((component, index) => {
+    if (typeof component === "string") {
+      if (/[\uD800-\uDFFF]/u.test(component)) {
+        throw new Error(`${label}[${index}] must contain well-formed Unicode`);
+      }
+      key += "s";
+      for (const byte of nameKeyEncoder.encode(component)) key += byte.toString(16).padStart(2, "0");
+    } else if ((typeof component === "bigint" && component >= 0n) ||
+        (Number.isSafeInteger(component) && component >= 0)) {
+      key += `n${component}`;
+    } else {
+      throw new Error(`${label}[${index}] must be a string or a non-negative integer`);
+    }
+    key += "/";
+  });
+  return key;
+}
+
+function decodeNameKey(key) {
+  if (!key.endsWith("/") && key !== "") throw new Error("Lean.Name result key is malformed");
+  return key === "" ? [] : key.slice(0, -1).split("/").map((part) => {
+    if (part.startsWith("n")) return BigInt(part.slice(1));
+    const bytes = part.slice(1).match(/../g) ?? [];
+    return nameKeyDecoder.decode(Uint8Array.from(bytes, (byte) => parseInt(byte, 16)));
+  });
+}
+
 function normalizeBinderInfo(value, label) {
   if (
     typeof value === "number" &&
@@ -955,14 +886,14 @@ function requireObjectName(value, label) {
   for (const component of components) {
     if (component.length === 0) {
       throw new Error(
-        `${label} must use non-empty dotted identifier components`,
+        `${label} must use non-empty dotted identifier components; use an array of components for other names`,
       );
     }
     if (/^[0-9]+$/.test(component)) {
-      throw new Error(`${label} cannot contain numeric Name components`);
+      throw new Error(`${label} cannot contain numeric components in dotted text; use an array such as ["_uniq", 12n]`);
     }
     if (component.includes("«") || component.includes("»")) {
-      throw new Error(`${label} cannot contain escaped Name components`);
+      throw new Error(`${label} cannot contain escaped components in dotted text; use an array of components`);
     }
   }
   // The Wasm constructor/getter uses the pinned Lean identifier predicates.

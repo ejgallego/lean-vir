@@ -12,6 +12,8 @@ function mockRuntime(nameResult = "Nat.succ") {
   const runtime = Object.create(VirRuntime.prototype);
   runtime.exports = {
     vir_obj_expr_fvar: () => 1,
+    vir_obj_inc: () => {},
+    vir_obj_dec: () => {},
     vir_obj_name_string: () => 1,
     vir_obj_name_string_size: () => nameResult.length,
   };
@@ -37,13 +39,37 @@ test("Expr Name lowering checks structural spelling before the Wasm grammar chec
     "A..B",
     "A.«B.C»",
     "A\uD800",
+    ["A", -1n],
+    ["A", 1.5],
+    ["A", null],
+    ["A\uD800"],
+    { name: "A" },
   ]) {
     assert.throws(
       () => runtime.makeObjectExpr({ kind: "fvar", name }, "expr"),
-      /Name|identifier|numeric|escaped|components|Unicode/,
-      `expected unsupported name ${JSON.stringify(name)} to be rejected`,
+      /Name|identifier|numeric|escaped|components|Unicode|integer/,
+      `expected unsupported name ${JSON.stringify(name, (_key, value) =>
+        typeof value === "bigint" ? `${value}n` : value)} to be rejected`,
     );
   }
+});
+
+test("Expr Name lowering sends component arrays as canonical name keys", () => {
+  const runtime = mockRuntime();
+  const sent = [];
+  runtime.withWasmString = (text, _label, callback) => {
+    sent.push(text);
+    return callback(1, text.length);
+  };
+  for (const name of [["_uniq", 12n], ["_private", "M", 0, "x"], ["A", "B.C"], []]) {
+    assert.equal(runtime.makeObjectExpr({ kind: "fvar", name }, "expr"), 1);
+  }
+  assert.deepEqual(sent, [
+    "s5f756e6971/n12/",
+    "s5f70726976617465/s4d/n0/s78/",
+    "s41/s422e43/",
+    "",
+  ]);
 });
 
 test("lifted Expr Names reject representations that would normalize", () => {
@@ -61,10 +87,13 @@ test("lifted Expr Names reject representations that would normalize", () => {
     assert.equal(runtime.readObjectName(1), name);
   }
 
-  const rejectedRawName = mockRuntime();
-  rejectedRawName.exports.vir_obj_name_string = () => 0;
-  assert.throws(
-    () => rejectedRawName.readObjectName(1),
-    /unsupported numeric, escaped, empty, or non-identifier components/,
-  );
+  // Names without a dotted spelling are read through their structural key.
+  const keyed = mockRuntime("s4e756d6572616c/n1/s7061727420776974682073706163652e/");
+  keyed.exports.vir_obj_name_string = () => 0;
+  keyed.exports.vir_obj_name_key = () => 1;
+  assert.deepEqual(keyed.readObjectName(1), ["Numeral", 1n, "part with space."]);
+
+  const unreadable = mockRuntime();
+  unreadable.exports.vir_obj_name_string = () => 0;
+  assert.throws(() => unreadable.readObjectName(1), /could not be read/);
 });
