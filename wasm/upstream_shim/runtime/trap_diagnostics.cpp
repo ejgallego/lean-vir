@@ -17,8 +17,6 @@ Author: Emilio J. Gallego Arias
 // unwind, so it ends the instance: record the exception text here, then trap.
 // The JS runtime reads this buffer when it retires the failed instance.
 
-extern "C" char * __cxa_demangle(char const *, char *, size_t *, int *);
-
 namespace {
 
 // Fixed storage: reporting a memory_exception must not allocate.
@@ -36,7 +34,7 @@ void append_trap_message(char const * text) {
 
 // Without unwinding there is no catch clause to match a thrown type against its
 // bases, so recognize the Lean exception classes linked into this module. Any
-// other type is reported by name.
+// other type is reported by its mangled name: the demangler would add ~140 KB.
 char const * lean_exception_message(void * thrown, std::type_info const & type) {
     if (type == typeid(lean::exception)) return static_cast<lean::exception *>(thrown)->what();
     if (type == typeid(lean::throwable)) return static_cast<lean::throwable *>(thrown)->what();
@@ -60,10 +58,7 @@ void record_thrown_exception(void * thrown, std::type_info const * type) {
         return;
     }
     append_trap_message("C++ exception of type ");
-    int status = 0;
-    char * demangled = __cxa_demangle(type->name(), nullptr, nullptr, &status);
-    append_trap_message(status == 0 && demangled != nullptr ? demangled : type->name());
-    free(demangled);
+    append_trap_message(type->name());
 }
 
 }  // namespace
