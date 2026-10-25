@@ -217,6 +217,9 @@ The package-set transaction inside the fresh instance is:
    once for a successful set. Generated descriptors order members dependency-first,
    with each member retaining its owning initializer metadata.
 
+Preparation also rejects an extern declaration that this runtime cannot resolve
+through its native registry or the package set's host imports, naming the
+declaration, instead of trapping when the interpreter first calls it.
 The JS loader aborts staged state on decode, preparation or manifest failure
 before initialization. Failure after initialization begins retires the instance.
 Manifest checksums detect corruption but do not prove agreement with binary call

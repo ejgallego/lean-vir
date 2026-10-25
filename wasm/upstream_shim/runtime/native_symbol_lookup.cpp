@@ -86,6 +86,10 @@ bool lean::vir::is_registered_native_symbol(char const * symbol) {
     return find_native_symbol(symbol) != nullptr;
 }
 
+bool lean::vir::has_native_implementation(lean::name const & declaration) {
+    return known_symbol_stem(declaration) != nullptr;
+}
+
 extern "C" void * dlsym(void *, char const * sym) {
     if (auto entry = find_native_symbol(sym)) return entry->address;
     if (void * host_import = lean::vir::host_import_trampoline(sym)) {

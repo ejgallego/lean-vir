@@ -158,6 +158,7 @@ export const runtimeTests = Object.freeze(
       group: "lean",
     },
     { id: "recursive-owner", file: "recursive-owner-smoke.mjs", group: "lean" },
+    { id: "missing-extern", file: "missing-extern-smoke.mjs", group: "lean" },
     { id: "option-values", file: "option-values-smoke.mjs", group: "lean" },
     { id: "native-value-codecs", file: "native-value-codecs-smoke.mjs", group: "lean" },
     { id: "json-safe-values", file: "json-safe-values-smoke.mjs", group: "lean" },

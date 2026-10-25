@@ -94,6 +94,19 @@ static bool build_decl_indices() {
     return true;
 }
 
+// Without this check, an extern missing from this runtime is reported only
+// when the interpreter first calls it, by trapping the instance.
+static bool validate_extern_implementations() {
+    for (decl_entry const & entry : g_package.records.entries) {
+        if (entry.is_extern && !has_native_implementation(name(entry.name, true))) {
+            g_package.last_error = "IR declaration `" + lean_name_string(entry.name) +
+                "` is an extern with no native implementation in this runtime";
+            return false;
+        }
+    }
+    return true;
+}
+
 static decl_entry const * find_indexed_decl(
     name_hash_map<uint32_t> const * index,
     object * n) {
@@ -388,7 +401,8 @@ bool prepare_package_set() {
         return false;
     }
     g_package.phase = package_phase::failed;
-    if (!validate_host_import_limits() || !build_decl_indices() || !build_call_table()) {
+    if (!validate_host_import_limits() || !build_decl_indices() ||
+        !validate_extern_implementations() || !build_call_table()) {
         return false;
     }
     g_package.phase = package_phase::prepared;
