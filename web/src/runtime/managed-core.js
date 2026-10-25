@@ -34,6 +34,17 @@ export class ManagedRuntime extends PrimitiveObjectRuntime {
     super();
     const boundary = guardWasmExports(exports, hostState);
     runtimeBoundaries.set(this, boundary);
+    // A failed instance cannot run Lean callbacks again. Stop the timers,
+    // frames and other activity scheduled through bindings this runtime owns.
+    if (typeof hostState?.disposeOwnedHostBindings === "function") {
+      boundary.subscribe(() => {
+        try {
+          hostState.disposeOwnedHostBindings();
+        } catch (error) {
+          hostState.recordFinalizerError(error);
+        }
+      });
+    }
     this.exports = boundary.exports;
     this.module = module;
     this.hostState = hostState;
