@@ -10,6 +10,8 @@ experimental conveniences, including when available through default imports.
 See [support scope](docs/SUPPORT.md) for the boundary, including the experimental
 [JSON-safe codecs](docs/design/JSON_SAFE_VALUE_CODEC.md).
 
+See [CHANGES.md](CHANGES.md) for release notes.
+
 ## Try it
 
 Open the [hosted demos](https://ejgallego.github.io/lean-vir/), including
