@@ -118,7 +118,9 @@ larger harness machinery out unless the maintainer requests them.
   for a notification.
 - Send one consolidated handoff only when a specific recipient needs to act:
   request review/decision, take a dependency, wake an idle owner, or resolve a
-  blocker. `codex queue` is targeted wake-up/assignment, not a broadcast or
+  blocker. A targeted wake-up (whatever mechanism the owner's agent runtime
+  provides to resume or message a specific session; see the mailbox protocol
+  for known commands) is for assignment and handoff, not a broadcast or
   receipt mechanism. Do not send acknowledgments, receipt echoes, duplicate
   completion reports, or unchanged CI updates. For PR checks, record the final
   exact-head result once; report an earlier failure only if it changes scope or
