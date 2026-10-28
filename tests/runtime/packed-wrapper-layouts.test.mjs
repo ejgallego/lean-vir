@@ -33,12 +33,12 @@ for (const [name, inner, location] of [
   ["Bool", booleanBoundary(), { tag: "scalar", offset: 0, size: 1 }],
   ["USize", primitiveBoundary("unsigned", "number", { width: "usize" }), { tag: "usize", index: 0 }],
 ]) {
-  test(`${name} identity wrappers have valid packed storage and explicit conversion limits`, () => {
+  test(`${name} identity wrappers retain packed conversion operations`, () => {
     for (const wrapper of [wrapped(inner), wrapped(wrapped(inner))]) {
       const pair = container(wrapper, location);
       assert.equal(validateBoundaryInterface(pair), pair);
-      assert.equal(objectArgumentSupported(pair), false);
-      assert.equal(objectResultSupported(pair), false);
+      assert.equal(objectArgumentSupported(pair), true);
+      assert.equal(objectResultSupported(pair), true);
       assert.equal(objectArgumentSupported(wrapper), true, "standalone identity wrappers still convert");
     }
     const direct = validateBoundaryInterface(container(inner, location));

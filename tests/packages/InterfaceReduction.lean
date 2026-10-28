@@ -38,6 +38,32 @@ abbrev MoreNats := List Nats
 @[vir_export] def nestedAlias (xs : List Nats) : List Nats := xs
 @[vir_export] def deeperAlias (xs : List MoreNats) : List MoreNats := xs
 
+-- Lean 4.36 spills fields beyond its inline object-slot limit.
+inductive WideRecord where
+  | mk
+      (f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 : String)
+      (f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 : String)
+      (f24 f25 f26 f27 f28 f29 f30 f31 f32 f33 f34 f35 : String)
+      (f36 f37 f38 f39 f40 f41 f42 f43 f44 f45 f46 f47 : String)
+      (f48 f49 f50 f51 f52 f53 f54 f55 f56 f57 f58 f59 : String)
+      (f60 f61 f62 f63 f64 f65 f66 f67 f68 f69 f70 f71 : String)
+      (f72 f73 f74 f75 f76 f77 f78 f79 f80 f81 f82 f83 : String)
+      (f84 f85 f86 f87 f88 f89 f90 f91 f92 f93 f94 f95 : String)
+      (f96 f97 f98 f99 f100 f101 f102 f103 f104 f105 f106 f107 : String)
+      (f108 f109 f110 f111 f112 f113 f114 f115 f116 f117 f118 f119 : String)
+      (f120 f121 f122 f123 f124 f125 f126 f127 f128 f129 f130 f131 : String)
+      (f132 f133 f134 f135 f136 f137 f138 f139 f140 f141 f142 f143 : String)
+      (f144 f145 f146 f147 f148 f149 f150 f151 f152 f153 f154 f155 : String)
+      (f156 f157 f158 f159 f160 f161 f162 f163 f164 f165 f166 f167 : String)
+      (f168 f169 f170 f171 f172 f173 f174 f175 f176 f177 f178 f179 : String)
+      (f180 f181 f182 f183 f184 f185 f186 f187 f188 f189 f190 f191 : String)
+      (f192 f193 f194 f195 f196 f197 f198 f199 f200 f201 f202 f203 : String)
+      (f204 f205 f206 f207 f208 f209 f210 f211 f212 f213 f214 f215 : String)
+      (f216 f217 f218 f219 f220 f221 f222 f223 f224 f225 f226 f227 : String)
+      (f228 f229 f230 f231 f232 f233 f234 f235 f236 f237 f238 f239 : String)
+      (f240 f241 f242 f243 f244 f245 f246 f247 f248 f249 f250 f251 : String)
+      (f252 f253 f254 f255 : String)
+
 inductive FamilyValue (β : Nat → Type) where
   | mk (key : Nat) (value : β key)
 
@@ -127,6 +153,28 @@ structure ErasedField where
   type : Type
   value : Nat
 
+-- Imported classifiers must use constructor metadata, even when private
+-- projections are absent from the importing module's environment.
+structure PrivateKey where
+  private mk ::
+  private value : Nat
+
+def privateKeyAmount (value : PrivateKey) : Nat := value.value
+
+structure BoundedValue where
+  value : Nat
+  valid : value < 100
+
+structure ImplicitRecord where
+  {value : Nat}
+
+structure ConstantField (β : Nat → Type) where
+  key : Nat
+  value : β key
+
+@[vir_export] def implicitRecordIdentity (value : ImplicitRecord) := value
+@[vir_export] def constantFieldIdentity (value : ConstantField (fun _ => String)) := value
+
 meta section
 
 open Lean Vir.Interface
@@ -202,6 +250,13 @@ private def expectConstructorNames (type : Expr) (expected : Array (Name × Stri
     | .ok _ => throwError "JavaScript spelling must live in the value mapping"
 
 run_elab do
+  let wide := mkConst ``WideRecord
+  let .error wideError ← interfaceType wide
+    | throwError "a spilled constructor must be rejected before encoding an interface"
+  expect "spilled constructor reason"
+    (errorCause wideError == .spilledRuntimeLayout "f254" ``WideRecord.mk)
+  expect "spilled fields never alias inline slots"
+    ((fieldLayout? (.spilled 1 0 (mkConst ``String))).isNone)
   for name in #[``direct, ``projected, ``parameterized] do
     expectType name.toString (← argumentType name) .string
   let string := mkConst ``String
@@ -224,6 +279,20 @@ run_elab do
       (mkAppN (mkConst ``ParameterizedCarrier.mk) #[mkConst ``Nat, string, mkNatLit 0])) .string
   let family := Expr.lam `key (mkConst ``Nat) string .default
   expectType "constant family with bound key" (mkApp family (.bvar 0)) .string
+  let product := mkConst ``Prod [.zero, .zero]
+  let domain := Expr.sort (.succ .zero)
+  let underLambda := Expr.lam `element domain
+    (mkApp2 product (mkApp family (.bvar 1)) (.bvar 0)) .implicit
+  let expectedLambda := Expr.lam `element domain (mkApp2 product string (.bvar 0)) .implicit
+  expect "lambda reduction preserves local binder and binder info"
+    ((⟨← reduceConstructorFieldType underLambda⟩ : ExprStructEq) == ⟨expectedLambda⟩)
+  let closedLambda := Expr.mdata (({} : MData).setNat `origin 9) expectedLambda
+  expect "already closed lambda retains exact metadata and identity"
+    ((⟨← reduceConstructorFieldType closedLambda⟩ : ExprStructEq) == ⟨closedLambda⟩)
+  let dependent := mkApp (mkConst ``Fin) (.bvar 0)
+  expect "genuine dependency is not discarded"
+    ((⟨← reduceConstructorFieldType dependent⟩ : ExprStructEq) == ⟨dependent⟩ && dependent.hasLooseBVars)
+  rejected "dependent Fin field" dependent
   expectType "projection then beta"
     (mkApp (.proj ``FamilyCarrier 0 (mkApp (mkConst ``FamilyCarrier.mk) family)) (.bvar 0)) .string
   expectType "beta then projection"
@@ -251,7 +320,7 @@ run_elab do
   let .ok aliasDeeper ← interfaceType (← argumentType ``deeperAlias)
     | throwError "deeper abbreviated Lists must be supported"
   expect "nested abbreviations preserve finite descent" (aliasDeeper.toJson == explicitDeeper.toJson)
-  let .error growingError ← (classifyType (lists (lists nat)) #[⟨lists nat⟩]).run
+  let .error growingError ← (classifyType (lists (lists nat)) { owners := #[⟨lists nat⟩] }).run
     | throwError "a growing applied recursion context must stay rejected"
   expect "growing applied recursion reason"
     (errorCause growingError == .nonUniformRecursive .inductive ``List)
@@ -290,15 +359,15 @@ run_elab do
   let universeTree := mkConst ``UniverseTree [.zero]
   let .ok (.customInductive _ _ _) ← interfaceType universeTree
     | throwError "universe-polymorphic parameter-free recursion failed"
-  let .ok (.recursiveRef _ _ 0) ← (classifyType (.mdata {} universeTree) #[⟨universeTree⟩]).run
+  let .ok (.recursiveRef _ _ 0) ← (classifyType (.mdata {} universeTree) { owners := #[⟨universeTree⟩] }).run
     | throwError "outer metadata must not alter recursion identity"
-  let .error universeError ← (classifyType (mkConst ``UniverseTree [.succ .zero]) #[⟨universeTree⟩]).run
+  let .error universeError ← (classifyType (mkConst ``UniverseTree [.succ .zero]) { owners := #[⟨universeTree⟩] }).run
     | throwError "different universe instances must not share recursion identity"
   expect "universe identity reason" (errorCause universeError == .nonUniformRecursive .inductive ``UniverseTree)
   -- Existing metadata values, rather than their debug spelling, determine identity.
   let annotated (id : Nat) := mkApp (mkConst ``PolyTree [.zero])
     (.mdata (({} : MData).setNat `origin id) nat)
-  let .error metadataError ← (classifyType (annotated 2) #[⟨annotated 1⟩]).run
+  let .error metadataError ← (classifyType (annotated 2) { owners := #[⟨annotated 1⟩] }).run
     | throwError "distinct nested metadata must have distinct recursion keys"
   expect "nested metadata identity reason" (errorCause metadataError == .nonUniformRecursive .inductive ``PolyTree)
   let family (name : Name) (binder : BinderInfo) :=
@@ -307,13 +376,13 @@ run_elab do
       (family `left .default, family `right .default),
       (family `left .default, family `left .implicit)] do
     expect "alpha equality is broader than recursion identity" (original == changed)
-    let .error binderError ← (classifyType changed #[⟨original⟩]).run
+    let .error binderError ← (classifyType changed { owners := #[⟨original⟩] }).run
       | throwError "binder syntax must remain part of structural identity"
     expect "binder identity reason" (errorCause binderError == .nonUniformRecursive .inductive ``FamilyTree)
 
   -- Declaration resolution precedes layout lookup in the selected producer path.
   let missingInductive := mkConst `MissingInductive
-  let .error missingInductiveError ← (inductiveType #[] missingInductive).run
+  let .error missingInductiveError ← (inductiveType {} missingInductive).run
     | throwError "an absent inductive declaration must fail before layout lookup"
   expect "missing inductive declaration reason"
     (errorCause missingInductiveError == .unsupportedType missingInductive)
@@ -330,7 +399,7 @@ run_elab do
     | throwError "recursive callback aggregate must be rejected"
   expect "recursive callback result reason"
     (errorCause nodeError == .recursiveCallback ``CallbackNode)
-  let context : RecursiveSeen := #[⟨node⟩]
+  let context : ClassifyContext := { owners := #[⟨node⟩] }
   for type in #[
       .forallE `_arg node (mkConst ``Unit) .default,
       mkApp (mkConst ``IO) node,
@@ -352,7 +421,7 @@ run_elab do
   let natInstance := mkApp (mkConst ``CallbackParam [.zero]) (mkConst ``Nat)
   let stringInstance := mkApp (mkConst ``CallbackParam [.zero]) string
   let .error nonuniformError ← (classifyType (.forallE `_arg (mkConst ``Unit) stringInstance .default)
-      #[⟨natInstance⟩]).run
+      { owners := #[⟨natInstance⟩] }).run
     | throwError "nonuniform recursive callback context must be rejected"
   expect "nonuniform callback recursion reason"
     (errorCause nonuniformError == .nonUniformRecursive .inductive ``CallbackParam)
@@ -407,7 +476,15 @@ run_elab do
   expect "budget leaves original type" ((← reduceTypeAliases deep) == deep)
   rejected "budget exhaustion" deep
   let indexed := mkApp (mkConst ``Indexed) (mkNatLit 0)
-  for ty in #[indexed, mkConst ``ErasedField] do
+  for (ty, check) in #[(mkConst ``Char, FieldCheck.unicodeScalar),
+      (mkApp (mkConst ``Fin) (mkNatLit 100), FieldCheck.natLt 100)] do
+    let .ok (.structure _ _ descriptor) ← interfaceType ty
+      | throwError "validated structure rejected"
+    let some field := descriptor.fields[0]?
+      | throwError "validated data field missing"
+    expect "retained data field with explicit check"
+      (descriptor.fields.size == 1 && field.check? == some check)
+  for ty in #[indexed, mkConst ``ErasedField, mkConst ``BoundedValue] do
     rejected "direct unsupported layout" ty
     rejected "projection cannot bypass layout rejection" (project (mkApp (mkConst ``Carrier.mk) ty))
     rejected "beta cannot bypass layout rejection"

@@ -13,6 +13,8 @@ function supported(native, view, result, owners) {
   if (native.ref !== undefined) return native.ref < owners.length;
   if (native.type.tag !== "leanObject") return true;
   if (view.tag === "function") return result;
+  if (view.tag === "adapted") return supported(native.metadata.adapter.wire, view.wire, false, []) &&
+    supported(native.metadata.adapter.wire, view.wire, true, []);
   if (["unit", "boolean", "enum", "expr", "leanReference"].includes(view.tag)) return true;
   const constructors = native.metadata?.constructors, scope = [native, ...owners];
   if (view.tag === "sequence") {
@@ -23,14 +25,9 @@ function supported(native, view, result, owners) {
   function fieldSupported(field, value, bindings) {
     const location = field.location;
     if (location?.tag === "usize") {
-      if (field.type.type?.tag !== "unsigned" || field.type.type.width !== "usize") return false;
+      if (!packedSupported(field.type, value, true)) return false;
     } else if (location?.tag === "scalar") {
-      // Packed conversion needs scalar operations for the selected view.
-      // Identity-wrapper layouts are valid metadata, but their record/variant
-      // codecs currently expose only boxed lower/lift operations.
-      const tag = field.type.type?.tag;
-      if (tag !== "unsigned" && tag !== "float" &&
-          !["unit", "boolean", "enum"].includes(value.tag)) return false;
+      if (!packedSupported(field.type, value, false)) return false;
     }
     return supported(field.type, value, result, bindings);
   }
@@ -54,4 +51,24 @@ function supported(native, view, result, owners) {
       ? fieldSupported(fields[0], entry.value, scope) : mappings(fields, entry.fields));
   });
   return false;
+}
+
+function packedSupported(native, view, usize) {
+  const tag = native.type?.tag;
+  if (tag === "unsigned") return !usize || native.type.width === "usize";
+  if (!usize && (tag === "float" || ["unit", "boolean", "enum"].includes(view.tag))) return true;
+  const constructors = native.metadata?.constructors;
+  if (constructors?.length !== 1 || constructors[0].representation !== "identity") return false;
+  const field = constructors[0].fields[0];
+  let mappings;
+  if (view.tag === "record") mappings = view.fields;
+  else if (view.tag === "variant" && view.cases.length === 1) {
+    const entry = view.cases[0];
+    if (entry.payload === "value") return packedSupported(field.type, entry.value, usize);
+    if (entry.payload !== "fields") return false;
+    mappings = entry.fields;
+  } else return false;
+  const value = mappings.length === 1 && mappings[0].path.length === 1 ? mappings[0].value
+    : { tag: "record", fields: mappings.map(mapping => ({ ...mapping, path: mapping.path.slice(1) })) };
+  return packedSupported(field.type, value, usize);
 }

@@ -11,18 +11,19 @@ import { test } from "node:test";
 import { checkReleaseTag, releaseTagFromToolchain } from "../../scripts/release-tag.mjs";
 
 for (const [toolchain, expected] of [
-  ["leanprover/lean4:v4.35.0-rc4\n", "4.35-rc4"],
-  ["leanprover/lean4:v4.35.0", "4.35"],
-  ["leanprover/lean4:v4.35.1", "4.35.1"],
-  ["leanprover/lean4:v4.36.0-rc1", "4.36-rc1"],
+  ["leanprover/lean4:v4.35.0-rc4\n", "v4.35.0-rc4"],
+  ["leanprover/lean4:v4.35.0", "v4.35.0"],
+  ["leanprover/lean4:v4.35.1", "v4.35.1"],
+  ["leanprover/lean4:v4.36.0-rc1", "v4.36.0-rc1"],
 ]) test(`Lean release tag: ${expected}`, () => assert.equal(releaseTagFromToolchain(toolchain), expected));
 
 for (const toolchain of ["leanprover/lean4:nightly", "custom-lean", "leanprover/lean4:v4.35", "leanprover/lean4:v4.35.0-rc4-extra"])
   test(`unsupported release toolchain: ${toolchain}`, () => assert.throws(() => releaseTagFromToolchain(toolchain), /unsupported release toolchain/));
 
 test("milestone and mismatched Lean tags cannot publish", () => {
-  for (const tag of ["v0.1.0", "0.1.1", "4.34", "4.35", "4.35-rc3", "v4.35.0-rc4"])
-    assert.throws(() => checkReleaseTag(tag, "leanprover/lean4:v4.35.0-rc4"), /expected 4\.35-rc4/);
+  for (const tag of ["v0.1.0", "0.1.1", "4.34", "4.35", "4.35-rc3", "4.35-rc4",
+    "v4.35-rc4", "v4.35.0", "v4.35.0-rc3"])
+    assert.throws(() => checkReleaseTag(tag, "leanprover/lean4:v4.35.0-rc4"), /expected v4\.35\.0-rc4/);
 });
 
 test("workflow command checks the pinned toolchain from outside the checkout", async () => {
@@ -37,7 +38,7 @@ test("workflow command checks the pinned toolchain from outside the checkout", a
   assert.match(wrong.stderr, /does not match lean-toolchain/);
 });
 
-for (const [tag, exists] of [["4.35-rc4", false], ["4.35", false], ["4.35-rc4", true]]) {
+for (const [tag, exists] of [["v4.36.0-rc1", false], ["v4.36.0", false], ["v4.36.0-rc1", true]]) {
   test(`publishing metadata: ${tag}, existing=${exists}`, async () => {
     const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
     const { tmpdir } = await import("node:os");

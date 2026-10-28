@@ -202,7 +202,8 @@ meta partial def altHash : Alt → UInt64
 end
 
 meta def declInfoHash (info : DeclInfo) : UInt64 :=
-  hashOption (hash "DeclInfo") info.sorryDep? hash
+  mixHash (mixHash (hashOption (hash "DeclInfo") info.sorryDep? hash)
+    (hash info.maxJp)) (hash info.maxVar)
 
 private meta def hostImportMetadataHash (metadata : Vir.HostMetadata.HostImportMetadata) : UInt64 :=
   mixHash (hash metadata.marker.attributeName) (hash metadata.target)
@@ -254,7 +255,7 @@ private meta unsafe def prepareWidgetPackageImpl (source : String) (env : Enviro
     | .error message => return .error message
   -- Batch compilation need not load runtime IR for ordinary imports. Complete
   -- only imported owners; the current module always stays in the live snapshot.
-  let index ← Vir.GeneratePackage.resolveImportedModuleClosure #[input.target] input.index
+  let index ← Vir.GeneratePackage.resolveInterfaceModuleClosure #[input.target] input.index
   let package ← Vir.GeneratePackage.analyzePackage "widget elaboration" #[input.target] index
   if Vir.GeneratePackage.hasBlockingDiagnostics package.closure package.manifest then
     return .error package.report

@@ -70,6 +70,16 @@ def collectInterfaceManifest
                 manifest := { manifest with exports := manifest.exports.push entry }
           | .error diagnostic =>
               manifest := { manifest with diagnostics := manifest.diagnostics.push diagnostic }
+  let signatures := manifest.exports.map (fun entry => (entry.args, entry.result)) ++
+    hostImports.map (fun entry => (entry.args, entry.result))
+  for (args, result) in signatures do
+    let operations := args.flatMap (·.type.codecOperations) ++ result.codecOperations
+    for operation in operations do
+      if !manifest.codecOperations.any (·.entry == operation.name) then
+        manifest := { manifest with codecOperations := manifest.codecOperations.push {
+          entry := operation.name, source := "compiler codec operation",
+          args := operation.args.mapIdx fun i type => { name := s!"argument{i}", type },
+          result := operation.result } }
   return manifest
 
 end Vir.GeneratePackage

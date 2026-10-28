@@ -65,6 +65,11 @@ JavaScript's `Math.round` for negative halfway cases. See
 [numeric transport](../guides/JS_API.md#calls-and-manifest) for the
 JavaScript boundary.
 
+`Float.minimum` and `Float.maximum` use Lean's IEEE-754 providers, including
+NaN propagation from either operand. Minimum prefers negative zero; maximum
+prefers positive zero. The ordinary `min` and `max` instances use these same
+operations in Lean 4.36.
+
 ## Native boxed wrappers
 
 [`NativeExternSpec`](../../Vir/Compiler/NativeExterns.lean) stores VIR policy:
@@ -83,6 +88,18 @@ The generator emits selected raw Lean bodies when available; imported
 implementation closures available only in compiled upstream output use the
 listed stage0 providers. Canonical inline runtime operations can likewise be
 materialized by generated adapters without a new shim provider.
+
+`ByteArray.usize`, `ByteArray.uset`, `ByteArray.beq`, `Float.toUInt8` and
+`Float.toInt64` use compiler-generated boxed adapters over Lean's runtime
+providers. Float-to-integer conversion truncates toward zero and saturates at
+the target range; NaN converts to zero. `ByteArray.uset` retains Lean's
+copy-on-write behavior and takes a wasm32 `USize` index.
+
+`Char.ofNatAux` uses the separate lookup stem `l_Char_ofNatAux` and Lean's
+compiler-generated two-argument boxed wrapper. Its raw provider,
+`lean_uint32_of_nat`, is shared with `UInt32.ofNat`, but the character
+constructor has an extra erased-proof argument. A separate lookup entry
+preserves that call shape while using the original conversion provider.
 
 Local behavior belongs in raw providers. The three handwritten boxed ownership
 exceptions are `Array.ugetBorrowed`, `Array.getInternalBorrowed` and
@@ -379,7 +396,7 @@ until disposal; they cannot invoke the failed instance.
 | --- | --- |
 | Tasks and blocking IO | `Task.pure`, `Task.get` and `Task.map` support only the exercised synchronous, already-resolved mode. There is no task scheduler or general blocking-IO implementation. |
 | Native thunk forcing | `Thunk.mk`/`Thunk.get` wrappers can link, but the native forcing path cannot apply an interpreter closure as a compiled function pointer. Supporting this requires a closure-aware design. |
-| Proof-bearing native calls | `Char.ofNatAux` has an observed indirect-call signature mismatch. `Int.divExact`, `Nat.divExact`, `String.Internal.ugetUTF8Byte`, `String.get'`, `String.getUtf8Byte`, `String.next'`, `UInt16.ofNatLT` and `USize.ofNat32` remain unsupported pending independent calling-convention checks. |
+| Proof-bearing native calls | `Int.divExact`, `Nat.divExact`, `String.Internal.ugetUTF8Byte`, `String.get'`, `String.getUtf8Byte`, `String.next'`, `UInt16.ofNatLT` and `USize.ofNat32` remain unsupported pending independent calling-convention checks. |
 | Parser environment policy | `evalConstCore` delegates to upstream `lean_eval_const`; `isReservedName` delegates to packaged IR; the raw `evalCheckMeta` provider accepts the check. This is not full Lean environment-policy fidelity. |
 | Budget, tracing and options | System/heartbeat, stack-info, timing and trace hooks are inert. Boolean option lookup returns its default; option registration exposes no discovery. Do not infer cancellation, budget enforcement or trace-sensitive behavior. |
 | Environment queries | Sorry-dependency and export-name lookup return `none`. Initializer-name queries are package-backed and aligned with the table run through `interpreter::run_init` in the persistent package session. |

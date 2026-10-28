@@ -147,7 +147,7 @@ See the [descriptor schema](../reference/IRPKG_FORMAT.md#package-set-descriptor)
 ordering, integrity and duplicate-identity rules. Browsers load neither
 `.olean` nor Lean's raw `.ir` files.
 
-The supported compatibility tuple is manifest 12, package format 11 and runtime
+The supported compatibility tuple is manifest 13, package format 11 and runtime
 ABI 4. Generate the package set and install the JavaScript/Wasm SDK from the
 same `lean_vir` revision. After changing that revision or the generator,
 regenerate the `.irpkg` members and descriptor and reinstall the matching SDK.
@@ -212,8 +212,9 @@ lake build :virSdk
 ```
 
 This installs the release matching the Lean toolchain under
-`.lake/build/vir/sdk/`: for example, Lean `v4.35.0` selects tag `4.35`.
-Stable `v4.35.0` selects `4.35`; a nonzero patch such as `v4.35.1` is retained.
+`.lake/build/vir/sdk/`: for example, Lean `v4.36.0-rc1` selects tag
+`v4.36.0-rc1`. The full Lean tag spelling is retained, including the `v` prefix
+and zero patch component.
 Milestone numbers and the SDK manifest version do not select the release tag.
 That GitHub release must exist. `VIR_SDK_TAG` selects an explicit release tag.
 For an unreleased revision, select the exact dependency commit:

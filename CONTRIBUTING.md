@@ -59,6 +59,10 @@ conventions.
 
 ## Commits
 
+Record user-visible changes in [CHANGES.md](CHANGES.md), under `unreleased`,
+using a short bullet with a component tag and PR reference. At release time,
+move those entries under the matching Lean version heading.
+
 Prefer concise imperative subjects in the form:
 
 ```text

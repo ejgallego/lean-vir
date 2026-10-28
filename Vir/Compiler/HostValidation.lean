@@ -43,6 +43,7 @@ private def hostBoundaryKind : InterfaceType → String
   | .simpleEnum .. => "enum"
   | .customInductive .. => "inductive"
   | .structure .. => "structure"
+  | .libraryAdapter .. => "library-adapted Lean type"
   | .recursiveRef .. => "recursive type"
   | .array .. => "array"
   | .resource .. => "resource"

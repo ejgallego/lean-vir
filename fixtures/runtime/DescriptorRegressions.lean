@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 -/
 module
 public import Vir.Js
+public import Lean.Data.Name
 public meta import Vir.Attributes
 public section
 
@@ -49,5 +50,38 @@ structure Row where
 
 @[vir_export] def listCallback (_ : Unit) : Lean.Vir.RuntimeM (List Row → List Row) :=
   pure fun rows => rows
+
+-- Name stores computed hashes. These observations compare JS-constructed Names
+-- against independently constructed Lean literals, not just a codec round trip.
+@[vir_export] def nameIdentity (value : Lean.Name) : Lean.Name := value
+@[vir_export] def matchesStringName (value : Lean.Name) : Bool :=
+  value.quickCmp (.str (.str .anonymous "") "λ🦀") == .eq
+@[vir_export] def matchesNumericName (value : Lean.Name) : Bool :=
+  value.quickCmp (.num (.str .anonymous "λ🦀") 900719925474099312345) == .eq
+
+inductive CachedScalar where
+  | empty
+  | mk (value : UInt64)
+with
+  @[computed_field] fingerprint : CachedScalar → UInt64
+    | .empty => 0
+    | .mk value => value + 1
+
+@[vir_export] def scalarIdentity (value : CachedScalar) : CachedScalar := value
+@[vir_export] def scalarComputed (value : CachedScalar) : UInt64 := value.fingerprint
+
+structure Base where
+  label : String
+  next : Option Base
+structure Child extends Base where
+  extra : String
+structure Grandchild extends Child where
+  note : String
+@[vir_export] def childIdentity (value : Child) : Child := value
+@[vir_export] def grandchildIdentity (value : Grandchild) : Grandchild := value
+@[vir_export] def childTailLabel (value : Child) : String :=
+  match value.next with
+  | none => ""
+  | some parent => parent.label
 
 end DescriptorRegressions

@@ -73,8 +73,10 @@ cycles, unsupported descriptors or arbitrary structural reference identity.
 Plain JSON.stringify still rejects bigint and drops undefined object fields.
 The runner's JSON text is an editing convenience; Unit inputs can use an explicit
 null payload, which normal Unit conversion accepts, while lifted Unit remains
-undefined. Persisted formats need an [explicit JSON codec](EXPLICIT_CODECS.md).
+undefined. JSON transport needs an explicit encoding; see the experimental
+[JSON-safe contract](JSON_SAFE_VALUE_CODEC.md).
 
 This decision follows the PR221 review's compositionality finding, PR224's
 recursive-context repair, and PR227's separate application-owned JSON regressions.
-It fixes native Option presence without introducing a JSON converter API.
+The native Option contract is independent of the explicitly selected JSON-safe
+representation.

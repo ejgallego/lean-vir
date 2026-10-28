@@ -9,10 +9,9 @@ import { fileURLToPath } from "node:url";
 
 // Release names follow Lean, independently of SDK versions and milestones.
 export function releaseTagFromToolchain(toolchain) {
-  const match = /^leanprover\/lean4:v(\d+)\.(\d+)\.(\d+)(-rc\d+)?$/.exec(toolchain.trim());
+  const match = /^leanprover\/lean4:(v\d+\.\d+\.\d+(?:-rc\d+)?)$/.exec(toolchain.trim());
   if (!match) throw new Error(`unsupported release toolchain: ${toolchain.trim()}`);
-  const [, major, minor, patch, suffix = ""] = match;
-  return `${major}.${minor}${patch === "0" ? "" : `.${patch}`}${suffix}`;
+  return match[1];
 }
 
 export function checkReleaseTag(tag, toolchain) {

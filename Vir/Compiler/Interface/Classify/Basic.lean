@@ -8,6 +8,7 @@ module
 
 public import Lean.Compiler.LCNF.ToImpureType
 public import Vir.Compiler.Interface.Model
+public import Vir.Compiler.Interface.Classify.Error
 public import Vir.Compiler.InterfaceValidation
 
 public section
@@ -148,19 +149,11 @@ def instantiateForallPrefix? (type : Lean.Expr) (args : Array Lean.Expr) : Optio
     let .forallE _ _ body _ := type.consumeMData | none
     some (body.instantiate1 arg)
 
-def projectionFieldType? (numParams : Nat) (params : Array Lean.Expr) (projType : Lean.Expr) : Option Lean.Expr := do
-  if params.size != numParams then
-    none
-  let instantiated ← instantiateForallPrefix? projType params
-  match instantiated.consumeMData with
-  | .forallE _ _ body _ => some body
-  | _ => none
-
 def fieldLayout? : Lean.Compiler.LCNF.CtorFieldInfo → Option FieldLayout
   | .object index _ => some (.object index)
   | .usize index => some (.usize index)
   | .scalar size offset _ => some (.scalar size offset)
-  | .erased | .void => none
+  | .spilled .. | .erased | .void => none
 
 def binderArgName (fallback : Nat) (name : Name) : String :=
   let candidate := name.toString
@@ -168,6 +161,34 @@ def binderArgName (fallback : Nat) (name : Name) : String :=
     s!"arg{fallback}"
   else
     candidate
+
+/-- Instantiated constructor binders, including private and erased fields.
+Consumers choose their own implicit/proof-field policy after this shared step. -/
+structure ConstructorFieldType where
+  name : Name
+  type : Lean.Expr
+  binderInfo : BinderInfo
+
+/-- Read field types from the constructor, without private projection lookup or
+reduction that could expose extra binders. Preserve owner/universe/parameter facts. -/
+def instantiateConstructorFields (env : Environment) (type : Lean.Expr) (ctorName : Name) :
+    Except InterfaceClassifierError (Array ConstructorFieldType) := do
+  let type := type.consumeMData
+  let some (.ctorInfo info) := env.find? ctorName
+    | throw (.constructorMissingDeclaration ctorName)
+  let owner := type.getAppFn.constName
+  unless info.induct == owner do
+    throw (.constructorOwnerMismatch ctorName owner info.induct)
+  let ctorType := info.toConstantVal.instantiateTypeLevelParams type.getAppFn.constLevels!
+  let some instantiated := instantiateForallPrefix? ctorType type.getAppArgs
+    | throw (.constructorInvalidType ctorName info.type)
+  let rec fields (type : Lean.Expr) (result : Array ConstructorFieldType) :=
+    match type with
+    | .mdata _ body => fields body result
+    | .forallE name domain body binderInfo =>
+        fields body (result.push {name, type := domain, binderInfo})
+    | _ => result
+  return fields instantiated #[]
 
 def effectResultRaw? (e : Lean.Expr) : Option (InterfaceEffect × Lean.Expr) :=
   let e := e.consumeMData

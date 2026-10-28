@@ -7,7 +7,7 @@ import test from "node:test";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { validateInterfaceManifest, interfaceSignatureKey, INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
 import { encodeInterfaceManifest } from "../../scripts/packages/irpkg-format.mjs";
-import { primitiveBoundary, enumBoundary, unitBoundary, objectBoundary, objectConstructor, immediateConstructor, nativeField } from "../support/interface-fixtures.mjs";
+import { primitiveBoundary, nativeDescriptor, enumBoundary, unitBoundary, objectBoundary, objectConstructor, immediateConstructor, nativeField } from "../support/interface-fixtures.mjs";
 
 const nat = primitiveBoundary("nat", "bigint");
 function wire(interfaces, argument = 0, result = 0) {
@@ -31,12 +31,54 @@ test("admission shares complete pair identity and leaves the wire input unchange
     interfaceSignatureKey({ args: [nat], result: nat, effect: "pure" }));
 });
 
+test("the extended codec contract rejects manifest 12 before using its pairs", () => {
+  const input = wire([nat]);
+  input.version = 12;
+  assert.throws(() => validateInterfaceManifest(input), /regenerate packages with the matching SDK/);
+  assert.equal(input.exports[0].result, 0, "rejected wire input stays unexpanded");
+  assert.equal(validateInterfaceManifest(wire([nat])).exports[0].result, nat);
+});
+
 test("table indices are local to each package", () => {
   const string = primitiveBoundary("string", "string");
   const first = validateInterfaceManifest(wire([nat]));
   const second = validateInterfaceManifest(wire([string]));
   assert.equal(first.exports[0].result, nat);
   assert.equal(second.exports[0].result, string);
+});
+
+function computedWire() {
+  const pair = objectBoundary("Cached", [{ ...objectConstructor("Cached.mk", {
+    objectFieldCount: 1, usizeFieldCount: 0, scalarByteSize: 8,
+  }, [nativeField("value", nat.native, { tag: "object", index: 0 })]), operation: "s436163686564/s6d6b/" }], {
+    tag: "record", fields: [{ key: "value", path: [0], value: nat.value }],
+  });
+  const manifest = wire([pair, { native: nativeDescriptor("leanObject"), value: { tag: "leanReference" } }]);
+  manifest.codecOperations = [{ entry: "Cached.mk", nameKey: "s436163686564/s6d6b/",
+    args: [{ name: "value", type: 1 }], result: 1, effect: "pure", startup: false }];
+  return manifest;
+}
+
+test("construction operations resolve privately against admitted boxed helper contracts", () => {
+  const admitted = validateInterfaceManifest(computedWire());
+  assert.equal(admitted.exports.length, 1);
+  assert.equal(admitted.codecOperations.length, 1);
+  assert.equal(admitted.codecOperations[0].args[0].type.value.tag, "leanReference");
+  const again = validateInterfaceManifest(encodeInterfaceManifest(admitted));
+  assert.deepEqual(again, admitted);
+});
+
+test("required operations cannot be omitted, mismatched, effectful or exposed as ordinary exports", () => {
+  for (const mutate of [
+    m => { delete m.codecOperations; },
+    m => { m.codecOperations[0].args = []; },
+    m => { m.codecOperations[0].effect = "io"; },
+    m => { m.codecOperations[0].result = 0; },
+    m => { m.exports.push(m.codecOperations[0]); },
+  ]) {
+    const input = computedWire(); mutate(input);
+    assert.throws(() => validateInterfaceManifest(input), /constructor operation|codec operations/i);
+  }
 });
 
 test("callable roots require table indices and valid table entries", () => {

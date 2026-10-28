@@ -59,6 +59,7 @@ def publicSourceDeclsFor (index : DeclIndex) (target : Target) : Array Name :=
       sourceDeclNamesFor index target |>.filter fun n =>
         !isPrivateName n &&
         !isGeneratedAuxName n &&
+        !isLibraryAdapterOperation env n &&
         match env.find? n with
         | some info => isInterfaceDeclInfo info || index.hasCompiledDefinition n
         | none => false
@@ -103,6 +104,8 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
     }
   else
     let env ← getEnv
+    if isLibraryAdapterOperation env name then
+      return .error { name, source, reason := "library codec helpers are retained privately; export an application wrapper instead" }
     match env.find? name with
     | none => return .error { name, source, reason := "missing elaborated Lean declaration" }
     | some info =>

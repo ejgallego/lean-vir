@@ -70,7 +70,7 @@ visibility flags nor extension state are shared between these contexts.
 `importModulesCore` at exported level with
 interpretation IR. It uses `import all Lean.Environment` for its internal
 acquisition types/readers and ordinary `finalizeImport`; see [the upstream
-implementation at the source revision used for this adapter](https://github.com/leanprover/lean4/blob/eb6cafb7290e8bd5f2937522d8d804f58f02bafc/src/Lean/Environment.lean#L2108).
+implementation at the source revision used for this adapter](https://github.com/leanprover/lean4/blob/c9afcddf514a6772bd4d649f7cfc04eff0b9f15e/src/Lean/Environment.lean#L2472).
 On toolchain changes, compare it with the new upstream implementation, update
 the source link, and run the import-cache equivalence tests.
 `CompiledImportCache.empty` fixes the resolved artifact map for one index;
@@ -245,7 +245,7 @@ Runtime ABI is SDK metadata, not embedded package metadata. The same artifact
 metadata records exact build-time React/ReactDOM versions from
 `package-lock.json` for the optional React host. ABI 4 is the current SDK
 contract: loader success status and declaration counts remain separate,
-including for successful empty packages. It requires manifest 12, package
+including for successful empty packages. It requires manifest 13, package
 format 11, and matching JavaScript/Wasm artifacts. Installed manifest metadata
 remains deeply frozen; installers reject older ABIs before replacing an SDK.
 When the generator or runtime revision changes, regenerate the package set and
