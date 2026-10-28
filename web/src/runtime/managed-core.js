@@ -14,7 +14,10 @@ import {
   throwCollectedErrors,
 } from "./cleanup.js";
 import { PrimitiveObjectRuntime } from "./primitive-values.js";
-import { RESOURCE_ROOT_EXPORTS } from "./object-abi-exports.js";
+import {
+  RESOURCE_ROOT_EXPORTS,
+  TRAP_DIAGNOSTIC_EXPORTS,
+} from "./object-abi-exports.js";
 import { asBytes } from "./vir-codec.js";
 
 const runtimeBoundaries = new WeakMap();
@@ -538,9 +541,26 @@ const abandonedCleanupExports = new Set([
   "vir_abort_ir_package_set",
 ]);
 
-// These operations touch only the externref table and fixed root-manager
-// globals. They do not enter the abandoned Lean heap or interpreter.
-const retirementSafeExports = new Set(RESOURCE_ROOT_EXPORTS);
+// These operations touch only the externref table, fixed root-manager globals
+// and fixed trap-diagnostic storage. They do not enter the abandoned Lean heap
+// or interpreter.
+const retirementSafeExports = new Set([
+  ...RESOURCE_ROOT_EXPORTS,
+  ...TRAP_DIAGNOSTIC_EXPORTS,
+]);
+
+// The shim records a C++ exception's text before trapping, because the module
+// has no Wasm exception handling to unwind it.
+function readTrapMessage(exports) {
+  try {
+    const size = exports.vir_last_trap_message_size?.() ?? 0;
+    if (size === 0) return null;
+    const ptr = exports.vir_last_trap_message();
+    return textDecoder.decode(new Uint8Array(exports.memory.buffer, ptr, size));
+  } catch {
+    return null;
+  }
+}
 
 function guardWasmExports(exports, hostState) {
   const listeners = new Set();
@@ -567,11 +587,16 @@ function guardWasmExports(exports, hostState) {
       if (boundary.failure !== null) return boundary.failure;
       // Commit abandonment before touching the thrown value or host diagnostics.
       boundary.failure = new Error("Wasm invocation failed", { cause: error });
-      let cause = error;
+      let hostError = null;
       try {
-        cause = hostState?.takeCallError() ?? error;
+        hostError = hostState?.takeCallError() ?? null;
       } catch {}
-      boundary.failure = asError(cause, "Wasm invocation failed");
+      // A JavaScript host exception explains a trap it caused; otherwise use
+      // the Lean runtime's own exception text when it raised one.
+      const trapMessage = hostError === null ? readTrapMessage(exports) : null;
+      boundary.failure = trapMessage === null
+        ? asError(hostError ?? error, "Wasm invocation failed")
+        : new Error(`Lean runtime error: ${trapMessage}`, { cause: error });
       for (const subscription of listeners) schedule(subscription);
       return boundary.failure;
     },

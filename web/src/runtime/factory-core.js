@@ -233,8 +233,10 @@ export class ManagedRuntimeFactory {
           : createVirImports(module, this.imports ?? {}, hostState);
       const instance = new WebAssembly.Instance(module, imports);
       hostState.attach(instance.exports);
-      // Constructor failure cannot expose a runtime; clean up its fresh provider.
-      instance.exports.__wasm_call_ctors?.();
+      // The reactor's C++ global constructors run exactly once, before any
+      // other export. Constructor failure cannot expose a runtime; clean up
+      // its fresh provider.
+      instance.exports._initialize?.();
       return new this.#Runtime(instance.exports, {
         module,
         hostState,

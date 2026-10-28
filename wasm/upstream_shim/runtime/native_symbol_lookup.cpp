@@ -109,12 +109,3 @@ extern "C" lean::obj_res lean_mk_mangled_boxed_name(lean::obj_arg str) {
     std::string boxed = stem.to_std_string() + "___boxed";
     return lean_mk_string(boxed.c_str());
 }
-
-extern "C" void * __cxa_allocate_exception(size_t size) {
-    return malloc(size == 0 ? 1 : size);
-}
-
-extern "C" [[noreturn]] void __cxa_throw(void *, void *, void (*)(void *)) {
-    __builtin_trap();
-    abort();
-}

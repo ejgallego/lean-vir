@@ -151,6 +151,7 @@ export const runtimeTests = Object.freeze(
     },
     { id: "host-error-propagation", file: "host-error-propagation-smoke.mjs", group: "lean" },
     { id: "fatal-generation", file: "fatal-generation-smoke.mjs", group: "lean" },
+    { id: "trap-diagnostics", file: "trap-diagnostics-smoke.mjs", group: "lean" },
     { id: "js-nat-number", file: "js-nat-number-smoke.mjs", group: "lean" },
     {
       id: "package-generation",
