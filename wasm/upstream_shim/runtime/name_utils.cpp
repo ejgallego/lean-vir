@@ -12,6 +12,7 @@ Author: Emilio J. Gallego Arias
 #include <string>
 
 #include "runtime/utf8.h"
+#include "util/nat.h"
 
 extern "C" uint8_t l_Lean_isIdFirst(uint32_t c);
 extern "C" uint8_t l_Lean_isIdRest(uint32_t c);
@@ -121,6 +122,44 @@ bool is_supported_name(name const & value) {
             return false;
         }
     }
+    return true;
+}
+
+bool name_from_key(char const * text, size_t len, name & out) {
+    if (text == nullptr && len != 0) return false;
+    auto hex_digit = [](char c) -> int {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        return -1;
+    };
+    name current;
+    size_t pos = 0;
+    while (pos < len) {
+        char kind = text[pos++];
+        size_t end = pos;
+        while (end < len && text[end] != '/') end++;
+        if (end == len) return false;
+        if (kind == 's') {
+            if ((end - pos) % 2 != 0) return false;
+            std::string bytes;
+            for (size_t i = pos; i < end; i += 2) {
+                int hi = hex_digit(text[i]), lo = hex_digit(text[i + 1]);
+                if (hi < 0 || lo < 0) return false;
+                bytes += static_cast<char>(hi * 16 + lo);
+            }
+            if (!valid_utf8(bytes.data(), bytes.size())) return false;
+            current = name(current, string_ref(bytes));
+        } else if (kind == 'n') {
+            size_t digits = end - pos;
+            if (!all_ascii_digits(text + pos, digits) || (digits > 1 && text[pos] == '0')) return false;
+            std::string decimal(text + pos, digits);
+            current = name(current, nat(mk_nat_obj(mpz(decimal.c_str()))));
+        } else {
+            return false;
+        }
+        pos = end + 1;
+    }
+    out = current;
     return true;
 }
 

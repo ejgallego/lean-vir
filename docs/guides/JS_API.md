@@ -656,12 +656,28 @@ This limit does not restrict arbitrary-precision Nat literals or projection indi
 Expr results use bigint for these Nat-valued indices and literals, following
 the same mapping as other Nat results.
 
-Names inside these structural expression and level values use a restricted
-text spelling: non-empty Lean identifier components separated by single dots.
+Structural conversion preserves sharing between Expr constructor nodes in both
+directions: a subterm reached twice from a Lean result is one JS object, and a JS
+Expr object used twice lowers to one Lean object. Traversal of those nodes is
+iterative, so long application spines do not exhaust the JavaScript stack. Treat
+lifted values as immutable, because mutating a shared subterm changes every
+occurrence. Lowering rejects cycles between Expr nodes. Nested Level values keep
+their existing recursive conversion: they do not preserve object identity and
+remain subject to JavaScript stack depth limits.
+
+Names inside these structural expression and level values are either dotted
+text or an array of components. Results use dotted text whenever the name has
+that spelling, and an array otherwise: each component is a string or a
+non-negative `bigint`, so a free variable reads as `["_uniq", 12n]` and a private
+name keeps its numeric component. Inputs accept either form; array components
+may also be non-negative safe integers, and an empty array is the anonymous name.
+Dotted text uses a restricted spelling: non-empty Lean identifier components
+separated by single dots.
 Unicode components accepted by the pinned Lean identifier predicates are
 supported, such as `café` and `αβ₁`; these predicates differ from JavaScript's
 Unicode identifier grammar. JavaScript checks well-formed Unicode and rejects
-numeric, empty and escaped components such as `A.«B.C»`. The Wasm constructors
+numeric, empty and escaped components such as `A.«B.C»` in dotted text; write
+those names as arrays, for example `["A", "B.C"]`. The Wasm constructors
 and getters apply the pinned Lean identifier predicates to the remaining
 components. Unsupported spellings fail conversion instead of being normalized
 into a different `Lean.Name`; ordinary conversion failures leave the runtime
