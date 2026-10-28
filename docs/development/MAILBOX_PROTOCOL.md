@@ -280,10 +280,13 @@ An owner that can be woken records `x-runtime`, `x-session-uuid` and, when its
 runtime needs it, `x-session-cwd` in its claim or opener, and repeats them in
 later messages after a restart, model switch or handoff. These fields describe
 the sender's own session: wake the current owner using the most recent message
-whose `from` is that owner. A message without `x-runtime` predates this
-convention and denotes `codex`. Never fork, stop or otherwise disturb another
-agent's running session to wake it; when a mechanism cannot reach a running
-session, ask the owner or the maintainer to relay the handoff. Known runtimes
+whose `from` is that owner. Missing `x-runtime` does not establish a message's
+age or runtime. Default to `codex` only for known historical Codex lanes;
+otherwise consult the authoritative board/session record or ask the owner or
+maintainer before choosing a wake-up mechanism. Never guess a session UUID.
+Never fork, stop or otherwise disturb another agent's running session to wake
+it; when a mechanism cannot reach a running session, ask the owner or the
+maintainer to relay the handoff. Known runtimes
 and mechanisms include:
 
 - `codex`: `codex queue --thread <uuid> --message '<handoff>'`.
