@@ -75,6 +75,11 @@ for (const name of [["\uFEFFx"], ["\uFEFF"], ["A", "\uFEFFx", "\uFEFF"]]) {
   const expr = { kind: "fvar", name };
   assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.bumpBVar", expr), expr);
 }
+for (const value of ["\uFEFFx", "\uFEFF", "x\uFEFF"]) {
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", value), value);
+  const expr = { kind: "lit", literal: { kind: "string", value } };
+  assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.bumpBVar", expr), expr);
+}
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.mvarExpr"), {
   kind: "mvar",
   name: "m",

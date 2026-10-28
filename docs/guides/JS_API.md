@@ -656,12 +656,14 @@ This limit does not restrict arbitrary-precision Nat literals or projection indi
 Expr results use bigint for these Nat-valued indices and literals, following
 the same mapping as other Nat results.
 
-Structural conversion preserves sharing in both directions: a subterm reached
-twice from a Lean result is one JS object, and a JS object used twice lowers to
-one Lean object. Conversion is iterative, so deep terms such as long application
-spines do not exhaust the JavaScript stack. Treat lifted values as immutable,
-because mutating a shared subterm changes every occurrence. Lowering rejects a
-cyclic JavaScript value.
+Structural conversion preserves sharing between Expr constructor nodes in both
+directions: a subterm reached twice from a Lean result is one JS object, and a JS
+Expr object used twice lowers to one Lean object. Traversal of those nodes is
+iterative, so long application spines do not exhaust the JavaScript stack. Treat
+lifted values as immutable, because mutating a shared subterm changes every
+occurrence. Lowering rejects cycles between Expr nodes. Nested Level values keep
+their existing recursive conversion: they do not preserve object identity and
+remain subject to JavaScript stack depth limits.
 
 Names inside these structural expression and level values are either dotted
 text or an array of components. Results use dotted text whenever the name has
