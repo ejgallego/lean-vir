@@ -71,6 +71,10 @@ for (const [entry, name] of [
   assert.deepEqual(lifted, { kind: "fvar", name }, entry);
   assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.bumpBVar", lifted), lifted, entry);
 }
+for (const name of [["\uFEFFx"], ["\uFEFF"], ["A", "\uFEFFx", "\uFEFF"]]) {
+  const expr = { kind: "fvar", name };
+  assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.bumpBVar", expr), expr);
+}
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.mvarExpr"), {
   kind: "mvar",
   name: "m",

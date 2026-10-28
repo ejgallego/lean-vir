@@ -97,3 +97,24 @@ test("lifted Expr Names reject representations that would normalize", () => {
   unreadable.exports.vir_obj_name_string = () => 0;
   assert.throws(() => unreadable.readObjectName(1), /could not be read/);
 });
+
+test("structural Name components preserve leading U+FEFF on round-trip", () => {
+  for (const [key, name] of [
+    ["sefbbbf78/", ["\uFEFFx"]],
+    ["sefbbbf/", ["\uFEFF"]],
+    ["s41/sefbbbf78/sefbbbf/", ["A", "\uFEFFx", "\uFEFF"]],
+  ]) {
+    const runtime = mockRuntime(key);
+    runtime.exports.vir_obj_name_string = () => 0;
+    runtime.exports.vir_obj_name_key = () => 1;
+    const lifted = runtime.readObjectName(1);
+    assert.deepEqual(lifted, name);
+    let loweredKey;
+    runtime.withWasmString = (text, _label, callback) => {
+      loweredKey = text;
+      return callback(1, text.length);
+    };
+    runtime.makeObjectExpr({ kind: "fvar", name: lifted }, "expr");
+    assert.equal(loweredKey, key);
+  }
+});

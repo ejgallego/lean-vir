@@ -803,7 +803,8 @@ function exprChildren(expr, label) {
 }
 
 const nameKeyEncoder = new TextEncoder();
-const nameKeyDecoder = new TextDecoder("utf-8", { fatal: true });
+// U+FEFF is Name data, including at the start of each component.
+const nameKeyDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 // Text for the Name-taking Wasm constructors: dotted text as is, or the
 // canonical structural key (Vir.nameKey) for an array of components.
