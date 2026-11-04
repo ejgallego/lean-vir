@@ -29,21 +29,13 @@ larger harness machinery out unless the maintainer requests them.
 
 ## Local Commands
 
-- `npm install`
-- `npm run setup`
-- `npm run doctor`
-- `npm run fetch:lean`
-- `npm run install:wasi`
-- `npm run build:demo`
-- `npm run build:site`
-- `npm run probe:upstream`
-- `npm test`
-- `npm run test:upstream`
-- `npm run test:fixtures:unit`
-- `VIR_FIXTURE_FILTER=fib12 npm run test:fixtures`
-- `VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build`
-- `CHROMIUM=/path/to/chromium npm run test:pages:browser`
-- `npm run dev -- --port 5173`
+- `npm run setup`, then `npm run doctor` to check the environment.
+- `npm run build:demo` builds the Lean library and the upstream Wasm.
+- `npm test` runs the full local suite; for a focused fixture check, use
+  `VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build`.
+- `npm run dev -- --port 5173` serves the browser runner.
+- See [the harness](docs/HARNESS.md#smallest-useful-check) for the full command
+  map and the smallest useful check for each area.
 
 ## Git Layout
 
@@ -57,95 +49,39 @@ larger harness machinery out unless the maintainer requests them.
 
 ## Agent Coordination
 
-- When present, read `WORKBOARD.md` in the primary checkout before choosing or
-  resuming work. It is the single private queue; do not create worktree copies.
-  Keep its active queue short: task, owner, state, and next action or blocker.
-  Owners update their entries; the coordinator maintains priorities and resolves
-  conflicts. Link supporting history instead of repeating it. Give assigned
-  sessions the canonical board path.
-- Report discoveries with a proposed next action. The coordinator must put
-  deferred work on the board with an owner and revisit trigger, or explicitly
-  decline it; a mailbox mention of "after the PR" is not a queued task.
-- Choose the tools, models, and degree of delegation that best fit the task.
-  Work directly or use independent agents/subagents as useful; routine choices
-  need no additional permission. Consider correctness, context, latency, cost,
-  and coordination overhead, and adapt when the evidence changes.
-- Ownership belongs to an explicit active task and write scope, not a subsystem
-  or agent nickname. Labels such as "Module" describe expertise, not permanent
-  control of all build/resource work. Completed tasks and historical mailbox
-  claims do not reserve future work. Preserve actual in-flight edits until a
-  handoff, but do not ask former owners for permission to start independent work.
-  Resolve ambiguous or stale assignments once on the board, not through a chain
-  of owner approvals. Delegation does not transfer an existing active task.
-
-- Before choosing a base, read [the backport guidelines](docs/HARNESS.md#backports).
-  Start new work from `main`; a maintenance checkout is for selected backports
-  or explicitly requested maintenance work. Verify the branch, base commit and
-  `lean-toolchain` rather than inferring the line from the worktree name.
-- For a backport, name the source PR/landed commit and maintenance target in the
-  lane claim. Preserve `cherry-pick -x` provenance, explain conflict adaptations,
-  and validate using that line's own toolchain and generated artifacts.
-
-- Use the canonical mailbox at `.agents/mailbox/` in the primary/root
-  checkout. Linked implementation worktrees must not create separate
-  mailboxes.
-- Follow `docs/development/MAILBOX_PROTOCOL.md` for same-project and cross-project
-  messages. A cross-project thread belongs to the project that owns the
-  requested code change.
-- Read the board and relevant handoffs before starting or resuming work. Use
-  `npm run mailbox:list` when ownership is unclear; do not scan the entire
-  mailbox for routine continuation. Check Git for actual heads and dirty work;
-  messages record intent, not whether an agent is running.
+- Before choosing or resuming work, read `WORKBOARD.md` in the primary checkout
+  and the relevant handoffs, and check Git for actual heads and dirty work. The
+  board is the single private queue; do not create worktree copies. Keep each
+  entry to task, owner, state and next action or blocker, linking history
+  instead of repeating it. Owners update their entries; the coordinator sets
+  priorities, resolves conflicts, and queues deferred work with an owner and
+  revisit trigger or declines it. Give assigned sessions the board path.
+- Use the canonical mailbox at `.agents/mailbox/` in the primary checkout and
+  follow [the mailbox protocol](docs/development/MAILBOX_PROTOCOL.md) for
+  messages, ownership, handoffs and wake-ups. Use `npm run mailbox:list` when
+  ownership is unclear; messages record intent, not whether an agent is running.
 - Give each implementation lane one accountable writer, a concrete agent
-  address, an explicit base commit, write scope, acceptance checks, and
-  publication boundary. Check for overlapping work before recording the claim.
-- For parallel work, the coordinating agent owns task decomposition,
-  dependencies, integration order, and final validation. Keep overlapping edits
-  sequential. Review agents may inspect a lane without acquiring write ownership.
-- Consult another owner only for overlapping edits or a change to a shared
-  contract. Source ownership is not approval authority over unrelated work.
-  Continue already-authorized scope without another agreement round trip;
-  request a decision only for new scope, a real conflict, or missing authority.
-  A liaison handles assigned intake and handoffs directly; the coordinator need
-  not relay or re-approve each exchange. Each PR operation (publication, CI,
-  landing) has one accountable owner; roles may differ, but do not duplicate them.
-- Scale coordination to the work. Use explicit assignments, inspectable agent
-  IDs, and durable checkpoints for long or overlapping lanes; keep independent
-  work independent. Do not poll or message other lanes for routine status.
-- Be quiet by default. Owners update the board/evidence at meaningful state
-  changes; do not send chat or queue messages for each commit, build start, CI
-  start, or ordinary progress. The board is the status surface, not a trigger
-  for a notification.
-- Send one consolidated handoff only when a specific recipient needs to act:
-  request review/decision, take a dependency, wake an idle owner, or resolve a
-  blocker. A targeted wake-up (whatever mechanism the owner's agent runtime
-  provides to resume or message a specific session; see the mailbox protocol
-  for known commands) is for assignment and handoff, not a broadcast or
-  receipt mechanism. Do not send acknowledgments, receipt echoes, duplicate
-  completion reports, or unchanged CI updates. For PR checks, record the final
-  exact-head result once; report an earlier failure only if it changes scope or
-  blocks the next action.
-- Notify the human when their review/decision is needed, or promptly for a
-  material blocker or scope/ownership conflict. Otherwise keep the board current
-  and batch independent lane updates into one short digest when useful; do not
-  fan out routine status. Keep hashes, logs, and test inventories in evidence.
-  Default actionable handoffs to four lines: outcome, exact head/PR, decision
-  needed, and one evidence link.
-- Keep long non-interactive build/test output in ignored logs; report the result
-  and a short failure excerpt when needed. Preserve full diagnostics. Do not
-  suppress interactive output or progress needed for diagnosis.
-- Continue approved work without another permission loop, but surface real
-  blockers and decisions promptly. Do not reply merely to acknowledge this rule.
-- Treat an agent's completion as a handoff for review. Verify the actual head,
-  diff, dirty state, and remaining work before consuming it. Transfer ownership
-  explicitly before another agent writes to the same lane. After an interruption,
-  check the current source and handoff before continuing; a model switch alone
-  does not require a new claim or notification.
-- The validated envelope is deliberately small. Kinds, states, ownership, and
-  lane metadata are recommended coordination conventions, not a requirement
-  for free-form agent messages.
-- Mailbox completion does not authorize a push, PR, worktree removal, or branch
-  deletion. Those remain explicit maintainer actions.
+  address, an explicit base commit, write scope, acceptance checks and
+  publication boundary. Check for overlapping work first and keep overlapping
+  edits sequential. Ownership is task-scoped: completed tasks and old claims
+  reserve nothing. The coordinator owns decomposition, integration order and
+  final validation of parallel work; reviewers may inspect a lane without
+  owning it.
+- Start new work from `main`. Use a maintenance line only for selected
+  backports, following [the backport guidelines](docs/HARNESS.md#backports);
+  verify branch, base and `lean-toolchain` rather than inferring them from a
+  worktree name.
+- Be quiet by default. Update the board or evidence at meaningful state
+  changes. Message only a named recipient who must act now, and notify the
+  human only for their review or decision or a material blocker. Report
+  discoveries with a proposed next action.
+- Continue approved work without another permission round trip. Treat another
+  agent's completion as a handoff: verify its head, diff, dirty state and
+  remaining work before building on it.
+- Keep long non-interactive build/test output in ignored logs with
+  [quiet command capture](docs/HARNESS.md#quiet-command-capture).
+- Mailbox completion does not authorize a push, PR, merge, worktree removal or
+  branch deletion; those remain explicit maintainer actions.
 
 ## Pull Requests
 
@@ -168,31 +104,15 @@ larger harness machinery out unless the maintainer requests them.
 ## Development Notes
 
 - Follow the [API change policy](CONTRIBUTING.md#api-changes): remove retired
-  interfaces and their compatibility code, and update callers, docs and tests
-  together. Do not retain legacy aliases or fallbacks for previous VIR revisions.
-
-- JavaScript runtime modules and Wasm binaries must come from the same VIR
-  revision/build. Users are responsible for refreshing their build setup,
-  replacing deployed assets together, and refreshing stale browser/deployment
-  caches after updating VIR. Mixing revisions is unsupported and has undefined
-  behavior, even when instantiation succeeds. For now, do not treat mixed-revision
-  failures as product bugs or merge blockers, or add compatibility adapters,
-  version gates, or deployment machinery solely to support that combination.
-  See [matching runtime assets](docs/guides/JS_API.md#matching-runtime-assets).
-
-- Follow [the review assumptions](docs/development/REVIEW_ASSUMPTIONS.md).
-  Supported workflows assume cooperative users/developers; unsupported artifact
-  manipulation has undefined behavior. Justify checks by ordinary configuration,
-  acquisition, compatibility, portability or ownership failures, not an implicit
-  hostile-input threat model. Reproduce inferred defects before changing behavior.
-  For runtime findings, identify the documented public caller and its required
-  preconditions. Internal constructors, partial test fixtures and shipped helper
-  modules do not establish support for every combination of optional arguments.
-  Separate supported-path defects from internal consistency and optional hardening;
-  do not expand the API contract merely to make an unsupported reproducer work.
-
-- Keep generated `build/` outputs out of Git.
-- Keep generated `web/dist/` outputs out of Git.
+  interfaces and update callers, docs and tests together, without legacy
+  aliases or fallbacks.
+- JavaScript modules and Wasm binaries must come from the same VIR build. Mixed
+  revisions are unsupported; do not treat their failures as bugs or merge
+  blockers. See [matching runtime assets](docs/guides/JS_API.md#matching-runtime-assets).
+- Review against [the review assumptions](docs/development/REVIEW_ASSUMPTIONS.md):
+  cooperative users and documented public callers, not a hostile-input threat
+  model. Reproduce an inferred defect before changing behavior.
+- Keep generated `build/` and `web/dist/` outputs out of Git.
 - `web/public/vir-upstream.wasm` is generated and should not be committed.
 - Generated `.irpkg`, `.wasm`, `.input.json`, and `.report.md` files under
   `web/public/` are local artifacts unless the maintainer explicitly says

@@ -81,7 +81,8 @@ npm run mailbox:deliver -- /path/to/draft.md
 
 Delivery validates the draft against the active thread graph and archive,
 writes a complete copy under `tmp/`, and publishes it atomically without
-overwriting an existing message ID. The source draft is retained. Advisory
+overwriting an existing message ID in the mailbox or archive; the delivered
+filename is derived from the `message-id` and the draft is retained. Advisory
 warnings do not block delivery. Never copy a partially written file directly
 into the active mailbox; a reply cannot repair an invalid graph node.
 
@@ -248,11 +249,11 @@ open, blocked or otherwise active branch. The archive command moves the complete
 thread to `archive/<thread-id>/`. Archiving does not remove its source worktree.
 Archived messages are deletable only after their outcome is retained durably.
 
-## Concise Checkpoints
+## Messages And Wake-ups
 
-Use the mailbox for durable evidence, not a copy of every command transcript.
-At a meaningful handoff, the notification and the top of the evidence record
-should normally answer only:
+Use the mailbox for durable evidence, not command transcripts. Before sending,
+name the recipient and the action or decision they must take now; otherwise
+update the board or evidence silently. A handoff normally answers only:
 
 ```text
 Outcome: ready, blocked, landed, or no-action
@@ -261,113 +262,63 @@ Decision: one action needed, or none
 Evidence: one durable file or report
 ```
 
-Keep logs, hash inventories, repeated test output, and detailed rationale in
-the linked evidence. Do not send acknowledgement-only messages, unchanged CI
-updates, or duplicate completion reports. A real blocker or a decision that
-changes scope remains worth an immediate message.
+Keep logs, hashes and detailed rationale in the linked evidence. Do not send
+acknowledgements, receipt echoes, routine progress, build/CI starts, unchanged
+CI updates or duplicate completion reports. Record a PR's final exact-head
+check result once, and an earlier failure only if it changes scope or blocks
+the next action. A real blocker or a scope-changing decision is worth an
+immediate message. Batch independent status into one coordinator digest when
+useful.
 
-The board is the current status surface; a board/mailbox update does not by
-itself require a separate notification. Work quietly between action boundaries:
-do not announce routine claims, build/CI starts, or unchanged progress. Use a
-targeted wake-up, through whatever mechanism the owner's agent runtime provides,
-only to wake or assign a specific owner, or to deliver a handoff that needs that
-owner's action. The mailbox and board stay tool-neutral; a thread must not
-depend on one runtime's queue to be understood. Batch independent status into
-one coordinator digest; notify the human when review/decision is needed or a
-material blocker changes the plan.
+Consult other owners only for overlapping edits or shared-contract changes, and
+do not repeat permission already granted. An assigned liaison handles intake
+and handoffs directly. Each PR operation (publication, CI, landing) has one
+accountable owner; independent review does not transfer ownership. After an
+interruption, check the current source and handoff before continuing; a model
+switch alone needs no new claim or message.
 
-An owner that can be woken records `x-runtime`, `x-session-uuid` and, when its
-runtime needs it, `x-session-cwd` in its claim or opener, and repeats them in
-later messages after a restart, model switch or handoff. These fields describe
-the sender's own session: wake the current owner using the most recent message
-whose `from` is that owner. Missing `x-runtime` does not establish a message's
-age or runtime. Default to `codex` only for known historical Codex lanes;
-otherwise consult the authoritative board/session record or ask the owner or
-maintainer before choosing a wake-up mechanism. Never guess a session UUID.
-Never fork, stop or otherwise disturb another agent's running session to wake
-it; when a mechanism cannot reach a running session, ask the owner or the
-maintainer to relay the handoff. Known runtimes
-and mechanisms include:
+To wake a specific owner, use the targeted mechanism its runtime provides;
+threads and the board must stay understandable without it. An owner that can
+be woken records its own `x-runtime`, `x-session-uuid` and, if needed,
+`x-session-cwd`, and repeats them after a restart or handoff; use the latest
+values from a message whose `from` is the current owner. When they are
+missing, use `codex` only for known historical Codex lanes; otherwise check the
+board or ask, and never guess a session. Never fork, stop or otherwise disturb
+a running session to wake it; ask the owner or the maintainer to relay.
 
 - `codex`: `codex queue --thread <uuid> --message '<handoff>'`.
-- `claude-code`: from `x-session-cwd`, the directory where the session was
-  launched (which may differ from its worktree), run
-  `claude --bg --resume <uuid> '<handoff>'` to continue a stopped session under
-  the same ID. If `claude agents --json` shows the session still running, relay
-  the handoff instead. If the command reports that it started a copy, stop that
-  copy at once.
-
-Consult only owners affected by overlapping edits or shared-contract changes.
-Do not seek unrelated owners' agreement or repeat permission already granted.
-An assigned liaison can handle intake and handoffs directly; the coordinator
-handles priorities, conflicts and decisions rather than relaying every exchange.
-Keep one CI owner per PR; avoid duplicate watches and routine receipt echoes.
-Independent substantive review remains useful and does not transfer ownership.
+- `claude-code`: from `x-session-cwd` (the launch directory, which may differ
+  from the worktree), `claude --bg --resume <uuid> '<handoff>'` continues a
+  stopped session. If `claude agents --json` shows it running, relay instead;
+  if the command reports that it started a copy, stop the copy at once.
 
 ## Commands
 
-`mailbox:list` prints at most 20 recent compact thread summaries by default,
-with an explicit notice when entries are omitted. Use `--details` for the full
-index/metadata/warnings, `--all` for all compact entries including terminal
-threads, or `--json` for uncapped machine-readable inspection.
-The mailbox is supporting evidence, not a roster of running agents; read the
-current workboard rather than interpreting old thread states as active work.
-
-Validate and atomically publish a complete draft message:
-
 ```bash
 npm run mailbox:deliver -- /path/to/draft.md
-```
-
-The draft may have any filename; the delivered filename is derived from its
-validated `message-id`. Delivery preserves the draft and refuses an identity
-already present in either the active mailbox or archive.
-
-Validate all v1 envelopes and thread graphs, and report advisory workflow
-warnings:
-
-```bash
 npm run mailbox:check
-```
-
-Run the focused protocol contract tests with `npm run test:mailbox`.
-
-List active threads:
-
-```bash
 npm run mailbox:list
-```
-
-The human-readable list includes the latest recorded lane checkpoint
-(worktree, branch, base/head, cleanliness, and publication) when present.
-JSON output contains the protocol marker, resolved mailbox path, ignored
-filenames, and the same thread summaries. A summary is an index into the
-immutable event files, not a replacement for their message bodies.
-For a branching thread, the summary reports the number of leaf branches and
-derives lane metadata only from the ancestry of its most recent message; read
-the individual messages when branch-specific state matters.
-
-Include terminal threads or emit JSON:
-
-```bash
-npm run mailbox:list -- --all
-npm run mailbox:list -- --json
-```
-
-Archive a wholly closed or cancelled thread:
-
-```bash
+npm run mailbox:list -- --details    # or --all, --json
 npm run mailbox:archive -- ROOT-VIR-20260813-001
 npm run mailbox:list -- --archive
 npm run mailbox:check -- --archive
+npm run test:mailbox
 ```
 
-These commands work from the primary checkout or any linked worktree. For an
-explicit mailbox:
+The commands work from the primary checkout or any linked worktree; pass
+`--mailbox /path/to/.agents/mailbox` for an explicit mailbox and `--help` for
+options. `mailbox:check` validates all v1 envelopes and thread graphs and
+reports advisory warnings. `mailbox:archive` accepts only a wholly closed or
+cancelled thread unless `--completed` applies (see above).
 
-```bash
-npm run mailbox:check -- --mailbox /path/to/.agents/mailbox
-```
+`mailbox:list` prints at most 20 recent compact thread summaries, with a notice
+when entries are omitted, including the latest recorded lane checkpoint.
+`--details` adds the full index, metadata and warnings; `--all` includes
+terminal threads; `--json` is uncapped. A summary is an index into the
+immutable message files, not a replacement for them or a roster of running
+agents: for a branching thread it derives lane metadata only from the ancestry
+of the most recent message, and the workboard, not old thread states, shows
+active work.
 
 Every top-level Markdown file other than `README.md` is treated as a v1
 message, so an obsolete directional ledger fails validation instead of
