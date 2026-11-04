@@ -298,6 +298,7 @@ a running session to wake it; ask the owner or the maintainer to relay.
 npm run mailbox:deliver -- /path/to/draft.md
 npm run mailbox:check
 npm run mailbox:list
+npm run mailbox:list -- --brief      # one line per thread
 npm run mailbox:list -- --details    # or --all, --json
 npm run mailbox:archive -- ROOT-VIR-20260813-001
 npm run mailbox:list -- --archive
@@ -313,6 +314,7 @@ cancelled thread unless `--completed` applies (see above).
 
 `mailbox:list` prints at most 20 recent compact thread summaries, with a notice
 when entries are omitted, including the latest recorded lane checkpoint.
+`--brief` prints a compact one-line index for routine lane selection;
 `--details` adds the full index, metadata and warnings; `--all` includes
 terminal threads; `--json` is uncapped. A summary is an index into the
 immutable message files, not a replacement for them or a roster of running

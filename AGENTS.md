@@ -86,6 +86,13 @@ larger harness machinery out unless the maintainer requests them.
 ## Pull Requests
 
 - Publish branches only when the maintainer requests a PR, publication or landing.
+- The maintainer gives the final green light before a PR is merged or a
+  release or asset is published: present the PR/head or release scope,
+  validation and remaining risks, then wait. Requests to implement, prepare or
+  continue towards landing do not authorize merge or publication, and agent
+  review, passing CI or use of the maintainer's account or Git identity are not
+  approval. Approval given in conversation or on the PR covers the identified
+  change; record its source, and ask again after material changes.
 - Land repository changes through a PR, including documentation-only changes
   and maintenance fixes. Direct pushes to `main` or a maintenance branch require
   an explicit maintainer exception. Follow
