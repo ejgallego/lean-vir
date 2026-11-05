@@ -84,8 +84,15 @@ export const RESOURCE_ROOT_EXPORTS = [
   "vir_resource_roots_reusable",
 ];
 
+// These read only fixed trap-diagnostic storage and remain callable on retirement.
+export const TRAP_DIAGNOSTIC_EXPORTS = [
+  "vir_last_trap_message",
+  "vir_last_trap_message_size",
+];
+
 export const OBJECT_ABI_EXPORTS = [
   ...OBJECT_ABI_CALL_EXPORTS,
   ...OBJECT_VALUE_EXPORTS,
   ...RESOURCE_ROOT_EXPORTS,
+  ...TRAP_DIAGNOSTIC_EXPORTS,
 ];

@@ -762,7 +762,9 @@ overrides when an extension needs these services. Any other unresolved import
 is rejected by name before instantiation. Low-level `createVirImports` can link a
 module without an attached host state, but invoking its host-dispatch hook throws.
 This linking utility does not provide managed runtime construction or disposal;
-use the factory for that lifecycle.
+use the factory for that lifecycle. A raw instance must call the reactor's
+`_initialize` export once, before any other export, to run its C++ global
+constructors.
 
 Custom imports can be declared directly:
 
@@ -863,7 +865,11 @@ not let the outer Lean call continue. Other runtime instances remain usable.
 
 `runtime.failure` is a read-only `Error | null` diagnostic. It is `null` while
 the runtime is healthy or after a recoverable effect failure; after a fatal
-host/Wasm failure it retains the original error when available. Guarded runtime
+host/Wasm failure it retains the original error when available. When the Lean
+runtime itself raised the trap, for example with an unknown declaration, a
+missing native implementation or exhausted stack space, the failure is an
+`Error` whose message starts with `Lean runtime error:` and whose `cause` is the
+Wasm trap. Guarded runtime
 methods still throw after the failure, so inspect this property for diagnostics
 and create a fresh runtime for continued execution. Failure state is private and
 cannot be reset through a public boundary object.

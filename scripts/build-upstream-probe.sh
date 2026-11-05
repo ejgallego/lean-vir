@@ -293,6 +293,7 @@ shim_sources=(
   "wasm/upstream_shim/package/host_import_trampolines.cpp"
   "wasm/upstream_shim/runtime/native_symbol_lookup.cpp"
   "wasm/upstream_shim/runtime/runtime_environment_stubs.cpp"
+  "wasm/upstream_shim/runtime/trap_diagnostics.cpp"
   "wasm/upstream_shim/package/package_init_bridge.cpp"
   "wasm/upstream_shim/package/package_loader_abi.cpp"
   "wasm/upstream_shim/runtime/runtime_value_stubs.cpp"
@@ -548,7 +549,11 @@ link_objects=(
   "${object_files[@]}"
 )
 
+# A reactor exports _initialize, which runs C++ global constructors; the JS
+# factory calls it once per instance. A command module would only run them
+# from _start.
 link_flags=(
+  -mexec-model=reactor
   -Wl,--no-entry
   -Wl,--gc-sections
   -Wl,--export-memory
@@ -669,6 +674,24 @@ copy_profile_wasm_if_needed() {
     return 1
   fi
 }
+
+if [ "$strict_status" = "0" ]; then
+  # Constructors run only through _initialize, and JS reports C++ exception
+  # text only if the trap diagnostics are exported.
+  if ! node -e '
+    const exports = new Set(WebAssembly.Module.exports(
+      new WebAssembly.Module(require("node:fs").readFileSync(process.argv[1]))).map(e => e.name));
+    const problems = ["_initialize", "vir_last_trap_message", "vir_last_trap_message_size"]
+      .filter(name => !exports.has(name)).map(name => `missing export ${name}`);
+    if (exports.has("_start")) problems.push("unexpected command entry _start");
+    if (problems.length !== 0) {
+      console.error(`error: ${process.argv[1]}: ${problems.join(", ")}`);
+      process.exit(1);
+    }
+  ' "$strict_wasm"; then
+    strict_status=1
+  fi
+fi
 
 copied_demo_wasm=0
 copied_demo_dev_wasm=0
