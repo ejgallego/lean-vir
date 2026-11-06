@@ -5,10 +5,12 @@ Author: Emilio J. Gallego Arias
 */
 
 #include <stdint.h>
+#include <string.h>
 
 #include <initializer_list>
 #include <string>
 
+#include "runtime/name_identity.h"
 #include "runtime/name_utils.h"
 #include "runtime/object.h"
 
@@ -69,11 +71,18 @@ static lean::object * mk_nat_from_decimal(char const * text, uint32_t len) {
 // null result instead of poisoning the Wasm call.
 constexpr uint32_t MAX_EXPR_BVAR_INDEX = 1048574;
 
+// Name text is either the restricted dotted spelling or, for any other Name,
+// its canonical structural key. Only keys contain '/', which no dotted
+// identifier component may.
 static lean::object * mk_name_from_dotted_string(char const * text, uint32_t len) {
-    if (!lean::is_supported_dotted_name(text, len)) {
+    lean::name name;
+    if (text != nullptr && memchr(text, '/', len) != nullptr) {
+        if (!lean::name_from_key(text, len, name)) return nullptr;
+    } else if (lean::is_supported_dotted_name(text, len)) {
+        name = lean::name_from_dotted(text, len);
+    } else {
         return nullptr;
     }
-    lean::name name = lean::name_from_dotted(text, len);
     lean_inc(name.raw());
     return name.raw();
 }
@@ -234,6 +243,17 @@ extern "C" char const * vir_obj_name_string(lean::object * value) {
     } else {
         g_obj_name_string_result = lean::name_to_string(lean::name(value, true));
     }
+    return g_obj_name_string_result.c_str();
+}
+
+// Any Name, as its canonical structural key; shares the result buffer and size
+// export with vir_obj_name_string.
+extern "C" char const * vir_obj_name_key(lean::object * value) {
+    if (value == nullptr) {
+        g_obj_name_string_result.clear();
+        return nullptr;
+    }
+    g_obj_name_string_result = lean::vir::name_key(lean::name(value, true));
     return g_obj_name_string_result.c_str();
 }
 

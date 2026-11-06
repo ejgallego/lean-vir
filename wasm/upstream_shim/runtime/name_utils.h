@@ -34,4 +34,12 @@ std::string name_to_string(name const & value);
 // identities that this string-only adapter cannot preserve.
 name name_from_dotted(char const * text, size_t len);
 
+/**
+ * Parse a canonical structural name key (`Vir.nameKey`): `s<hex UTF-8>/` and
+ * `n<decimal>/` per component, outermost prefix first. Unlike dotted text it
+ * represents every Name, including numeric and non-identifier components.
+ * Returns false for any non-canonical spelling.
+ */
+bool name_from_key(char const * text, size_t len, name & out);
+
 }

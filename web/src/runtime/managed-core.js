@@ -21,7 +21,8 @@ import {
 import { asBytes } from "./vir-codec.js";
 
 const runtimeBoundaries = new WeakMap();
-const textDecoder = new TextDecoder();
+// These are Lean string values, not BOM-prefixed text files.
+const textDecoder = new TextDecoder("utf-8", { ignoreBOM: true });
 const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
 

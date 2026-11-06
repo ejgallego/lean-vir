@@ -54,6 +54,7 @@ export const OBJECT_VALUE_EXPORTS = [
   "vir_obj_level_zero",
   "vir_obj_literal_nat",
   "vir_obj_literal_string",
+  "vir_obj_name_key",
   "vir_obj_name_string",
   "vir_obj_name_string_size",
   "vir_obj_resource",
