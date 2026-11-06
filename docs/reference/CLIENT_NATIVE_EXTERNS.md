@@ -17,7 +17,9 @@ vir_extern_fallback MyProject.increment
 
 Without the manifest, package generation uses that Lean body. With the manifest,
 the same declaration is packaged as a native extern and the runtime contains a
-compiler-generated boxed adapter plus the client provider.
+compiler-generated boxed adapter plus the client provider. Such a package needs
+that client-enabled runtime: loading it into a runtime without the provider
+fails during package preparation, naming the extern.
 
 Under Lean's module system, declare a cross-module extern `public` as usual.
 `vir_extern_fallback` exports its reserved-name compiler artifact so the

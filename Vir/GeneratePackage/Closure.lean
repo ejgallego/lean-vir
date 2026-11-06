@@ -58,7 +58,12 @@ partial def collectName
             else
               { state with missingDecls := state.missingDecls.push dependency }
         | some loaded =>
-            if isUnsupportedInitGlobal loaded.decl then
+            -- Imported externs are already filtered by `DeclIndex.find?`; local
+            -- and owner-module ones reach here. Native catalog entries and
+            -- fallbacks were resolved above, so the runtime cannot call this one.
+            if loaded.decl matches .extern .. && !isVirJsDecl loaded.decl then
+              { state with missingExterns := state.missingExterns.push { name, path } }
+            else if isUnsupportedInitGlobal loaded.decl then
               match index.initFnNameFor? name with
               | some initName =>
                   let state := { state with decls := state.decls.push loaded }

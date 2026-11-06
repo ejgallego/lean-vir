@@ -267,7 +267,7 @@ first-discovered root-to-blocker path after `via`; the CLI prints the same path.
 | Report or diagnostic | Meaning and next check |
 | --- | --- |
 | `Missing IR Declarations` | Check module identity, imports, explicit roots and package-only support targets. Automatic owner loading normally supplies module-system dependencies; a remaining failure means ownership is unresolved or the owner supplies no compiled body. |
-| `Missing Native Extern Registrations` | The closure needs a registered runtime provider. Review `NativeExterns`, check native externs, and regenerate/check the boundary registry if entries change. |
+| `Missing Native Extern Registrations` | The closure needs a registered runtime provider. This includes local `@[extern]` declarations: an `@[extern] def` can package its Lean body with `vir_extern_fallback`, or a [client-native manifest](CLIENT_NATIVE_EXTERNS.md) can select a provider. Otherwise review `NativeExterns`, check native externs, and regenerate/check the boundary registry if entries change. |
 | `Unsupported Init Globals` | Reached initialization-backed state lacks an initializer function in the loaded inputs. |
 | `Package Diagnostics` | Unsupported interface types/layouts, declaration-name collisions. Inspect the requested boundary and report. |
 | Boxed boundary diagnostics | Top-level `Float`, `Float32`, `UInt64` and trivial wrappers over them need compiler-generated `_boxed` companions at the wasm32 boundary. Generation includes an available companion and fails explicitly when it is missing. |

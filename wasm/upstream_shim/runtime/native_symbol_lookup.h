@@ -6,9 +6,17 @@ Author: Emilio J. Gallego Arias
 
 #pragma once
 
+namespace lean {
+class name;
+}
+
 namespace lean::vir {
 
 // Membership in the generated native registry; never performs dynamic lookup.
 bool is_registered_native_symbol(char const * symbol);
+
+// Whether the interpreter can resolve this extern declaration: a registered
+// native symbol or a JavaScript host import of the loaded package set.
+bool has_native_implementation(lean::name const & declaration);
 
 }

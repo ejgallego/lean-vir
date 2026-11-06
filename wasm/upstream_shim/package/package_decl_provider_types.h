@@ -20,6 +20,8 @@ struct decl_entry {
     object * name;
     object * boxed_base;
     object * decl;
+    // The interpreter resolves an extern only through the native registry.
+    bool is_extern = false;
 };
 
 struct init_global_entry {

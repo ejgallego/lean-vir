@@ -344,10 +344,11 @@ public:
         }
     }
 
-    object * ir_decl(object * fn) {
+    object * ir_decl(object * fn, bool & is_extern) {
         max_var = 0;
         max_jp = 0;
         uint8_t tag = u8();
+        is_extern = static_cast<tags::decl_tag>(tag) == tags::decl_tag::Extern;
         object * ps = mk_array(ir_params());
         type result_type = ir_type();
         switch (static_cast<tags::decl_tag>(tag)) {
@@ -418,8 +419,9 @@ static std::vector<decl_entry> read_ir_decl_entries(reader & r, uint32_t count) 
         object * n = r.name();
         object * boxed_base = r.boolean() ? r.name() : nullptr;
         lean_inc(n);
-        object * d = r.ir_decl(n);
-        entries.push_back({ n, boxed_base, d });
+        bool is_extern = false;
+        object * d = r.ir_decl(n, is_extern);
+        entries.push_back({ n, boxed_base, d, is_extern });
     }
     return entries;
 }
