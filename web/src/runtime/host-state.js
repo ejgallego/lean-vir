@@ -39,6 +39,7 @@ export class VirHostState {
     this.userBindings = hostBindings;
     this.defaultBindings = defaultHostBindings;
     this.ownsDefaultHostBindings = ownsDefaultHostBindings;
+    this.ownedHostBindingsDisposed = false;
     this.runtime = null;
     this.leanObjectHandleCells = new Set();
     this.leanObjectHandleTrackingClosed = false;
@@ -122,6 +123,14 @@ export class VirHostState {
       );
     }
     return messages.map((message) => new Error(message));
+  }
+
+  // Owned default bindings schedule timers, frames and other activity that
+  // invokes Lean callbacks. Dispose them once, on runtime failure or disposal.
+  disposeOwnedHostBindings() {
+    if (!this.ownsDefaultHostBindings || this.ownedHostBindingsDisposed) return;
+    this.ownedHostBindingsDisposed = true;
+    disposeHostBindings(this.defaultBindings);
   }
 
   clearResourceRoots() {
@@ -315,11 +324,7 @@ export class VirHostState {
     try {
       this.clearCallError();
 
-      if (this.ownsDefaultHostBindings) {
-        collectCleanupError(errors, () =>
-          disposeHostBindings(this.defaultBindings),
-        );
-      }
+      collectCleanupError(errors, () => this.disposeOwnedHostBindings());
 
       collectCleanupError(errors, () => this.releaseLeanObjectHandleCells());
       collectCleanupError(errors, () => this.clearResourceRoots());

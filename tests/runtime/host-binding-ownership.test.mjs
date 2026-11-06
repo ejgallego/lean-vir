@@ -259,3 +259,38 @@ test("failed creation retains both the original and owned-provider cleanup error
   state.dispose();
   assert.equal(disposals, 1);
 });
+
+// Exports memory and a function that traps, to retire a real runtime.
+const trapModule = new WebAssembly.Module(Uint8Array.of(
+  0, 97, 115, 109, 1, 0, 0, 0,
+  1, 4, 1, 0x60, 0, 0,
+  3, 2, 1, 0,
+  5, 3, 1, 0, 1,
+  7, 17, 2, 6, 109, 101, 109, 111, 114, 121, 2, 0, 4, 116, 114, 97, 112, 0, 0,
+  10, 5, 1, 3, 0, 0, 0x0b,
+));
+
+test("a failed runtime stops its owned bindings and leaves supplied ones alone", async () => {
+  const owned = activeBindings();
+  const supplied = activeBindings();
+  const runtime = await new VirRuntimeFactory({
+    wasmModule: trapModule,
+    hostBindings: supplied.bindings,
+    defaultHostBindings: () => owned.bindings,
+  }).instantiate();
+  try {
+    assert.throws(() => runtime.exports.trap(), WebAssembly.RuntimeError);
+    // Failure listeners run after the failing stack has unwound.
+    assert.equal(owned.disposals, 0);
+    await Promise.resolve();
+    assert.equal(owned.disposals, 1);
+    assert.equal(owned.lifecycle.debugResourceCounts().active, 0);
+    assert.equal(supplied.disposals, 0);
+    assert.equal(supplied.lifecycle.phase, "active");
+    runtime.dispose();
+    assert.equal(owned.disposals, 1, "disposal after failure does not repeat it");
+  } finally {
+    runtime.dispose();
+    supplied.bindings[VIR_HOST_DISPOSE]();
+  }
+});
