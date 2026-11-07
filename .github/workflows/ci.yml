@@ -81,6 +81,13 @@ jobs:
       - run: npm run install:wasi
       - run: npm run check:boundary-registry
       - run: npm run build:site
+      - run: lake build vir_resource_pack
+      - run: npm run package:runtime
+      - name: Select this source's runtime candidate
+        run: |
+          packs=("$GITHUB_WORKSPACE"/build/artifacts/runtime/*.virres)
+          test "${#packs[@]}" -eq 1
+          echo "VIR_RUNTIME_PACK=${packs[0]}" >> "$GITHUB_ENV"
       - run: npm run test:constructor-providers
       - run: npm run test:resource-roots
       - run: npm run test:env-lookup:wasm-pair
@@ -99,7 +106,6 @@ jobs:
             build/quickstart-*/*.log
           if-no-files-found: ignore
       - run: npm run test:upstream:no-build
-      - run: npm run package:runtime
       - name: Upload runtime pack and provenance
         uses: actions/upload-artifact@v4
         with:
@@ -160,6 +166,15 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: lean-vir-runtime
+          path: build/artifacts/runtime
+      - name: Select this source's runtime candidate
+        run: |
+          packs=("$GITHUB_WORKSPACE"/build/artifacts/runtime/*.virres)
+          test "${#packs[@]}" -eq 1
+          echo "VIR_RUNTIME_PACK=${packs[0]}" >> "$GITHUB_ENV"
       - run: npm run test:lake:facets
       - run: npm run test:generator:imports
       - run: npm run test:resources:core
@@ -167,7 +182,7 @@ jobs:
       - run: npm run test:resources:acquisition
       - run: npm run test:resources:packing
       - run: npm run test:resources:program
-      - run: npm run test:resources:published
+      - run: npm run test:resources:client -- "$VIR_RUNTIME_PACK"
       - run: npm run test:quickstart
       - run: npm run test:resources:cache
       - name: Preserve failed resource cache campaign

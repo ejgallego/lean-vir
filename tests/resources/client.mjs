@@ -7,6 +7,9 @@ Author: Emilio J. Gallego Arias
 // Supplied-pack or anonymous published-pack acceptance. In both modes the leaf
 // application's only command and dependency are the normal client ones.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { releaseTagFromToolchain } from "../../scripts/release-tag.mjs";
+import { runtimeAssetName } from "../../scripts/resources/runtime-source.mjs";
 import { replaceFixture } from "./fixture-edit.mjs";
 import { runCommand } from "./run-command.mjs";
 import { spawnSync } from "node:child_process";
@@ -40,17 +43,10 @@ if (published) {
   // A committed source snapshot, not the producer's warm build/cache/stage.
   root = join(evidence, "producer");
   mkdirSync(root);
-  const archive = spawnSync("git", ["archive", "HEAD"], {
-    cwd: sourceRoot,
-    maxBuffer: 64 * 1024 * 1024,
+  const clone = spawnSync("git", ["clone", "--quiet", "--shared", sourceRoot, root], {
+    encoding: "utf8",
   });
-  if (archive.error) throw archive.error;
-  assert.equal(archive.status, 0, archive.stderr.toString());
-  const extracted = spawnSync("tar", ["-x", "-C", root], {
-    input: archive.stdout,
-  });
-  if (extracted.error) throw extracted.error;
-  assert.equal(extracted.status, 0, extracted.stderr.toString());
+  assert.equal(clone.status, 0, clone.stderr);
   assert.ok(!existsSync(join(root, ".lake")));
   assert.ok(!existsSync(join(root, ".vir-generated")));
 }
@@ -72,28 +68,24 @@ writeFileSync(join(client, "lakefile.lean"), config);
 const run = (cwd, label, cmd, args, error = null) =>
   runCommand(cwd, join(evidence, `${label}.log`), cmd, args, { error });
 
-const lock = JSON.parse(readFileSync(join(root, "vir-resources/runtime.json")));
-if (published) assert.match(lock.source, /^https:\/\//);
-const runtimeCache = join(
-  root,
-  ".lake/build/vir/resources/runtime",
-  `${lock.contentId}.virres`,
-);
+const packId = bytes => {
+  const n = bytes.readUInt32LE(8);
+  return createHash("sha256").update("vir-resource-bundle-v2\n")
+    .update(bytes.subarray(12, 12 + n)).digest("hex");
+};
+const revision = spawnSync("git", ["rev-parse", "HEAD"], {
+  cwd: root, encoding: "utf8",
+}).stdout.trim();
+const supplied = published ? null : resolve(source);
+if (published) delete process.env.VIR_RUNTIME_PACK;
+else process.env.VIR_RUNTIME_PACK = supplied;
+const key = published ? revision : packId(readFileSync(supplied));
+const tag = releaseTagFromToolchain(readFileSync(join(root, "lean-toolchain"), "utf8"));
+const lock = {
+  source: `https://github.com/ejgallego/lean-vir/releases/download/${tag}/${runtimeAssetName(revision)}`,
+};
+const runtimeCache = join(root, ".lake/build/vir/resources/runtime", `${key}.virres`);
 const runtimeStage = join(root, ".vir-generated/VirResourceRuntime.virres");
-if (!published)
-  run(
-    root,
-    "seed-maintainer-runtime",
-    join(root, ".lake/build/bin/vir_resource_pack"),
-    [
-      "acquire",
-      join(root, "vir-resources/compatibility.json"),
-      lock.contentId,
-      resolve(source),
-      runtimeCache,
-      runtimeStage,
-    ],
-  );
 const build = (label) =>
   run(leaf, label, "lake", ["exe", "generate-site", join(evidence, "site")]);
 const snapshot = (path) => {
@@ -109,6 +101,7 @@ assert.ok(!existsSync(programStage));
 assert.ok(!existsSync(producerCarrier));
 run(leaf, "dependency-owned-cold", "lake", ["build", "UserAssets"]);
 assert.ok(existsSync(programStage));
+lock.contentId = packId(readFileSync(runtimeStage));
 assert.ok(!existsSync(producerCarrier));
 assert.ok(!existsSync(join(leaf, ".lake/build/lib/lean/vir-assets/Client/Program.virres")));
 writeFileSync(join(leaf, "InspectAssets.lean"), `import UserAssets

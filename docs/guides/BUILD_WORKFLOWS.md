@@ -35,7 +35,7 @@ marked module + compatibility + native producer tools ────────�
                                                                   ↓
                                                 compiled client resource value ──┐
                                                                                 ↓
-runtime lock + compatibility + native pack tool ── virRuntimePack ── runtime carrier
+VIR source revision + native pack tool ── virRuntimePack ── runtime carrier
                                                                                 ↓
                                                                   ResourceSet / publisher
 ```
@@ -87,7 +87,7 @@ before Lake can mutate owned output/trace/hash paths.
 ### Runtime acquisition is a separate branch
 
 `VirResourceRuntime` has `needs := #[virRuntimePack]`. That target reads the
-compatibility profile and `vir-resources/runtime.json` lock, then uses the native
+compatibility profile and the owning VIR Git revision, then uses the native
 pack tool to acquire the exact content identity:
 
 1. Try the verified cache, then the existing verified stage.
@@ -95,11 +95,11 @@ pack tool to acquire the exact content identity:
 3. Validate the complete pack and compatibility before installation; restore
    cache/stage without writing through existing hard links.
 
-The current lock names a content-addressed public release asset. An empty runtime
-cache downloads and verifies those exact bytes. `source: "-"` is an available-only selection,
-not a download source. There is no implicit SDK installation, npm invocation,
-GitHub authentication, WASI installation, or local runtime build. HTTPS acquisition
-uses `curl`; packing runtime distributions is a separate maintainer operation.
+The default asset name is derived from the owning VIR Git revision and Lean
+release name. The descriptor must identify that source revision. An empty cache
+acquires that exact asset; another same-Lean runtime cannot satisfy the request.
+For an unreleased candidate, `VIR_RUNTIME_PACK` explicitly selects a local pack.
+Its content ID and input bytes are traced, and all payloads/profile are verified.
 
 ## Shared core, separate public contracts
 

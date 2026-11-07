@@ -199,7 +199,7 @@ supply authentication headers. This is public acquisition, not credential
 isolation from host configuration. Pack reads are bounded after download and
 before installation; Lake does not impose VIR's pack-size limit on transport.
 There is no source-build fallback. URL
-userinfo is rejected by both runtime-lock admission and transport, even when
+userinfo is rejected by explicit-CID transport, even when
 verified cache bytes are already available.
 
 Valid cache or staging bytes suffice offline. Missing staging is repaired even
@@ -208,14 +208,11 @@ verified bytes; a cold offline miss identifies the required bundle. There is no
 fallback revision, filename-based trust or successful return after a failed
 download. Reads are bounded independently of a prior filesystem size check.
 
-For public distribution, a release owner must publish the exact verified
-`CONTENT_ID.virres` as an immutable, anonymously downloadable asset. Prepare a
-draft, upload without overwriting an existing asset, verify the uploaded bytes,
-then publish. Only after that verification should the owning runtime lock replace
-`source: "-"` with the actual durable HTTPS URL; keep its content ID unchanged.
-Verify public acquisition before advertising the asset for ordinary application
-builds. Authenticated CI downloads and supplied packs do not establish anonymous
-installation. The owning-library workflow remains the application entry point;
+For public distribution, publish the verified runtime as the immutable,
+source-addressed `runtime-REV.virres` asset of the matching Lean-aligned release.
+Verify public default acquisition before advertising it for ordinary application
+builds. Authenticated CI downloads and explicit candidate packs do not establish
+anonymous default installation. There is no post-publication lock update. The owning-library workflow remains the application entry point;
 neither publication nor an acquisition miss builds Wasm or selects a different
 revision implicitly.
 
@@ -249,16 +246,26 @@ optional `VirResourceRuntime` library fetches and validates the selected runtime
 before elaboration. Core types, the native producer and browser program modules
 must not import that carrier.
 
-The [runtime lock](../../vir-resources/runtime.json) selects one content ID and
-acquisition source. The [compatibility record](../../vir-resources/compatibility.json)
-independently defines the Lean revision / VIR version pair shared by program
-production. A runtime must match that profile; another release is not a fallback.
+Runtime selection is derived from the owning VIR Git commit and the Lean release
+name. For commit `REV`, ordinary Lake preparation downloads
+`v<Lean version>/runtime-REV.virres` from VIR's GitHub releases. There is no
+separately maintained content-ID/URL lock. The generated runtime descriptor's
+logical ID is `lean-vir/runtime/REV`; acquisition checks it before accepting
+cached, staged or downloaded bytes, along with the exact Lean/compatibility
+profile and every payload checksum. An older same-Lean runtime is not a fallback.
+The [compatibility record](../../vir-resources/compatibility.json) still defines
+the compiler / VIR contract used by program production.
 
-After selecting a matching public, content-addressed runtime, missing local bytes
-are acquired anonymously over HTTPS and verified before installation. A warm
-verified cache or stage needs no runtime download. Missing offline bytes produce
-an acquisition error naming the required identity, never an implicit Wasm build.
-The native tool's `--offline` flag makes that acquisition boundary explicit.
+A warm verified cache or stage needs no download. Missing exact-revision bytes
+fail rather than compiling Wasm or choosing a different release. The native
+`acquire-runtime` command accepts `--offline` for an explicit cache-only check.
+
+For unreleased source, supply an already-built candidate explicitly with
+`VIR_RUNTIME_PACK=/absolute/path/to/candidate.virres`. Lake traces that file;
+its complete format, runtime kind, Lean/compatibility and checksums are still
+verified. This explicit developer/CI selection does not certify published source
+identity. Dirty source and source archives without Git also require an explicit local candidate.
+Ordinary Git dependencies need no application configuration or override.
 
 A client library registers an independent program module and an asset library:
 
@@ -341,11 +348,13 @@ node scripts/resources/pack-runtime.mjs RELEASE_WASM BUILD_IDENTITY NEW_OUTPUT_D
 
 `npm run package:runtime` uses the repository's release Wasm and build identity
 to write `build/artifacts/runtime/`. CI packages and retains this output after
-the runtime checks. The tagged release workflow publishes its content-named
-pack without overwriting it; maintainers select a verified public asset in
-`vir-resources/runtime.json` separately. Actions artifacts alone are not a
-durable consumer source, and a new producer commit does not silently change
-the runtime selected by applications.
+the runtime checks. The tagged workflow publishes it as `runtime-REV.virres`
+for its exact Git commit, with source identity included in the generated descriptor.
+Both runtime and SDK publication reuse identical existing bytes and reject
+replacement. CI exercises its own candidate through the ordinary application
+workflow. Release acceptance also exercises a fresh Git dependency with no
+runtime override, downloads the public source-addressed asset and compares it
+to the qualified candidate. Actions artifacts alone are not durable releases.
 
 It minimizes the JS import closure while preserving legal comments and public
 properties, bundles Wasm and notices, verifies the compiler/profile

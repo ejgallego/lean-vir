@@ -43,7 +43,7 @@ Before upgrading `lean-toolchain`:
 - Compare affected Lean adapters with the new upstream source, then update their
   immutable source links.
 - Refresh `vir-resources/compatibility.json` and qualify a runtime bundle for
-  that compiler before changing `vir-resources/runtime.json`; preserve the
+  that compiler and exact VIR source revision; preserve the
   bundle's content identity rather than relabeling an older bundle.
 - Record catalog compatibility and the remaining migration work using the
   roadmap below. Older producer pins preserve historical reproducibility;
@@ -457,12 +457,19 @@ Existing releases retain their published tag names.
 Version tags beginning with `v` trigger
 [release-sdk.yml](../.github/workflows/release-sdk.yml),
 which rejects tags that do not match `lean-toolchain`, checks ABI versions,
-builds/imports the SDK and uploads the archive plus a content-named runtime pack.
+builds/imports the SDK, checks the ordinary application against that candidate,
+and publishes the SDK plus `runtime-<VIR commit>.virres`. Runtime acquisition
+selects this exact source-derived name and verifies the descriptor's source
+identity; there is no runtime lock to update. A missing revision fails clearly.
+After publication, a fresh Git dependency must acquire that exact runtime through
+the public default path and its bytes must equal the qualified candidate.
 RC tags produce prereleases; content-addressed `resource-…` releases remain
 separate. Runtime pack
 publication uploads absent assets, verifies and reuses byte-identical assets on
 reruns, and rejects different bytes without replacing them. The SDK archive
-upload remains replaceable. Create the tag from the final merged commit
+follows the same immutable publication rule. Both assets are uploaded to a draft
+and downloaded for byte comparison before the release is published. Create the
+tag from the final merged commit
 so its manifest identifies the revision clients use. Before the tag exists,
 select `VIR_SDK_ARCHIVE` or the exact-commit artifact path; the zero-argument
 `:virSdk` facet targets the tagged release. See
