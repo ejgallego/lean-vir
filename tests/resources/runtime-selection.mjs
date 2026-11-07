@@ -66,11 +66,12 @@ run("no-enclosing-repository-fallback", ["runtime-plan", archive], {
 const profile = JSON.parse(
   readFileSync(join(root, "vir-resources/compatibility.json")),
 );
-function pack(logicalId, compatibility = profile, kind = "runtime") {
+function pack(logicalId, compatibility = profile, kind = "runtime",
+  moduleSource = "export function createProgram(){}") {
   const members = [
     [
       "runtime.js",
-      Buffer.from("export function createProgram(){}"),
+      Buffer.from(moduleSource),
       "text/javascript",
     ],
     [
@@ -185,8 +186,58 @@ for (const [label, source, error] of [
   assert.ok(!existsSync(absent) && !existsSync(absentStage));
 }
 run("explicit-candidate", acquire(good, "", absent, absentStage));
-console.log(`source-addressed runtime selection PASS; evidence: ${evidence}`);
 
 // Changing an explicit candidate must replace a compatible existing stage too.
 run("changed-explicit-candidate", acquire(stale, "", absent, absentStage));
 assert.deepEqual(readFileSync(absentStage), readFileSync(stale));
+
+// Same compiler/profile, different actual payloads and CIDs: retain the reviewed
+// A -> B failure, including the absent B-cache and incorrectly keyed cache cases.
+const explicitA = pack(runtimeLogicalId("0".repeat(40)), profile, "runtime",
+  'export const candidate = "A";');
+const explicitB = pack(runtimeLogicalId("1".repeat(40)), profile, "runtime",
+  'export const candidate = "B";');
+const selectedB = join(evidence, "explicit-B.virres");
+writeFileSync(selectedB, explicitB);
+const planB = JSON.parse(run("explicit-B-plan", ["runtime-plan", archive], {
+  extra: { VIR_RUNTIME_PACK: selectedB },
+}));
+const expectedB = createHash("sha256").update("vir-resource-bundle-v2\n")
+  .update(explicitB.subarray(12, 12 + explicitB.readUInt32LE(8))).digest("hex");
+assert.equal(planB.key, expectedB);
+assert.equal(planB.logicalId, "");
+for (const [label, cacheBytes, stageBytes] of [
+  ["empty-control", null, null],
+  ["stage-A-absent-B-cache", null, explicitA],
+  ["A-under-B-cache-key", explicitA, null],
+  ["cache-and-stage-A", explicitA, explicitA],
+  ["recover-B-cache-from-stage-offline", null, explicitB],
+  ["repair-B-stage-from-cache-offline", explicitB, null],
+]) {
+  const dir = join(evidence, `explicit-${label}`);
+  mkdirSync(dir);
+  const cacheB = join(dir, `${planB.key}.virres`), stageB = join(dir, "stage");
+  if (cacheBytes) writeFileSync(cacheB, cacheBytes);
+  if (stageBytes) writeFileSync(stageB, stageBytes);
+  const args = acquire(planB.source, planB.logicalId, cacheB, stageB);
+  run(`explicit-${label}`, [...args, "--offline"]);
+  assert.deepEqual(readFileSync(cacheB), explicitB, label);
+  assert.deepEqual(readFileSync(stageB), explicitB, label);
+  const warm = [stat(cacheB), stat(stageB)];
+  run(`explicit-${label}-warm-offline`, [...args, "--offline"]);
+  assert.deepEqual([stat(cacheB), stat(stageB)], warm, label);
+}
+for (const [label, selected, error] of [
+  ["profile-invalid", bad, /INCOMPATIBLE/],
+  ["malformed", join(evidence, "explicit-malformed.virres"), /TRUNCATED_PACK/],
+]) {
+  if (label === "malformed") writeFileSync(selected, "bad");
+  const dir = join(evidence, `explicit-${label}`);
+  mkdirSync(dir);
+  const retainedCache = join(dir, "cache"), retainedStage = join(dir, "stage");
+  writeFileSync(retainedCache, explicitA); writeFileSync(retainedStage, explicitA);
+  run(`explicit-${label}`, acquire(selected, "", retainedCache, retainedStage), { error });
+  assert.deepEqual(readFileSync(retainedCache), explicitA);
+  assert.deepEqual(readFileSync(retainedStage), explicitA);
+}
+console.log(`source-addressed runtime selection PASS; evidence: ${evidence}`);
