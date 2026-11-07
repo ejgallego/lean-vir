@@ -12,6 +12,10 @@ import { releaseTagFromToolchain } from "../../scripts/release-tag.mjs";
 import { runtimeAssetName } from "../../scripts/resources/runtime-source.mjs";
 import { replaceFixture } from "./fixture-edit.mjs";
 import { runCommand } from "./run-command.mjs";
+import { readRuntimeExpectation, assertProducedRuntime, assertEmittedRuntime,
+  assertHistoricalStaleRuntime } from "./expected-runtime.mjs";
+import { launchChromium, openChromiumPage, navigate, evaluate, serveDist }
+  from "../browser/harness.mjs";
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
@@ -29,15 +33,30 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const sourceRoot = fileURLToPath(new URL("../../", import.meta.url));
-const source = process.argv[2];
-if (!source)
-  throw new Error(
-    "usage: node tests/resources/client.mjs EXACT_RUNTIME_PACK | --published",
-  );
+const [source, expectationFlag, expectedPath, staleFlag, stalePath, ...extra] = process.argv.slice(2);
+if (!source || expectationFlag !== "--expect-runtime-pack" || !expectedPath ||
+    staleFlag !== "--stale-runtime-pack" || !stalePath ||
+    (extra.length && !(extra.length === 1 && extra[0] === "--stale-negative-child")))
+  throw new Error("usage: node tests/resources/client.mjs PACK | --published --expect-runtime-pack PRODUCED_PACK --stale-runtime-pack HISTORICAL426C");
+// These inputs are independent assertions only; never forwarded to selection.
+const expectedRuntime = readRuntimeExpectation(resolve(expectedPath));
+const historicalRuntime = readRuntimeExpectation(resolve(stalePath));
+assertHistoricalStaleRuntime(historicalRuntime, expectedRuntime);
 const published = source === "--published";
 mkdirSync(join(sourceRoot, "build"), { recursive: true });
 const evidence = mkdtempSync(join(sourceRoot, "build/resource-client-"));
 console.log(`resource client evidence: ${evidence}`);
+if (extra[0] !== "--stale-negative-child") {
+  // Prove the expectation cannot silently act as a source override. Actual old426c
+  // must be acquired by Lake and rejected by the same stage assertion below.
+  runCommand(sourceRoot, join(evidence, "actual426c-negative.log"), process.execPath, [
+    fileURLToPath(import.meta.url), resolve(stalePath),
+    "--expect-runtime-pack", resolve(expectedPath),
+    "--stale-runtime-pack", resolve(stalePath), "--stale-negative-child",
+  ], {error: /RUNTIME_RELEASE_MISMATCH: actual Lake stage/});
+  assert.deepEqual(readFileSync(join(sourceRoot, ".vir-generated/VirResourceRuntime.virres")), historicalRuntime.bytes);
+}
+
 let root = sourceRoot;
 if (published) {
   // A committed source snapshot, not the producer's warm build/cache/stage.
@@ -101,20 +120,59 @@ assert.ok(!existsSync(programStage));
 assert.ok(!existsSync(producerCarrier));
 run(leaf, "dependency-owned-cold", "lake", ["build", "UserAssets"]);
 assert.ok(existsSync(programStage));
+assertProducedRuntime(readFileSync(runtimeStage), expectedRuntime, "actual Lake stage");
+assertProducedRuntime(readFileSync(runtimeCache), expectedRuntime, "actual Lake cache");
 lock.contentId = packId(readFileSync(runtimeStage));
+assert.equal(lock.contentId, expectedRuntime.contentId);
 assert.ok(!existsSync(producerCarrier));
 assert.ok(!existsSync(join(leaf, ".lake/build/lib/lean/vir-assets/Client/Program.virres")));
+const embeddedPack = join(evidence, "embedded-runtime.virres");
 writeFileSync(join(leaf, "InspectAssets.lean"), `import UserAssets
+import Vir.Resources.Pack
+#eval do
+  let bytes ← IO.ofExcept ((Vir.Resources.Pack.encode UserAssets.resources.runtime).mapError reprStr)
+  IO.FS.writeBinFile ${JSON.stringify(embeddedPack)} bytes
 #eval IO.println UserAssets.resources.runtime.contentId
 #eval IO.println (reprStr (UserAssets.resources.programs.map (·.descriptor.logicalId)))
 `);
 const included = run(leaf, "dependency-owned-value", "lake", ["env", "lean", "InspectAssets.lean"]);
-assert.match(included, new RegExp(lock.contentId));
+assertProducedRuntime(readFileSync(embeddedPack), expectedRuntime, "actual embedded UserAssets runtime");
+assert.match(included, new RegExp(expectedRuntime.contentId));
 assert.match(included, /#\["Client.Program"\]/);
 const directProgram = readFileSync(programStage);
 run(leaf, "dependency-owned-warm", "lake", ["build", "UserAssets"]);
 assert.deepEqual(readFileSync(programStage), directProgram);
 build("cold");
+assertEmittedRuntime(join(evidence, "site"), expectedRuntime);
+// One real call through the emitted/acquired loader and its generated program.
+const siteServer = await serveDist(join(evidence, "site"), "/");
+let chromium, cdp;
+try {
+  chromium = await launchChromium();
+  cdp = await openChromiumPage(chromium);
+  const runtimeUrl = `${siteServer.origin}/${lock.contentId}/bundle.json`;
+  const programUrl = `${siteServer.origin}/${packId(directProgram)}/bundle.json`;
+  const emittedRuntime = JSON.parse(readFileSync(join(evidence, "site", lock.contentId, "bundle.json")));
+  const modulePath = emittedRuntime.descriptor.fileEntries.find(entry => entry.role === "runtimeModule").path;
+  await navigate(cdp, runtimeUrl);
+  const observed = await evaluate(cdp, `(async () => {
+    const {createProgram} = await import(${JSON.stringify(new URL(modulePath, runtimeUrl).href)});
+    const program = await createProgram({runtimeManifestUrl: new URL(${JSON.stringify(runtimeUrl)}),
+      programManifestUrl: new URL(${JSON.stringify(programUrl)})});
+    let result;
+    try { result = program.call('Client.Program.greet', 'world'); }
+    finally { program.dispose(); }
+    let rejected = false;
+    try { program.call('Client.Program.greet', 'again'); }
+    catch (error) { rejected = /disposed/.test(error.message); }
+    return {result, status: program.status, rejected};
+  })()`);
+  assert.deepEqual(observed, {result: "Hello, world", status: "disposed", rejected: true});
+  writeFileSync(join(evidence, "acquired-runtime-call.json"), JSON.stringify(observed, null, 2) + "\n");
+} finally {
+  cdp?.close(); await chromium?.close(); await siteServer.close();
+}
+
 if (published) {
   const before = [snapshot(runtimeCache), snapshot(runtimeStage)];
   const tool = join(root, ".lake/build/bin/vir_resource_pack");
@@ -255,10 +313,11 @@ run(
   join(leaf, ".lake/build/bin/generate-site"),
   [destination],
 );
+assertEmittedRuntime(destination, expectedRuntime);
 assert.equal(readdirSync(destination).length, 2);
 for (const id of readdirSync(destination)) {
   assert.ok(existsSync(join(destination, id, "bundle.json")));
 }
 console.log(
-  `resource client (${published ? "anonymous published" : "supplied"}): ordinary cold/warm build, program edit, stage repair, cycle, relocated native execution PASS (${evidence})`,
+  `resource client (${published ? "anonymous published" : "supplied"}): independent staged/embedded/emitted identity + real acquired call/disposal, ordinary cold/warm build, program edit, stage repair, cycle, relocated native execution PASS (${evidence})`,
 );

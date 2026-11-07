@@ -350,11 +350,15 @@ node scripts/resources/pack-runtime.mjs RELEASE_WASM BUILD_IDENTITY NEW_OUTPUT_D
 to write `build/artifacts/runtime/`. CI packages and retains this output after
 the runtime checks. The tagged workflow publishes it as `runtime-REV.virres`
 for its exact Git commit, with source identity included in the generated descriptor.
-Both runtime and SDK publication reuse identical existing bytes and reject
-replacement. CI exercises its own candidate through the ordinary application
-workflow. Release acceptance also exercises a fresh Git dependency with no
-runtime override, downloads the public source-addressed asset and compares it
-to the qualified candidate. Actions artifacts alone are not durable releases.
+Runtime publication reuses identical existing bytes and rejects replacement;
+the separate SDK archive retains its existing retry policy. CI exercises its own
+candidate through the ordinary application
+workflow. Its produced pack is passed as an assertion-only expectation: staged,
+embedded and emitted runtime bytes must equal it, and one real emitted-runtime
+call must return the expected result and dispose. The actual retained426c
+same-profile fixture is a negative control. Release acceptance exercises a fresh
+Git dependency with no runtime override against the same independent expectation.
+Actions artifacts alone are not durable releases.
 
 It minimizes the JS import closure while preserving legal comments and public
 properties, bundles Wasm and notices, verifies the compiler/profile

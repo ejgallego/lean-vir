@@ -467,9 +467,12 @@ RC tags produce prereleases; content-addressed `resource-…` releases remain
 separate. Runtime pack
 publication uploads absent assets, verifies and reuses byte-identical assets on
 reruns, and rejects different bytes without replacing them. The SDK archive
-follows the same immutable publication rule. Both assets are uploaded to a draft
-and downloaded for byte comparison before the release is published. Create the
-tag from the final merged commit
+retains its existing replacement/retry policy. Runtime assets are read back
+before publishing the draft. The client gate receives the produced pack as an
+assertion-only expectation and compares actual staged, embedded and emitted
+bytes, then executes one acquired-runtime call and disposal. The retained426c
+same-profile regression must fail that independent expectation. Create the tag
+from the final merged commit
 so its manifest identifies the revision clients use. Before the tag exists,
 select `VIR_SDK_ARCHIVE` or the exact-commit artifact path; the zero-argument
 `:virSdk` facet targets the tagged release. See

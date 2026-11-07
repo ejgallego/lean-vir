@@ -182,7 +182,8 @@ jobs:
       - run: npm run test:resources:acquisition
       - run: npm run test:resources:packing
       - run: npm run test:resources:program
-      - run: npm run test:resources:client -- "$VIR_RUNTIME_PACK"
+      - run: node tests/resources/historical-runtime.mjs build/stale-runtime-426c.virres
+      - run: npm run test:resources:client -- "$VIR_RUNTIME_PACK" --expect-runtime-pack "$VIR_RUNTIME_PACK" --stale-runtime-pack build/stale-runtime-426c.virres
       - run: npm run test:quickstart
       - run: npm run test:resources:cache
       - name: Preserve failed resource cache campaign

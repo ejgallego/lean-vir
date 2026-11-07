@@ -6,9 +6,10 @@ Author: Emilio J. Gallego Arias
 
 // Maintainer release operation, never invoked by application acquisition.
 import { execFileSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { runtimeAssetName, runtimeLogicalId } from "./runtime-source.mjs";
-import { publishAsset } from "../releases/publish-asset.mjs";
 
 const [tag, pack, ...extra] = process.argv.slice(2);
 if (!tag || !pack || extra.length)
@@ -27,4 +28,36 @@ const bytes = await readFile(pack);
 const descriptor = JSON.parse(bytes.subarray(12, 12 + bytes.readUInt32LE(8)));
 if (descriptor.logicalId !== runtimeLogicalId(revision))
   throw new Error("runtime pack source does not match the publishing checkout");
-await publishAsset(tag, pack, name);
+const { assets } = JSON.parse(
+  execFileSync("gh", ["release", "view", tag, "--json", "assets"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"],
+  }),
+);
+const existing = assets.some((asset) => asset.name === name);
+const temporary = await mkdtemp(join(tmpdir(), "vir-runtime-release-"));
+try {
+  if (!existing) {
+    const upload = join(temporary, name);
+    await copyFile(pack, upload);
+    execFileSync("gh", ["release", "upload", tag, upload], {
+      stdio: "inherit",
+    });
+  }
+  const verified = join(temporary, "verified");
+  await mkdir(verified);
+  execFileSync(
+    "gh",
+    ["release", "download", tag, "--pattern", name, "--dir", verified],
+    { stdio: "inherit" },
+  );
+  if (!(await readFile(pack)).equals(await readFile(join(verified, name))))
+    throw new Error(
+      `existing release asset differs: ${tag}/${name}; left unchanged`,
+    );
+  console.log(
+    `${existing ? "reused" : "published"} identical runtime asset: ${tag}/${name}`,
+  );
+} finally {
+  await rm(temporary, { recursive: true, force: true });
+}

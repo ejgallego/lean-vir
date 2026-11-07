@@ -50,7 +50,8 @@ jobs:
         run: |
           packs=("$GITHUB_WORKSPACE"/build/artifacts/runtime/*.virres)
           test "${#packs[@]}" -eq 1
-          node tests/resources/client.mjs "${packs[0]}"
+          node tests/resources/historical-runtime.mjs build/stale-runtime-426c.virres
+          node tests/resources/client.mjs "${packs[0]}" --expect-runtime-pack "${packs[0]}" --stale-runtime-pack build/stale-runtime-426c.virres
 
       - name: Publish durable runtime artifacts
         env:
@@ -65,16 +66,19 @@ jobs:
           fi
           # Verify/reuse identical runtime assets on reruns; never replace them.
           node scripts/resources/publish-runtime.mjs "$GITHUB_REF_NAME" build/artifacts/runtime/*.virres
-          node scripts/releases/publish-asset.mjs "$GITHUB_REF_NAME" build/artifacts/lean-vir-sdk.tar.gz
-          # Both assets have been downloaded and compared before becoming public.
+          gh release upload "$GITHUB_REF_NAME" build/artifacts/lean-vir-sdk.tar.gz --clobber
+          # Publish after both uploads complete; SDK retry policy is unchanged.
           gh release edit "$GITHUB_REF_NAME" --draft=false
 
       - name: Qualify public default source selection
         run: |
           # No supplied pack: the fresh Git dependency must acquire its own asset.
           unset VIR_RUNTIME_PACK
-          npm run test:resources:published
+          packs=("$GITHUB_WORKSPACE"/build/artifacts/runtime/*.virres)
+          test "${#packs[@]}" -eq 1
+          npm run test:resources:published -- --expect-runtime-pack "${packs[0]}" --stale-runtime-pack build/stale-runtime-426c.virres
           revision=$(git rev-parse HEAD)
           curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/runtime-$revision.virres" -o build/public-runtime.virres
           cmp build/public-runtime.virres build/artifacts/runtime/*.virres
           lake build :virSdk
+          cmp .lake/build/vir/sdk/wasm/vir-upstream.wasm web/public/vir-upstream.wasm
