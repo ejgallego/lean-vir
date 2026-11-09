@@ -5,16 +5,10 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntimeFactory } from "./vir-runtime.js";
-import { validateIrPackageSetMembers } from "./runtime/ir-package.js";
-import {
-  requireSha256,
-  sha256Hex,
-  validateEnvelope,
-} from "./resources/descriptor.js";
-import {
-  resolveProgramExports,
-  snapshotExpectedExports,
-} from "./resources/program-exports.js";
+import { runtimePackageSetInfo } from "./runtime/factory-core.js";
+import { creationError, openOwnedProgram } from "./resources/owned-program.js";
+import { sha256Hex, validateEnvelope } from "./resources/descriptor.js";
+import { snapshotExpectedExports } from "./resources/program-exports.js";
 import { assertResourceCompatibility } from "./resources/compatibility.js";
 
 const manifestLimit = 4 * 1024 * 1024 + 1024;
@@ -125,14 +119,6 @@ async function fetchBounded(url, limit, signal, mediaType = null) {
   return bytes;
 }
 
-function creationError(phase, cause, context = {}, name = "Error") {
-  const error = new Error(`program creation failed during ${phase}`, { cause });
-  error.name = name;
-  error.phase = phase;
-  error.context = Object.freeze({ ...context });
-  return error;
-}
-
 async function fetchManifest(url, kind, signal, perform) {
   const value = await perform(`${kind}-manifest`, async () =>
     parseJson(
@@ -165,7 +151,9 @@ async function fetchPayloads(envelope, url, signal, perform) {
     envelope.descriptor.kind === "runtime"
       ? envelope.descriptor.files.filter((info) =>
           envelope.descriptor.fileEntries.some(
-            (entry) => ["runtimeModule", "wasm"].includes(entry.role) && entry.path === info.path,
+            (entry) =>
+              ["runtimeModule", "wasm"].includes(entry.role) &&
+              entry.path === info.path,
           ),
         )
       : envelope.descriptor.files;
@@ -205,10 +193,7 @@ async function fetchPayloads(envelope, url, signal, perform) {
     }
   };
   await Promise.all(
-    Array.from(
-      { length: Math.min(4, inventory.length) },
-      worker,
-    ),
+    Array.from({ length: Math.min(4, inventory.length) }, worker),
   );
   return { ...envelope, files };
 }
@@ -258,206 +243,75 @@ export async function createProgram(options) {
   } catch (cause) {
     throw creationError("program-manifest", cause);
   }
-  if (signal?.aborted)
-    throw creationError("runtime-manifest", signal.reason, {}, "AbortError");
-  try {
-    requireSha256();
-  } catch (cause) {
-    throw creationError("runtime-creation", cause);
-  }
-  const controller = new AbortController();
-  let primary = null;
-  let phase = "runtime-manifest";
-  const stop = (error) => {
-    if (primary === null) {
-      primary = error;
-      controller.abort(error);
-    }
-    return primary;
-  };
-  const checkStopped = () => {
-    if (primary !== null) throw primary;
-  };
-  const abort = () =>
-    stop(creationError(phase, signal.reason, {}, "AbortError"));
-  signal?.addEventListener("abort", abort, { once: true });
-  const timeout = setTimeout(
-    () =>
-      stop(
-        creationError(
-          phase,
-          new Error("resource acquisition timeout"),
-          {},
-          "TimeoutError",
-        ),
-      ),
-    120000,
-  );
-  let detached = false;
-  const detach = () => {
-    if (detached) return;
-    detached = true;
-    clearTimeout(timeout);
-    signal?.removeEventListener("abort", abort);
-  };
-  const perform = async (nextPhase, action, context = {}) => {
-    phase = nextPhase;
-    try {
-      checkStopped();
-      const value = await action();
-      checkStopped();
-      return value;
-    } catch (cause) {
-      throw stop(primary ?? creationError(nextPhase, cause, context));
-    }
-  };
-  let runtime = null;
-  try {
-    // Admit descriptors before payload acquisition. ABI shape checks still need
-    // verified package bytes, and all checks precede runtime instantiation.
-    const [runtimeManifest, programManifest] = await Promise.all([
-      fetchManifest(runtimeUrl, "runtime", controller.signal, perform),
-      fetchManifest(programUrl, "program", controller.signal, perform),
-    ]);
-    await perform("compatibility", () => {
-      if (
-        JSON.stringify(runtimeManifest.descriptor.compatibility) !==
-        JSON.stringify(programManifest.descriptor.compatibility)
-      )
-        throw new Error("incompatible runtime and program resource bundles");
-      assertResourceCompatibility(runtimeManifest.descriptor.compatibility);
-      if (
-        runtimeManifest.descriptor.logicalId ===
-        programManifest.descriptor.logicalId
-      )
-        throw new Error(
-          "runtime and program resource logical identities conflict",
+  return openOwnedProgram({
+    signal,
+    expected,
+    initialPhase: "runtime-manifest",
+    async prepare({ signal: acquisitionSignal, perform }) {
+      // Admit descriptors before payload acquisition. ABI shape checks still need
+      // verified package bytes, and all checks precede runtime instantiation.
+      const [runtimeManifest, programManifest] = await Promise.all([
+        fetchManifest(runtimeUrl, "runtime", acquisitionSignal, perform),
+        fetchManifest(programUrl, "program", acquisitionSignal, perform),
+      ]);
+      await perform("compatibility", () => {
+        if (
+          JSON.stringify(runtimeManifest.descriptor.compatibility) !==
+          JSON.stringify(programManifest.descriptor.compatibility)
+        )
+          throw new Error("incompatible runtime and program resource bundles");
+        assertResourceCompatibility(runtimeManifest.descriptor.compatibility);
+        if (
+          runtimeManifest.descriptor.logicalId ===
+          programManifest.descriptor.logicalId
+        )
+          throw new Error(
+            "runtime and program resource logical identities conflict",
+          );
+        if (runtimeManifest.roleUrl("runtimeModule").href !== import.meta.url)
+          throw new Error(
+            "runtimeModule role does not identify the executing resource module",
+          );
+      });
+      const [engine, program] = await Promise.all([
+        fetchPayloads(runtimeManifest, runtimeUrl, acquisitionSignal, perform),
+        fetchPayloads(programManifest, programUrl, acquisitionSignal, perform),
+      ]);
+      const compatibility = engine.descriptor.compatibility;
+      return perform("program-validation", async () => {
+        const wasmUrl = engine.roleUrl("wasm");
+        const wasmInfo = engine.descriptor.files.find(
+          (info) => new URL(info.path, runtimeUrl).href === wasmUrl.href,
         );
-      if (runtimeManifest.roleUrl("runtimeModule").href !== import.meta.url)
-        throw new Error(
-          "runtimeModule role does not identify the executing resource module",
-        );
-    });
-    const [engine, program] = await Promise.all([
-      fetchPayloads(runtimeManifest, runtimeUrl, controller.signal, perform),
-      fetchPayloads(programManifest, programUrl, controller.signal, perform),
-    ]);
-    const compatibility = engine.descriptor.compatibility;
-    phase = "program-validation";
-    const wasmUrl = engine.roleUrl("wasm");
-    const wasmInfo = engine.descriptor.files.find(
-      (info) => new URL(info.path, runtimeUrl).href === wasmUrl.href,
-    );
-    if (wasmInfo.mediaType !== "application/wasm")
-      throw new Error("wasm role requires application/wasm");
-    const setUrl = program.roleUrl("programSet");
-    // The existing runtime owns package-set semantics. Restrict its byte reader
-    // to the already verified inventory: missing/escaping members never fetch.
-    const verifiedBytes = async (url) => {
-      const bytes = program.files.get(String(url));
-      if (!bytes)
-        throw new Error(`program member is outside verified inventory: ${url}`);
-      return bytes;
-    };
-    const factory = createVirRuntimeFactory({
-      wasmBytes: engine.files.get(wasmUrl.href),
-      fetchBytes: verifiedBytes,
-    });
-    // Preflight duplicate keys and JSON depth before the existing descriptor parser.
-    parseJson(await verifiedBytes(setUrl), "program package-set");
-    const packageSet = await perform("program-validation", () =>
-      factory.fetchIrPackageSet(setUrl),
-    );
-    const { manifests } = validateIrPackageSetMembers(
-      packageSet.members.map((m) => m.bytes),
-      {
-        members: packageSet.members,
-      },
-    );
-    for (const manifest of manifests) {
-      // IR and interface format versions were checked by the package validator.
-      if (manifest.metadata.leanGithash !== compatibility.leanRevision) {
-        throw new Error(
-          "program compiled identity does not match resource compatibility",
-        );
-      }
-    }
-    const rootDeclarations = resolveProgramExports(
-      manifests.at(-1).exports,
-      expected,
-    );
-    // Assign before the post-await abort check so a late owned instance cannot
-    // escape cleanup. Creation itself may be non-preemptible.
-    await perform("runtime-creation", async () => {
-      runtime = await factory.createRuntime({ irPackageSet: packageSet });
-    });
-    // Use the installed entries (including their runtime call-index cache), not
-    // structurally equivalent entries parsed during the preflight above.
-    phase = "program-validation";
-    const installedDeclarations = resolveProgramExports(
-      runtime.interfaceManifest.exports,
-      expected,
-    );
-    const declarations = new Map();
-    for (const declaration of rootDeclarations.keys()) {
-      const entry = installedDeclarations.get(declaration);
-      if (entry === undefined)
-        throw new Error(`missing installed program export ${declaration}`);
-      declarations.set(declaration, entry);
-    }
-    checkStopped();
-    detach(); // Final check and ownership handoff have no intervening await.
-    let disposed = false;
-    return Object.freeze({
-      get status() {
-        return disposed
-          ? "disposed"
-          : runtime.failure === null
-            ? "active"
-            : "failed";
-      },
-      call(declaration, ...args) {
-        if (disposed) throw new Error("program has been disposed");
-        const entry = declarations.get(declaration);
-        if (entry === undefined)
-          throw new Error(`unknown program export ${declaration}`);
-        return runtime.callEntry(entry, args);
-      },
-      callWith(options, declaration, ...args) {
-        if (disposed) throw new Error("program has been disposed");
-        if (!declarations.has(declaration))
-          throw new Error(`unknown program export ${declaration}`);
-        return runtime.callWith(options, declaration, ...args);
-      },
-      dispose() {
-        if (disposed) return;
-        disposed = true;
-        try {
-          runtime.dispose();
-        } finally {
-          // A retained closed facade must not keep the Wasm heap reachable,
-          // including when runtime cleanup reports an error.
-          runtime = null;
-          declarations.clear();
-        }
-      },
-    });
-  } catch (error) {
-    const failure = stop(primary ?? creationError(phase, error));
-    const owned = runtime;
-    runtime = null; // Detach before invoking arbitrary cleanup, even on throw.
-    if (owned !== null) {
-      try {
-        owned.dispose();
-      } catch (cleanupError) {
-        Object.defineProperty(failure, "cleanupError", {
-          value: cleanupError,
-          enumerable: true,
+        if (wasmInfo.mediaType !== "application/wasm")
+          throw new Error("wasm role requires application/wasm");
+        const setUrl = program.roleUrl("programSet");
+        // The existing runtime owns package-set semantics. Restrict its byte reader
+        // to the already verified inventory: missing/escaping members never fetch.
+        const verifiedBytes = async (url) => {
+          const bytes = program.files.get(String(url));
+          if (!bytes)
+            throw new Error(
+              `program member is outside verified inventory: ${url}`,
+            );
+          return bytes;
+        };
+        const factory = createVirRuntimeFactory({
+          wasmBytes: engine.files.get(wasmUrl.href),
+          fetchBytes: verifiedBytes,
         });
-      }
-    }
-    throw failure;
-  } finally {
-    detach();
-  }
+        // Preflight duplicate keys and JSON depth before the existing descriptor parser.
+        parseJson(await verifiedBytes(setUrl), "program package-set");
+        const packageSet = await factory.fetchIrPackageSet(setUrl);
+        return {
+          compatibility,
+          packages: packageSet.members.map((member) =>
+            Uint8Array.from(member.bytes),
+          ),
+          packageInfo: runtimePackageSetInfo(packageSet),
+          instantiate: () => factory.instantiate(),
+        };
+      });
+    },
+  });
 }

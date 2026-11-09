@@ -41,6 +41,63 @@ separately reviewed compiler output alongside the client's typed adapter. Do not
 construct expectations from the program being loaded. ABI agreement does not
 prove semantics; applications check behavior separately.
 
+## Owned programs from in-memory bytes
+
+Hosts that already have package bytes can use the SDK factory directly. The
+same owned facade and independent contract checks are available without URL
+acquisition:
+
+```js
+import { createVirRuntimeFactory } from "./js/vir-runtime.js";
+
+const factory = createVirRuntimeFactory({
+  wasmBytes,
+  runtimeManifest,          // existing { contentId, descriptor } runtime envelope
+  expectedRuntimeContentId, // independently selected contentId for that build
+});
+const program = await factory.createProgram({
+  irPackageSet: [dependencyBytes, rootBytes], // root last; one member is also valid
+  expectedExports,          // independently reviewed callable contracts
+  signal: pending.signal,
+});
+try {
+  const result = program.call("Client.Program.greet", "Ada");
+} finally {
+  program.dispose();
+}
+```
+
+The host supplies the existing runtime envelope and its independently selected
+content ID; it does not author another lock or derive expected callable contracts
+from the package being opened. This operation verifies the envelope's canonical
+content ID and Wasm inventory length/hash, supported VIR compatibility, every
+package's compiler identity and the expected root exports before initializing a
+runtime. It uses the same admission and facade implementation as URL loading.
+The URL loader retains its existing origin, inventory and module-role rules.
+
+Runtime bytes and envelope are copied at factory construction. Package bytes and
+expected contracts are copied at each `createProgram` invocation, before any
+await. The factory privately associates its verified bytes with one compiled
+module, reused by independent program instances. Changing caller buffers or the
+factory's public low-level Wasm fields cannot retarget that association. A bare
+`WebAssembly.Module` or identity string does not establish it. Configure this
+operation with raw `wasmBytes`, `runtimeManifest` and
+`expectedRuntimeContentId`, without other Wasm selectors.
+
+These checks establish agreement with a trusted publisher's selected bytes and
+metadata. The embedder must load the JavaScript modules from the matching SDK;
+the envelope cannot attest to arbitrary executing JavaScript or prove program
+semantics. Keep the compiler, SDK, Wasm and generated packages matched. No
+published artifact for a different Lean revision is an acceptable substitute.
+
+`program` exposes only root `call`, `callWith`, `status` and idempotent `dispose`.
+Disposal releases its instance, leaving the factory reusable. Creation observes
+`signal` before and after asynchronous work and disposes a late-created instance
+on cancellation. The error and `cleanupError` rules below apply to both loading
+routes. Synchronous Lean execution is not preempted by abort; a worker owner may
+terminate its worker when required. UI mounting and retained-callback lifetimes
+keep their existing ownership rules.
+
 ## Pending-creation cancellation
 
 `signal` cancels only pending creation. After success, the program belongs to its
