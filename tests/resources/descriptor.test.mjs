@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { webcrypto } from "node:crypto";
+import { sha256Hex as hashBytes } from "../../web/src/runtime/vir-codec.js";
 import { readFileSync } from "node:fs";
 
 import {
@@ -270,4 +271,10 @@ test("rejects representative schema-v2 metadata, path, and role failures", () =>
   for (const [value, code] of cases) {
     assert.throws(() => validateDescriptor(value), new RegExp(code));
   }
+});
+
+
+test("shared byte hashing honors typed-array and Buffer view offsets", async () => {
+  assert.equal(await hashBytes(new TextEncoder().encode("xabcx").subarray(1, 4)), abcSha256);
+  assert.equal(await hashBytes(Buffer.from("xabcx").subarray(1, 4)), abcSha256);
 });

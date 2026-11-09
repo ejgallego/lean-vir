@@ -85,7 +85,17 @@ function packageBytes(
       leanToolchain: "test",
       leanGithash: revision,
       packageSetMember: { module, role },
-      targets: role === "root" ? [{ mode: "markedModule", module, roots: [], resolvedRoots: ["Root.run"] }] : [],
+      targets:
+        role === "root"
+          ? [
+              {
+                mode: "markedModule",
+                module,
+                roots: [],
+                resolvedRoots: ["Root.run"],
+              },
+            ]
+          : [],
     },
     exports: role === "root" ? [entry] : [],
   });
@@ -191,6 +201,7 @@ async function fixture(options = {}) {
       },
       dispose() {
         state.disposed++;
+        state.onDispose?.();
         if (state.cleanupError) throw state.cleanupError;
       },
     };
@@ -374,5 +385,49 @@ test("installation failure owns the instance and retains cleanup failure", async
     h.open(),
     (error) => error.cause === primary && error.cleanupError === cleanup,
   );
+  assert.equal(h.state.disposed, 1);
+});
+
+test("in-memory owned creation installs no acquisition timer", async () => {
+  const h = await fixture();
+  const originalSet = globalThis.setTimeout,
+    originalClear = globalThis.clearTimeout;
+  let timers = 0,
+    clears = 0;
+  try {
+    globalThis.setTimeout = (...args) => {
+      timers++;
+      return originalSet(...args);
+    };
+    globalThis.clearTimeout = (...args) => {
+      clears++;
+      return originalClear(...args);
+    };
+    const program = await h.open();
+    program.dispose();
+    assert.equal(timers, 0);
+    assert.equal(clears, 0);
+  } finally {
+    globalThis.setTimeout = originalSet;
+    globalThis.clearTimeout = originalClear;
+  }
+});
+
+test("facade detaches ownership before reentrant or throwing cleanup", async () => {
+  const h = await fixture(),
+    cleanup = new Error("cleanup");
+  const program = await h.open();
+  h.state.onDispose = () => {
+    assert.equal(program.status, "disposed");
+    assert.throws(() => program.call("Root.run"), /disposed/);
+    assert.throws(() => program.callWith({}, "Root.run"), /disposed/);
+    program.dispose();
+  };
+  h.state.cleanupError = cleanup;
+  assert.throws(
+    () => program.dispose(),
+    (error) => error === cleanup,
+  );
+  program.dispose();
   assert.equal(h.state.disposed, 1);
 });

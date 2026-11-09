@@ -4,6 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { sha256Hex } from "../runtime/vir-codec.js";
+export { requireSha256, sha256Hex } from "../runtime/vir-codec.js";
+
 // Browser-side counterpart of Vir.Resources.Validate's v2 descriptor rules.
 // This intentionally receives already-parsed JSON: callers must bound JSON
 // input and reject duplicate JSON keys before calling it.
@@ -23,10 +26,7 @@ const descriptorKeys = [
   "files",
   "fileEntries",
 ];
-const compatibilityKeys = [
-  "leanRevision",
-  "virVersion",
-];
+const compatibilityKeys = ["leanRevision", "virVersion"];
 const fileKeys = ["path", "mediaType", "byteLength", "sha256"];
 const entryKeys = ["role", "path"];
 const hex64 = /^[0-9a-f]{64}$/;
@@ -104,32 +104,6 @@ export function validateDescriptor(value) {
 
 export function encodeDescriptor(value) {
   return prepareDescriptor(value).encoded;
-}
-
-export function requireSha256() {
-  const subtle = globalThis.crypto?.subtle;
-  if (typeof subtle?.digest !== "function") {
-    throw new Error(
-      "WebCrypto SHA-256 is unavailable; serve resources in a secure context (HTTPS or trusted localhost)",
-    );
-  }
-  return subtle;
-}
-
-export async function sha256Hex(bytes) {
-  if (!(bytes instanceof Uint8Array)) {
-    throw new TypeError("SHA256 input must be a Uint8Array");
-  }
-  const subtle = requireSha256();
-  const digest = new Uint8Array(
-    await subtle.digest(
-      "SHA-256",
-      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-    ),
-  );
-  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join(
-    "",
-  );
 }
 
 export async function descriptorContentId(value) {

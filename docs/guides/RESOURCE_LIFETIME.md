@@ -93,9 +93,12 @@ published artifact for a different Lean revision is an acceptable substitute.
 `program` exposes only root `call`, `callWith`, `status` and idempotent `dispose`.
 Disposal releases its instance, leaving the factory reusable. Creation observes
 `signal` before and after asynchronous work and disposes a late-created instance
-on cancellation. The error and `cleanupError` rules below apply to both loading
-routes. Synchronous Lean execution is not preempted by abort; a worker owner may
-terminate its worker when required. UI mounting and retained-callback lifetimes
+on cancellation. Byte creation has no implicit deadline: its caller supplies
+`signal` when needed. URL loading retains its 120-second acquisition deadline.
+Neither route promises prompt cancellation of a non-abortable operation. The
+error and `cleanupError` rules below apply to both loading routes. Synchronous
+Lean execution is not preempted by abort; a worker owner may terminate its worker
+when required. UI mounting and retained-callback lifetimes
 keep their existing ownership rules.
 
 ## Pending-creation cancellation

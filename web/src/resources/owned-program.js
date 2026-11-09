@@ -5,7 +5,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 
 import { validateIrPackageSetMembers } from "../runtime/ir-package.js";
 import { resolveProgramExports } from "./program-exports.js";
-import { requireSha256 } from "./descriptor.js";
+import { requireSha256 } from "../runtime/vir-codec.js";
 
 export function creationError(phase, cause, context = {}, name = "Error") {
   const error = new Error(`program creation failed during ${phase}`, { cause });
@@ -23,6 +23,7 @@ export async function openOwnedProgram({
   expected,
   prepare,
   initialPhase = "program-validation",
+  acquisitionTimeoutMs = null,
 }) {
   if (signal?.aborted)
     throw creationError(initialPhase, signal.reason, {}, "AbortError");
@@ -47,23 +48,26 @@ export async function openOwnedProgram({
   const abort = () =>
     stop(creationError(phase, signal.reason, {}, "AbortError"));
   signal?.addEventListener("abort", abort, { once: true });
-  const timeout = setTimeout(
-    () =>
-      stop(
-        creationError(
-          phase,
-          new Error("resource acquisition timeout"),
-          {},
-          "TimeoutError",
-        ),
-      ),
-    120000,
-  );
+  const timeout =
+    acquisitionTimeoutMs === null
+      ? null
+      : setTimeout(
+          () =>
+            stop(
+              creationError(
+                phase,
+                new Error("resource acquisition timeout"),
+                {},
+                "TimeoutError",
+              ),
+            ),
+          acquisitionTimeoutMs,
+        );
   let detached = false;
   const detach = () => {
     if (detached) return;
     detached = true;
-    clearTimeout(timeout);
+    if (timeout !== null) clearTimeout(timeout);
     signal?.removeEventListener("abort", abort);
   };
   const perform = async (nextPhase, action, context = {}) => {
@@ -127,39 +131,34 @@ export async function openOwnedProgram({
     }
     checkStopped();
     detach(); // Final check and ownership handoff have no intervening await.
-    let disposed = false;
     return Object.freeze({
       get status() {
-        return disposed
+        return runtime === null
           ? "disposed"
           : runtime.failure === null
             ? "active"
             : "failed";
       },
       call(declaration, ...args) {
-        if (disposed) throw new Error("program has been disposed");
+        if (runtime === null) throw new Error("program has been disposed");
         const entry = declarations.get(declaration);
         if (entry === undefined)
           throw new Error(`unknown program export ${declaration}`);
         return runtime.callEntry(entry, args);
       },
       callWith(options, declaration, ...args) {
-        if (disposed) throw new Error("program has been disposed");
+        if (runtime === null) throw new Error("program has been disposed");
         if (!declarations.has(declaration))
           throw new Error(`unknown program export ${declaration}`);
         return runtime.callWith(options, declaration, ...args);
       },
       dispose() {
-        if (disposed) return;
-        disposed = true;
-        try {
-          runtime.dispose();
-        } finally {
-          // A retained closed facade must not keep the Wasm heap reachable,
-          // including when runtime cleanup reports an error.
-          runtime = null;
-          declarations.clear();
-        }
+        const owned = runtime;
+        if (owned === null) return;
+        // Detach before cleanup so reentrant calls cannot reacquire ownership.
+        runtime = null;
+        declarations.clear();
+        owned.dispose();
       },
     });
   } catch (error) {

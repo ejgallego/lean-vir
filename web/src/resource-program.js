@@ -247,6 +247,7 @@ export async function createProgram(options) {
     signal,
     expected,
     initialPhase: "runtime-manifest",
+    acquisitionTimeoutMs: 120000,
     async prepare({ signal: acquisitionSignal, perform }) {
       // Admit descriptors before payload acquisition. ABI shape checks still need
       // verified package bytes, and all checks precede runtime instantiation.
