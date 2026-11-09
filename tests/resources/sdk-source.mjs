@@ -17,6 +17,37 @@ import { fileURLToPath } from "node:url";
 import { RUNTIME_ABI_VERSION } from "../../web/src/runtime/versions.js";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const evidence = mkdtempSync(join(root, "build/sdk-source-"));
+// Both default paths share the same owning-checkout resolver. Exercise the SDK
+// adapter's clean, dirty and source-archive diagnostics without a download.
+const fetcher = join(root, ".lake/build/bin/vir_fetch_sdk");
+const checkout = join(evidence, "checkout");
+execFileSync("git", ["clone", "--quiet", "--shared", root, checkout]);
+const checkoutRevision = execFileSync("git", ["rev-parse", "HEAD"], {
+  cwd: checkout,
+  encoding: "utf8",
+}).trim();
+function resolveSource(path, error) {
+  const result = spawnSync(fetcher, ["--source-revision", path], {
+    encoding: "utf8",
+  });
+  assert.ifError(result.error);
+  if (error) {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, error);
+  } else {
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), checkoutRevision);
+  }
+}
+resolveSource(checkout);
+writeFileSync(join(checkout, "README.md"), "SDK dirty-source control\n");
+resolveSource(checkout, /VIR_UNRELEASED_SOURCE:.*VIR_SDK_ARCHIVE/);
+const sourceArchive = join(evidence, "source-archive");
+mkdirSync(sourceArchive);
+resolveSource(
+  sourceArchive,
+  /VIR_SOURCE_REVISION_UNAVAILABLE:.*VIR_SDK_ARCHIVE/,
+);
 const sdk = join(root, ".lake/build/vir/sdk");
 if (existsSync(sdk)) renameSync(sdk, join(evidence, "previous-sdk"));
 const revision = execFileSync("git", ["rev-parse", "HEAD"], {

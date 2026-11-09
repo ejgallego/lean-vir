@@ -94,6 +94,12 @@ inventory. Do not reconstruct manifests or content-ID directory names.
 publication failure; the simple example writer is not transactional. Program
 generation remains independent of acquiring the precompiled interpreter.
 Missing acquisition is an error, never an implicit Wasm source build.
+Default acquisition requires a clean Git dependency whose exact VIR commit has
+published runtime assets. For an unreleased revision, local edits or a source
+archive, set `VIR_RUNTIME_PACK` to an explicitly built matching `.virres` file
+before running Lake. Its planned content ID is checked against cache, stage and
+downloaded bytes; replacing that file after planning cannot change the selected
+identity. See [runtime production](../reference/RESOURCE_BUNDLES.md#publication).
 
 The page/JavaScript are embedded with Lean's standard `include_str`. An ordinary
 Lake input-directory dependency tracks those files, so frontend edits rebuild

@@ -19,9 +19,9 @@ def runtimeName (revision : String) : String := s!"runtime-{revision}.virres"
 def runtimeLogicalId (revision : String) : String := s!"lean-vir/runtime/{revision}"
 
 /-- Resolve the owning checkout, never an enclosing consumer repository. -/
-def sourceRevision (root : System.FilePath) : IO String := do
+def sourceRevision (root : System.FilePath) (candidate : String := "VIR_RUNTIME_PACK") : IO String := do
   unless ← (root / ".git").pathExists do
-    throw <| IO.userError "VIR_SOURCE_REVISION_UNAVAILABLE: use a Git dependency or supply VIR_RUNTIME_PACK for a source archive"
+    throw <| IO.userError s!"VIR_SOURCE_REVISION_UNAVAILABLE: use a Git dependency or supply {candidate} for a source archive"
   let result ← IO.Process.output {
     cmd := "git", args := #["-C", root.toString, "rev-parse", "HEAD"] }
   let revision := result.stdout.trimAscii.toString
@@ -30,8 +30,10 @@ def sourceRevision (root : System.FilePath) : IO String := do
     throw <| IO.userError "VIR_SOURCE_REVISION_UNAVAILABLE: cannot resolve the VIR source commit"
   let status ← IO.Process.output {
     cmd := "git", args := #["-C", root.toString, "status", "--porcelain", "--untracked-files=normal"] }
-  unless status.exitCode == 0 && status.stdout.trimAscii.toString.isEmpty do
-    throw <| IO.userError "VIR_UNRELEASED_SOURCE: dirty VIR source requires an explicit VIR_RUNTIME_PACK candidate"
+  unless status.exitCode == 0 do
+    throw <| IO.userError "VIR_SOURCE_REVISION_UNAVAILABLE: cannot check the VIR source status"
+  unless status.stdout.trimAscii.toString.isEmpty do
+    throw <| IO.userError s!"VIR_UNRELEASED_SOURCE: dirty VIR source requires an explicit {candidate} candidate"
   return revision
 
 end Vir.Release

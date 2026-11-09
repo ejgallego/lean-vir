@@ -265,6 +265,13 @@ def fetchArchive (url : String) (dest : FilePath) : IO Unit :=
   fetchUrl url dest
 
 def runMain (args : List String) : IO UInt32 := do
+  if let ["--source-revision", root] := args then
+    try
+      IO.println (← Vir.Release.sourceRevision root "VIR_SDK_ARCHIVE")
+      return 0
+    catch error =>
+      IO.eprintln s!"error: {error}"
+      return 1
   match parseArgs args with
   | .error err =>
       IO.eprintln err

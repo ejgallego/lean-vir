@@ -462,7 +462,12 @@ and publishes the SDK plus `runtime-<VIR commit>.virres`. Runtime acquisition
 selects this exact source-derived name and verifies the descriptor's source
 identity; there is no runtime lock to update. A missing revision fails clearly.
 After publication, a fresh Git dependency must acquire that exact runtime through
-the public default path and its bytes must equal the qualified candidate.
+the public default path and its bytes must equal the qualified candidate. The
+workflow runs `scripts/publish-sdk-release.sh`: failure returns a newly created
+or previously draft release to draft and clears its latest status. An already
+public release keeps its visibility on a failed retry; the failing check requires
+maintainer action. A failed recovery reports the required manual repair. Tags and
+assets are retained for diagnosis.
 RC tags produce prereleases; content-addressed `resource-…` releases remain
 separate. Runtime pack
 publication uploads absent assets, verifies and reuses byte-identical assets on
@@ -471,7 +476,12 @@ retains its existing replacement/retry policy. Runtime assets are read back
 before publishing the draft. The client gate receives the produced pack as an
 assertion-only expectation and compares actual staged, embedded and emitted
 bytes, then executes one acquired-runtime call and disposal. The retained426c
-same-profile regression must fail that independent expectation. Create the tag
+regression must fail that independent expectation. With its original
+Lean4.36-rc2/compat7 profile, it also passes ordinary native admission before
+failing the byte expectation. Later toolchains still validate its fixed public
+SHA/CID and rejection by the byte oracle, without asking the current compiler to
+admit an incompatible historical runtime. Current same-profile source/CID
+substitution controls remain in `test:resources:acquisition`. Create the tag
 from the final merged commit
 so its manifest identifies the revision clients use. Before the tag exists,
 select `VIR_SDK_ARCHIVE` or the exact-commit artifact path; the zero-argument

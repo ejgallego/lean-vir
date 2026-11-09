@@ -127,36 +127,85 @@ def candidate (expected : String) (profile : Compatibility) (path : FilePath)
       verifyIdentity expected profile bundle
     return some verified
 
-def runtimePlan (root : FilePath) : IO Unit := do
-  let (key, source, logicalId) : String × String × String ← match ← IO.getEnv "VIR_RUNTIME_PACK" with
-    | some path => do
-      let path := FilePath.mk path
-      let path := if path.isAbsolute then path else root / path
-      let bytes ← readInput path packLimit "PACK_LIMIT"
-      let bundle ← fromResource (Pack.decode bytes)
-      pure (bundle.contentId, path.toString, "")
-    | none => do
-      let revision ← Vir.Release.sourceRevision root
-      let name := Vir.Release.runtimeName revision
-      pure (revision,
-        s!"https://github.com/ejgallego/lean-vir/releases/download/{Vir.Release.tag}/{name}",
-        Vir.Release.runtimeLogicalId revision)
-  IO.println (Json.compress <| Json.mkObj [
-    ("key", toJson key), ("source", toJson source), ("logicalId", toJson logicalId)])
+/-- Selection records one immutable expected identity before any acquisition. -/
+inductive RuntimeIdentity where
+  | sourceRevision (revision : String)
+  | contentId (contentId : String)
+  deriving Repr, BEq
 
-/-- Runtime selection is derived from source identity. A cache/stage candidate
-must satisfy that identity, not just the compiler compatibility profile. -/
-def verifyRuntime (logicalId : String) (expected : Option String) (bytes : ByteArray) : IO Unit := do
-  let bundle ← fromResource (Pack.decode bytes)
-  if let some expected := expected then
-    unless bundle.contentId == expected do
-      fail "CONTENT_ID_MISMATCH" s!"expected {expected}, got {bundle.contentId}"
-  unless bundle.descriptor.kind == .runtime do fail "EXPECTED_RUNTIME" bundle.contentId
+namespace RuntimeIdentity
+
+def kind : RuntimeIdentity → String
+  | .sourceRevision _ => "sourceRevision"
+  | .contentId _ => "contentId"
+
+def value : RuntimeIdentity → String
+  | .sourceRevision revision => revision
+  | .contentId cid => cid
+
+def parse (kind value : String) : Except String RuntimeIdentity := do
+  let length ← match kind with
+    | "sourceRevision" => pure 40
+    | "contentId" => pure 64
+    | _ => throw "expected sourceRevision or contentId"
+  unless value.length == length && value.toList.all ("0123456789abcdef".contains ·) do
+    throw s!"expected {length} lowercase hexadecimal digits"
+  return if kind == "sourceRevision" then .sourceRevision value else .contentId value
+
+end RuntimeIdentity
+
+structure RuntimeSelection where
+  identity : RuntimeIdentity
+  source : String
+
+private def selectRuntime (root : FilePath) : IO RuntimeSelection := do
+  match ← IO.getEnv "VIR_RUNTIME_PACK" with
+  | some path =>
+    let path := FilePath.mk path
+    let path := if path.isAbsolute then path else root / path
+    let bundle ← fromResource (Pack.decode (← readInput path packLimit "PACK_LIMIT"))
+    return { identity := .contentId bundle.contentId, source := path.toString }
+  | none =>
+    let revision ← Vir.Release.sourceRevision root
+    return { identity := .sourceRevision revision
+             source := s!"https://github.com/ejgallego/lean-vir/releases/download/{Vir.Release.tag}/{Vir.Release.runtimeName revision}" }
+
+def runtimePlan (root : FilePath) : IO Unit := do
+  let selection ← selectRuntime root
+  IO.println (Json.compress <| Json.mkObj [
+    ("identity", Json.mkObj [("kind", toJson selection.identity.kind),
+      ("value", toJson selection.identity.value)]),
+    ("source", toJson selection.source)])
+
+/-- Pure domain validation; filesystem failures are never cache misses. -/
+def validateRuntime (identity : RuntimeIdentity) (bytes : ByteArray) : Except ResourceError Unit := do
+  let bundle ← Pack.decode bytes
+  unless bundle.descriptor.kind == .runtime do throw { code := "EXPECTED_RUNTIME" }
   unless bundle.descriptor.compatibility == currentCompatibility do
-    fail "INCOMPATIBLE" s!"expected {repr currentCompatibility}"
-  unless logicalId.isEmpty || bundle.descriptor.logicalId == logicalId do
-    fail "RUNTIME_SOURCE_MISMATCH"
-      s!"expected {logicalId}, got {bundle.descriptor.logicalId}"
+    throw { code := "INCOMPATIBLE", expected := some (reprStr currentCompatibility) }
+  match identity with
+  | .contentId expected =>
+    unless bundle.contentId == expected do
+      throw { code := "CONTENT_ID_MISMATCH", expected := some expected, actual := some bundle.contentId }
+  | .sourceRevision revision =>
+    let expected := Vir.Release.runtimeLogicalId revision
+    unless bundle.descriptor.logicalId == expected do
+      throw { code := "RUNTIME_SOURCE_MISMATCH"
+              expected := some expected
+              actual := some bundle.descriptor.logicalId }
+
+def verifyRuntime (identity : RuntimeIdentity) (bytes : ByteArray) : IO Vir.NativePayload.VerifiedPayload :=
+  Vir.NativePayload.verifyBytes bytes fun bytes => fromResource (validateRuntime identity bytes)
+
+def runtimeCandidate (identity : RuntimeIdentity) (path : FilePath)
+    : IO (Option Vir.NativePayload.VerifiedPayload) := do
+  checkFile path
+  let some metadata ← metadata? path | return none
+  if metadata.byteSize.toNat > packLimit then return none
+  let bytes ← readInput path packLimit "PACK_LIMIT"
+  match validateRuntime identity bytes with
+  | .error _ => return none
+  | .ok _ => return some (← Vir.NativePayload.verifyBytes bytes fun _ => pure ())
 
 def stage (compatibilityPath packPath outputPath : FilePath) : IO String := do
   let expected ← compatibility compatibilityPath

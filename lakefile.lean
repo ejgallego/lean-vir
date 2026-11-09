@@ -358,29 +358,23 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
   let commit? ← IO.getEnv "VIR_SDK_COMMIT"
   let expectCommit? ← IO.getEnv "VIR_SDK_EXPECT_COMMIT"
   let repo? ← IO.getEnv "VIR_SDK_REPO"
-  -- Default release acquisition must identify this VIR source, not merely
-  -- another SDK built with the same Lean version.
-  let expectCommit? ← if expectCommit?.isNone && archive?.isNone && url?.isNone &&
-      tag?.isNone && commit?.isNone then do
-    unless ← (pkg.dir / ".git").pathExists do
-      error "VIR_SOURCE_REVISION_UNAVAILABLE: default SDK acquisition requires the owning Git checkout; supply VIR_SDK_ARCHIVE for a source archive"
-    let status ← captureProc {
-      cmd := "git", args := #["-C", pkg.dir.toString, "status", "--porcelain", "--untracked-files=normal"] }
-    unless status.trimAscii.toString.isEmpty do
-      error "VIR_UNRELEASED_SOURCE: dirty VIR source requires an explicit VIR_SDK_ARCHIVE candidate"
-    let revision ← captureProc {
-      cmd := "git", args := #["-C", pkg.dir.toString, "rev-parse", "HEAD"] }
-    pure (some revision.trimAscii.toString)
-  else pure expectCommit?
-  let sourceConfig := String.intercalate "\n" [
-    s!"archive={archive?.getD ""}",
-    s!"url={url?.getD ""}",
-    s!"tag={tag?.getD ""}",
-    s!"commit={commit?.getD ""}",
-    s!"expectCommit={expectCommit?.getD ""}",
-    s!"repo={repo?.getD ""}"
-  ]
   fetcherJob.mapM fun fetcher => do
+    -- Resolve Git identity once, with the same owning-checkout contract used
+    -- by runtime acquisition; no import of unbuilt VIR code into Lake config.
+    let expectCommit? ← if expectCommit?.isNone && archive?.isNone && url?.isNone &&
+        tag?.isNone && commit?.isNone then do
+      let revision ← captureProc {
+        cmd := fetcher.toString, args := #["--source-revision", pkg.dir.toString] }
+      pure (some revision.trimAscii.toString)
+    else pure expectCommit?
+    let sourceConfig := String.intercalate "\n" [
+      s!"archive={archive?.getD ""}",
+      s!"url={url?.getD ""}",
+      s!"tag={tag?.getD ""}",
+      s!"commit={commit?.getD ""}",
+      s!"expectCommit={expectCommit?.getD ""}",
+      s!"repo={repo?.getD ""}"
+    ]
     addTrace (← computeTrace fetcher)
     addPureTrace virSdkVersion "VIR SDK version"
     addPureTrace Lean.versionString "VIR SDK release toolchain"
@@ -420,16 +414,17 @@ target virRuntimePack (pkg) : System.FilePath := do
       cmd := tool.toString
       args := #["runtime-plan", pkg.dir.toString] }
     let json ← IO.ofExcept (Lean.Json.parse plan)
-    let key ← IO.ofExcept <| json.getObjValAs? String "key"
+    let identity ← IO.ofExcept <| json.getObjVal? "identity"
+    let kind ← IO.ofExcept <| identity.getObjValAs? String "kind"
+    let expected ← IO.ofExcept <| identity.getObjValAs? String "value"
     let source ← IO.ofExcept <| json.getObjValAs? String "source"
-    let logicalId ← IO.ofExcept <| json.getObjValAs? String "logicalId"
     if !source.startsWith "https://" then
       addTrace (← computeTrace (System.FilePath.mk source))
     addLeanTrace
-    let cache := pkg.buildDir / "vir/resources/runtime" / s!"{key}.virres"
+    let cache := pkg.buildDir / "vir/resources/runtime" / s!"{expected}.virres"
     let stage := pkg.srcDir / ".vir-generated/VirResourceRuntime.virres"
     -- Check the full profile before installation, in the same acquisition pass.
-    proc { cmd := tool.toString, args := #["acquire-runtime", source, logicalId,
+    proc { cmd := tool.toString, args := #["acquire-runtime", kind, expected, source,
       cache.toString, stage.toString] }
     addTrace (← computeTrace stage)
     return stage

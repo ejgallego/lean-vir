@@ -41,12 +41,14 @@ if (!source || expectationFlag !== "--expect-runtime-pack" || !expectedPath ||
 // These inputs are independent assertions only; never forwarded to selection.
 const expectedRuntime = readRuntimeExpectation(resolve(expectedPath));
 const historicalRuntime = readRuntimeExpectation(resolve(stalePath));
-assertHistoricalStaleRuntime(historicalRuntime, expectedRuntime);
+const historicalSharesProfile = assertHistoricalStaleRuntime(historicalRuntime, expectedRuntime);
 const published = source === "--published";
 mkdirSync(join(sourceRoot, "build"), { recursive: true });
 const evidence = mkdtempSync(join(sourceRoot, "build/resource-client-"));
 console.log(`resource client evidence: ${evidence}`);
-if (extra[0] !== "--stale-negative-child") {
+if (extra[0] === "--stale-negative-child") {
+  assert.ok(historicalSharesProfile, "native historical admission requires the original compiler/profile");
+} else if (historicalSharesProfile) {
   // Prove the expectation cannot silently act as a source override. Actual old426c
   // must be acquired by Lake and rejected by the same stage assertion below.
   runCommand(sourceRoot, join(evidence, "actual426c-negative.log"), process.execPath, [
@@ -55,6 +57,8 @@ if (extra[0] !== "--stale-negative-child") {
     "--stale-runtime-pack", resolve(stalePath), "--stale-negative-child",
   ], {error: /RUNTIME_RELEASE_MISMATCH: actual Lake stage/});
   assert.deepEqual(readFileSync(join(sourceRoot, ".vir-generated/VirResourceRuntime.virres")), historicalRuntime.bytes);
+} else {
+  console.log("historical426c: fixed identity/integrity/byte-oracle negative passed; native admission belongs to its Lean4.36-rc2/compat7 profile");
 }
 
 let root = sourceRoot;
