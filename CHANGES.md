@@ -1,6 +1,10 @@
 # unreleased
 ------------------------------
 
+ - [runtime] Open owned programs from verified in-memory runtime and package bytes,
+   sharing callable-contract validation, cancellation and disposal with URL loading;
+   byte creation uses explicit cancellation while URL acquisition keeps its deadline (#278).
+
 # VIR v4.36.0-rc2
 ------------------------------
 

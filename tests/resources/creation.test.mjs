@@ -241,7 +241,7 @@ async function fixture(body) {
         async fetchIrPackageSet() {
           return { members: [{ bytes: new Uint8Array() }] };
         },
-        async createRuntime() {
+        async instantiate() {
           state.instances++;
           started.resolve();
           return creation.promise;
@@ -250,6 +250,7 @@ async function fixture(body) {
     },
     runtime: {
       failure: null,
+      installIrPackageSetBytes() {},
       interfaceManifest: {
         exports: [
           structuredClone(entry),
@@ -647,7 +648,7 @@ for (const order of [
         async fetchIrPackageSet() {
           return { members: [{ bytes: new Uint8Array() }] };
         },
-        async createRuntime() {
+        async instantiate() {
           const i = next++;
           starts[i].resolve();
           return attempts[i].promise;

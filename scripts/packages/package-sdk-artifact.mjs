@@ -129,7 +129,7 @@ SDK host code should import the entry modules directly under js/:
   js/vir-host-bindings.js
   js/vir-react-host-bindings.js
 
-Nested js/runtime/, js/host/, and js/react/ modules are shipped so those entry
+Nested js/runtime/, js/resources/, js/host/, and js/react/ modules are shipped so those entry
 modules can resolve relative imports. They remain internal implementation
 modules and may change with the matching lean_vir revision.
 
