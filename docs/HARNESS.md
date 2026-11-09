@@ -43,7 +43,7 @@ Before upgrading `lean-toolchain`:
 - Compare affected Lean adapters with the new upstream source, then update their
   immutable source links.
 - Refresh `vir-resources/compatibility.json` and qualify a runtime bundle for
-  that compiler before changing `vir-resources/runtime.json`; preserve the
+  that compiler and exact VIR source revision; preserve the
   bundle's content identity rather than relabeling an older bundle.
 - Record catalog compatibility and the remaining migration work using the
   roadmap below. Older producer pins preserve historical reproducibility;
@@ -457,12 +457,31 @@ Existing releases retain their published tag names.
 Version tags beginning with `v` trigger
 [release-sdk.yml](../.github/workflows/release-sdk.yml),
 which rejects tags that do not match `lean-toolchain`, checks ABI versions,
-builds/imports the SDK and uploads the archive plus a content-named runtime pack.
-RC tags produce prereleases; content-addressed `resource-…` releases remain
-separate. Runtime pack
-publication uploads absent assets, verifies and reuses byte-identical assets on
-reruns, and rejects different bytes without replacing them. The SDK archive
-upload remains replaceable. Create the tag from the final merged commit
+builds/imports the SDK, checks the ordinary application against that candidate,
+and publishes the SDK plus `runtime-<VIR commit>.virres`. Runtime acquisition
+selects this exact source-derived name and verifies the descriptor's source
+identity; there is no runtime lock to update. A missing revision fails clearly.
+After publication, a fresh Git dependency must acquire that exact runtime through
+the public default path and its bytes must equal the qualified candidate. The
+workflow runs `scripts/publish-sdk-release.sh`: a command failure or handled
+interrupt returns a newly created or previously draft release to draft and
+clears its latest status. Cleanup preserves the original exit status and runs
+once in the main shell. Recovery is best effort if the runner is lost. An already
+public release keeps its visibility on a failed retry; the failing check requires
+maintainer action. A failed recovery reports the required manual repair. Tags and
+assets are retained for diagnosis.
+New and previously draft releases are published as non-latest for public checks.
+Stable releases become Latest only after runtime and SDK qualification succeeds;
+RC tags remain non-latest prereleases. Content-addressed `resource-…` releases
+remain separate. Runtime pack publication uploads absent assets, verifies and
+reuses byte-identical assets on reruns, and rejects different bytes without
+replacing them. The SDK archive
+retains its existing replacement/retry policy. Runtime assets are read back
+before publishing the draft. The client gate receives the produced pack as an
+assertion-only expectation and compares actual staged, embedded and emitted
+bytes, then executes one acquired-runtime call and disposal. The historical
+stale-runtime negative and current same-profile substitution controls protect
+the independence of that expectation. Create the tag from the final merged commit
 so its manifest identifies the revision clients use. Before the tag exists,
 select `VIR_SDK_ARCHIVE` or the exact-commit artifact path; the zero-argument
 `:virSdk` facet targets the tagged release. See

@@ -46,17 +46,17 @@ jobs:
       - run: lake build vir_resource_pack
       - run: npm run package:runtime
 
-      - name: Publish durable runtime artifacts
+      - name: Qualify this source's runtime through ordinary application preparation
+        run: |
+          packs=("$GITHUB_WORKSPACE"/build/artifacts/runtime/*.virres)
+          test "${#packs[@]}" -eq 1
+          node tests/resources/historical-runtime.mjs build/stale-runtime-426c.virres
+          node tests/resources/client.mjs "${packs[0]}" --expect-runtime-pack "${packs[0]}" --stale-runtime-pack build/stale-runtime-426c.virres
+
+      - name: Publish and qualify durable artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            release_args=(--verify-tag --generate-notes)
-            if [[ "$GITHUB_REF_NAME" == *-rc* ]]; then
-              release_args+=(--prerelease --latest=false)
-            fi
-            gh release create "$GITHUB_REF_NAME" "${release_args[@]}"
-          fi
-          # Verify/reuse identical runtime assets on reruns; never replace them.
-          node scripts/resources/publish-runtime.mjs "$GITHUB_REF_NAME" build/artifacts/runtime/*.virres
-          gh release upload "$GITHUB_REF_NAME" build/artifacts/lean-vir-sdk.tar.gz --clobber
+          packs=("$GITHUB_WORKSPACE"/build/artifacts/runtime/*.virres)
+          test "${#packs[@]}" -eq 1
+          bash scripts/publish-sdk-release.sh "$GITHUB_REF_NAME" "${packs[0]}" build/artifacts/lean-vir-sdk.tar.gz build/stale-runtime-426c.virres

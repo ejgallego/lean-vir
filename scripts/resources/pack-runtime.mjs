@@ -13,6 +13,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildRuntimeModule } from "./runtime-module.mjs";
 import { assertResourceCompatibility } from "../../web/src/resources/compatibility.js";
+import { runtimeLogicalId } from "./runtime-source.mjs";
 import {
   descriptorContentId,
   encodeDescriptor,
@@ -64,7 +65,12 @@ const members = [
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const descriptor = validateDescriptor({
   schemaVersion: 2,
-  logicalId: "lean-vir/runtime",
+  logicalId: runtimeLogicalId(
+    execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim(),
+  ),
   kind: "runtime",
   compatibility: profile,
   files: members.map(([path, bytes, mediaType]) => ({

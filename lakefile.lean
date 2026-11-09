@@ -68,7 +68,8 @@ lean_lib VirResourceCore where
   roots := #[]
   globs := #[.one `Vir.BinaryLiteral, .one `Vir.Resources, .one `Vir.Resources.Types,
     .one `Vir.Resources.Validate, .one `Vir.Resources.Site, .one `Vir.Resources.Pack,
-    .one `Vir.Resources.Build, .one `Vir.Resources.Program, .one `Vir.NativePayload]
+    .one `Vir.Resources.Build, .one `Vir.Resources.Program, .one `Vir.NativePayload,
+    .one `Vir.Release]
 
 lean_lib VirResourceEmbed where
   roots := #[]
@@ -357,15 +358,23 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
   let commit? ← IO.getEnv "VIR_SDK_COMMIT"
   let expectCommit? ← IO.getEnv "VIR_SDK_EXPECT_COMMIT"
   let repo? ← IO.getEnv "VIR_SDK_REPO"
-  let sourceConfig := String.intercalate "\n" [
-    s!"archive={archive?.getD ""}",
-    s!"url={url?.getD ""}",
-    s!"tag={tag?.getD ""}",
-    s!"commit={commit?.getD ""}",
-    s!"expectCommit={expectCommit?.getD ""}",
-    s!"repo={repo?.getD ""}"
-  ]
   fetcherJob.mapM fun fetcher => do
+    -- Resolve Git identity once, with the same owning-checkout contract used
+    -- by runtime acquisition; no import of unbuilt VIR code into Lake config.
+    let expectCommit? ← if expectCommit?.isNone && archive?.isNone && url?.isNone &&
+        tag?.isNone && commit?.isNone then do
+      let revision ← captureProc {
+        cmd := fetcher.toString, args := #["--source-revision", pkg.dir.toString] }
+      pure (some revision.trimAscii.toString)
+    else pure expectCommit?
+    let sourceConfig := String.intercalate "\n" [
+      s!"archive={archive?.getD ""}",
+      s!"url={url?.getD ""}",
+      s!"tag={tag?.getD ""}",
+      s!"commit={commit?.getD ""}",
+      s!"expectCommit={expectCommit?.getD ""}",
+      s!"repo={repo?.getD ""}"
+    ]
     addTrace (← computeTrace fetcher)
     addPureTrace virSdkVersion "VIR SDK version"
     addPureTrace Lean.versionString "VIR SDK release toolchain"
@@ -375,7 +384,8 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
     if ← manifestPath.pathExists then
       let verification ← IO.Process.output {
         cmd := fetcher.toString
-        args := #["--verify-installed", sdkDir.toString, "--expect-version", virSdkVersion]
+        args := #["--verify-installed", sdkDir.toString, "--expect-version", virSdkVersion] ++
+          (expectCommit?.map (#["--expect-commit", ·])).getD #[]
         env := ← getAugmentedEnv
       }
       if verification.exitCode != 0 then
@@ -384,7 +394,8 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
       createParentDirs manifestPath
       proc {
         cmd := fetcher.toString
-        args := #["--out", sdkDir.toString]
+        args := #["--out", sdkDir.toString] ++
+          (expectCommit?.map (#["--expect-commit", ·])).getD #[]
         env := ← getAugmentedEnv
       }
     return manifestPath
@@ -396,31 +407,27 @@ input_file virResourceCompatibility where
   path := "vir-resources/compatibility.json"
   text := true
 
-input_file virResourceRuntimeLock where
-  path := "vir-resources/runtime.json"
-  text := true
-
 target virRuntimePack (pkg) : System.FilePath := do
   let tool ← vir_resource_pack.fetch
-  let profile ← virResourceCompatibility.fetch
-  let lock ← virResourceRuntimeLock.fetch
-  tool.bindM fun tool => profile.bindM fun profile => lock.mapM fun lock => do
-      let plan ← captureProc {
-        cmd := tool.toString
-        args := #["runtime-plan", profile.toString, lock.toString, pkg.dir.toString] }
-      let json ← IO.ofExcept (Lean.Json.parse plan)
-      let contentId ← IO.ofExcept <| json.getObjValAs? String "contentId"
-      let source ← IO.ofExcept <| json.getObjValAs? String "source"
-      if source != "-" && !source.startsWith "https://" then
-        addTrace (← computeTrace (System.FilePath.mk source))
-      addLeanTrace
-      let cache := pkg.buildDir / "vir/resources/runtime" / s!"{contentId}.virres"
-      let stage := pkg.srcDir / ".vir-generated/VirResourceRuntime.virres"
-      -- Check the full profile before installation, in the same acquisition pass.
-      proc { cmd := tool.toString, args := #["acquire", profile.toString, contentId, source,
-        cache.toString, stage.toString] }
-      addTrace (← computeTrace stage)
-      return stage
+  tool.mapM fun tool => do
+    let plan ← captureProc {
+      cmd := tool.toString
+      args := #["runtime-plan", pkg.dir.toString] }
+    let json ← IO.ofExcept (Lean.Json.parse plan)
+    let identity ← IO.ofExcept <| json.getObjVal? "identity"
+    let kind ← IO.ofExcept <| identity.getObjValAs? String "kind"
+    let expected ← IO.ofExcept <| identity.getObjValAs? String "value"
+    let source ← IO.ofExcept <| json.getObjValAs? String "source"
+    if !source.startsWith "https://" then
+      addTrace (← computeTrace (System.FilePath.mk source))
+    addLeanTrace
+    let cache := pkg.buildDir / "vir/resources/runtime" / s!"{expected}.virres"
+    let stage := pkg.srcDir / ".vir-generated/VirResourceRuntime.virres"
+    -- Check the full profile before installation, in the same acquisition pass.
+    proc { cmd := tool.toString, args := #["acquire-runtime", kind, expected, source,
+      cache.toString, stage.toString] }
+    addTrace (← computeTrace stage)
+    return stage
 
 /-- Optional carrier: no other VIR library or native tool imports it. -/
 lean_lib VirResourceRuntime where

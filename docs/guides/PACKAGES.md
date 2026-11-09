@@ -216,7 +216,9 @@ This installs the release matching the Lean toolchain under
 `v4.36.0-rc1`. The full Lean tag spelling is retained, including the `v` prefix
 and zero patch component.
 Milestone numbers and the SDK manifest version do not select the release tag.
-That GitHub release must exist. `VIR_SDK_TAG` selects an explicit release tag.
+That GitHub release must exist. Default acquisition also requires its SDK manifest
+to identify the owning VIR source commit; a same-Lean SDK from another revision
+is rejected. `VIR_SDK_TAG` selects an explicit release tag.
 For an unreleased revision, select the exact dependency commit:
 
 ```bash
