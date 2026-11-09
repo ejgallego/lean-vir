@@ -45,6 +45,7 @@ async function publication({
   state = "absent",
   fail = "",
   recoveryFails = false,
+  signal = "",
 } = {}) {
   const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
@@ -63,7 +64,9 @@ async function publication({
           `if(command==='gh'&&args[1]==='view'){if(process.env.RELEASE_STATE==='absent')process.exit(1);console.log(process.env.RELEASE_STATE==='draft'?'true':'false');}\n` +
           `if(command==='gh'&&args[1]==='edit'&&args.includes('--draft')&&process.env.RECOVERY_FAILS==='true')process.exit(31);\n` +
           `if(command==='git')console.log('a'.repeat(40));\n` +
-          `if(command===process.env.FAIL_COMMAND)process.exit(23);\n`,
+          `if(command===process.env.FAIL_COMMAND)process.exit(23);\n` +
+          `if(command==='gh'&&args.includes('--latest')&&process.env.FAIL_COMMAND==='promotion')process.exit(23);\n` +
+          `if(command==='npm'&&process.env.SIGNAL){process.kill(process.ppid,process.env.SIGNAL);setTimeout(()=>process.exit(0),20); }\n`,
         { mode: 0o755 },
       );
     }
@@ -78,6 +81,7 @@ async function publication({
       {
         cwd: directory,
         encoding: "utf8",
+        timeout: 30000,
         env: {
           ...process.env,
           PATH: `${bin}:${process.env.PATH}`,
@@ -85,11 +89,13 @@ async function publication({
           RELEASE_STATE: state,
           FAIL_COMMAND: fail,
           RECOVERY_FAILS: String(recoveryFails),
+          SIGNAL: signal,
           GITHUB_REPOSITORY: "owner/vir",
           VIR_RUNTIME_PACK: "must-be-cleared",
         },
       },
     );
+    assert.ifError(result.error);
     const commands = (await readFile(log, "utf8"))
       .trim()
       .split("\n")
@@ -104,6 +110,8 @@ for (const [tag, state] of [
   ["v4.36.0", "absent"],
   ["v4.36.0-rc1", "public"],
   ["v4.36.0-rc1", "draft"],
+  ["v4.36.0", "draft"],
+  ["v4.36.0", "public"],
 ]) {
   test(`publishing metadata: ${tag}, state=${state}`, async () => {
     const result = await publication({ tag, state });
@@ -117,10 +125,7 @@ for (const [tag, state] of [
     else {
       assert.equal(creation.args[2], tag);
       assert.equal(creation.args.includes("--prerelease"), tag.includes("-rc"));
-      assert.equal(
-        creation.args.includes("--latest=false"),
-        tag.includes("-rc"),
-      );
+      assert.ok(creation.args.includes("--latest=false"));
       assert.ok(creation.args.includes("--verify-tag"));
       assert.ok(creation.args.includes("--draft"));
     }
@@ -153,15 +158,41 @@ for (const [tag, state] of [
           item.command === "lake" && item.args.join(" ") === "build :virSdk",
       ),
     );
-    assert.ok(
-      !commands.some(
-        (item) => item.args.includes("--draft") && item.args[1] === "edit",
-      ),
+    const edits = commands.filter(
+      (item) => item.command === "gh" && item.args[1] === "edit",
     );
+    if (state === "public")
+      assert.deepEqual(
+        edits,
+        [],
+        "public retry preserves all visibility metadata",
+      );
+    else {
+      assert.equal(edits.length, tag.includes("-rc") ? 1 : 2);
+      assert.ok(edits[0].args.includes("--draft=false"));
+      assert.ok(edits[0].args.includes("--latest=false"));
+      assert.ok(
+        edits[0].args.includes(
+          tag.includes("-rc") ? "--prerelease" : "--prerelease=false",
+        ),
+      );
+      assert.ok(
+        commands.indexOf(edits[0]) < commands.indexOf(probe),
+        "public probe follows non-latest publication",
+      );
+      if (!tag.includes("-rc")) {
+        assert.deepEqual(edits[1].args, ["release", "edit", tag, "--latest"]);
+        assert.equal(
+          commands.at(-1),
+          edits[1],
+          "promote only after every runtime and SDK check",
+        );
+      }
+    }
   });
 }
 for (const state of ["absent", "draft", "public"]) {
-  for (const fail of ["node", "npm", "cmp", "lake"]) {
+  for (const fail of ["node", "npm", "git", "cmp", "lake"]) {
     test(`publication failure: ${state}, ${fail}`, async () => {
       const result = await publication({ state, fail });
       assert.equal(result.status, 23, result.stderr);
@@ -187,3 +218,67 @@ test("failed recovery preserves qualification failure and requests manual repair
   assert.equal(result.status, 23);
   assert.match(result.stderr, /RELEASE_RECOVERY_FAILED: manually return/);
 });
+
+for (const state of ["absent", "draft", "public"]) {
+  for (const [signal, status] of [
+    ["SIGINT", 130],
+    ["SIGTERM", 143],
+  ]) {
+    test(`publication interrupted: ${state}, ${signal}`, async () => {
+      const result = await publication({ state, signal, tag: "v4.36.0" });
+      assert.equal(result.status, status, result.stderr);
+      const edits = result.commands.filter(
+        (item) => item.command === "gh" && item.args[1] === "edit",
+      );
+      const recovery = edits.filter((item) => item.args.includes("--draft"));
+      assert.equal(recovery.length, state === "public" ? 0 : 1);
+      assert.ok(
+        !edits.some((item) => item.args.includes("--latest")),
+        "interrupted qualification cannot promote Latest",
+      );
+      assert.ok(
+        !result.commands.some((item) => item.command === "git"),
+        "no qualification continues after interruption",
+      );
+    });
+  }
+  test(`stable qualification failure cannot promote Latest: ${state}`, async () => {
+    const result = await publication({ state, fail: "npm", tag: "v4.36.0" });
+    assert.equal(result.status, 23);
+    assert.ok(!result.commands.some((item) => item.args.includes("--latest")));
+  });
+}
+test("failed Latest promotion recovers the draft and preserves failure", async () => {
+  const result = await publication({ tag: "v4.36.0", fail: "promotion" });
+  assert.equal(result.status, 23);
+  assert.equal(
+    result.commands.filter(
+      (item) =>
+        item.command === "gh" &&
+        item.args[1] === "edit" &&
+        item.args.includes("--draft"),
+    ).length,
+    1,
+  );
+  assert.ok(result.commands.at(-1).args.includes("--draft"));
+});
+
+for (const [signal, status] of [
+  ["SIGINT", 130],
+  ["SIGTERM", 143],
+]) {
+  test(`failed interruption recovery preserves ${signal} status`, async () => {
+    const result = await publication({ signal, recoveryFails: true });
+    assert.equal(result.status, status);
+    assert.match(result.stderr, /RELEASE_RECOVERY_FAILED: manually return/);
+    assert.equal(
+      result.commands.filter(
+        (item) =>
+          item.command === "gh" &&
+          item.args[1] === "edit" &&
+          item.args.includes("--draft"),
+      ).length,
+      1,
+    );
+  });
+}

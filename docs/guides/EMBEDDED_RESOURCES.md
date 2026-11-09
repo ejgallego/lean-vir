@@ -99,7 +99,7 @@ published runtime assets. For an unreleased revision, local edits or a source
 archive, set `VIR_RUNTIME_PACK` to an explicitly built matching `.virres` file
 before running Lake. Its planned content ID is checked against cache, stage and
 downloaded bytes; replacing that file after planning cannot change the selected
-identity. See [runtime production](../reference/RESOURCE_BUNDLES.md#publication).
+identity. See [runtime production](../reference/RESOURCE_BUNDLES.md#runtime-production).
 
 The page/JavaScript are embedded with Lean's standard `include_str`. An ordinary
 Lake input-directory dependency tracks those files, so frontend edits rebuild

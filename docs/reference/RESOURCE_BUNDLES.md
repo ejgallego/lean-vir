@@ -333,12 +333,14 @@ Runtime planning and staging use the lightweight `vir_resource_pack` tool.
 `Vir.NativePayload` provides bounded reads, digest checks and verified publication
 for both this path and the SDK installer. Domain validators and source selection
 remain separate: an SDK release/commit is not a resource content ID, and SDK
-authentication does not enter locked resource acquisition. These tools do not
+authentication does not enter anonymous resource acquisition. These tools do not
 depend on the generator or acquire program inputs. Neither runtime selection
 nor compatible JavaScript-only runtime changes are program compilation inputs.
 
 Native rendering consumes compiled bytes only; moving the executable or removing
 raw program packs does not turn rendering into acquisition.
+
+## Runtime production
 
 Runtime production is a separate maintainer operation:
 

@@ -86,9 +86,9 @@ before Lake can mutate owned output/trace/hash paths.
 
 ### Runtime acquisition is a separate branch
 
-`VirResourceRuntime` has `needs := #[virRuntimePack]`. That target reads the
-compatibility profile and the owning VIR Git revision, then uses the native
-pack tool to acquire the exact content identity:
+`VirResourceRuntime` has `needs := #[virRuntimePack]`. That target resolves the
+owning VIR Git revision or an explicit candidate's content ID. The native pack
+tool checks that identity and its compiled compatibility profile:
 
 1. Try the verified cache, then the existing verified stage.
 2. Otherwise read the configured local pack or fetch its anonymous HTTPS URL.

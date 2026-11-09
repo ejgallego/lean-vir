@@ -463,26 +463,25 @@ selects this exact source-derived name and verifies the descriptor's source
 identity; there is no runtime lock to update. A missing revision fails clearly.
 After publication, a fresh Git dependency must acquire that exact runtime through
 the public default path and its bytes must equal the qualified candidate. The
-workflow runs `scripts/publish-sdk-release.sh`: failure returns a newly created
-or previously draft release to draft and clears its latest status. An already
+workflow runs `scripts/publish-sdk-release.sh`: a command failure or handled
+interrupt returns a newly created or previously draft release to draft and
+clears its latest status. Cleanup preserves the original exit status and runs
+once in the main shell. Recovery is best effort if the runner is lost. An already
 public release keeps its visibility on a failed retry; the failing check requires
 maintainer action. A failed recovery reports the required manual repair. Tags and
 assets are retained for diagnosis.
-RC tags produce prereleases; content-addressed `resource-…` releases remain
-separate. Runtime pack
-publication uploads absent assets, verifies and reuses byte-identical assets on
-reruns, and rejects different bytes without replacing them. The SDK archive
+New and previously draft releases are published as non-latest for public checks.
+Stable releases become Latest only after runtime and SDK qualification succeeds;
+RC tags remain non-latest prereleases. Content-addressed `resource-…` releases
+remain separate. Runtime pack publication uploads absent assets, verifies and
+reuses byte-identical assets on reruns, and rejects different bytes without
+replacing them. The SDK archive
 retains its existing replacement/retry policy. Runtime assets are read back
 before publishing the draft. The client gate receives the produced pack as an
 assertion-only expectation and compares actual staged, embedded and emitted
-bytes, then executes one acquired-runtime call and disposal. The retained426c
-regression must fail that independent expectation. With its original
-Lean4.36-rc2/compat7 profile, it also passes ordinary native admission before
-failing the byte expectation. Later toolchains still validate its fixed public
-SHA/CID and rejection by the byte oracle, without asking the current compiler to
-admit an incompatible historical runtime. Current same-profile source/CID
-substitution controls remain in `test:resources:acquisition`. Create the tag
-from the final merged commit
+bytes, then executes one acquired-runtime call and disposal. The historical
+stale-runtime negative and current same-profile substitution controls protect
+the independence of that expectation. Create the tag from the final merged commit
 so its manifest identifies the revision clients use. Before the tag exists,
 select `VIR_SDK_ARCHIVE` or the exact-commit artifact path; the zero-argument
 `:virSdk` facet targets the tagged release. See
