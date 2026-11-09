@@ -2,7 +2,7 @@
 ------------------------------
 
  - [runtime] Open owned programs from verified in-memory runtime and package bytes,
-   sharing callable-contract validation, cancellation and disposal with URL loading.
+   sharing callable-contract validation, cancellation and disposal with URL loading (#278).
 
 # VIR v4.36.0-rc2
 ------------------------------
