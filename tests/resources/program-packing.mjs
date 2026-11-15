@@ -40,22 +40,14 @@ const compat = join(repo, "vir-resources/compatibility.json");
 assert.ok(existsSync(tool) && existsSync(program));
 const evidence = mkdtempSync(join(repo, "build/resource-program-"));
 const rootModule = "tests.resources.BrowserProgram";
-const runtimeLockPath = join(evidence, "runtime-lock.json");
 const packPath = join(evidence, "program.virres");
 const stagedPath = join(evidence, "stage", "program.virres");
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const runtimeLock = {
-  schemaVersion: 1,
-  contentId: "a".repeat(64),
-  source: "tests/resources/BrowserProgram.lean",
-};
-const writeRuntimeLock = (value) =>
-  writeFileSync(runtimeLockPath, JSON.stringify(value));
 function run(label, args, error) {
   const command =
     args[0] === "verify"
       ? programTool
-      : ["runtime-plan", "stage"].includes(args[0])
+      : args[0] === "stage"
         ? packTool
         : tool;
   const result = spawnSync("lake", ["env", command, ...args], {
@@ -80,47 +72,6 @@ const build = (label, error, input = program) => {
   );
   return stdout.split("\n").at(-1);
 };
-writeRuntimeLock(runtimeLock);
-const runtimePlan = (label, error) =>
-  run(label, ["runtime-plan", compat, runtimeLockPath, repo], error);
-assert.deepEqual(JSON.parse(runtimePlan("runtime-plan-local")), {
-  contentId: runtimeLock.contentId,
-  source: join(repo, runtimeLock.source),
-});
-writeRuntimeLock({ ...runtimeLock, source: "-" });
-assert.equal(JSON.parse(runtimePlan("runtime-plan-offline")).source, "-");
-writeRuntimeLock({
-  ...runtimeLock,
-  source: "https://example.invalid/program.virres",
-});
-assert.equal(
-  JSON.parse(runtimePlan("runtime-plan-https")).source,
-  "https://example.invalid/program.virres",
-);
-for (const [i, source] of [
-  "https://user:pass@example.invalid/program.virres",
-  "https://user@example.invalid/program.virres",
-  "https://user%40name:pass@example.invalid/program.virres",
-  "https://?query/no-host",
-  "https://#fragment/no-host",
-  "https://example.invalid/with space",
-].entries()) {
-  writeRuntimeLock({ ...runtimeLock, source });
-  runtimePlan(`runtime-plan-invalid-https-${i}`, /INVALID_RUNTIME_LOCK/);
-}
-// An @ in the path is not URL userinfo.
-writeRuntimeLock({ ...runtimeLock, source: "https://example.invalid/path@name" });
-assert.equal(
-  JSON.parse(runtimePlan("runtime-plan-https-path-at")).source,
-  "https://example.invalid/path@name",
-);
-writeRuntimeLock({ ...runtimeLock, source: "../elsewhere" });
-runtimePlan("runtime-plan-traversal", /INVALID_RUNTIME_LOCK/);
-writeRuntimeLock({ ...runtimeLock, contentId: "INVALID" });
-runtimePlan("runtime-plan-id", /INVALID_RUNTIME_LOCK/);
-writeRuntimeLock({ ...runtimeLock, extra: true });
-runtimePlan("runtime-plan-unknown", /INVALID_RUNTIME_LOCK/);
-writeRuntimeLock(runtimeLock);
 const firstId = build("build-cold");
 assert.match(firstId, /^[0-9a-f]{64}$/);
 const first = readFileSync(packPath);

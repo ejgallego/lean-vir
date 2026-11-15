@@ -40,44 +40,53 @@ private def pack (descriptorPath root destination : FilePath) : IO Unit := do
     | .error e => fail e.code (reprStr e)
   Build.atomicInstall destination bytes
 
+/-- Acquisition mechanics shared by explicit-CID tools and source-selected runtimes.
+The caller freezes identity and supplies domain validation, never transport policy. -/
+private def acquireSelected (required source : String) (cache stage : FilePath)
+    (offline : Bool) (candidate : FilePath → IO (Option Vir.NativePayload.VerifiedPayload))
+    (verify : ByteArray → IO Vir.NativePayload.VerifiedPayload) : IO Unit := do
+  if source.startsWith "https://" then
+    match Vir.NativePayload.checkAnonymousHttps source with
+    | .error detail => fail "INVALID_RESOURCE_URL" detail
+    | .ok _ => pure ()
+  else if (source.splitOn "://").length > 1 then
+    fail "UNSUPPORTED_RESOURCE_TRANSPORT" source
+  Build.checkFile cache
+  Build.checkFile stage
+  let payload ← match ← candidate cache with
+    | some payload => pure payload
+    | none => match ← candidate stage with
+      | some payload => pure payload
+      | none => do
+        if source == "-" || (offline && source.startsWith "https://") then
+          fail "RESOURCE_OFFLINE_MISS" s!"required {required}; cache {cache}"
+        let bytes ← if source.startsWith "https://" then
+          Build.withSibling cache fun temporary => do
+            let downloaded ← (Lake.download source temporary).toBaseIO
+            if downloaded.isNone then
+              fail "RESOURCE_DOWNLOAD_FAILED"
+                s!"required {required} from {source}; unreleased VIR sources need an already-built VIR_RUNTIME_PACK candidate"
+            Build.readInput temporary Build.packLimit "PACK_LIMIT"
+        else Build.readInput source Build.packLimit "PACK_LIMIT"
+        verify bytes
+  Vir.NativePayload.promote cache payload
+  Vir.NativePayload.promote stage payload
+
 private def acquire (compatibilityPath : FilePath) (expected source : String)
     (cache stage : FilePath) (offline : Bool) : IO Unit := do
   let profile ← Build.compatibility compatibilityPath
   unless expected.length == 64 && expected.toList.all ("0123456789abcdef".contains ·) do
     fail "INVALID_CONTENT_ID" expected
-  if source.startsWith "https://" then
-    match Vir.NativePayload.checkAnonymousHttps source with
-    | .error detail => fail "INVALID_RESOURCE_URL" detail
-    | .ok _ => pure ()
-  -- Check both destinations before doing any acquisition or committing a cache.
-  Build.checkFile cache
-  Build.checkFile stage
-  let payload ← match ← Build.candidate expected profile cache with
-    | some payload => pure payload
-    | none => match ← Build.candidate expected profile stage with
-      | some payload => pure payload
-      | none =>
-        if source == "-" || (offline && source.startsWith "https://") then
-          fail "RESOURCE_OFFLINE_MISS" s!"required bundle {expected}; cache {cache}"
-        let bytes ← if source.startsWith "https://" then
-          Build.withSibling cache fun temporary => do
-            -- Lake owns download mechanics. Its destructive file download only
-            -- sees a fresh sibling, never a verified cache or staged hardlink.
-            -- Resource identity and bounded reads remain VIR's responsibility.
-            let downloaded ← (Lake.download source temporary).toBaseIO
-            if downloaded.isNone then
-              fail "RESOURCE_DOWNLOAD_FAILED" s!"required bundle {expected} from {source}"
-            Build.readInput temporary Build.packLimit "PACK_LIMIT"
-        else
-          if (source.splitOn "://").length > 1 then
-            fail "UNSUPPORTED_RESOURCE_TRANSPORT" source
-          Build.readInput source Build.packLimit "PACK_LIMIT"
-        Build.verifyPayload expected profile bytes
-  Vir.NativePayload.promote cache payload
-  Vir.NativePayload.promote stage payload
+  acquireSelected s!"bundle {expected}" source cache stage offline
+    (Build.candidate expected profile) (Build.verifyPayload expected profile)
 
-private def runtimePlan (compatibilityPath lockPath root : FilePath) : IO Unit :=
-  Build.runtimePlan compatibilityPath lockPath root
+private def acquireRuntime (kind expected source : String) (cache stage : FilePath)
+    (offline : Bool) : IO Unit := do
+  let identity ← match Build.RuntimeIdentity.parse kind expected with
+    | .ok identity => pure identity
+    | .error detail => fail "INVALID_RUNTIME_IDENTITY" detail
+  acquireSelected s!"runtime {kind} {expected}" source cache stage offline
+    (Build.runtimeCandidate identity) (Build.verifyRuntime identity)
 
 private def stage (compatibilityPath packPath outputPath : FilePath) : IO Unit := do
   let contentId ← Build.stage compatibilityPath packPath outputPath
@@ -86,7 +95,8 @@ private def stage (compatibilityPath packPath outputPath : FilePath) : IO Unit :
 def usage : String :=
   "usage: vir_resource_pack pack DESCRIPTOR ROOT OUT\n" ++
   "       vir_resource_pack acquire COMPAT CONTENT_ID SOURCE CACHE STAGE [--offline]\n" ++
-  "       vir_resource_pack runtime-plan COMPAT LOCK OWNERROOT\n" ++
+  "       vir_resource_pack runtime-plan OWNERROOT\n" ++
+  "       vir_resource_pack acquire-runtime IDENTITY_KIND EXPECTED SOURCE CACHE STAGE [--offline]\n" ++
   "       vir_resource_pack stage COMPAT PACK OUT\n" ++
   "SOURCE is a local pack, anonymous HTTPS URL, or '-' (available bytes only).\n" ++
   "Transport never overrides CONTENT_ID or the tool's exact Lean build identity."
@@ -101,8 +111,11 @@ def main (args : List String) : IO Unit := do
     Vir.ResourcePack.acquire compatibility expected source cache stage false
   | ["acquire", compatibility, expected, source, cache, stage, "--offline"] =>
     Vir.ResourcePack.acquire compatibility expected source cache stage true
-  | ["runtime-plan", compatibility, lock, root] =>
-    Vir.ResourcePack.runtimePlan compatibility lock root
+  | ["runtime-plan", root] => Vir.Resources.Build.runtimePlan root
+  | ["acquire-runtime", kind, expected, source, cache, stage] =>
+    Vir.ResourcePack.acquireRuntime kind expected source cache stage false
+  | ["acquire-runtime", kind, expected, source, cache, stage, "--offline"] =>
+    Vir.ResourcePack.acquireRuntime kind expected source cache stage true
   | ["stage", compatibility, pack, out] =>
     Vir.ResourcePack.stage compatibility pack out
   | _ => throw <| IO.userError Vir.ResourcePack.usage

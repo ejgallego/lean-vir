@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import Lake
 import Vir.NativePayload
 import Vir.Package.Format
+import Vir.Release
 
 open Lean
 open System
@@ -14,12 +15,6 @@ open System
 namespace Vir.FetchSdk
 
 def sdkVersion : String := "0.1.0"
-
-/-- Use Lean's full release tag, including the `v` prefix and patch component. -/
-def releaseTagForVersion (version : String) : String :=
-  "v" ++ version
-
-def sdkReleaseTag : String := releaseTagForVersion Lean.versionString
 
 structure Options where
   out : FilePath := "web/public/vendor/lean-vir"
@@ -37,7 +32,7 @@ def usage : String :=
   "usage: lake exe lean_vir/vir_fetch_sdk [--out DIR] [--archive FILE | --url URL | --tag TAG | --commit SHA [--repo OWNER/REPO]]\n" ++
   "       lake exe lean_vir/vir_fetch_sdk --verify-installed DIR [--expect-version VERSION] [--expect-commit SHA]\n\n" ++
   "Installs a lean-vir-sdk.tar.gz archive into DIR and verifies lean-vir-artifact.json checksums.\n\n" ++
-  s!"The default source is Lean-aligned release {sdkReleaseTag}. Use --expect-version VERSION or --expect-commit SHA to reject a mismatched SDK.\n\n" ++
+  s!"The default source is Lean-aligned release {Vir.Release.tag}. Use --expect-version VERSION or --expect-commit SHA to reject a mismatched SDK.\n\n" ++
   "Environment fallbacks: VIR_SDK_ARCHIVE, VIR_SDK_URL, VIR_SDK_TAG, VIR_SDK_COMMIT, VIR_SDK_EXPECT_COMMIT, VIR_SDK_REPO."
 
 partial def parseArgs (args : List String) (opts : Options := {}) : Except String Options :=
@@ -126,7 +121,7 @@ def sourceFromOptions (opts : Options) : IO Source := do
                               | some commit => return .commit commit
                               | none =>
                                   let repo := repo.getD opts.repo
-                                  return .url s!"https://github.com/{repo}/releases/download/{sdkReleaseTag}/lean-vir-sdk.tar.gz"
+                                  return .url s!"https://github.com/{repo}/releases/download/{Vir.Release.tag}/lean-vir-sdk.tar.gz"
 
 def expectedCommitFromOptions (opts : Options) : IO (Option String) := do
   match opts.expectCommit? with
@@ -270,6 +265,13 @@ def fetchArchive (url : String) (dest : FilePath) : IO Unit :=
   fetchUrl url dest
 
 def runMain (args : List String) : IO UInt32 := do
+  if let ["--source-revision", root] := args then
+    try
+      IO.println (← Vir.Release.sourceRevision root "VIR_SDK_ARCHIVE")
+      return 0
+    catch error =>
+      IO.eprintln s!"error: {error}"
+      return 1
   match parseArgs args with
   | .error err =>
       IO.eprintln err

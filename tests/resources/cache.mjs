@@ -111,9 +111,6 @@ writeFileSync(
     '\n[[require]]\nname = "peer_fixture"\npath = "../peer"\n',
 );
 cpSync(join(root, "fixtures/resources/shared-user/Main.lean"), join(leaf, "Main.lean"));
-const lock = JSON.parse(
-  readFileSync(join(producer, "vir-resources/runtime.json")),
-);
 let runtimeBytes;
 if (source) runtimeBytes = readFileSync(resolve(source));
 else {
@@ -158,23 +155,12 @@ else {
     encoded,
     ...members.map((m) => m[1]),
   ]);
-  lock.contentId = await descriptorContentId(descriptor);
-  writeFileSync(
-    join(producer, "vir-resources/runtime.json"),
-    JSON.stringify(lock),
-  );
 }
-const runtimeCache = join(
-  producer,
-  ".lake/build/vir/resources/runtime",
-  `${lock.contentId}.virres`,
-);
-mkdirSync(join(producer, ".lake/build/vir/resources/runtime"), {
-  recursive: true,
-});
-writeFileSync(runtimeCache, runtimeBytes);
+const localRuntime = join(evidence, "runtime.virres");
+writeFileSync(localRuntime, runtimeBytes);
 const env = {
   ...process.env,
+  VIR_RUNTIME_PACK: localRuntime,
   LAKE_CACHE_DIR: cache,
   LAKE_ARTIFACT_CACHE: "true",
   LAKE_RESTORE_ARTIFACTS: "false",
@@ -396,23 +382,14 @@ const changedRuntime = Buffer.concat([
   encoded,
   ...payloads,
 ]);
-const changedId = await descriptorContentId(descriptor);
-const runtimeDir = join(producer, ".lake/build/vir/resources/runtime");
-writeFileSync(join(runtimeDir, `${changedId}.virres`), changedRuntime);
-writeFileSync(
-  join(producer, "vir-resources/runtime.json"),
-  JSON.stringify({ ...lock, contentId: changedId }),
-);
+writeFileSync(localRuntime, changedRuntime);
 const programSignatures = stages.slice(1).map(signature);
 const runtimeEdit = build("runtime-js-only");
 await assertConsumers(runtimeEdit);
 assert.deepEqual(readFileSync(stages[0]), changedRuntime);
 assert.deepEqual(stages.slice(1).map(signature), programSignatures);
 assert.doesNotMatch(runtimeEdit, /Built.*:virResourcePack/);
-writeFileSync(
-  join(producer, "vir-resources/runtime.json"),
-  JSON.stringify(lock),
-);
+writeFileSync(localRuntime, runtimeBytes);
 await assertConsumers(build("runtime-restored"));
 assert.deepEqual(
   stages.map((path) => readFileSync(path)),

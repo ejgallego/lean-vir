@@ -12,6 +12,7 @@ public import Vir.Resources.Types
 public import Vir.NativePayload
 import Vir.Resources.Pack
 import Vir.Package.Format
+import Vir.Release
 
 /-! Native-only support for bounded resource preparation.
 
@@ -64,9 +65,6 @@ def exactKeys (json : Json) (keys : Array String) : Except String Unit := do
   unless actual == keys.toList.mergeSort (· < ·) do
     throw s!"expected only fields {keys.toList}, got {actual}"
 
-def validMetadata (value : String) : Bool :=
-  !value.isEmpty && value.utf8ByteSize ≤ maxMetadataBytes
-
 def currentCompatibility : Compatibility := {
   leanRevision := Lean.githash
   virVersion := Vir.GeneratePackage.currentVirCompatibilityVersion
@@ -85,12 +83,6 @@ def compatibility (path : FilePath) : IO Compatibility := do
     fail "UNSUPPORTED_COMPATIBILITY"
       s!"expected {repr currentCompatibility}, got {repr c}"
   return c
-
-def checkedSupport (root : FilePath) (source : String) : IO FilePath := do
-  checkDirectory root
-  let path := root / source
-  discard <| Vir.NativePayload.regularInput path
-  return path
 
 /-! Write through a fresh sibling and rename. Never truncate or write through a
 possibly hardlinked destination; identical bytes are a deliberate no-op. -/
@@ -135,30 +127,85 @@ def candidate (expected : String) (profile : Compatibility) (path : FilePath)
       verifyIdentity expected profile bundle
     return some verified
 
-def runtimePlan (compatibilityPath lockPath root : FilePath) : IO Unit := do
-  let _ ← compatibility compatibilityPath
-  let json ← readJson lockPath maxMetadataBytes
-  let (contentId, source) ← fromExcept "INVALID_RUNTIME_LOCK" do
-    exactKeys json #["schemaVersion", "contentId", "source"]
-    let version ← json.getObjValAs? Nat "schemaVersion"
-    unless version == 1 do throw s!"unsupported schemaVersion {version}; expected 1"
-    let contentId ← json.getObjValAs? String "contentId"
-    unless contentId.utf8ByteSize == 64 &&
-        contentId.toList.all ("0123456789abcdef".contains ·) do
-      throw "contentId must be 64 lowercase hex digits"
-    let source ← json.getObjValAs? String "source"
-    unless validMetadata source do throw "source must be a bounded nonempty string"
-    return (contentId, source)
-  let source ← if source == "-" then pure source
-    else if source.startsWith "https://" then do
-      fromExcept "INVALID_RUNTIME_LOCK" (Vir.NativePayload.checkAnonymousHttps source)
-      pure source
-    else do
-      unless validPath source do fail "INVALID_RUNTIME_LOCK" s!"unsafe local source `{source}`"
-      let path ← checkedSupport root source
-      pure path.toString
+/-- Selection records one immutable expected identity before any acquisition. -/
+inductive RuntimeIdentity where
+  | sourceRevision (revision : String)
+  | contentId (contentId : String)
+  deriving Repr, BEq
+
+namespace RuntimeIdentity
+
+def kind : RuntimeIdentity → String
+  | .sourceRevision _ => "sourceRevision"
+  | .contentId _ => "contentId"
+
+def value : RuntimeIdentity → String
+  | .sourceRevision revision => revision
+  | .contentId cid => cid
+
+def parse (kind value : String) : Except String RuntimeIdentity := do
+  let length ← match kind with
+    | "sourceRevision" => pure 40
+    | "contentId" => pure 64
+    | _ => throw "expected sourceRevision or contentId"
+  unless value.length == length && value.toList.all ("0123456789abcdef".contains ·) do
+    throw s!"expected {length} lowercase hexadecimal digits"
+  return if kind == "sourceRevision" then .sourceRevision value else .contentId value
+
+end RuntimeIdentity
+
+structure RuntimeSelection where
+  identity : RuntimeIdentity
+  source : String
+
+private def selectRuntime (root : FilePath) : IO RuntimeSelection := do
+  match ← IO.getEnv "VIR_RUNTIME_PACK" with
+  | some path =>
+    let path := FilePath.mk path
+    let path := if path.isAbsolute then path else root / path
+    let bundle ← fromResource (Pack.decode (← readInput path packLimit "PACK_LIMIT"))
+    return { identity := .contentId bundle.contentId, source := path.toString }
+  | none =>
+    let revision ← Vir.Release.sourceRevision root
+    return { identity := .sourceRevision revision
+             source := s!"https://github.com/ejgallego/lean-vir/releases/download/{Vir.Release.tag}/{Vir.Release.runtimeName revision}" }
+
+def runtimePlan (root : FilePath) : IO Unit := do
+  let selection ← selectRuntime root
   IO.println (Json.compress <| Json.mkObj [
-    ("contentId", toJson contentId), ("source", toJson source)])
+    ("identity", Json.mkObj [("kind", toJson selection.identity.kind),
+      ("value", toJson selection.identity.value)]),
+    ("source", toJson selection.source)])
+
+/-- Pure domain validation; filesystem failures are never cache misses. -/
+def validateRuntime (identity : RuntimeIdentity) (bytes : ByteArray) : Except ResourceError Unit := do
+  let bundle ← Pack.decode bytes
+  unless bundle.descriptor.kind == .runtime do throw { code := "EXPECTED_RUNTIME" }
+  unless bundle.descriptor.compatibility == currentCompatibility do
+    throw { code := "INCOMPATIBLE", expected := some (reprStr currentCompatibility) }
+  match identity with
+  | .contentId expected =>
+    unless bundle.contentId == expected do
+      throw { code := "CONTENT_ID_MISMATCH", expected := some expected, actual := some bundle.contentId }
+  | .sourceRevision revision =>
+    let expected := Vir.Release.runtimeLogicalId revision
+    unless bundle.descriptor.logicalId == expected do
+      throw { code := "RUNTIME_SOURCE_MISMATCH"
+              expected := some expected
+              actual := some bundle.descriptor.logicalId }
+
+def verifyRuntime (identity : RuntimeIdentity) (bytes : ByteArray) : IO Vir.NativePayload.VerifiedPayload :=
+  Vir.NativePayload.verifyBytes bytes fun bytes => fromResource (validateRuntime identity bytes)
+
+def runtimeCandidate (identity : RuntimeIdentity) (path : FilePath)
+    : IO (Option Vir.NativePayload.VerifiedPayload) := do
+  checkFile path
+  let some metadata ← metadata? path | return none
+  if metadata.byteSize.toNat > packLimit then return none
+  let bytes ← readInput path packLimit "PACK_LIMIT"
+  match validateRuntime identity bytes with
+  | .error _ => return none
+  | .ok _ => return some (← Vir.NativePayload.verifyBytes bytes fun _ => pure ())
 
 def stage (compatibilityPath packPath outputPath : FilePath) : IO String := do
   let expected ← compatibility compatibilityPath

@@ -7,7 +7,22 @@ Author: Emilio J. Gallego Arias
 // Controlled maintainer-tool regressions, not Wasm or public release qualification.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
+import {
+  runtimeAssetName,
+  runtimeLogicalId,
+} from "../../scripts/resources/runtime-source.mjs";
+const revision = execFileSync("git", ["rev-parse", "HEAD"], {
+  encoding: "utf8",
+}).trim();
+const publicationBytes = (text, rev = revision) => {
+  const descriptor = Buffer.from(
+    JSON.stringify({ logicalId: runtimeLogicalId(rev) }),
+  );
+  const header = Buffer.alloc(12);
+  header.writeUInt32LE(descriptor.length, 8);
+  return Buffer.concat([header, descriptor, Buffer.from(text)]);
+};
 import {
   chmodSync,
   existsSync,
@@ -72,17 +87,29 @@ test("runtime packaging creates parents but never reuses an existing destination
     legalComments: "inline",
     outfile: "runtime.js",
   });
-  assert.ok(moduleBytes.length < unminified.outputFiles[0].contents.length,
-    "release module is minimized");
-  const module = await import(pathToFileURL(join(output, "payloads/runtime.js")));
+  assert.ok(
+    moduleBytes.length < unminified.outputFiles[0].contents.length,
+    "release module is minimized",
+  );
+  const module = await import(
+    pathToFileURL(join(output, "payloads/runtime.js"))
+  );
   assert.deepEqual(Object.keys(module), ["createProgram"]);
-  assert.equal(typeof module.createProgram, "function", "public loader export remains callable");
+  assert.equal(
+    typeof module.createProgram,
+    "function",
+    "public loader export remains callable",
+  );
   for (const [name, source] of [
-    ["LICENSE", join(root, "LICENSE")], ["NOTICE", join(root, "NOTICE")],
+    ["LICENSE", join(root, "LICENSE")],
+    ["NOTICE", join(root, "NOTICE")],
     ["lean-LICENSE", join(root, "third_party/lean4-src/LICENSE")],
     ["lean-LICENSES", join(root, "third_party/lean4-src/LICENSES")],
   ])
-    assert.deepEqual(readFileSync(join(output, "payloads", name)), readFileSync(source));
+    assert.deepEqual(
+      readFileSync(join(output, "payloads", name)),
+      readFileSync(source),
+    );
   const repeat = run(process.execPath, args, "pack-existing-destination");
   assert.notEqual(repeat.status, 0);
   assert.match(repeat.stderr, /EEXIST/);
@@ -100,7 +127,7 @@ import { basename, join } from "node:path";
 const args = process.argv.slice(2);
 appendFileSync(process.env.TEST_GH_LOG, JSON.stringify(args) + "\\n");
 const remote = process.env.TEST_GH_REMOTE;
-const name = basename(process.env.TEST_GH_PACK);
+const name = process.env.TEST_GH_NAME;
 if (args[0] !== "release") throw new Error("unexpected gh operation");
 if (process.env.TEST_GH_FAIL === args[1]) process.exit(23);
 if (args[1] === "view") {
@@ -127,12 +154,14 @@ function publication(label, remoteBytes, fail) {
   const pack = join(directory, `${"a".repeat(64)}.virres`);
   const remote = join(directory, "published.virres");
   const log = join(directory, "gh.jsonl");
-  writeFileSync(pack, "selected runtime bytes");
-  if (remoteBytes !== undefined) writeFileSync(remote, remoteBytes);
+  writeFileSync(pack, publicationBytes("selected runtime bytes"));
+  if (remoteBytes !== undefined)
+    writeFileSync(remote, publicationBytes(remoteBytes));
   const env = {
     ...process.env,
     PATH: `${transport}:${process.env.PATH}`,
     TEST_GH_PACK: pack,
+    TEST_GH_NAME: runtimeAssetName(revision),
     TEST_GH_REMOTE: remote,
     TEST_GH_LOG: log,
     TEST_GH_FAIL: fail ?? "",
@@ -157,7 +186,10 @@ function publication(label, remoteBytes, fail) {
 test("runtime release uploads an absent asset without clobber", () => {
   const { result, calls, remote } = publication("absent");
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(readFileSync(remote, "utf8"), "selected runtime bytes");
+  assert.deepEqual(
+    readFileSync(remote),
+    publicationBytes("selected runtime bytes"),
+  );
   assert.equal(calls.filter((args) => args[1] === "upload").length, 1);
   assert.ok(calls.every((args) => !args.includes("--clobber")));
 });
@@ -168,7 +200,10 @@ test("runtime release reuses an existing byte-identical asset", () => {
     "selected runtime bytes",
   );
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(readFileSync(remote, "utf8"), "selected runtime bytes");
+  assert.deepEqual(
+    readFileSync(remote),
+    publicationBytes("selected runtime bytes"),
+  );
   assert.equal(calls.filter((args) => args[1] === "upload").length, 0);
 });
 
@@ -178,8 +213,11 @@ test("runtime release rejects different bytes without replacing the asset", () =
     "retained other bytes",
   );
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /existing runtime asset differs/);
-  assert.equal(readFileSync(remote, "utf8"), "retained other bytes");
+  assert.match(result.stderr, /existing release asset differs/);
+  assert.deepEqual(
+    readFileSync(remote),
+    publicationBytes("retained other bytes"),
+  );
   assert.equal(calls.filter((args) => args[1] === "upload").length, 0);
 });
 
@@ -193,7 +231,7 @@ for (const fail of ["view", "download", "upload"]) {
     );
     assert.notEqual(result.status, 0);
     if (initial === undefined) assert.ok(!existsSync(remote));
-    else assert.equal(readFileSync(remote, "utf8"), initial);
+    else assert.deepEqual(readFileSync(remote), publicationBytes(initial));
     assert.ok(
       calls.every(
         (args) => args[1] !== "delete" && !args.includes("--clobber"),
