@@ -37,6 +37,7 @@ const environmentLookupSharedHarnessPaths = [
   "web/src/runtime/constructor-scratch.js",
   "web/src/runtime/core.js",
   "web/src/resources/owned-program.js",
+  "web/src/resources/prepared-runtime.js",
   "web/src/resources/descriptor.js",
   "web/src/resources/compatibility.js",
   "web/src/resources/program-exports.js",

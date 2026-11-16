@@ -11,7 +11,7 @@ import { primitiveBoundary } from "../support/interface-fixtures.mjs";
 const root = new URL("../../", import.meta.url);
 const runtimeEntry = process.argv[2] ?? new URL("web/src/vir-runtime-node.js", root).href;
 const wasmRoot = process.argv[3] ?? new URL("web/public/", root).pathname;
-const { createVirRuntimeFactory } = await import(runtimeEntry);
+const { prepareRuntime, createVirImports } = await import(runtimeEntry);
 const built = spawnSync("lake", ["build", "+ModuleSetFixture.Root:vir"], { cwd: root, encoding: "utf8" });
 assert.equal(built.status, 0, built.stderr || built.stdout);
 const compiler = spawnSync("lean", ["--githash"], { cwd: root, encoding: "utf8" });
@@ -32,21 +32,30 @@ for (const file of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
       { path: "runtime.js", mediaType: "text/javascript", byteLength: jsBytes.length, sha256: await sha256Hex(jsBytes) },
     ], fileEntries: [{ role: "wasm", path: file }, { role: "runtimeModule", path: "runtime.js" }] };
   const runtimeManifest = { descriptor, contentId: await descriptorContentId(descriptor) };
-  const factory = createVirRuntimeFactory({ wasmBytes, runtimeManifest, expectedRuntimeContentId: runtimeManifest.contentId });
-  const instances = [], instantiate = factory.instantiateModule;
-  factory.instantiateModule = function (...args) { const runtime = instantiate.apply(this, args); instances.push(runtime); return runtime; };
+  const instances = [];
+  const prepared = await prepareRuntime({ wasmBytes, runtimeManifest,
+    expectedRuntimeContentId: runtimeManifest.contentId,
+    imports(module, hostState) {
+      instances.push({ module, hostState });
+      return createVirImports(module, {}, hostState);
+    },
+  });
+  assert.deepEqual(Object.keys(prepared), ["createProgram"]);
+  assert.ok(Object.isFrozen(prepared));
+  assert.equal(instances.length, 0, "preparation allocates no live instance");
   const options = { irPackageSet: packages, expectedExports };
   for (const bad of [
     { ...options, expectedExports: { "ModuleSetFixture.Root.answer": { args: [], result: primitiveBoundary("string", "string"), effect: "pure" } } },
     { ...options, irPackageSet: [...packages].reverse() },
     { ...options, irPackageSet: packages.map(bytes => { const manifest = structuredClone(readIrPackageInfo(bytes).manifest); manifest.metadata.leanGithash = "wrong"; return replaceIrPackageManifest(bytes, manifest); }) },
-  ]) await assert.rejects(factory.createProgram(bad), error => error.phase === "program-validation");
+  ]) await assert.rejects(prepared.createProgram(bad), error => error.phase === "program-validation");
   assert.equal(instances.length, 0, "contract/compiler/member failures precede reactor initialization");
-  const first = await factory.createProgram(options), second = await factory.createProgram(options);
+  const first = await prepared.createProgram(options), second = await prepared.createProgram(options);
+  const runtimes = instances.map(({hostState}) => hostState.runtime);
   try {
-    assert.equal(instances[0].packageInfo.packageCount, 6);
+    assert.equal(instances[0].hostState.runtime.packageInfo.packageCount, 6);
     assert.equal(instances[0].module, instances[1].module);
-    assert.notEqual(instances[0].exports.memory, instances[1].exports.memory);
+    assert.notEqual(instances[0].hostState.exports.memory, instances[1].hostState.exports.memory);
     assert.equal(first.call("ModuleSetFixture.Root.answer"), 62n);
     assert.equal(first.callWith({ resultRepresentation: "json-safe-v1" }, "ModuleSetFixture.Root.answer"), "62");
     assert.throws(() => first.call("ModuleSetFixture.Shared.hidden"), /unknown program export/);
@@ -55,6 +64,7 @@ for (const file of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
     assert.throws(() => first.call("ModuleSetFixture.Root.answer"), /disposed/);
     assert.equal(second.call("ModuleSetFixture.Root.answer"), 62n);
   } finally { first.dispose(); second.dispose(); }
-  assert.ok(instances.every(runtime => runtime.disposed));
+  assert.ok(runtimes.every(runtime => runtime.disposed));
+  assert.ok(instances.every(({hostState}) => hostState.runtime === null));
   console.log(`owned program verified six-member call/callWith/disposal: ${file} PASS`);
 }

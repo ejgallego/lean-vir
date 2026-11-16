@@ -19,6 +19,7 @@ export const SDK_PAYLOADS = [
   ["js/runtime/factory.js", "web/src/runtime/factory.js"],
   ["js/runtime/factory-core.js", "web/src/runtime/factory-core.js"],
   ["js/resources/owned-program.js", "web/src/resources/owned-program.js"],
+  ["js/resources/prepared-runtime.js", "web/src/resources/prepared-runtime.js"],
   ["js/resources/descriptor.js", "web/src/resources/descriptor.js"],
   ["js/resources/compatibility.js", "web/src/resources/compatibility.js"],
   ["js/resources/program-exports.js", "web/src/resources/program-exports.js"],

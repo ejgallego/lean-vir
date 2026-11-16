@@ -66,6 +66,9 @@ try {
 
   assert.equal(typeof runtime.createVirRuntime, "function");
   assert.equal(typeof runtime.createVirRuntimeFactory, "function");
+  assert.equal(typeof runtime.prepareRuntime, "function");
+  assert.equal(typeof nodeRuntime.prepareRuntime, "function");
+  assert.equal(runtime.createVirRuntimeFactory({}).createProgram, undefined);
   assert.equal(typeof runtime.createVirImports, "function");
   assert.equal(Object.hasOwn(runtime, "VirCallback"), false);
   assert.equal(typeof runtime.VIR_HOST_DISPOSE, "symbol");
@@ -169,12 +172,14 @@ try {
   } finally {
     packagedRuntime.dispose();
   }
-  const ownedProgram = spawnSync(process.execPath, [
-    new URL("./owned-program-smoke.mjs", import.meta.url).pathname,
-    pathToFileURL(join(jsDir, "vir-runtime-node.js")).href,
-    join(jsDir, "..", "wasm"),
-  ], { encoding: "utf8" });
-  assert.equal(ownedProgram.status, 0, ownedProgram.stderr || ownedProgram.stdout);
+  for (const entry of ["vir-runtime-node.js", "vir-runtime.js"]) {
+    const ownedProgram = spawnSync(process.execPath, [
+      new URL("./owned-program-smoke.mjs", import.meta.url).pathname,
+      pathToFileURL(join(jsDir, entry)).href,
+      join(jsDir, "..", "wasm"),
+    ], { encoding: "utf8" });
+    assert.equal(ownedProgram.status, 0, ownedProgram.stderr || ownedProgram.stdout);
+  }
 
   const hostPackage = await readFile(new URL("../../web/public/demo-host.irpkg", import.meta.url));
   for (const profile of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {

@@ -43,19 +43,20 @@ prove semantics; applications check behavior separately.
 
 ## Owned programs from in-memory bytes
 
-Hosts that already have package bytes can use the SDK factory directly. The
-same owned facade and independent contract checks are available without URL
-acquisition:
+Hosts that already have package bytes first prepare their selected runtime.
+Successful preparation returns a reusable program creator with the same owned
+facade and independent contract checks as URL loading:
 
 ```js
-import { createVirRuntimeFactory } from "./js/vir-runtime.js";
+import { prepareRuntime } from "./js/vir-runtime.js";
 
-const factory = createVirRuntimeFactory({
+const runtime = await prepareRuntime({
   wasmBytes,
   runtimeManifest,          // existing { contentId, descriptor } runtime envelope
   expectedRuntimeContentId, // independently selected contentId for that build
+  signal: pending.signal,
 });
-const program = await factory.createProgram({
+const program = await runtime.createProgram({
   irPackageSet: [dependencyBytes, rootBytes], // root last; one member is also valid
   expectedExports,          // independently reviewed callable contracts
   signal: pending.signal,
@@ -69,20 +70,27 @@ try {
 
 The host supplies the existing runtime envelope and its independently selected
 content ID; it does not author another lock or derive expected callable contracts
-from the package being opened. This operation verifies the envelope's canonical
-content ID and Wasm inventory length/hash, supported VIR compatibility, every
-package's compiler identity and the expected root exports before initializing a
-runtime. It uses the same admission and facade implementation as URL loading.
-The URL loader retains its existing origin, inventory and module-role rules.
+from the package being opened. Preparation verifies the envelope's canonical
+content ID, supported VIR compatibility and Wasm inventory length/hash, then
+asynchronously compiles the Wasm module. It creates no live instance or host provider.
+`runtime.createProgram` checks package compiler identities and expected root
+exports before initializing an instance, using the same admission and facade
+implementation as URL loading. The URL loader retains its existing origin,
+inventory and module-role rules.
 
-Runtime bytes and envelope are copied at factory construction. Package bytes and
+Runtime bytes and envelope are copied at preparation entry. Package bytes and
 expected contracts are copied at each `createProgram` invocation, before any
-await. The factory privately associates its verified bytes with one compiled
-module, reused by independent program instances. Changing caller buffers or the
-factory's public low-level Wasm fields cannot retarget that association. A bare
-`WebAssembly.Module` or identity string does not establish it. Configure this
-operation with raw `wasmBytes`, `runtimeManifest` and
-`expectedRuntimeContentId`, without other Wasm selectors.
+await. Successful preparation returns a frozen object exposing only
+`createProgram`, with a private compiled module reused by independent instances.
+Changing caller buffers cannot retarget it. Preparation accepts raw `wasmBytes`,
+`runtimeManifest` and `expectedRuntimeContentId`; a bare `WebAssembly.Module`, URL
+or asserted identity string cannot substitute for verified bytes. Existing
+`imports`, `hostBindings` and `defaultHostBindings` configure each instance;
+browser and Node entry points retain their usual host defaults.
+
+The low-level `createVirRuntimeFactory` keeps its ordinary `createRuntime`
+interface. Owned-program creation is available on a successfully prepared
+runtime, without conditional factory modes or additional verification flags.
 
 These checks establish agreement with a trusted publisher's selected bytes and
 metadata. The embedder must load the JavaScript modules from the matching SDK;
@@ -91,13 +99,20 @@ semantics. Keep the compiler, SDK, Wasm and generated packages matched. No
 published artifact for a different Lean revision is an acceptable substitute.
 
 `program` exposes only root `call`, `callWith`, `status` and idempotent `dispose`.
-Disposal releases its instance, leaving the factory reusable. Creation observes
+Disposal releases its instance, leaving the prepared runtime reusable. Preparation
+has no live instance to dispose; releasing the creator's JavaScript references
+releases its compiled-module ownership. Creation observes
 `signal` before and after asynchronous work and disposes a late-created instance
-on cancellation. Byte creation has no implicit deadline: its caller supplies
-`signal` when needed. URL loading retains its 120-second acquisition deadline.
+on cancellation. Neither preparation nor byte creation has an implicit deadline.
+Their signals have separate pending-operation scopes: abort after preparation
+does not revoke the reusable creator; abort after program creation does not
+dispose the program. A request owner can pass the same signal to both calls,
+as above. URL loading retains its 120-second acquisition deadline.
 Neither route promises prompt cancellation of a non-abortable operation. The
-error and `cleanupError` rules below apply to both loading routes. Synchronous
-Lean execution is not preempted by abort; a worker owner may terminate its worker
+error and `cleanupError` rules below apply to both loading routes. Cancellation
+does not stop compilation already in progress or preempt synchronous Lean
+execution; a late compilation result is rejected before returning a creator.
+A worker owner may terminate its worker
 when required. UI mounting and retained-callback lifetimes
 keep their existing ownership rules.
 

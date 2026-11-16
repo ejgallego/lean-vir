@@ -1,9 +1,10 @@
 # unreleased
 ------------------------------
 
- - [runtime] Open owned programs from verified in-memory runtime and package bytes,
-   sharing callable-contract validation, cancellation and disposal with URL loading;
-   byte creation uses explicit cancellation while URL acquisition keeps its deadline (#278).
+ - [runtime] Prepare a verified runtime before opening owned programs from in-memory
+   package bytes, sharing callable-contract validation, cancellation and disposal
+   with URL loading. Preparation and byte creation use explicit cancellation;
+   URL acquisition keeps its deadline (#278).
 
 # VIR v4.36.0-rc2
 ------------------------------

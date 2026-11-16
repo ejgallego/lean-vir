@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntimeFactory as createRuntimeFactory } from "./runtime/factory.js";
+import { prepareRuntime as prepare } from "./resources/prepared-runtime.js";
 import {
   createCommonHostBindings,
   createConsoleHostBindings,
@@ -28,16 +29,24 @@ export {
   requireExternrefTableSupport,
 } from "./host-boundary.js";
 
+function defaultNodeHostBindings() {
+  return {
+    ...createCommonHostBindings(),
+    ...createConsoleHostBindings(),
+  };
+}
+
 export function createVirRuntimeFactory(options = {}) {
   const { hostBindings = null, ...factoryOptions } = options;
   return createRuntimeFactory({
     ...factoryOptions,
-    defaultHostBindings: options.defaultHostBindings ?? (() => ({
-      ...createCommonHostBindings(),
-      ...createConsoleHostBindings(),
-    })),
+    defaultHostBindings: options.defaultHostBindings ?? defaultNodeHostBindings,
     hostBindings,
   });
+}
+
+export function prepareRuntime(options = {}) {
+  return prepare(options, defaultNodeHostBindings);
 }
 
 export async function createVirRuntime(options = {}) {

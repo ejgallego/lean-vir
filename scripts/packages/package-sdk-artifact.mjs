@@ -100,6 +100,10 @@ This SDK contains the JavaScript runtime modules and wasm32-wasip1 interpreter
 for the matching lean_vir package revision.
 
 It exposes the direct runtime API for custom hosts and existing integrations.
+prepareRuntime verifies selected runtime bytes once and returns a reusable
+creator for owned programs from package bytes; see the resource lifecycle guide:
+https://github.com/ejgallego/lean-vir/blob/main/docs/guides/RESOURCE_LIFETIME.md
+
 The application resource workflow uses a separately prepared runtime.js loader
 with createProgram; that facade exposes status, call, callWith and dispose.
 Start ordinary applications with the complete resource example:

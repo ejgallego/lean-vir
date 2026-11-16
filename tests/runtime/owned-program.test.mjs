@@ -1,7 +1,9 @@
 /* Copyright (c) 2026 Lean FRO LLC. Released under Apache 2.0. */
 import assert from "node:assert/strict";
-import test from "node:test";
-import { createVirRuntimeFactory } from "../../web/src/vir-runtime.js";
+import test, { afterEach, mock } from "node:test";
+import { prepareRuntime, createVirRuntimeFactory } from "../../web/src/vir-runtime.js";
+import { VirRuntimeFactory } from "../../web/src/runtime/factory.js";
+import { prepareRuntime as prepareNodeRuntime } from "../../web/src/vir-runtime-node.js";
 import {
   descriptorContentId,
   sha256Hex,
@@ -19,6 +21,8 @@ import {
 } from "../../web/src/runtime/interface-manifest.js";
 import { encodeInterfaceManifest } from "../../scripts/packages/irpkg-format.mjs";
 import { primitiveBoundary } from "../support/interface-fixtures.mjs";
+
+afterEach(() => mock.restoreAll());
 
 // Valid real Wasm compilation and actual envelope/package admission. Runtime
 // initialization/installation/calls are modeled here; the smoke uses Lean/Wasm.
@@ -161,14 +165,6 @@ async function envelope({
 async function fixture(options = {}) {
   const runtimeManifest = await envelope(options);
   const wasmBytes = Uint8Array.from(wasm);
-  const factory = createVirRuntimeFactory({
-    wasmBytes,
-    runtimeManifest,
-    expectedRuntimeContentId: runtimeManifest.contentId,
-    fetchBytes: () => {
-      throw new Error("byte admission must not fetch");
-    },
-  });
   const state = {
     started: deferred(),
     initialized: 0,
@@ -177,7 +173,7 @@ async function fixture(options = {}) {
     runtimes: [],
     installs: 0,
   };
-  factory.instantiateModule = (module) => {
+  mock.method(VirRuntimeFactory.prototype, "instantiateModule", (module) => {
     state.initialized++;
     state.started.resolve();
     state.modules.push(module);
@@ -207,14 +203,23 @@ async function fixture(options = {}) {
     };
     state.runtimes.push(runtime);
     return state.late ? state.late.promise.then(() => runtime) : runtime;
-  };
+  });
+  const preparation = prepareRuntime({
+    wasmBytes,
+    runtimeManifest,
+    expectedRuntimeContentId: runtimeManifest.contentId,
+    signal: options.signal,
+  });
+  options.mutateRuntimeInputs?.(wasmBytes, runtimeManifest);
+  const runtime = await preparation;
+  assert.equal(state.initialized, 0, "preparation creates no live instance");
   return {
-    factory,
+    runtime,
     state,
     runtimeManifest,
     wasmBytes,
     open: (opts = {}) =>
-      factory.createProgram({
+      runtime.createProgram({
         irPackageSet: [packageBytes()],
         expectedExports: expected(),
         ...opts,
@@ -234,7 +239,8 @@ test("owned programs verify bytes, share only their module and restrict the faca
   );
   assert.throws(() => a.call("Dependency.hidden"), /unknown program export/);
   assert.equal(h.state.modules[0], h.state.modules[1]);
-  assert.equal(await h.factory.module(), h.state.modules[0]);
+  assert.deepEqual(Object.keys(h.runtime), ["createProgram"]);
+  assert.ok(Object.isFrozen(h.runtime));
   h.state.runtimes[0].failure = new Error("fatal");
   assert.equal(a.status, "failed");
   assert.equal(b.status, "active");
@@ -247,19 +253,20 @@ test("owned programs verify bytes, share only their module and restrict the faca
   assert.equal(h.state.disposed, 2);
 });
 
-test("runtime association and operation inputs are snapshotted before awaiting", async () => {
-  const h = await fixture();
-  h.wasmBytes.fill(0);
-  h.runtimeManifest.descriptor.compatibility.leanRevision = "mutated";
-  h.factory.wasmBytes = Uint8Array.of(0);
-  h.factory.wasmModule = new WebAssembly.Module(wasm);
+test("preparation and operation inputs are snapshotted before awaiting", async () => {
+  const h = await fixture({ mutateRuntimeInputs(bytes, manifest) {
+    bytes.fill(0);
+    manifest.descriptor.compatibility.leanRevision = "mutated";
+  } });
+  assert.throws(() => { h.runtime.wasmBytes = Uint8Array.of(0); }, TypeError);
+  assert.throws(() => { h.runtime.wasmModule = new WebAssembly.Module(wasm); }, TypeError);
   const bytes = packageBytes(),
     contracts = structuredClone(expected());
   const pending = h.open({ irPackageSet: [bytes], expectedExports: contracts });
   bytes.fill(0);
   contracts["Root.run"].result = primitiveBoundary("string", "string");
   const program = await pending;
-  assert.notEqual(h.state.modules[0], h.factory.wasmModule);
+  assert.equal(h.state.modules.length, 1);
   assert.equal(program.call("Root.run"), 42n);
   program.dispose();
 });
@@ -311,37 +318,153 @@ for (const [name, options] of [
   ["profile", { version: VIR_COMPATIBILITY_VERSION + 1 }],
   ["Wasm digest", { bytes: Uint8Array.of(0) }],
 ])
-  test(`owned program rejects wrong ${name} before initialization`, async () => {
-    const h = await fixture(options);
-    await assert.rejects(h.open(), (error) => error.phase === "compatibility");
-    assert.equal(h.state.initialized, 0);
+  test(`preparation rejects wrong ${name} before returning a creator`, async () => {
+    await assert.rejects(fixture(options), (error) => error.phase === "compatibility");
   });
 
-test("bare modules and caller-asserted identities do not establish a verified runtime association", async () => {
+test("preparation replaces conditional factory mode and rejects bare modules or wrong identity", async () => {
   const runtimeManifest = await envelope();
-  assert.throws(
+  await assert.rejects(
     () =>
-      createVirRuntimeFactory({
+      prepareRuntime({
         wasmModule: new WebAssembly.Module(wasm),
         runtimeManifest,
         expectedRuntimeContentId: runtimeManifest.contentId,
       }),
-    /owned programs require/,
+    TypeError,
   );
   const factory = createVirRuntimeFactory({ wasmBytes: wasm });
+  assert.equal(factory.createProgram, undefined);
+  assert.throws(() => createVirRuntimeFactory({
+    wasmBytes: wasm, runtimeManifest,
+    expectedRuntimeContentId: runtimeManifest.contentId,
+  }), /unknown option/);
   await assert.rejects(
-    factory.createProgram({ irPackageSet: [packageBytes()] }),
-    /compatibility/,
+    prepareRuntime({ wasmBytes: wasm }),
+    TypeError,
   );
-  const wrong = createVirRuntimeFactory({
+  await assert.rejects(prepareRuntime({
     wasmBytes: wasm,
     runtimeManifest,
     expectedRuntimeContentId: "0".repeat(64),
-  });
-  await assert.rejects(
-    wrong.createProgram({ irPackageSet: [packageBytes()] }),
+  }),
     (error) => /content identity/.test(error.cause.message),
   );
+});
+
+test("preparation resolves to a ready creator without fetching or initializing host providers", async () => {
+  const runtimeManifest = await envelope();
+  let providers = 0;
+  const fetch = mock.method(globalThis, "fetch", () => { throw new Error("unexpected fetch"); });
+  const pending = prepareRuntime({
+    wasmBytes: wasm, runtimeManifest,
+    expectedRuntimeContentId: runtimeManifest.contentId,
+    defaultHostBindings: () => { providers++; return {}; },
+  });
+  assert.equal(typeof pending.then, "function");
+  assert.equal(pending.createProgram, undefined);
+  const prepared = await pending;
+  assert.deepEqual(Object.keys(prepared), ["createProgram"]);
+  assert.ok(Object.isFrozen(prepared));
+  assert.equal(providers, 0);
+  assert.equal(fetch.mock.callCount(), 0);
+});
+
+test("both public preparation entries reject invalid inputs through their promises", async () => {
+  for (const prepare of [prepareRuntime, prepareNodeRuntime]) {
+    for (const input of [null, [], "runtime", 0]) {
+      const pending = prepare(input);
+      assert.equal(typeof pending.then, "function");
+      await assert.rejects(pending, TypeError);
+    }
+  }
+});
+
+test("preparation rejects invalid selected Wasm before publishing a creator", async () => {
+  const bytes = Uint8Array.of(0);
+  const runtimeManifest = await envelope({ bytes });
+  let providers = 0;
+  await assert.rejects(prepareRuntime({
+    wasmBytes: bytes, runtimeManifest,
+    expectedRuntimeContentId: runtimeManifest.contentId,
+    defaultHostBindings: () => { providers++; return {}; },
+  }), error => error.phase === "runtime-creation" && error.cause instanceof WebAssembly.CompileError);
+  assert.equal(providers, 0);
+});
+
+test("pre-aborted preparation performs no hashing or initialization", async () => {
+  const runtimeManifest = await envelope();
+  const controller = new AbortController(), reason = { cancelled: "before preparation" };
+  controller.abort(reason);
+  const digest = mock.method(crypto.subtle, "digest");
+  await assert.rejects(prepareRuntime({
+    wasmBytes: wasm, runtimeManifest,
+    expectedRuntimeContentId: runtimeManifest.contentId, signal: controller.signal,
+  }), error => error.name === "AbortError" && error.cause === reason);
+  assert.equal(digest.mock.callCount(), 0);
+});
+
+for (const stage of [1, 2]) {
+  test(`preparation abort during ${stage === 1 ? "envelope" : "Wasm"} hashing returns no creator`, async () => {
+    const runtimeManifest = await envelope();
+    const reached = deferred(), resume = deferred(), controller = new AbortController();
+    const digest = crypto.subtle.digest.bind(crypto.subtle);
+    let calls = 0, providers = 0;
+    mock.method(crypto.subtle, "digest", async (...args) => {
+      if (++calls === stage) { reached.resolve(); await resume.promise; }
+      return digest(...args);
+    });
+    const pending = prepareRuntime({
+      wasmBytes: wasm, runtimeManifest,
+      expectedRuntimeContentId: runtimeManifest.contentId, signal: controller.signal,
+      defaultHostBindings: () => { providers++; return {}; },
+    });
+    await reached.promise;
+    const reason = { cancelled: stage };
+    controller.abort(reason);
+    resume.resolve();
+    await assert.rejects(pending, error => error.name === "AbortError" && error.cause === reason && error.phase === "compatibility");
+    assert.equal(providers, 0);
+  });
+}
+
+test("successful preparation and program handoffs detach their cancellation scopes", async () => {
+  const preparation = new AbortController();
+  const h = await fixture({ signal: preparation.signal });
+  preparation.abort("after preparation");
+  const creation = new AbortController();
+  const program = await h.open({ signal: creation.signal });
+  creation.abort("after program creation");
+  try {
+    assert.equal(program.status, "active");
+    assert.equal(program.call("Root.run"), 42n);
+  } finally { program.dispose(); }
+  const another = await h.open();
+  another.dispose();
+  assert.equal(h.state.disposed, 2);
+});
+
+test("preparation owns a late compiled module without initializing an aborted runtime", async () => {
+  const runtimeManifest = await envelope();
+  const reached = deferred(), resume = deferred(), controller = new AbortController();
+  const compile = WebAssembly.compile.bind(WebAssembly);
+  let providers = 0;
+  mock.method(WebAssembly, "compile", async (bytes) => {
+    reached.resolve();
+    await resume.promise;
+    return compile(bytes);
+  });
+  const pending = prepareRuntime({
+    wasmBytes: wasm, runtimeManifest,
+    expectedRuntimeContentId: runtimeManifest.contentId, signal: controller.signal,
+    defaultHostBindings: () => { providers++; return {}; },
+  });
+  await reached.promise;
+  controller.abort("during compilation");
+  resume.resolve();
+  await assert.rejects(pending, error => error.name === "AbortError" &&
+    error.phase === "runtime-creation" && error.cause === "during compilation");
+  assert.equal(providers, 0);
 });
 
 test("pre-abort and late creation preserve primary abort and cleanup errors", async () => {
@@ -388,8 +511,7 @@ test("installation failure owns the instance and retains cleanup failure", async
   assert.equal(h.state.disposed, 1);
 });
 
-test("in-memory owned creation installs no acquisition timer", async () => {
-  const h = await fixture();
+test("preparation and byte creation install no acquisition timer", async () => {
   const originalSet = globalThis.setTimeout,
     originalClear = globalThis.clearTimeout;
   let timers = 0,
@@ -403,6 +525,7 @@ test("in-memory owned creation installs no acquisition timer", async () => {
       clears++;
       return originalClear(...args);
     };
+    const h = await fixture();
     const program = await h.open();
     program.dispose();
     assert.equal(timers, 0);
