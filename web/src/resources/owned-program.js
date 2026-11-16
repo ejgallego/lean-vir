@@ -15,7 +15,7 @@ export function creationError(phase, cause, context = {}, name = "Error") {
   return error;
 }
 
-// Shared by verified URL acquisition and the factory's verified byte input.
+// Shared by verified URL acquisition and prepared runtime byte input.
 // prepare supplies private snapshots and an instantiator, never caller flags
 // claiming that arbitrary bytes or a precompiled module have been verified.
 export async function openOwnedProgram({

@@ -111,8 +111,8 @@ export async function prepareRuntime(options = {}, defaultHostBindings = null) {
     // Snapshot all artifact inputs before the first await. The selected content
     // ID is independent from the received envelope, never inferred from it.
     const bytes = Uint8Array.from(asBytes(wasmBytes, "wasmBytes"));
-    const envelopeInput = structuredClone(runtimeManifest);
-    const envelope = await validateEnvelope(envelopeInput);
+    // Validation owns normalized metadata before its first await.
+    const envelope = await validateEnvelope(runtimeManifest);
     checkAborted();
     if (
       envelope.contentId !== expectedRuntimeContentId ||

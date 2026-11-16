@@ -13,6 +13,7 @@ import { readFile, writeFile, mkdir, mkdtemp } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
 import { buildRuntimeModule } from "../../scripts/resources/runtime-module.mjs";
 import { measureResourceRetention } from "./retention.mjs";
 import {
@@ -137,6 +138,21 @@ const program = await bundle(
   ],
   [{ role: "programSet", path: "set.json" }],
 );
+// A real module worker imports the public browser entry, independently of the
+// URL loader bundle. It receives already acquired bytes through structured clone.
+const worker = await build({
+  absWorkingDir: root,
+  entryPoints: ["tests/resources/owned-program-worker.js"],
+  bundle: true,
+  format: "esm",
+  platform: "browser",
+  target: "es2022",
+  write: false,
+});
+inventory.set("owned-program-worker.js", {
+  bytes: worker.outputFiles[0].contents,
+  mediaType: "text/javascript",
+});
 for (const [path, { bytes }] of inventory) {
   const destination = join(output, "site", path);
   await mkdir(resolve(destination, ".."), { recursive: true });
@@ -265,6 +281,38 @@ try {
     path === `/${notice}` || path === `/talk/nested/${notice}`)), false);
   override = null;
   outcomes.push("minimized runtime: callable export retained, no notice startup requests PASS");
+  const ownedWorker = await evaluate(cdp, `(async () => {
+    const readBytes = async url => new Uint8Array(await (await fetch(url)).arrayBuffer());
+    const setUrl = new URL('program/set.json', location.href);
+    const [runtimeManifest, wasmBytes, packageSet] = await Promise.all([
+      fetch('runtime/bundle.json').then(response => response.json()),
+      readBytes('runtime/runtime.wasm'),
+      fetch(setUrl).then(response => response.json()),
+    ]);
+    const irPackageSet = await Promise.all(packageSet.packages.map(member =>
+      readBytes(new URL(member.path, setUrl))));
+    const worker = new Worker(new URL('owned-program-worker.js', location.href), {type: 'module'});
+    let timeout;
+    try {
+      return await new Promise((resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error('owned-program worker timeout')), 30000);
+        worker.onerror = event => reject(new Error(event.message));
+        worker.onmessageerror = () => reject(new Error('owned-program worker message error'));
+        worker.onmessage = ({data}) => data.ok ? resolve(data.result) : reject(new Error(JSON.stringify(data.error)));
+        worker.postMessage({wasmBytes, runtimeManifest, irPackageSet,
+          expectedRuntimeContentId: ${JSON.stringify(runtime.contentId)}});
+      });
+    } finally {
+      clearTimeout(timeout);
+      worker.terminate();
+    }
+  })()`);
+  assert.deepEqual(ownedWorker, {
+    preparedWithoutInstance: true, sameModule: true, separateMemories: true,
+    values: [true, true, true], disposedCallRejected: true, peerActive: true,
+    bothDisposed: true, hostReferencesCleared: true,
+  });
+  outcomes.push("module worker: prepared public byte API, exact calls, independent instances, post-handoff abort and disposal PASS");
   const browserVersion = await cdp.send("Browser.getVersion");
   await measureResourceRetention(cdp, async (observations) => {
     await writeFile(join(output, "retention.json"), JSON.stringify({
@@ -557,7 +605,7 @@ try {
   outcomes.push("strict actual-ABI mismatch and preabort: zero Wasm creations PASS");
   await writeFile(
     join(output, "acceptance.json"),
-    JSON.stringify({ outcomes, requests }, null, 2),
+    JSON.stringify({ outcomes, requests, ownedWorker }, null, 2),
   );
   console.log(`resource browser: ${outcomes.length} checks passed; ${output}`);
 } finally {

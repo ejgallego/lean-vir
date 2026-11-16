@@ -256,7 +256,10 @@ test("owned programs verify bytes, share only their module and restrict the faca
 test("preparation and operation inputs are snapshotted before awaiting", async () => {
   const h = await fixture({ mutateRuntimeInputs(bytes, manifest) {
     bytes.fill(0);
+    manifest.contentId = "0".repeat(64);
     manifest.descriptor.compatibility.leanRevision = "mutated";
+    manifest.descriptor.files[0].sha256 = "0".repeat(64);
+    manifest.descriptor.fileEntries[0].path = "mutated.wasm";
   } });
   assert.throws(() => { h.runtime.wasmBytes = Uint8Array.of(0); }, TypeError);
   assert.throws(() => { h.runtime.wasmModule = new WebAssembly.Module(wasm); }, TypeError);

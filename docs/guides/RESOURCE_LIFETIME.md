@@ -50,6 +50,7 @@ facade and independent contract checks as URL loading:
 ```js
 import { prepareRuntime } from "./js/vir-runtime.js";
 
+const pending = new AbortController();
 const runtime = await prepareRuntime({
   wasmBytes,
   runtimeManifest,          // existing { contentId, descriptor } runtime envelope
