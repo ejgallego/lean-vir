@@ -27,6 +27,9 @@ interpreter:
 | Library-prepared application resources | The runtime bundle's `runtime.js` | `createProgram` loads runtime/program manifests and returns `status`, `call`, `callWith` and `dispose`. |
 | SDK archive for custom hosts and existing integrations | `js/vir-runtime.js` or `js/vir-runtime-node.js` | `createVirRuntime` and `createVirRuntimeFactory`, with the direct call, host-binding and object APIs documented below. |
 
+An SDK factory can also open an owned program from verified in-memory bytes;
+see [in-memory program admission](RESOURCE_LIFETIME.md#owned-programs-from-in-memory-bytes).
+
 The current `createProgram` facade does not expose the underlying runtime or
 accept custom `hostBindings`. A host needing those APIs uses the SDK entry
 points and supplies a matching Wasm and package set. See

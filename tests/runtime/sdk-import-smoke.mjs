@@ -169,6 +169,13 @@ try {
   } finally {
     packagedRuntime.dispose();
   }
+  const ownedProgram = spawnSync(process.execPath, [
+    new URL("./owned-program-smoke.mjs", import.meta.url).pathname,
+    pathToFileURL(join(jsDir, "vir-runtime-node.js")).href,
+    join(jsDir, "..", "wasm"),
+  ], { encoding: "utf8" });
+  assert.equal(ownedProgram.status, 0, ownedProgram.stderr || ownedProgram.stdout);
+
   const hostPackage = await readFile(new URL("../../web/public/demo-host.irpkg", import.meta.url));
   for (const profile of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
     let retained;

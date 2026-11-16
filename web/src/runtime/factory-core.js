@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { asBytes } from "./vir-codec.js";
+import { asBytes, sha256Hex } from "./vir-codec.js";
 import { VirHostState } from "./host-state.js";
 import { validateIrPackageSetMembers } from "./ir-package.js";
 import { requireModuleIdentity } from "./module-name.js";
@@ -488,7 +488,7 @@ async function packageSetMemberBytes(packageSet, { verify = true } = {}) {
   );
 }
 
-function runtimePackageSetInfo(packageSet) {
+export function runtimePackageSetInfo(packageSet) {
   return Object.freeze({
     format: packageSet.format,
     version: packageSet.version,
@@ -499,18 +499,6 @@ function runtimePackageSetInfo(packageSet) {
       ),
     ),
   });
-}
-
-async function sha256Hex(bytes) {
-  if (globalThis.crypto?.subtle === undefined) {
-    throw new Error("SHA-256 verification requires Web Crypto support");
-  }
-  const digest = new Uint8Array(
-    await globalThis.crypto.subtle.digest("SHA-256", bytes),
-  );
-  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join(
-    "",
-  );
 }
 
 function selectWasmUrl({ wasmUrl, wasmDebugUrl, debugWasm }) {

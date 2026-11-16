@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 Lean FRO LLC. Released under Apache 2.0. */
 import assert from "node:assert/strict";
 import test from "node:test";
+import { build } from "esbuild";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime.js";
 
 // A real Wasm module exporting one page of memory, sufficient for an unloaded
@@ -108,4 +109,27 @@ test("failed compilation of fetched bytes retries acquisition", async () => {
   const [a, b] = await Promise.all([factory.module(), factory.module()]);
   assert.equal(fetches, 2);
   assert.equal(a, b);
+});
+
+test("primitive factory composition excludes optional resource and value-conversion policy", async () => {
+  const bundle = await build({
+    entryPoints: [
+      new URL("../../web/src/runtime/primitive-factory.js", import.meta.url)
+        .pathname,
+    ],
+    bundle: true,
+    format: "esm",
+    platform: "neutral",
+    write: false,
+    metafile: true,
+  });
+  const inputs = Object.keys(bundle.metafile.inputs);
+  assert.equal(
+    inputs.some((path) => path.includes("web/src/resources/")),
+    false,
+  );
+  assert.equal(
+    inputs.some((path) => path.endsWith("runtime/object-values.js")),
+    false,
+  );
 });
