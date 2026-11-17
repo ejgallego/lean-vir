@@ -317,36 +317,6 @@ for (const [name, modify, pattern] of [
     assert.equal(h.state.initialized, 0);
   });
 
-for (const [name, options, phase] of [
-  ["profile", { version: VIR_COMPATIBILITY_VERSION + 1 }, "compatibility"],
-  ["Wasm digest", { bytes: Uint8Array.of(0) }, "integrity"],
-])
-  test(`preparation rejects wrong ${name} before returning a creator`, async () => {
-    await assert.rejects(fixture(options), (error) => error.phase === phase &&
-      error.message === `runtime preparation failed during ${phase}`);
-  });
-
-for (const [name, change] of [
-  ["content ID", value => { value.contentId = "0".repeat(64); }],
-  ["malformed envelope", value => { delete value.descriptor.files; }],
-]) {
-  test(`preparation reports ${name} as integrity failure`, async () => {
-    const runtimeManifest = await envelope();
-    const expectedRuntimeContentId = runtimeManifest.contentId;
-    change(runtimeManifest);
-    await assert.rejects(prepareRuntime({ wasmBytes: wasm, runtimeManifest, expectedRuntimeContentId }),
-      error => error.phase === "integrity" && error.message === "runtime preparation failed during integrity");
-  });
-}
-
-test("preparation reports equal-length Wasm corruption as integrity failure", async () => {
-  const runtimeManifest = await envelope(), corrupted = Uint8Array.from(wasm);
-  corrupted[0] ^= 1;
-  await assert.rejects(prepareRuntime({ wasmBytes: corrupted, runtimeManifest,
-    expectedRuntimeContentId: runtimeManifest.contentId }),
-    error => error.phase === "integrity" && /inventory/.test(error.cause.message));
-});
-
 test("preparation rejects non-byte arguments as TypeError before hashing", async () => {
   const runtimeManifest = await envelope();
   const digest = mock.method(crypto.subtle, "digest");

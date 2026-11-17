@@ -113,6 +113,7 @@ jobs:
           path: |
             build/artifacts/runtime/*.virres
             build/artifacts/runtime/provenance.json
+            build/artifacts/runtime/payloads/bundle.json
           if-no-files-found: error
       - name: Upload SDK artifact
         uses: actions/upload-artifact@v4
@@ -236,7 +237,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 7
-      - run: npm run test:runtime:lean
+      - run: VIR_SDK_TEST_RUNTIME_PACK="$VIR_RUNTIME_PACK" npm run test:runtime:lean
 
   fixtures:
     runs-on: ubuntu-latest

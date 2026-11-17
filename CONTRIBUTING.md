@@ -20,6 +20,12 @@ Keep checks that enforce the current contract and implementations required by
 current supported hosts. Applications must refresh their build and deployed
 assets together; see [matching runtime assets](docs/guides/JS_API.md#matching-runtime-assets).
 
+For each new required input, explain who produces it, how a public caller obtains
+it, and where ownership transfers. Examples should work through that producer's
+ordinary workflow. Derive test expectations from the documented contract or an
+independent oracle; a round trip or agreement with the same implementation only
+checks internal consistency. Distinguish modeled boundaries from real execution.
+
 ## Branches
 
 - Use `feat/<slug>` for user-facing or architectural changes.
