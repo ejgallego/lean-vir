@@ -4,11 +4,15 @@ Released under Apache 2.0 license as described in the file LICENSE.
 */
 
 import { createVirRuntimeFactory } from "../runtime/factory.js";
-import { asBytes, sha256Hex } from "../runtime/vir-codec.js";
+import { asBytes, requireSha256, sha256Hex } from "../runtime/vir-codec.js";
 import { validateEnvelope } from "./descriptor.js";
 import { assertResourceCompatibility } from "./compatibility.js";
 import { snapshotExpectedExports } from "./program-exports.js";
 import { creationError, openOwnedProgram } from "./owned-program.js";
+
+function preparationError(phase, cause, name = "Error") {
+  return creationError(phase, cause, {}, name, "runtime preparation");
+}
 
 // Capture only the verified compatibility and compiled module. Raw input copies
 // and the envelope belong to preparation, not the reusable program creator.
@@ -98,30 +102,36 @@ export async function prepareRuntime(options = {}, defaultHostBindings = null) {
     throw new TypeError(
       "prepareRuntime requires wasmBytes, runtimeManifest and expectedRuntimeContentId",
     );
+  if (!(wasmBytes instanceof ArrayBuffer) && !ArrayBuffer.isView(wasmBytes))
+    throw new TypeError("wasmBytes must be an ArrayBuffer or ArrayBuffer view");
   if (signal !== undefined && !(signal instanceof AbortSignal))
     throw new TypeError("signal must be an AbortSignal");
 
-  let phase = "compatibility";
+  let phase = "runtime-creation";
   const checkAborted = () => {
     if (signal?.aborted)
-      throw creationError(phase, signal.reason, {}, "AbortError");
+      throw preparationError(phase, signal.reason, "AbortError");
   };
   checkAborted();
   try {
+    requireSha256();
+    phase = "integrity";
     // Snapshot all artifact inputs before the first await. The selected content
     // ID is independent from the received envelope, never inferred from it.
     const bytes = Uint8Array.from(asBytes(wasmBytes, "wasmBytes"));
     // Validation owns normalized metadata before its first await.
     const envelope = await validateEnvelope(runtimeManifest);
     checkAborted();
-    if (
-      envelope.contentId !== expectedRuntimeContentId ||
-      envelope.descriptor.kind !== "runtime"
-    )
+    if (envelope.contentId !== expectedRuntimeContentId)
       throw new Error(
         "runtime envelope does not match the selected runtime content identity",
       );
+    phase = "runtime-manifest";
+    if (envelope.descriptor.kind !== "runtime")
+      throw new Error("incorrect resource bundle kind");
+    phase = "compatibility";
     assertResourceCompatibility(envelope.descriptor.compatibility);
+    phase = "integrity";
     const role = envelope.descriptor.fileEntries.find(
       (entry) => entry.role === "wasm",
     );
@@ -141,11 +151,10 @@ export async function prepareRuntime(options = {}, defaultHostBindings = null) {
     const factory = createVirRuntimeFactory({
       ...hostOptions,
       defaultHostBindings: hostOptions.defaultHostBindings ?? defaultHostBindings,
-      wasmModule: module,
     });
     return programCreator(factory, module, envelope.descriptor.compatibility);
   } catch (cause) {
     checkAborted();
-    throw creationError(phase, cause);
+    throw preparationError(phase, cause);
   }
 }

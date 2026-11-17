@@ -496,6 +496,15 @@ instance promise). Acquisition timeout is named `TimeoutError`; it is not caller
 cancellation or a formatting budget. Primary classification is fixed before
 cleanup and cannot be overwritten by a later abort.
 
+SDK `prepareRuntime` uses the same phase names with the message
+`runtime preparation failed during PHASE`. Envelope, selected-content-ID and Wasm
+inventory failures are `integrity`; a valid envelope of the wrong kind is
+`runtime-manifest`; an unsupported VIR profile is `compatibility`; unavailable
+WebCrypto and Wasm compilation failures are `runtime-creation`. Invalid call
+shapes, byte/signal arguments or content-ID selectors reject with `TypeError`.
+Preparation owns no live instance; instance cleanup belongs to the subsequent
+program creation.
+
 If owned-instance cleanup also fails, an own read-only `cleanupError` retains
 the untouched thrown value, even `undefined`/`null`. Inspect property presence,
 and report this secondary failure even when suppressing stale cancellation.

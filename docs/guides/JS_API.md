@@ -28,7 +28,8 @@ interpreter:
 | SDK archive for custom hosts and existing integrations | `js/vir-runtime.js` or `js/vir-runtime-node.js` | `prepareRuntime` for owned programs; `createVirRuntime` and `createVirRuntimeFactory` for direct call, host-binding and object APIs. |
 
 SDK `prepareRuntime` verifies selected in-memory runtime bytes and returns a
-reusable program creator;
+reusable program creator. It additionally needs a matching resource runtime
+bundle's envelope and independently expected content ID;
 see [in-memory program admission](RESOURCE_LIFETIME.md#owned-programs-from-in-memory-bytes).
 
 The URL loader does not accept custom `hostBindings`. SDK preparation accepts

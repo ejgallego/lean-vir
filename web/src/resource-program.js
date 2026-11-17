@@ -151,9 +151,7 @@ async function fetchPayloads(envelope, url, signal, perform) {
     envelope.descriptor.kind === "runtime"
       ? envelope.descriptor.files.filter((info) =>
           envelope.descriptor.fileEntries.some(
-            (entry) =>
-              ["runtimeModule", "wasm"].includes(entry.role) &&
-              entry.path === info.path,
+            (entry) => ["runtimeModule", "wasm"].includes(entry.role) && entry.path === info.path,
           ),
         )
       : envelope.descriptor.files;
@@ -193,7 +191,10 @@ async function fetchPayloads(envelope, url, signal, perform) {
     }
   };
   await Promise.all(
-    Array.from({ length: Math.min(4, inventory.length) }, worker),
+    Array.from(
+      { length: Math.min(4, inventory.length) },
+      worker,
+    ),
   );
   return { ...envelope, files };
 }
@@ -306,9 +307,8 @@ export async function createProgram(options) {
         const packageSet = await factory.fetchIrPackageSet(setUrl);
         return {
           compatibility,
-          packages: packageSet.members.map((member) =>
-            Uint8Array.from(member.bytes),
-          ),
+          // fetchIrPackageSet already owns these verified private bytes.
+          packages: packageSet.members.map((member) => member.bytes),
           packageInfo: runtimePackageSetInfo(packageSet),
           instantiate: () => factory.instantiate(),
         };

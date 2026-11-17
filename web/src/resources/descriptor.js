@@ -26,7 +26,10 @@ const descriptorKeys = [
   "files",
   "fileEntries",
 ];
-const compatibilityKeys = ["leanRevision", "virVersion"];
+const compatibilityKeys = [
+  "leanRevision",
+  "virVersion",
+];
 const fileKeys = ["path", "mediaType", "byteLength", "sha256"];
 const entryKeys = ["role", "path"];
 const hex64 = /^[0-9a-f]{64}$/;

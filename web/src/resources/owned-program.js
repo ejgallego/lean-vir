@@ -7,8 +7,8 @@ import { validateIrPackageSetMembers } from "../runtime/ir-package.js";
 import { resolveProgramExports } from "./program-exports.js";
 import { requireSha256 } from "../runtime/vir-codec.js";
 
-export function creationError(phase, cause, context = {}, name = "Error") {
-  const error = new Error(`program creation failed during ${phase}`, { cause });
+export function creationError(phase, cause, context = {}, name = "Error", operation = "program creation") {
+  const error = new Error(`${operation} failed during ${phase}`, { cause });
   error.name = name;
   error.phase = phase;
   error.context = Object.freeze({ ...context });
@@ -109,7 +109,7 @@ export async function openOwnedProgram({
     // Assign before the post-await abort check so a late owned instance cannot
     // escape cleanup. Creation itself may be non-preemptible.
     await perform("runtime-creation", async () => {
-      runtime = await instantiate(checkStopped);
+      runtime = await instantiate();
       // Own the instance before installation: partial initialization or an abort
       // must still dispose it, preserving the primary creation error.
       checkStopped();

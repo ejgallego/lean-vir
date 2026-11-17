@@ -23,8 +23,9 @@ const expectedExports = { "ModuleSetFixture.Root.answer": { args: [], result: pr
 const jsBytes = await readFile(new URL(runtimeEntry));
 for (const file of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
   const wasmBytes = await readFile(resolve(wasmRoot, file));
-  // Existing envelope grammar, derived from the actual local selected files.
-  // This exercises bytes/metadata admission, not public resource acquisition.
+  // This test is the publisher of a fixture inventory for each Wasm profile.
+  // Its computed CID exercises admission, not independent artifact selection.
+  // The real resource-bundle/worker gate uses the produced bundle's envelope.
   const descriptor = { schemaVersion: 2, logicalId: `test/${file}`, kind: "runtime",
     compatibility: { leanRevision: compiler.stdout.trim(), virVersion: VIR_COMPATIBILITY_VERSION },
     files: [
@@ -33,10 +34,12 @@ for (const file of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
     ], fileEntries: [{ role: "wasm", path: file }, { role: "runtimeModule", path: "runtime.js" }] };
   const runtimeManifest = { descriptor, contentId: await descriptorContentId(descriptor) };
   const instances = [];
+  let abortDuringInstantiation = null;
   const prepared = await prepareRuntime({ wasmBytes, runtimeManifest,
     expectedRuntimeContentId: runtimeManifest.contentId,
     imports(module, hostState) {
       instances.push({ module, hostState });
+      abortDuringInstantiation?.abort("inside synchronous instantiation");
       return createVirImports(module, {}, hostState);
     },
   });
@@ -64,6 +67,12 @@ for (const file of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
     assert.throws(() => first.call("ModuleSetFixture.Root.answer"), /disposed/);
     assert.equal(second.call("ModuleSetFixture.Root.answer"), 62n);
   } finally { first.dispose(); second.dispose(); }
+  // The real prepared instantiator is synchronous, but a supplied imports hook
+  // can abort reentrantly. Its returned instance must still be owned and disposed.
+  abortDuringInstantiation = new AbortController();
+  await assert.rejects(prepared.createProgram({ ...options, signal: abortDuringInstantiation.signal }),
+    error => error.name === "AbortError" && error.phase === "runtime-creation" &&
+      error.cause === "inside synchronous instantiation");
   assert.ok(runtimes.every(runtime => runtime.disposed));
   assert.ok(instances.every(({hostState}) => hostState.runtime === null));
   console.log(`owned program verified six-member call/callWith/disposal: ${file} PASS`);

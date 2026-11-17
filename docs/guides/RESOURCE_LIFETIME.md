@@ -45,7 +45,22 @@ prove semantics; applications check behavior separately.
 
 Hosts that already have package bytes first prepare their selected runtime.
 Successful preparation returns a reusable program creator with the same owned
-facade and independent contract checks as URL loading:
+facade and independent contract checks as URL loading.
+
+Use the matching resource runtime bundle produced by the
+[application asset writer](EMBEDDED_RESOURCES.md#publish-with-the-applications-writer):
+its generated `bundle.json` is `runtimeManifest`, and its `wasm` role identifies
+the selected Wasm bytes. The publisher supplies `expectedRuntimeContentId` from
+its build selection, for example `resources.runtime.contentId` from the producer's
+Lean `ResourceSet` value, separately from the envelope received by JavaScript.
+Do not compute the expected ID from that received envelope or fabricate a
+replacement descriptor.
+
+The SDK archive supplies the matching JavaScript entry points and Wasm profiles;
+it does not contain a runtime envelope. Use the bundle's Wasm, or an SDK Wasm file
+only when it matches that envelope's inventory exactly. The development Wasm is
+not interchangeable with a bundle's selected release Wasm. For a standalone SDK
+without resource-bundle inputs, use the low-level runtime factory instead.
 
 ```js
 import { prepareRuntime } from "./js/vir-runtime.js";
@@ -53,7 +68,7 @@ import { prepareRuntime } from "./js/vir-runtime.js";
 const pending = new AbortController();
 const runtime = await prepareRuntime({
   wasmBytes,
-  runtimeManifest,          // existing { contentId, descriptor } runtime envelope
+  runtimeManifest,          // resource runtime bundle's generated bundle.json
   expectedRuntimeContentId, // independently selected contentId for that build
   signal: pending.signal,
 });
@@ -78,6 +93,11 @@ asynchronously compiles the Wasm module. It creates no live instance or host pro
 exports before initializing an instance, using the same admission and facade
 implementation as URL loading. The URL loader retains its existing origin,
 inventory and module-role rules.
+
+The envelope's `runtimeModule` role describes the resource bundle's URL loader.
+SDK preparation neither fetches nor imports it: the host has already imported
+the matching SDK entry point. The complete bundle grammar is retained while the
+byte path verifies the selected Wasm inventory.
 
 Runtime bytes and envelope are copied at preparation entry. Package bytes and
 expected contracts are copied at each `createProgram` invocation, before any

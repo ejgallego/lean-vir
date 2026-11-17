@@ -277,4 +277,8 @@ test("rejects representative schema-v2 metadata, path, and role failures", () =>
 test("shared byte hashing honors typed-array and Buffer view offsets", async () => {
   assert.equal(await hashBytes(new TextEncoder().encode("xabcx").subarray(1, 4)), abcSha256);
   assert.equal(await hashBytes(Buffer.from("xabcx").subarray(1, 4)), abcSha256);
+  const bytes = new TextEncoder().encode("abc");
+  const pending = hashBytes(bytes);
+  bytes.fill(0);
+  assert.equal(await pending, abcSha256, "WebCrypto snapshots its input at invocation");
 });

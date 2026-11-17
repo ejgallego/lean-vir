@@ -317,13 +317,64 @@ for (const [name, modify, pattern] of [
     assert.equal(h.state.initialized, 0);
   });
 
-for (const [name, options] of [
-  ["profile", { version: VIR_COMPATIBILITY_VERSION + 1 }],
-  ["Wasm digest", { bytes: Uint8Array.of(0) }],
+for (const [name, options, phase] of [
+  ["profile", { version: VIR_COMPATIBILITY_VERSION + 1 }, "compatibility"],
+  ["Wasm digest", { bytes: Uint8Array.of(0) }, "integrity"],
 ])
   test(`preparation rejects wrong ${name} before returning a creator`, async () => {
-    await assert.rejects(fixture(options), (error) => error.phase === "compatibility");
+    await assert.rejects(fixture(options), (error) => error.phase === phase &&
+      error.message === `runtime preparation failed during ${phase}`);
   });
+
+for (const [name, change] of [
+  ["content ID", value => { value.contentId = "0".repeat(64); }],
+  ["malformed envelope", value => { delete value.descriptor.files; }],
+]) {
+  test(`preparation reports ${name} as integrity failure`, async () => {
+    const runtimeManifest = await envelope();
+    const expectedRuntimeContentId = runtimeManifest.contentId;
+    change(runtimeManifest);
+    await assert.rejects(prepareRuntime({ wasmBytes: wasm, runtimeManifest, expectedRuntimeContentId }),
+      error => error.phase === "integrity" && error.message === "runtime preparation failed during integrity");
+  });
+}
+
+test("preparation reports equal-length Wasm corruption as integrity failure", async () => {
+  const runtimeManifest = await envelope(), corrupted = Uint8Array.from(wasm);
+  corrupted[0] ^= 1;
+  await assert.rejects(prepareRuntime({ wasmBytes: corrupted, runtimeManifest,
+    expectedRuntimeContentId: runtimeManifest.contentId }),
+    error => error.phase === "integrity" && /inventory/.test(error.cause.message));
+});
+
+test("preparation rejects non-byte arguments as TypeError before hashing", async () => {
+  const runtimeManifest = await envelope();
+  const digest = mock.method(crypto.subtle, "digest");
+  await assert.rejects(prepareRuntime({ wasmBytes: "wasm", runtimeManifest,
+    expectedRuntimeContentId: runtimeManifest.contentId }), TypeError);
+  assert.equal(digest.mock.callCount(), 0);
+});
+
+test("preparation rejects a valid envelope of the wrong kind as runtime-manifest", async () => {
+  const runtimeManifest = await envelope();
+  runtimeManifest.descriptor.kind = "program";
+  runtimeManifest.descriptor.fileEntries.push({ role: "programSet", path: "runtime.js" });
+  runtimeManifest.contentId = await descriptorContentId(runtimeManifest.descriptor);
+  await assert.rejects(prepareRuntime({ wasmBytes: wasm, runtimeManifest,
+    expectedRuntimeContentId: runtimeManifest.contentId }),
+    error => error.phase === "runtime-manifest" && /bundle kind/.test(error.cause.message));
+});
+
+test("preparation reports unavailable WebCrypto as runtime-creation", async () => {
+  const runtimeManifest = await envelope();
+  const original = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+  try {
+    Object.defineProperty(globalThis, "crypto", { value: {}, configurable: true });
+    await assert.rejects(prepareRuntime({ wasmBytes: wasm, runtimeManifest,
+      expectedRuntimeContentId: runtimeManifest.contentId }),
+      error => error.phase === "runtime-creation" && /WebCrypto SHA-256/.test(error.cause.message));
+  } finally { Object.defineProperty(globalThis, "crypto", original); }
+});
 
 test("preparation replaces conditional factory mode and rejects bare modules or wrong identity", async () => {
   const runtimeManifest = await envelope();
@@ -426,7 +477,7 @@ for (const stage of [1, 2]) {
     const reason = { cancelled: stage };
     controller.abort(reason);
     resume.resolve();
-    await assert.rejects(pending, error => error.name === "AbortError" && error.cause === reason && error.phase === "compatibility");
+    await assert.rejects(pending, error => error.name === "AbortError" && error.cause === reason && error.phase === "integrity");
     assert.equal(providers, 0);
   });
 }
@@ -470,7 +521,7 @@ test("preparation owns a late compiled module without initializing an aborted ru
   assert.equal(providers, 0);
 });
 
-test("pre-abort and late creation preserve primary abort and cleanup errors", async () => {
+test("pre-abort and modeled shared-owner late creation preserve primary abort and cleanup errors", async () => {
   const h = await fixture(),
     controller = new AbortController();
   controller.abort("before");
@@ -480,6 +531,8 @@ test("pre-abort and late creation preserve primary abort and cleanup errors", as
   );
   assert.equal(h.state.initialized, 0);
   const late = deferred();
+  // The shared owner also serves asynchronous URL instantiation. The prepared
+  // factory's real instantiateModule is synchronous; only this boundary is modeled.
   h.state.late = late;
   const abort = new AbortController(),
     cleanup = new Error("cleanup");
