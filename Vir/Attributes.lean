@@ -76,7 +76,8 @@ private def checkVirMarker
         dependency := { name := declName, path := #[declName] }
       }]
     }
-  let closure := Vir.ExportValidation.checkVisibleClosure env declName
+  -- The compiled body can use ordinary imports hidden from the public signature.
+  let closure := Vir.ExportValidation.checkVisibleClosure (env.setExporting false) declName
   if let some blocker := closure.blockers[0]? then
     return { diagnostic? := some blocker.message }
   return { deferred := closure.deferred }

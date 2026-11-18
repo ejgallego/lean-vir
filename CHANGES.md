@@ -1,6 +1,8 @@
 # unreleased
 ------------------------------
 
+ - [lean] Support Lean 4.37.0-rc1 with a matching browser runtime and SDK.
+
  - [runtime] Prepare a verified runtime before opening owned programs from in-memory
    package bytes, sharing callable-contract validation, cancellation and disposal
    with URL loading. Preparation and byte creation use explicit cancellation;

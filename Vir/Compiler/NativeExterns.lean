@@ -74,7 +74,8 @@ private def stringCompletionExternSpecs : Array NativeExternSpec :=
     "any", "capitalize", "drop", "dropRight", "front", "intercalate", "nextWhile"
   ] ++ boxedExternSpecs `String.Pos.Raw.Internal #["min", "sub"] ++
   boxedExternSpecs `String.Pos.Raw #["get!", "get?"] ++
-  boxedExternSpecs `String.Slice #["hash", "instDecidableLt"] ++ boxedExternSpecs `String #[
+  boxedExternSpecs `String.Slice #["hash"] ++
+  boxedExternSpecs `String.Slice.Pattern.Internal #["memcmpStrLt", "memcmpStrCompare"] ++ boxedExternSpecs `String #[
     "atEnd", "get", "get!", "get?", "mk", "next", "prev", "toByteArray"
   ] ++ boxedExternSpecs `Substring.Raw.Internal #[
     "all", "drop", "extract", "front", "get", "isEmpty", "prev", "takeWhile", "toString"
@@ -526,7 +527,15 @@ def nativeExternSpecs : Array NativeExternSpec := #[
     generateBoxedWrapper := true
   },
   {
-    name := `Void.mk,
+    name := `ST.Internal.Void.mk,
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Thunk.mk,
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Thunk.get,
     generateBoxedWrapper := true
   },
   {
@@ -996,6 +1005,10 @@ def nativeExternSpecs : Array NativeExternSpec := #[
     generateBoxedWrapper := true
   },
   {
+    name := `mixHash32,
+    generateBoxedWrapper := true
+  },
+  {
     name := `UInt64.ofNatLT,
     symbolOverride? := some "l_UInt64_ofNatLT",
     generateBoxedWrapper := true
@@ -1150,6 +1163,14 @@ def nativeExternSpecs : Array NativeExternSpec := #[
   },
   {
     name := `Lean.Expr.equal,
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Lean.Literal.natHash,
+    generateBoxedWrapper := true
+  },
+  {
+    name := mkPrivateNameCore `Lean.ConstMap `Lean.ImportedConsts.findConstEntryCachedImpl,
     generateBoxedWrapper := true
   }
 ] ++ primitiveCompletionExternSpecs ++ floatCoreExternSpecs ++

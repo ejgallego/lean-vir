@@ -249,6 +249,8 @@ support_sources=(
   "$src/src/kernel/expr.cpp"
   "$src/src/kernel/expr_eq_fn.cpp"
   "$src/stage0/stdlib/Lean/Data/KVMap.c"
+  # Implementation of imported-constant lookups. The Lean core is linked below.
+  "$src/src/library/const_cache.cpp"
 )
 
 lean_stage0_support_root="$src/stage0/stdlib/Init"
@@ -270,13 +272,14 @@ local_native_support_sources=(
   "wasm/upstream_shim/runtime/native_symbols.cpp"
 )
 
-# These providers are generated from the pinned Lean sources.  Their raw
-# constructors/accessors carry the runtime ownership and packed-metadata
-# contract used by the upstream kernel; keep the boundary adapters above
-# independent from that generated implementation.
-constructor_support_sources=(
+# These pinned stage0 providers supply kernel constructors and the Lean
+# lookup core for const_cache.cpp. The native support bundle keeps their
+# generated boxed wrappers under the same duplicate audit as the Init providers.
+lean_stage0_module_providers=(
   "$src/stage0/stdlib/Lean/Level.c"
   "$src/stage0/stdlib/Lean/Expr.c"
+  "$src/stage0/stdlib/Lean/ConstMap.c"
+  "$src/stage0/stdlib/Lean/ConstTrie.c"
 )
 
 shim_sources=(
@@ -441,7 +444,7 @@ done
 native_support_objects=()
 client_native_provider_objects=()
 for source in "${local_native_support_sources[@]}" "$generated_native_wrappers" \
-    "${client_native_provider_sources[@]}" "${constructor_support_sources[@]}" \
+    "${client_native_provider_sources[@]}" "${lean_stage0_module_providers[@]}" \
     "${lean_stage0_support_sources[@]}"; do
   object="$(object_for_source "$source")"
   if [[ "$source" == wasm/upstream_shim/* ]]; then

@@ -90,3 +90,13 @@ extern "C" lean::object * lean_get_export_name_for(lean::object *, lean::object 
     return lean_box(0);
 }
 
+extern "C" lean::obj_res lean_get_imported_decl_module(lean::obj_arg env, lean::obj_arg decl) {
+    // Package sessions have no Lean environment or imported-module provenance.
+    lean::elab_environment environment(env);
+    lean::name declaration(decl);
+    if (environment.raw() != lean_box(0)) {
+        throw lean::exception("package runtime requires an empty Lean environment");
+    }
+    return lean_box(0);
+}
+
