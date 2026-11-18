@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { VirRuntimeFactory as RuntimeFactory } from "./runtime/factory.js";
+import { prepareRuntime as prepare } from "./resources/prepared-runtime.js";
 import { createBrowserHostBindings } from "./vir-host-bindings.js";
 
 export {
@@ -30,6 +31,10 @@ export class VirRuntimeFactory extends RuntimeFactory {
       defaultHostBindings: options.defaultHostBindings ?? createBrowserHostBindings,
     });
   }
+}
+
+export function prepareRuntime(options = {}) {
+  return prepare(options, createBrowserHostBindings);
 }
 
 export function createVirRuntimeFactory(options = {}) {

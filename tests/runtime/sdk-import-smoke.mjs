@@ -15,10 +15,13 @@ import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { SDK_JS_MODULES } from "../../scripts/packages/sdk-payloads.mjs";
+import { readRuntimeExpectation } from "../resources/expected-runtime.mjs";
+
+const root = fileURLToPath(new URL("../../", import.meta.url));
 
 const packaged = spawnSync(
   process.execPath,
@@ -44,6 +47,59 @@ async function extractSdk(tempDir) {
   return join(sdkRoot, "js");
 }
 
+async function checkProducedBundle(jsDir, temporary, entries) {
+  // CI supplies its actual build-demo pack. Standalone SDK checks run the same
+  // native producer with already-built qualified Wasm; they never build Wasm.
+  let pack = process.env.VIR_SDK_TEST_RUNTIME_PACK;
+  if (pack) pack = resolve(root, pack);
+  else {
+    const built = spawnSync("lake", ["build", "vir_resource_pack"],
+      { cwd: root, encoding: "utf8" });
+    assert.equal(built.status, 0, built.stderr || built.stdout);
+    const output = join(temporary, "produced-runtime");
+    const produced = spawnSync(process.execPath, ["scripts/resources/pack-runtime.mjs",
+      "web/public/vir-upstream.wasm", "build/upstream-probe/wasm-build-identity.json", output],
+      { cwd: root, encoding: "utf8" });
+    assert.equal(produced.status, 0, produced.stderr || produced.stdout);
+    const provenance = JSON.parse(await readFile(join(output, "provenance.json"), "utf8"));
+    pack = join(output, `${provenance.contentId}.virres`);
+  }
+  const producerDir = dirname(pack);
+  const producer = JSON.parse(await readFile(join(producerDir, "provenance.json"), "utf8"));
+  const runtimeManifest = JSON.parse(await readFile(join(producerDir, "payloads/bundle.json"), "utf8"));
+  const selected = readRuntimeExpectation(pack); // Independent Node SHA/pack oracle.
+  const sdk = join(jsDir, "..");
+  const manifest = JSON.parse(await readFile(join(sdk, "lean-vir-artifact.json"), "utf8"));
+  assert.equal(selected.contentId, producer.contentId);
+  assert.equal(selected.descriptor.logicalId, `lean-vir/runtime/${manifest.gitCommit}`);
+  assert.deepEqual(runtimeManifest, { contentId: selected.contentId, descriptor: selected.descriptor });
+  const wasmBytes = await readFile(join(sdk, "wasm/vir-upstream.wasm"));
+  const wasmPath = selected.descriptor.fileEntries.find(entry => entry.role === "wasm").path;
+  assert.deepEqual(wasmBytes, selected.files.get(wasmPath), "SDK and produced resource select the same Wasm");
+  // The existing owned-program smokes above build this six-member fixture.
+  const setPath = join(root, ".lake/build/vir/module-sets/ModuleSetFixture/Root.irpkg-set.json");
+  const set = JSON.parse(await readFile(setPath, "utf8"));
+  const irPackageSet = await Promise.all(set.packages.map(member =>
+    readFile(resolve(dirname(setPath), member.path))));
+  for (const [entry, api] of entries) {
+    await assert.rejects(api.prepareRuntime({ wasmBytes, runtimeManifest,
+      expectedRuntimeContentId: "0".repeat(64) }),
+      error => error.phase === "integrity", `${entry} must enforce independent selection`);
+    const runtime = await api.prepareRuntime({ wasmBytes, runtimeManifest,
+      expectedRuntimeContentId: producer.contentId });
+    const program = await runtime.createProgram({ irPackageSet, expectedExports: {
+      "ModuleSetFixture.Root.answer": {
+        args: [], result: primitiveBoundary("nat", "bigint"), effect: "pure",
+      },
+    } });
+    try { assert.equal(program.call("ModuleSetFixture.Root.answer"), 62n); }
+    finally { program.dispose(); }
+    assert.equal(program.status, "disposed");
+    assert.throws(() => program.call("ModuleSetFixture.Root.answer"), /disposed/);
+  }
+  console.log("packaged SDK + actual native-produced resource envelope/selection/call62/disposal ok");
+}
+
 const isolatedDir = await mkdtemp(join(tmpdir(), "lean-vir-sdk-import-"));
 try {
   const jsDir = await extractSdk(isolatedDir);
@@ -66,6 +122,9 @@ try {
 
   assert.equal(typeof runtime.createVirRuntime, "function");
   assert.equal(typeof runtime.createVirRuntimeFactory, "function");
+  assert.equal(typeof runtime.prepareRuntime, "function");
+  assert.equal(typeof nodeRuntime.prepareRuntime, "function");
+  assert.equal(runtime.createVirRuntimeFactory({}).createProgram, undefined);
   assert.equal(typeof runtime.createVirImports, "function");
   assert.equal(Object.hasOwn(runtime, "VirCallback"), false);
   assert.equal(typeof runtime.VIR_HOST_DISPOSE, "symbol");
@@ -119,7 +178,8 @@ try {
   assert.equal(typeof valueInterfaces.validateInterfaceType, "function");
   assert.equal(typeof valueInterfaces.formatInterfaceType, "function");
   assert.equal(typeof valueInterfaces.interfaceSignatureKey, "function");
-  assert.equal(SDK_JS_MODULES.includes("js/runtime/interface-tags.js"), false);
+  await assert.rejects(readFile(join(jsDir, "runtime/interface-tags.js")), { code: "ENOENT" },
+    "retired modules must be absent from the extracted archive, including unlisted files");
   const packagedRuntime = await nodeRuntime.createVirRuntime({
     wasmBytes: await readFile(join(jsDir, "..", "wasm", "vir-upstream.wasm")),
   });
@@ -169,6 +229,16 @@ try {
   } finally {
     packagedRuntime.dispose();
   }
+  for (const entry of ["vir-runtime-node.js", "vir-runtime.js"]) {
+    const ownedProgram = spawnSync(process.execPath, [
+      new URL("./owned-program-smoke.mjs", import.meta.url).pathname,
+      pathToFileURL(join(jsDir, entry)).href,
+      join(jsDir, "..", "wasm"),
+    ], { encoding: "utf8" });
+    assert.equal(ownedProgram.status, 0, ownedProgram.stderr || ownedProgram.stdout);
+  }
+  await checkProducedBundle(jsDir, isolatedDir, [["browser", runtime], ["Node", nodeRuntime]]);
+
   const hostPackage = await readFile(new URL("../../web/public/demo-host.irpkg", import.meta.url));
   for (const profile of ["vir-upstream.wasm", "vir-upstream.dev.wasm"]) {
     let retained;

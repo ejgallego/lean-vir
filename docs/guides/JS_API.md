@@ -25,11 +25,17 @@ interpreter:
 | Distribution | JavaScript entry | Available interface |
 | --- | --- | --- |
 | Library-prepared application resources | The runtime bundle's `runtime.js` | `createProgram` loads runtime/program manifests and returns `status`, `call`, `callWith` and `dispose`. |
-| SDK archive for custom hosts and existing integrations | `js/vir-runtime.js` or `js/vir-runtime-node.js` | `createVirRuntime` and `createVirRuntimeFactory`, with the direct call, host-binding and object APIs documented below. |
+| SDK archive for custom hosts and existing integrations | `js/vir-runtime.js` or `js/vir-runtime-node.js` | `prepareRuntime` for owned programs; `createVirRuntime` and `createVirRuntimeFactory` for direct call, host-binding and object APIs. |
 
-The current `createProgram` facade does not expose the underlying runtime or
-accept custom `hostBindings`. A host needing those APIs uses the SDK entry
-points and supplies a matching Wasm and package set. See
+SDK `prepareRuntime` verifies selected in-memory runtime bytes and returns a
+reusable program creator. It additionally needs a matching resource runtime
+bundle's envelope and independently expected content ID;
+see [in-memory program admission](RESOURCE_LIFETIME.md#owned-programs-from-in-memory-bytes).
+
+The URL loader does not accept custom `hostBindings`. SDK preparation accepts
+host bindings while keeping each owned program's runtime private. Hosts needing
+the direct runtime/object APIs use the low-level SDK factory with a matching
+Wasm and package set. See
 [SDK acquisition](PACKAGES.md#install-the-browser-sdk) for its prerequisites.
 Official support still follows the [support scope](../SUPPORT.md) within each
 interface; experimental providers remain experimental in either distribution.

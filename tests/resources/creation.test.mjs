@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { afterEach, mock } from "node:test";
+import { prepareRuntime } from "../../web/src/vir-runtime.js";
 import { build } from "esbuild";
 import { readFileSync } from "node:fs";
 import {
@@ -52,6 +53,15 @@ const expected = () => ({
   "Root.run": { args: [], result: { ...nat }, effect: "pure" },
 });
 const runtimeNotices = ["LICENSE", "NOTICE", "legal/lean.txt", "legal/dependencies.txt"];
+afterEach(() => mock.restoreAll());
+
+// Real compilable Wasm for the byte route. Only URL instance/package boundaries
+// are modeled; the public envelope/hash/compatibility checks run on both routes.
+const runtimeWasm = Uint8Array.of(
+  0, 97, 115, 109, 1, 0, 0, 0,
+  5, 3, 1, 0, 1,
+  7, 10, 1, 6, 109, 101, 109, 111, 114, 121, 2, 0,
+);
 
 test("the documented independent contract creates a program through the public loader", async () =>
   fixture(async (s) => {
@@ -180,7 +190,7 @@ async function fixture(body) {
       kind === "runtime"
         ? [
             ["runtime.js", "export {}", "text/javascript"],
-            ["runtime.wasm", "wasm", "application/wasm"],
+            ["runtime.wasm", runtimeWasm, "application/wasm"],
             ...runtimeNotices.map((path) => [path, `notice for ${path}`, "text/plain"]),
           ]
         : [["set.json", "{}", "application/json"]];
@@ -191,7 +201,7 @@ async function fixture(body) {
       compatibility,
       files: await Promise.all(
         files.map(async ([path, text, mediaType]) => {
-          const bytes = new TextEncoder().encode(text);
+          const bytes = typeof text === "string" ? new TextEncoder().encode(text) : text;
           inventory.set(`/${kind}/${path}`, { bytes, mediaType });
           return {
             path,
@@ -241,7 +251,7 @@ async function fixture(body) {
         async fetchIrPackageSet() {
           return { members: [{ bytes: new Uint8Array() }] };
         },
-        async createRuntime() {
+        async instantiate() {
           state.instances++;
           started.resolve();
           return creation.promise;
@@ -250,6 +260,7 @@ async function fixture(body) {
     },
     runtime: {
       failure: null,
+      installIrPackageSetBytes() {},
       interfaceManifest: {
         exports: [
           structuredClone(entry),
@@ -310,6 +321,78 @@ function trackedController() {
     return remove(name, listener);
   };
   return { controller, listeners };
+}
+
+// Expectations come from RESOURCE_BUNDLES.md's public error contract, not an
+// implementation classification helper. Run the same faults through both APIs.
+const errorContract = [
+  { fault: "envelope-id", phase: "integrity", cause: /CONTENT_ID_MISMATCH/ },
+  { fault: "envelope-shape", phase: "integrity", cause: /INVALID_DESCRIPTOR/ },
+  { fault: "wasm-length", phase: "integrity", cause: /inventory|integrity/ },
+  { fault: "wasm-digest", phase: "integrity", cause: /inventory|integrity/ },
+  { fault: "profile", phase: "compatibility", cause: /unsupported resource runtime compatibility/ },
+  { fault: "hash-failure", phase: "integrity" },
+  { fault: "preabort", phases: { url: "runtime-manifest", bytes: "runtime-creation" }, name: "AbortError" },
+];
+for (const route of ["url", "bytes"]) {
+  for (const contract of errorContract) {
+    test(`${route} public error contract: ${contract.fault}`, async () => fixture(async s => {
+      const runtime = await s.respond("http://vir.test/runtime/bundle.json").json();
+      const program = await s.respond("http://vir.test/program/bundle.json").json();
+      let expectedRuntimeContentId = runtime.contentId;
+      let wasm = Uint8Array.from(runtimeWasm);
+      const primary = new Error("private dependency failure");
+      const controller = new AbortController();
+      switch (contract.fault) {
+        case "envelope-id": runtime.contentId = "0".repeat(64); break;
+        case "envelope-shape": delete runtime.descriptor.files; break;
+        case "wasm-length": wasm = wasm.slice(0, -1); break;
+        case "wasm-digest":
+          wasm[12] = 2; // Another valid module, with two initial memory pages.
+          assert.ok(WebAssembly.validate(wasm), "integrity refusal must not rely on compilation failure");
+          break;
+        case "profile":
+          for (const envelope of [runtime, program]) {
+            envelope.descriptor.compatibility.virVersion += 1;
+            envelope.contentId = await descriptorContentId(envelope.descriptor);
+          }
+          expectedRuntimeContentId = runtime.contentId;
+          break;
+        case "hash-failure": mock.method(crypto.subtle, "digest", async () => { throw primary; }); break;
+        case "preabort": controller.abort(primary); break;
+        default: throw new Error(`unhandled contract fault ${contract.fault}`);
+      }
+      s.fetchOverride = async url => {
+        const path = new URL(url).pathname;
+        if (path === "/runtime/runtime.wasm")
+          return new Response(wasm, { headers: { "content-type": "application/wasm" } });
+        const envelope = path === "/runtime/bundle.json" ? runtime
+          : path === "/program/bundle.json" ? program : null;
+        return envelope ? new Response(JSON.stringify(envelope), { headers: { "content-type": "application/json" } })
+          : s.respond(url);
+      };
+      let providers = 0;
+      const pending = route === "url"
+        ? createProgram({ ...s.options, signal: controller.signal })
+        : prepareRuntime({ wasmBytes: wasm, runtimeManifest: runtime, expectedRuntimeContentId,
+          signal: controller.signal, defaultHostBindings: () => { providers++; return {}; } });
+      await assert.rejects(pending, error => {
+        const phase = contract.phases?.[route] ?? contract.phase;
+        assert.equal(error.name, contract.name ?? "Error");
+        assert.equal(error.phase, phase);
+        assert.equal(error.message, `${route === "url" ? "program creation" : "runtime preparation"} failed during ${phase}`);
+        assert.ok(error.cause instanceof Error);
+        assert.ok(Object.isFrozen(error.context));
+        if (contract.cause) assert.match(error.cause.message, contract.cause);
+        if (["hash-failure", "preabort"].includes(contract.fault)) assert.equal(error.cause, primary);
+        assert.equal(error.message.includes(primary.message), false, "primary text does not expose dependency details");
+        return true;
+      });
+      assert.equal(s.instances, 0, "rejected artifacts never reach instantiation");
+      assert.equal(providers, 0);
+      if (contract.fault === "preabort") assert.equal(s.requests.length, 0);
+    }));
+  }
 }
 
 test("wrong ABI is rejected before runtime creation", async () =>
@@ -647,7 +730,7 @@ for (const order of [
         async fetchIrPackageSet() {
           return { members: [{ bytes: new Uint8Array() }] };
         },
-        async createRuntime() {
+        async instantiate() {
           const i = next++;
           starts[i].resolve();
           return attempts[i].promise;

@@ -100,6 +100,12 @@ This SDK contains the JavaScript runtime modules and wasm32-wasip1 interpreter
 for the matching lean_vir package revision.
 
 It exposes the direct runtime API for custom hosts and existing integrations.
+prepareRuntime verifies selected runtime bytes once and returns a reusable
+creator for owned programs from package bytes. It also needs the matching resource
+runtime bundle's generated envelope and independently selected content ID; this
+SDK archive does not include an envelope. See the resource lifecycle guide:
+https://github.com/ejgallego/lean-vir/blob/main/docs/guides/RESOURCE_LIFETIME.md
+
 The application resource workflow uses a separately prepared runtime.js loader
 with createProgram; that facade exposes status, call, callWith and dispose.
 Start ordinary applications with the complete resource example:
@@ -129,7 +135,7 @@ SDK host code should import the entry modules directly under js/:
   js/vir-host-bindings.js
   js/vir-react-host-bindings.js
 
-Nested js/runtime/, js/host/, and js/react/ modules are shipped so those entry
+Nested js/runtime/, js/resources/, js/host/, and js/react/ modules are shipped so those entry
 modules can resolve relative imports. They remain internal implementation
 modules and may change with the matching lean_vir revision.
 

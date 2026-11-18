@@ -47,10 +47,13 @@ See [matching runtime assets](../guides/JS_API.md#matching-runtime-assets).
 ## Supported runtime construction
 
 Resource applications use `createProgram` through the
-[application workflow](../guides/EMBEDDED_RESOURCES.md). Lower-level hosts create
-runtimes through `createVirRuntime`, `createVirRuntimeFactory` or the public
-`VirRuntimeFactory`. These paths always
-attach a `VirHostState`, including in Node and with null/empty binding maps.
+[application workflow](../guides/EMBEDDED_RESOURCES.md). Hosts with selected runtime
+and package bytes use SDK `prepareRuntime`, then its returned `createProgram`,
+through [in-memory admission](../guides/RESOURCE_LIFETIME.md#owned-programs-from-in-memory-bytes).
+Lower-level hosts create runtimes through `createVirRuntime`,
+`createVirRuntimeFactory` or the public
+`VirRuntimeFactory`. Each instance created through these paths has an attached
+`VirHostState`, including in Node and with null/empty binding maps.
 No application bindings does not mean no internal host state.
 
 The SDK ships nested modules to resolve its public entry points' relative imports;
