@@ -131,16 +131,12 @@ function packageBytes(
   output.set(json, cursor);
   return output;
 }
-async function envelope({
-  revision = "test-revision",
-  version = VIR_COMPATIBILITY_VERSION,
-  bytes = wasm,
-} = {}) {
+async function envelope({ bytes = wasm } = {}) {
   const descriptor = {
     schemaVersion: 2,
     logicalId: "test/runtime",
     kind: "runtime",
-    compatibility: { leanRevision: revision, virVersion: version },
+    compatibility: { leanRevision: "test-revision", virVersion: VIR_COMPATIBILITY_VERSION },
     files: [
       {
         path: "runtime.wasm",
@@ -163,7 +159,7 @@ async function envelope({
   return { descriptor, contentId: await descriptorContentId(descriptor) };
 }
 async function fixture(options = {}) {
-  const runtimeManifest = await envelope(options);
+  const runtimeManifest = await envelope();
   const wasmBytes = Uint8Array.from(wasm);
   const state = {
     started: deferred(),
@@ -491,15 +487,27 @@ test("preparation owns a late compiled module without initializing an aborted ru
   assert.equal(providers, 0);
 });
 
-test("pre-abort and modeled shared-owner late creation preserve primary abort and cleanup errors", async () => {
-  const h = await fixture(),
-    controller = new AbortController();
-  controller.abort("before");
+test("pre-aborted program creation does not read package or signature inputs", async () => {
+  const h = await fixture();
+  const reason = new Error("stopped before creation");
+  const packages = [packageBytes()];
+  const contracts = expected();
+  const reads = [];
   await assert.rejects(
-    h.open({ signal: controller.signal }),
-    (error) => error.name === "AbortError" && error.cause === "before",
+    h.runtime.createProgram({
+      signal: AbortSignal.abort(reason),
+      get irPackageSet() { reads.push("packages"); return packages; },
+      get expectedExports() { reads.push("signatures"); return contracts; },
+    }),
+    (error) => error.name === "AbortError" &&
+      error.phase === "program-validation" && error.cause === reason,
   );
+  assert.deepEqual(reads, []);
   assert.equal(h.state.initialized, 0);
+});
+
+test("modeled shared-owner late creation preserves primary abort and cleanup errors", async () => {
+  const h = await fixture();
   const late = deferred();
   // The shared owner also serves asynchronous URL instantiation. The prepared
   // factory's real instantiateModule is synchronous; only this boundary is modeled.

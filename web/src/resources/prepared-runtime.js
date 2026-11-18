@@ -34,6 +34,8 @@ function programCreator(factory, module, compatibility) {
       const { signal } = options;
       if (signal !== undefined && !(signal instanceof AbortSignal))
         throw new TypeError("signal must be an AbortSignal");
+      if (signal?.aborted)
+        throw creationError("program-validation", signal.reason, {}, "AbortError");
       let expected, packages;
       try {
         expected = snapshotExpectedExports(options.expectedExports);

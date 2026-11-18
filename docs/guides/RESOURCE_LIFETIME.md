@@ -34,7 +34,8 @@ const program = await createProgram({
 });
 ```
 
-The key is the full Lean declaration name from the
+`expectedExports` requires the named signatures. Every export declared by the
+root package remains callable. The key is the full Lean declaration name from the
 [existing greeting fixture](../../fixtures/resources/client/program/Client/Program.lean).
 For compound types, retain the existing complete interface representation from
 separately reviewed compiler output alongside the client's typed adapter. Do not
