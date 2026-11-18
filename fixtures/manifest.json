@@ -499,6 +499,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-string-slice-order",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.stringSliceOrderScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "boundary-primitive-nat-frontier",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.natPrimitiveFrontierScore",
